@@ -5,6 +5,26 @@ phpMyAdmin** (schéma complet dans [ARCHITECTURE.md](ARCHITECTURE.md#2-architect
 Render héberge uniquement l'application ; la base de données reste sur l'hébergement
 cPanel existant — jamais de MySQL local en production.
 
+## État actuel (déployé)
+
+| Élément | Valeur |
+|---|---|
+| URL publique | **https://geoarchives.ceiba-analytics.com** (CNAME GoDaddy → `colect-app.onrender.com`, certificat HTTPS Render automatique) |
+| Service Render | `colect-app`, plan **Starter** (disque persistant `documents` monté sur `/var/data/documents`) |
+| Base de données | cPanel (GoDaddy, `p3plzcpnl504395.prod.phx3.secureserver.net`), base **`col_invent`** |
+| Structure | Migrations appliquées (`prisma migrate deploy`), référentiel RBAC + statuts de workflow chargés via `prisma/seed-production-core.ts` (aucune donnée fictive) |
+| Compte admin | 1 compte réel créé via `scripts/create-user.ts` |
+| Restant | Communes/lotissements/natures de dossier réels non encore chargés (0) — à fournir avant utilisation réelle de la Collecte |
+
+**Piège rencontré et corrigé** : le premier build Render a échoué (`Build failed`, erreur PostCSS sur
+`globals.css`). Cause : la variable d'environnement `NODE_ENV=production` posée dans Render
+affecte aussi `npm install`, qui saute alors les `devDependencies` — or `tailwindcss`,
+`@tailwindcss/postcss`, `typescript` et `prisma` en font partie et sont nécessaires pour
+*construire* l'app (pas seulement l'exécuter). Corrigé en changeant le **Build Command** Render en :
+```
+npm install --include=dev && npm run build
+```
+
 ## 0. Checklist avant de commencer
 
 - [ ] Code poussé sur un dépôt GitHub (`main` protégée, déploiements depuis une branche
@@ -115,9 +135,14 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 
 1. Render → **New → Web Service** → connecter le dépôt GitHub.
 2. Runtime : **Node**.
-3. Build command : `npm install && npm run build`
+3. Build command : `npm install --include=dev && npm run build`
    (`@prisma/client` déclenche automatiquement `prisma generate` via son propre
-   `postinstall` lors de `npm install` — aucune étape manuelle supplémentaire).
+   `postinstall` lors de `npm install` — aucune étape manuelle supplémentaire.
+   `--include=dev` est **nécessaire** : `NODE_ENV=production` étant posé en
+   variable d'environnement Render — section 2 — `npm install` sauterait sinon
+   les `devDependencies`, qui incluent pourtant `tailwindcss`/`typescript`/
+   `prisma`, indispensables pour *construire* l'app. Bug réel rencontré au
+   premier déploiement — voir « État actuel » en tête de ce document.)
 4. Start command : `npm run start`
 5. Health check path : **`/api/health`** (route publique ajoutée en Phase 15 — vérifie
    une vraie connexion base, pas seulement que le process répond, voir
@@ -166,9 +191,29 @@ Avant la mise en production réelle, deux options :
 3. Vérification post-migration : `npm run db:verify` (contre `DATABASE_URL` de prod)
    confirme tables, vues de reporting et référentiels attendus.
 
-## 6. Vérification post-déploiement
+## 6. Domaine personnalisé (optionnel)
 
-- [ ] `GET https://<votre-app>.onrender.com/api/health` → `{ "status": "ok", "database": "up", ... }`
+Pour faire pointer un sous-domaine existant (registrar quelconque, ex. GoDaddy) vers
+Render au lieu d'utiliser l'URL `*.onrender.com` :
+
+1. **Préférer un sous-domaine** (`app.mondomaine.com`, `geoarchives.mondomaine.com`...)
+   plutôt que le domaine racine si celui-ci héberge déjà un autre site — éviter tout
+   conflit avec l'existant.
+2. Render → service → **Settings → Custom Domains → Add Custom Domain** → saisir le
+   sous-domaine choisi. Render affiche l'enregistrement **CNAME** à créer (hostname =
+   le sous-domaine seul, valeur = `<nom-service>.onrender.com`).
+3. Chez le registrar (DNS du domaine) : ajouter ce CNAME. **Vérifier au préalable
+   qu'aucun enregistrement n'existe déjà sous ce nom** (A, CNAME ou autre) — un DNS
+   n'autorise pas deux enregistrements sur le même nom ; en cas de conflit, soit
+   supprimer l'ancien enregistrement (si inutilisé), soit choisir un autre nom de
+   sous-domaine.
+4. Propagation généralement rapide (quelques minutes à quelques heures, jusqu'à 24-48h
+   annoncées par certains registrars) — Render vérifie et émet le certificat HTTPS
+   automatiquement une fois le DNS résolu.
+
+## 7. Vérification post-déploiement
+
+- [ ] `GET https://<votre-domaine>/api/health` → `{ "status": "ok", "database": "up", ... }`
 - [ ] `/login` accessible, connexion avec un compte réel fonctionne
 - [ ] Cookie de session envoyé avec `Secure` (vérifier dans les DevTools réseau —
       nécessite HTTPS, automatique sur Render)
@@ -177,7 +222,7 @@ Avant la mise en production réelle, deux options :
 - [ ] `/administration/audit` (si permission) montre bien les événements de connexion
 - [ ] Export CSV/XLSX fonctionne (valide l'accès disque temporaire pour `exceljs`)
 
-## 7. Points de sécurité spécifiques à la mise en production
+## 8. Points de sécurité spécifiques à la mise en production
 
 Repris et complétés depuis [SECURITY.md](SECURITY.md) :
 
@@ -193,7 +238,7 @@ Repris et complétés depuis [SECURITY.md](SECURITY.md) :
 - **HTTPS** : automatique sur Render (certificat géré) — aucune action requise, mais
   vérifier que l'URL finale utilisée par les utilisateurs est bien en `https://`.
 
-## 8. Rollback
+## 9. Rollback
 
 Render conserve l'historique des déploiements (**Render → service → Deploys**) —
 revenir à un déploiement précédent est un clic. Ceci ne rejoue **aucune** migration en
