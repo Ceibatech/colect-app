@@ -1,0 +1,125 @@
+"use client";
+
+import type { UseFormReturn } from "react-hook-form";
+import { Controller } from "react-hook-form";
+import type { DossierFormValues } from "@/lib/validation/dossier";
+import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface CommuneWithLotissements {
+  id: number;
+  nom: string;
+  lotissements: { id: number; nom: string }[];
+}
+
+export function StepFoncier({
+  form,
+  communes,
+}: {
+  form: UseFormReturn<DossierFormValues>;
+  communes: CommuneWithLotissements[];
+}) {
+  const { register, control, watch, setValue, formState } = form;
+  const errors = formState.errors;
+  const communeId = watch("communeId");
+  const selectedCommune = communes.find((c) => c.id === communeId);
+
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field>
+        <FieldLabel>N° îlot</FieldLabel>
+        <FieldContent>
+          <Input {...register("numeroIlot")} />
+          <FieldError errors={[errors.numeroIlot]} />
+        </FieldContent>
+      </Field>
+
+      <Field>
+        <FieldLabel>N° lot</FieldLabel>
+        <FieldContent>
+          <Input {...register("numeroLot")} />
+          <FieldError errors={[errors.numeroLot]} />
+        </FieldContent>
+      </Field>
+
+      <Field>
+        <FieldLabel>Superficie (m²)</FieldLabel>
+        <FieldContent>
+          <Input type="number" step="0.01" min="0" {...register("superficie")} />
+          <FieldError errors={[errors.superficie]} />
+        </FieldContent>
+      </Field>
+
+      <Field>
+        <FieldLabel>N° titre foncier</FieldLabel>
+        <FieldContent>
+          <Input {...register("numeroTitreFoncier")} />
+          <FieldError errors={[errors.numeroTitreFoncier]} />
+        </FieldContent>
+      </Field>
+
+      <Field>
+        <FieldLabel>Commune</FieldLabel>
+        <FieldContent>
+          <Controller
+            control={control}
+            name="communeId"
+            render={({ field }) => (
+              <Select
+                items={communes.map((c) => ({ label: c.nom, value: c.id }))}
+                value={field.value ?? null}
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  setValue("lotissementId", undefined);
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sélectionner une commune" />
+                </SelectTrigger>
+                <SelectContent>
+                  {communes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError errors={[errors.communeId]} />
+        </FieldContent>
+      </Field>
+
+      <Field>
+        <FieldLabel>Lotissement</FieldLabel>
+        <FieldContent>
+          <Controller
+            control={control}
+            name="lotissementId"
+            render={({ field }) => (
+              <Select
+                items={(selectedCommune?.lotissements ?? []).map((l) => ({ label: l.nom, value: l.id }))}
+                value={field.value ?? null}
+                onValueChange={field.onChange}
+                disabled={!selectedCommune}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder={selectedCommune ? "Sélectionner un lotissement" : "Choisir d'abord une commune"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedCommune?.lotissements.map((l) => (
+                    <SelectItem key={l.id} value={l.id}>
+                      {l.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          <FieldError errors={[errors.lotissementId]} />
+        </FieldContent>
+      </Field>
+    </div>
+  );
+}

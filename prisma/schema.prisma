@@ -1,0 +1,665 @@
+// ================================================================
+// PRISMA SCHEMA — GeoArchives-MULCV : collecte, numérisation, indexation
+// et archivage
+//
+// Base cible : MySQL / MariaDB (port 3306)
+// Provider ORM : Prisma 6.x (generator classique "prisma-client-js")
+//
+// Conventions :
+// - Modèles en PascalCase (idiomatique Prisma/TS), tables mappées en
+//   snake_case via @@map pour respecter exactement les noms de tables
+//   demandés dans le cahier des charges (section 9).
+// - Champs en camelCase, colonnes mappées en snake_case via @map.
+// ================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ================================================================
+// RBAC — ROLES / PERMISSIONS
+// ================================================================
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique // ADMIN | SUPERVISEUR | OPERATEUR | CONSULTATION
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users           User[]
+  rolePermissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           Int      @id @default(autoincrement())
+  roleId       Int      @map("role_id")
+  permissionId Int      @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+// ================================================================
+// UTILISATEURS / OPÉRATEURS
+// ================================================================
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  roleId       Int       @map("role_id")
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  role Role @relation(fields: [roleId], references: [id])
+
+  operateur           Operateur?
+  dossierHistory      DossierHistory[]
+  workflowTransitions WorkflowTransition[]
+  documentsUploaded   Document[]           @relation("DocumentUploadedBy")
+  qualityChecks       QualityCheck[]
+  anomaliesCorrected  Anomalie[]           @relation("AnomalieCorrigePar")
+  imports             Import[]
+  exports             Export[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+
+  @@index([roleId])
+  @@map("users")
+}
+
+// NOTE ARCHITECTURE (choix technique documenté) :
+// Une table `operateurs` séparée de `users` est conservée car le cahier
+// des charges y fait référence explicitement comme clé étrangère sur
+// dossiers/numerisations/indexations/archivages (section 9), et un
+// opérateur métier (matricule, nom terrain) peut exister sans compte de
+// connexion actif. La relation user_id reste optionnelle pour couvrir
+// ce cas ; en usage normal 1 utilisateur OPERATEUR = 1 fiche opérateur.
+model Operateur {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @unique @map("user_id")
+  matricule String   @unique
+  nom       String
+  prenoms   String?
+  telephone String?
+  email     String?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  dossiers      Dossier[]
+  numerisations Numerisation[]
+  indexations   Indexation[]
+  archivages    Archivage[]
+
+  @@map("operateurs")
+}
+
+// ================================================================
+// RÉFÉRENTIELS
+// ================================================================
+
+model Commune {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  nom         String
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  lotissements Lotissement[]
+  dossiers     Dossier[]
+
+  @@map("communes")
+}
+
+model Lotissement {
+  id          Int      @id @default(autoincrement())
+  communeId   Int      @map("commune_id")
+  code        String   @unique
+  nom         String
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  commune  Commune   @relation(fields: [communeId], references: [id])
+  dossiers Dossier[]
+
+  @@index([communeId])
+  @@map("lotissements")
+}
+
+model NatureDossier {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  libelle     String
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  dossiers Dossier[]
+
+  @@map("natures_dossier")
+}
+
+// ================================================================
+// WORKFLOW (configuration + traçabilité des transitions)
+// ================================================================
+
+enum WorkflowType {
+  COLLECTE
+  VALIDATION
+  NUMERISATION
+  INDEXATION
+  ARCHIVAGE
+}
+
+model WorkflowStatus {
+  id           Int          @id @default(autoincrement())
+  workflowType WorkflowType @map("workflow_type")
+  code         String
+  libelle      String
+  ordre        Int
+  isFinal      Boolean      @default(false) @map("is_final")
+  isActive     Boolean      @default(true) @map("is_active")
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  @@unique([workflowType, code])
+  @@map("workflow_statuses")
+}
+
+model WorkflowTransition {
+  id           Int          @id @default(autoincrement())
+  dossierId    Int          @map("dossier_id")
+  workflowType WorkflowType @map("workflow_type")
+  fromStatus   String?      @map("from_status")
+  toStatus     String       @map("to_status")
+  userId       Int?         @map("user_id")
+  commentaire  String?      @db.Text
+  createdAt    DateTime     @default(now()) @map("created_at")
+
+  dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([dossierId, workflowType])
+  @@index([userId])
+  @@map("workflow_transitions")
+}
+
+model DossierHistory {
+  id            Int      @id @default(autoincrement())
+  dossierId     Int      @map("dossier_id")
+  userId        Int?     @map("user_id")
+  action        String
+  ancienStatut  String?  @map("ancien_statut")
+  nouveauStatut String?  @map("nouveau_statut")
+  commentaire   String?  @db.Text
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+
+  @@index([dossierId, createdAt])
+  @@index([userId])
+  @@map("dossier_history")
+}
+
+// ================================================================
+// DOSSIER — table centrale
+// ================================================================
+
+enum StatutCollecte {
+  BROUILLON
+  SOUMIS
+}
+
+enum StatutValidation {
+  EN_ATTENTE
+  EN_CONTROLE
+  VALIDE
+  REJETE
+}
+
+enum StatutNumerisation {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+}
+
+enum StatutIndexation {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+}
+
+enum StatutArchivage {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+}
+
+model Dossier {
+  id Int @id @default(autoincrement())
+
+  // Référence unique générée automatiquement : DOS-2026-000001
+  reference String @unique
+
+  operateurId Int @map("operateur_id")
+
+  // --- IDENTIFICATION (fiche CG1020) ---
+  libelleCarton       String? @map("libelle_carton")
+  codeBarres          String? @unique @map("code_barres")
+  numeroGuichet       String? @map("numero_guichet")
+  numeroDdu           String? @map("numero_ddu")
+  referenceClassement String? @map("reference_classement")
+
+  // --- INFORMATIONS FONCIÈRES (fiche CG1020) ---
+  numeroIlot         String?  @map("numero_ilot")
+  numeroLot          String?  @map("numero_lot")
+  superficie         Decimal? @db.Decimal(12, 2)
+  numeroTitreFoncier String?  @map("numero_titre_foncier")
+
+  communeId     Int? @map("commune_id")
+  lotissementId Int? @map("lotissement_id")
+
+  // --- DOSSIER (fiche CG1020) ---
+  natureDossierId Int? @map("nature_dossier_id")
+
+  // --- TITULAIRE (fiche CG1020) ---
+  nom       String?
+  prenoms   String?
+  adresse   String? @db.Text
+  telephone String?
+  email     String?
+
+  // --- CONTACT (fiche CG1020) ---
+  personneContact String? @map("personne_contact")
+  mobile          String?
+
+  // --- SUIVI APPLICATIF (ajouté pour la gestion du processus métier) ---
+  statutCollecte     StatutCollecte     @default(BROUILLON) @map("statut_collecte")
+  statutValidation   StatutValidation   @default(EN_ATTENTE) @map("statut_validation")
+  statutNumerisation StatutNumerisation @default(EN_ATTENTE) @map("statut_numerisation")
+  statutIndexation   StatutIndexation   @default(EN_ATTENTE) @map("statut_indexation")
+  statutArchivage    StatutArchivage    @default(EN_ATTENTE) @map("statut_archivage")
+
+  dateSoumission   DateTime? @map("date_soumission")
+  dateValidation   DateTime? @map("date_validation")
+  dateNumerisation DateTime? @map("date_numerisation")
+  dateIndexation   DateTime? @map("date_indexation")
+  dateArchivage    DateTime? @map("date_archivage")
+
+  nombrePages  Int?
+  observations String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  operateur     Operateur      @relation(fields: [operateurId], references: [id])
+  commune       Commune?       @relation(fields: [communeId], references: [id])
+  lotissement   Lotissement?   @relation(fields: [lotissementId], references: [id])
+  natureDossier NatureDossier? @relation(fields: [natureDossierId], references: [id])
+
+  documents           Document[]
+  numerisations       Numerisation[]
+  indexations         Indexation[]
+  archivages          Archivage[]
+  qualityChecks       QualityCheck[]
+  anomalies           Anomalie[]
+  workflowTransitions WorkflowTransition[]
+  history             DossierHistory[]
+
+  @@index([numeroDdu])
+  @@index([numeroGuichet])
+  @@index([referenceClassement])
+  @@index([numeroIlot])
+  @@index([numeroLot])
+  @@index([numeroTitreFoncier])
+  @@index([communeId])
+  @@index([lotissementId])
+  @@index([natureDossierId])
+  @@index([operateurId])
+  @@index([statutCollecte])
+  @@index([statutValidation])
+  @@index([statutNumerisation])
+  @@index([statutIndexation])
+  @@index([statutArchivage])
+  @@index([createdAt])
+  @@index([communeId, statutArchivage])
+  @@index([operateurId, statutValidation])
+  @@map("dossiers")
+}
+
+// ================================================================
+// DOCUMENTS
+// ================================================================
+
+enum StorageProvider {
+  LOCAL
+  CPANEL
+  S3
+  OTHER
+}
+
+model Document {
+  id              Int             @id @default(autoincrement())
+  dossierId       Int             @map("dossier_id")
+  nomFichier      String          @map("nom_fichier")
+  nomOriginal     String          @map("nom_original")
+  typeMime        String          @map("type_mime")
+  extension       String
+  taille          Int // octets
+  url             String          @db.Text
+  storageProvider StorageProvider @default(LOCAL) @map("storage_provider")
+  hash            String?
+  nombrePages     Int?            @map("nombre_pages")
+  uploadedBy      Int?            @map("uploaded_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  dossier  Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  uploader User?   @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
+
+  @@index([dossierId])
+  @@index([hash])
+  @@map("documents")
+}
+
+// ================================================================
+// NUMÉRISATION / INDEXATION / ARCHIVAGE (historique des opérations)
+// ================================================================
+
+enum OperationStatut {
+  EN_COURS
+  TERMINEE
+  ANNULEE
+}
+
+enum NiveauQualite {
+  BONNE
+  MOYENNE
+  FAIBLE
+}
+
+model Numerisation {
+  id          Int             @id @default(autoincrement())
+  dossierId   Int             @map("dossier_id")
+  operateurId Int?            @map("operateur_id")
+  dateDebut   DateTime?       @map("date_debut")
+  dateFin     DateTime?       @map("date_fin")
+  nombrePages Int?            @map("nombre_pages")
+  statut      OperationStatut @default(EN_COURS)
+  qualite     NiveauQualite?
+  commentaire String?         @db.Text
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  dossier   Dossier    @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  operateur Operateur? @relation(fields: [operateurId], references: [id])
+
+  @@index([dossierId])
+  @@index([operateurId])
+  @@map("numerisations")
+}
+
+model Indexation {
+  id           Int             @id @default(autoincrement())
+  dossierId    Int             @map("dossier_id")
+  operateurId  Int?            @map("operateur_id")
+  dateDebut    DateTime?       @map("date_debut")
+  dateFin      DateTime?       @map("date_fin")
+  statut       OperationStatut @default(EN_COURS)
+  scoreQualite Int?            @map("score_qualite") // 0-100
+  commentaire  String?         @db.Text
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  dossier   Dossier    @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  operateur Operateur? @relation(fields: [operateurId], references: [id])
+
+  @@index([dossierId])
+  @@index([operateurId])
+  @@map("indexations")
+}
+
+model Archivage {
+  id                 Int             @id @default(autoincrement())
+  dossierId          Int             @map("dossier_id")
+  operateurId        Int?            @map("operateur_id")
+  dateArchivage      DateTime?       @map("date_archivage")
+  emplacement        String?
+  referenceArchivage String?         @map("reference_archivage")
+  statut             OperationStatut @default(EN_COURS)
+  commentaire        String?         @db.Text
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  dossier   Dossier    @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  operateur Operateur? @relation(fields: [operateurId], references: [id])
+
+  @@index([dossierId])
+  @@index([operateurId])
+  @@map("archivages")
+}
+
+// ================================================================
+// CONTRÔLE QUALITÉ / ANOMALIES
+// ================================================================
+
+enum QualityCheckStatut {
+  CONFORME
+  NON_CONFORME
+  A_CORRIGER
+}
+
+model QualityCheck {
+  id              Int                @id @default(autoincrement())
+  dossierId       Int                @map("dossier_id")
+  userId          Int?               @map("user_id")
+  typeControle    String             @map("type_controle")
+  score           Int? // 0-100
+  statut          QualityCheckStatut
+  nombreAnomalies Int                @default(0) @map("nombre_anomalies")
+  commentaire     String?            @db.Text
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  dossier   Dossier    @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  user      User?      @relation(fields: [userId], references: [id])
+  anomalies Anomalie[]
+
+  @@index([dossierId])
+  @@index([userId])
+  @@map("quality_checks")
+}
+
+enum AnomalieType {
+  CHAMP_MANQUANT
+  DOUBLON
+  FORMAT_INVALIDE
+  INCOHERENCE
+  ERREUR_SAISIE
+  DOCUMENT_MANQUANT
+  AUTRE
+}
+
+enum AnomalieGravite {
+  FAIBLE
+  MOYENNE
+  ELEVEE
+  CRITIQUE
+}
+
+enum AnomalieStatut {
+  OUVERTE
+  EN_COURS
+  CORRIGEE
+  IGNOREE
+}
+
+model Anomalie {
+  id             Int             @id @default(autoincrement())
+  dossierId      Int             @map("dossier_id")
+  qualityCheckId Int?            @map("quality_check_id")
+  type           AnomalieType
+  champ          String?
+  description    String?         @db.Text
+  gravite        AnomalieGravite
+  statut         AnomalieStatut  @default(OUVERTE)
+  corrigePar     Int?            @map("corrige_par")
+  corrigeLe      DateTime?       @map("corrige_le")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  dossier      Dossier       @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  qualityCheck QualityCheck? @relation(fields: [qualityCheckId], references: [id])
+  correcteur   User?         @relation("AnomalieCorrigePar", fields: [corrigePar], references: [id])
+
+  @@index([dossierId])
+  @@index([qualityCheckId])
+  @@index([gravite])
+  @@index([statut])
+  @@map("anomalies")
+}
+
+// ================================================================
+// IMPORT / EXPORT
+// ================================================================
+
+enum ImportFileType {
+  CSV
+  XLSX
+}
+
+enum ImportStatut {
+  EN_COURS
+  TERMINE
+  ECHEC
+  ANNULE
+}
+
+model Import {
+  id              Int            @id @default(autoincrement())
+  userId          Int            @map("user_id")
+  nomFichier      String         @map("nom_fichier")
+  typeFichier     ImportFileType @map("type_fichier")
+  nombreLignes    Int?           @map("nombre_lignes")
+  nombreValides   Int?           @map("nombre_valides")
+  nombreInvalides Int?           @map("nombre_invalides")
+  nombreDoublons  Int?           @map("nombre_doublons")
+  nombreImportes  Int?           @map("nombre_importes")
+  statut          ImportStatut   @default(EN_COURS)
+  erreurs         Json?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  completedAt     DateTime?      @map("completed_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("imports")
+}
+
+model Export {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  typeExport   String   @map("type_export")
+  filtres      Json?
+  nombreLignes Int?     @map("nombre_lignes")
+  fichier      String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("exports")
+}
+
+// ================================================================
+// AUDIT / NOTIFICATIONS / PARAMÈTRES
+// ================================================================
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  action    String
+  entity    String
+  entityId  Int?     @map("entity_id")
+  oldValue  Json?    @map("old_value")
+  newValue  Json?    @map("new_value")
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  type      String
+  titre     String
+  message   String    @db.Text
+  isRead    Boolean   @default(false) @map("is_read")
+  createdAt DateTime  @default(now()) @map("created_at")
+  readAt    DateTime? @map("read_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model Setting {
+  id          Int      @id @default(autoincrement())
+  key         String   @unique
+  value       String?  @db.Text // JSON sérialisé si nécessaire
+  description String?  @db.Text
+  isPublic    Boolean  @default(false) @map("is_public")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}

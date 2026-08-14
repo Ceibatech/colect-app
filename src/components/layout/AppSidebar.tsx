@@ -1,0 +1,108 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Archive } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarRail,
+} from "@/components/ui/sidebar";
+import { NAV_ITEMS, type NavItem } from "@/config/navigation";
+import type { PermissionCode } from "@/lib/permissions/constants";
+
+function isActive(pathname: string, href: string) {
+  return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+export function AppSidebar({ permissions }: { permissions: PermissionCode[] }) {
+  const pathname = usePathname();
+  const visibleItems = NAV_ITEMS.filter((item) => permissions.includes(item.permission));
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <div className="flex items-center gap-2 px-2 py-1.5">
+          <Archive className="h-5 w-5 shrink-0 text-primary" />
+          <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="text-sm font-semibold">GeoArchives-MULCV</span>
+            <span className="text-xs text-muted-foreground">Numérisation &amp; Indexation</span>
+          </div>
+        </div>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {visibleItems.map((item) => (
+                <NavEntry key={item.href} item={item} pathname={pathname} permissions={permissions} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <div className="px-2 py-1 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+          GeoArchives-MULCV © 2026
+        </div>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  );
+}
+
+function NavEntry({ item, pathname, permissions }: { item: NavItem; pathname: string; permissions: PermissionCode[] }) {
+  const children = item.children?.filter((c) => permissions.includes(c.permission));
+  const active = isActive(pathname, item.href);
+
+  const trigger = (
+    <SidebarMenuButton
+      isActive={active}
+      tooltip={item.title}
+      render={
+        <Link href={item.href}>
+          <item.icon />
+          <span>{item.title}</span>
+        </Link>
+      }
+    />
+  );
+
+  if (!children || children.length === 0) {
+    return <SidebarMenuItem>{trigger}</SidebarMenuItem>;
+  }
+
+  return (
+    <SidebarMenuItem>
+      {trigger}
+      <SidebarMenuSub>
+        {children.map((child) => (
+          <SidebarMenuSubItem key={child.href}>
+            <SidebarMenuSubButton
+              isActive={pathname === child.href}
+              render={
+                <Link href={child.href}>
+                  <span>{child.title}</span>
+                </Link>
+              }
+            />
+          </SidebarMenuSubItem>
+        ))}
+      </SidebarMenuSub>
+    </SidebarMenuItem>
+  );
+}
