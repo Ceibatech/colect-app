@@ -16,23 +16,83 @@ cPanel existant — jamais de MySQL local en production.
 
 ## 1. Base de données MySQL/MariaDB sur cPanel
 
-1. cPanel → **MySQL® Databases** → créer une base (le nom sera préfixé automatiquement
-   par cPanel, ex. `cpanelname_geoarchives`).
-2. Créer un utilisateur dédié (jamais l'utilisateur root cPanel) et l'associer à cette
-   base avec **tous les privilèges**.
-3. cPanel → **Accès distant MySQL®** (Remote MySQL) → autoriser l'IP sortante de
-   Render. Render n'a pas d'IP sortante fixe sur les plans standards : soit passer par
-   un plan Render avec IP statique, soit (plus courant en pratique chez les
-   hébergeurs mutualisés) autoriser `%` temporairement le temps du déploiement puis
-   restreindre, soit vérifier si l'hébergeur propose un accès restreint par nom
-   d'hôte. **À valider avec l'hébergeur cPanel** — ce point est spécifique à chaque
-   infogérance et ne peut pas être généralisé ici.
-4. Noter les informations de connexion : hôte MySQL distant (souvent différent de
-   `localhost`, ex. `serveurXX.hebergeur.com`), port `3306`, nom de base, utilisateur,
-   mot de passe → ils forment `DATABASE_URL` :
-   ```
-   mysql://UTILISATEUR:MOT_DE_PASSE@HOTE_DISTANT:3306/NOM_BASE
-   ```
+Ces étapes se font **dans l'interface cPanel de l'hébergeur** (identifiants cPanel —
+jamais à saisir ailleurs qu'à cet endroit). Le thème cPanel le plus courant
+("Jupiter") est décrit ci-dessous ; les libellés peuvent varier légèrement selon
+l'hébergeur mais les 4 outils utilisés (MySQL® Databases, Remote MySQL, phpMyAdmin)
+existent sur la quasi-totalité des cPanel.
+
+### 1.1 Créer la base
+
+cPanel → section **Databases** → **MySQL® Databases**.
+
+1. Champ **"New Database"** : saisir un nom court, ex. `geoarchives`. cPanel préfixe
+   automatiquement avec le nom du compte d'hébergement — le nom final ressemblera à
+   `moncompte_geoarchives` (c'est normal, il apparaîtra tel quel dans `DATABASE_URL`).
+2. Cliquer **"Create Database"**.
+
+### 1.2 Créer un utilisateur dédié
+
+Sur la même page, section **"MySQL Users" → "Add New User"** :
+
+1. **Username** : ex. `geoarchives_app` (deviendra `moncompte_geoarchives_app`).
+2. **Password** : générer un mot de passe fort (cPanel propose un générateur — l'utiliser
+   plutôt qu'en inventer un). **Noter ce mot de passe immédiatement**, il ne sera plus
+   affiché en clair ensuite.
+3. Cliquer **"Create User"**.
+
+⚠️ Ne jamais utiliser l'utilisateur MySQL "root"/principal du compte cPanel pour
+l'application — toujours un utilisateur dédié à privilèges limités à cette seule base.
+
+### 1.3 Associer l'utilisateur à la base
+
+Toujours sur la même page, section **"Add User To Database"** :
+
+1. **User** : sélectionner `moncompte_geoarchives_app`.
+2. **Database** : sélectionner `moncompte_geoarchives`.
+3. Cliquer **"Add"**.
+4. Sur l'écran de permissions qui s'affiche : cocher **"ALL PRIVILEGES"** (en haut de la
+   liste, coche toutes les cases d'un coup), puis **"Make Changes"**.
+
+### 1.4 Autoriser l'accès distant (Render → cPanel)
+
+cPanel → **Remote MySQL®** (parfois sous "Databases" aussi).
+
+1. Champ **"Host"** : dépend de ce que propose l'hébergeur pour Render (pas d'IP
+   sortante fixe sur les plans Render standards) :
+   - Si l'hébergeur permet de restreindre par nom d'hôte plutôt que par IP, l'utiliser.
+   - Sinon, `%` (tout hôte) est l'option la plus courante en pratique chez les
+     hébergeurs mutualisés — à n'utiliser qu'en connaissance de cause (l'accès reste
+     protégé par utilisateur/mot de passe MySQL, mais c'est moins restrictif qu'une IP
+     précise).
+   - Un plan Render avec IP sortante statique (offre payante) permet de restreindre
+     précisément — préférable si disponible.
+   **Ce choix dépend de la politique de l'hébergeur cPanel — à valider avec lui,
+   impossible à généraliser ici.**
+2. **"Add Host"**.
+
+### 1.5 Récupérer les informations de connexion
+
+cPanel affiche généralement le nom d'hôte MySQL distant dans **MySQL® Databases** ou
+dans les infos générales du compte (souvent **pas** `localhost` en accès distant — ex.
+`serveurXX.hebergeur.com` ou une IP dédiée). Port MySQL standard : `3306`.
+
+Avec compte `moncompte`, base `geoarchives`, utilisateur `geoarchives_app` :
+
+```
+DATABASE_URL="mysql://moncompte_geoarchives_app:MOT_DE_PASSE@serveurXX.hebergeur.com:3306/moncompte_geoarchives"
+```
+
+Remplacer `MOT_DE_PASSE` par le mot de passe généré en 1.2, et l'hôte/port par les
+valeurs réelles de l'hébergeur. **Cette chaîne complète est ta variable Render
+`DATABASE_URL`** (section 2 ci-dessous) — ne jamais la commiter dans le dépôt.
+
+### 1.6 phpMyAdmin
+
+cPanel → **phpMyAdmin** — accessible avec les identifiants cPanel eux-mêmes (pas ceux
+de l'utilisateur MySQL applicatif). Sert à consulter/vérifier directement le contenu de
+la base indépendamment de l'application — utile en section 6 (vérification
+post-déploiement).
 5. phpMyAdmin (accessible depuis cPanel) sert de client d'administration/consultation
    directe — utile pour vérifier l'état de la base indépendamment de l'application.
 
