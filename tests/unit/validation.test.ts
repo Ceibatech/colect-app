@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loginSchema } from "@/lib/validation/auth";
+import { loginSchema, changePasswordSchema } from "@/lib/validation/auth";
 import { dossierFormSchema, dossierSubmitSchema } from "@/lib/validation/dossier";
 
 describe("loginSchema", () => {
@@ -15,6 +15,43 @@ describe("loginSchema", () => {
   it("rejette un e-mail ou un mot de passe vide", () => {
     expect(loginSchema.safeParse({ email: "", password: "x" }).success).toBe(false);
     expect(loginSchema.safeParse({ email: "a@b.com", password: "" }).success).toBe(false);
+  });
+});
+
+describe("changePasswordSchema (self-service, Phase 15)", () => {
+  const valid = { currentPassword: "AncienMdp1", newPassword: "NouveauMdp1", confirmPassword: "NouveauMdp1" };
+
+  it("accepte un changement valide (nouveau ≥ 8 caractères, confirmation identique, différent de l'actuel)", () => {
+    expect(changePasswordSchema.safeParse(valid).success).toBe(true);
+  });
+
+  it("rejette un nouveau mot de passe de moins de 8 caractères", () => {
+    const result = changePasswordSchema.safeParse({ ...valid, newPassword: "Court1", confirmPassword: "Court1" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejette si la confirmation ne correspond pas au nouveau mot de passe", () => {
+    const result = changePasswordSchema.safeParse({ ...valid, confirmPassword: "Different1" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("confirmPassword"))).toBe(true);
+    }
+  });
+
+  it("rejette si le nouveau mot de passe est identique à l'actuel", () => {
+    const result = changePasswordSchema.safeParse({
+      currentPassword: "MemeMdp123",
+      newPassword: "MemeMdp123",
+      confirmPassword: "MemeMdp123",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.path.includes("newPassword"))).toBe(true);
+    }
+  });
+
+  it("rejette un mot de passe actuel vide", () => {
+    expect(changePasswordSchema.safeParse({ ...valid, currentPassword: "" }).success).toBe(false);
   });
 });
 

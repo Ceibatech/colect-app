@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { LogOut, User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -50,9 +51,9 @@ export function UserMenu({ name, email, roleCode }: { name: string; email: strin
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem render={<Link href="/compte" />}>
           <UserIcon className="mr-2 h-4 w-4" />
-          Mon profil (à venir)
+          Mon compte
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => logoutAction()}>

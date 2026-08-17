@@ -4,7 +4,9 @@ L'application expose deux types d'endpoints serveur :
 
 - **Server Actions** (Next.js) pour les flux formulaires internes à l'application
   (collecte : `saveDraft`, `submitDossier` — voir
-  [src/lib/services/dossier-service.ts](src/lib/services/dossier-service.ts)).
+  [src/lib/services/dossier-service.ts](src/lib/services/dossier-service.ts) ;
+  authentification : `loginAction`, `logoutAction`, `changePasswordAction` — voir
+  [src/lib/services/auth-service.ts](src/lib/services/auth-service.ts)).
   Non accessibles en HTTP direct, uniquement appelées depuis les composants React
   de l'application.
 - **Route Handlers REST** (`/api/...`) pour les actions de workflow (§61 du

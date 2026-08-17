@@ -3,11 +3,11 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/client";
-import { verifyPassword } from "@/lib/auth/password";
+import { verifyPassword, hashPassword } from "@/lib/auth/password";
 import { signSession, COOKIE_NAME, SESSION_DURATION_SECONDS } from "@/lib/auth/session";
 import { isRateLimited, registerFailedAttempt, clearAttempts } from "@/lib/auth/rate-limit";
-import { loginSchema } from "@/lib/validation/auth";
-import { getSession } from "@/lib/auth/current-user";
+import { loginSchema, changePasswordSchema } from "@/lib/validation/auth";
+import { getSession, requireUser } from "@/lib/auth/current-user";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
 export interface LoginFormState {
@@ -103,4 +103,55 @@ export async function logoutAction(): Promise<void> {
   }
 
   redirect("/login");
+}
+
+export interface ChangePasswordFormState {
+  error?: string;
+  success?: boolean;
+}
+
+/**
+ * Changement de mot de passe self-service (Phase 15) — n'importe quel
+ * utilisateur connecté change son propre mot de passe (contrairement à
+ * `scripts/create-user.ts`, réservé à un opérateur ayant un accès direct à
+ * la base). Revérifie le mot de passe actuel côté serveur avant tout
+ * changement — jamais de confiance dans le seul état du formulaire.
+ */
+export async function changePasswordAction(
+  _prevState: ChangePasswordFormState,
+  formData: FormData
+): Promise<ChangePasswordFormState> {
+  const session = await requireUser();
+
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  if (!user) {
+    return { error: "Utilisateur introuvable." };
+  }
+
+  const validCurrent = await verifyPassword(parsed.data.currentPassword, user.passwordHash);
+  if (!validCurrent) {
+    return { error: "Le mot de passe actuel est incorrect." };
+  }
+
+  const passwordHash = await hashPassword(parsed.data.newPassword);
+  const ip = await getClientIp();
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.auditLog.create({
+      data: { userId: user.id, action: "PASSWORD_CHANGE", entity: "USER", entityId: user.id, ipAddress: ip },
+    }),
+  ]);
+
+  return { success: true };
 }

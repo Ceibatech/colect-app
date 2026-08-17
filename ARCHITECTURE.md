@@ -284,9 +284,17 @@ entre `quality-scoring.ts` (pur) et `quality-service.ts` (`"use server"`) en Pha
 | 10 | Import / Export (Excel/CSV) | ✅ Fait — testé (aperçu, doublons, confirmation, export filtré) |
 | 11 | Documents | ✅ Fait — testé (upload, téléchargement, suppression, cloisonnement) |
 | 12 | Audit | ✅ Fait — testé (filtres, permissions, 21 événements réels vérifiés) |
-| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 58 tests unitaires (Vitest) + 53 tests API + 1 E2E complet (Playwright), voir [TESTING.md](TESTING.md) |
+| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 63 tests unitaires (Vitest) + 53 tests API + 2 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
 | 14 | Optimisation | ✅ Fait — requêtes dupliquées mémoïsées, fuite mémoire rate-limit corrigée, error.tsx ajouté, bug réel `loading.tsx`/`redirect()` trouvé et corrigé (retiré) |
-| 15 | Production (GitHub → Render → cPanel) | ✅ Fait — `GET /api/health`, [DEPLOYMENT.md](DEPLOYMENT.md), nettoyage `NEXTAUTH_URL` (variable morte) |
+| 15 | Production (GitHub → Render → cPanel) | ✅ Fait et **déployé en réel** — https://geoarchives.ceiba-analytics.com, base cPanel `col_invent`, voir [DEPLOYMENT.md](DEPLOYMENT.md) |
+
+**Post-déploiement (Phase 15+)** : écran self-service « Mon compte » (`/compte`,
+[ChangePasswordForm.tsx](src/components/account/ChangePasswordForm.tsx)) — tout
+utilisateur connecté peut changer son propre mot de passe (revérification du mot
+de passe actuel côté serveur, jamais de confiance dans le seul formulaire).
+Protégé uniquement par `requireUser()` (pas de permission dédiée : ce n'est pas
+une action administrative sur un tiers, à la différence de `USER_MANAGE`).
+Accessible depuis le menu utilisateur (`UserMenu.tsx`).
 
 ## 7. Préparation IA (V2, hors périmètre V1)
 
