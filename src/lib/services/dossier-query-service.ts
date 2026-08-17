@@ -52,6 +52,7 @@ export async function searchDossiers(filters: DossierSearchFilters, options: Dos
         { reference: { contains: q } },
         { codeBarres: { contains: q } },
         { numeroDdu: { contains: q } },
+        { numeroDirectionService: { contains: q } },
         { numeroGuichet: { contains: q } },
         { referenceClassement: { contains: q } },
         { numeroIlot: { contains: q } },

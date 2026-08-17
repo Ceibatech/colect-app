@@ -287,8 +287,13 @@ model Dossier {
   libelleCarton       String? @map("libelle_carton")
   codeBarres          String? @unique @map("code_barres")
   numeroGuichet       String? @map("numero_guichet")
-  numeroDdu           String? @map("numero_ddu")
-  referenceClassement String? @map("reference_classement")
+  // Anciennement "N° DDU" — repurposé en "Direction/Service concerné(e)"
+  // (liste fermée + "Autres" en saisie libre, cf. src/lib/validation/dossier.ts
+  // DIRECTION_SERVICE_OPTIONS). Nom de colonne conservé (numero_ddu) pour
+  // éviter une migration de renommage sur une colonne déjà en usage.
+  numeroDdu              String? @map("numero_ddu")
+  numeroDirectionService String? @map("numero_direction_service")
+  referenceClassement    String? @map("reference_classement")
 
   // --- INFORMATIONS FONCIÈRES (fiche CG1020) ---
   numeroIlot         String?  @map("numero_ilot")
@@ -347,6 +352,7 @@ model Dossier {
   history             DossierHistory[]
 
   @@index([numeroDdu])
+  @@index([numeroDirectionService])
   @@index([numeroGuichet])
   @@index([referenceClassement])
   @@index([numeroIlot])

@@ -1,6 +1,38 @@
 import { z } from "zod";
 
 /**
+ * Liste fermée des directions/services pouvant être concernés par un
+ * dossier (remplace l'ancien champ libre "N° DDU"). "AUTRES" n'est pas une
+ * valeur métier réelle : c'est un choix d'interface qui bascule le champ en
+ * saisie libre (cf. StepIdentification.tsx) — jamais stockée telle quelle.
+ */
+export const DIRECTION_SERVICE_OPTIONS = [
+  "GUF",
+  "DDU",
+  "DUDU",
+  "DGUF",
+  "DTC",
+  "GUPCCU",
+  "AGEF",
+  "SDA",
+  "SCPA",
+  "SBICU",
+  "DGCMA",
+  "DEMA",
+  "DCM",
+  "DMISSA",
+  "DGLCV",
+  "DICAF",
+  "DGLPI",
+  "DCCV",
+  "SALA",
+  "DARRU",
+  "ANAH",
+  "SONAPIE",
+  "DAJC",
+] as const;
+
+/**
  * Schéma "souple" utilisé par React Hook Form pendant la saisie (brouillon
  * inclus) : les formats sont vérifiés mais rien n'est obligatoire, pour ne
  * jamais bloquer un `Enregistrer brouillon`. Les champs obligatoires à la
@@ -18,7 +50,11 @@ export const dossierFormSchema = z.object({
   libelleCarton: z.string().max(255).optional().or(z.literal("")),
   codeBarres: z.string().max(100).optional().or(z.literal("")),
   numeroGuichet: z.string().max(50).optional().or(z.literal("")),
+  // Direction/Service concerné(e) — valeur de DIRECTION_SERVICE_OPTIONS ou
+  // texte libre si "Autres" est choisi à la saisie (pas de contrainte
+  // z.enum ici pour ne pas bloquer ce cas).
   numeroDdu: z.string().max(50).optional().or(z.literal("")),
+  numeroDirectionService: z.string().max(50).optional().or(z.literal("")),
   referenceClassement: z.string().max(150).optional().or(z.literal("")),
 
   // ÉTAPE 2 — Informations foncières
@@ -68,7 +104,7 @@ export const dossierSubmitSchema = dossierFormSchema.extend({
 });
 
 export const DOSSIER_STEPS = [
-  { id: 1, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "referenceClassement"] },
+  { id: 1, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement"] },
   { id: 2, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementId"] },
   { id: 3, title: "Dossier", fields: ["natureDossierId"] },
   { id: 4, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },

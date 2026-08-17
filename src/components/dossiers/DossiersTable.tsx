@@ -29,7 +29,7 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
           <TableRow>
             <TableHead>Référence</TableHead>
             <TableHead>Code-barres</TableHead>
-            <TableHead>N° DDU</TableHead>
+            <TableHead>Direction/Service</TableHead>
             <TableHead>Nom</TableHead>
             <TableHead>Prénoms</TableHead>
             <TableHead>Commune</TableHead>

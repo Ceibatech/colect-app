@@ -10,7 +10,7 @@ const FULL_DOSSIER: Partial<Dossier> = {
   libelleCarton: "Carton A-12",
   codeBarres: "1234567890",
   numeroGuichet: "G-01",
-  numeroDdu: "DDU-01",
+  numeroDdu: "GUF",
   referenceClassement: "REF-01",
   numeroIlot: "I-01",
   numeroLot: "L-01",

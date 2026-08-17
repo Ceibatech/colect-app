@@ -1,11 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
-import type { DossierFormValues } from "@/lib/validation/dossier";
+import { DIRECTION_SERVICE_OPTIONS, type DossierFormValues } from "@/lib/validation/dossier";
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+/** Sentinelle d'interface uniquement — jamais stockée (cf. dossier.ts). */
+const AUTRES = "__AUTRES__";
+
+const DIRECTION_SERVICE_ITEMS = [
+  ...DIRECTION_SERVICE_OPTIONS.map((code) => ({ label: code, value: code })),
+  { label: "Autres (préciser)", value: AUTRES },
+];
 
 interface Operateur {
   id: number;
@@ -87,11 +96,13 @@ export function StepIdentification({
         </FieldContent>
       </Field>
 
+      <DirectionServiceField form={form} />
+
       <Field>
-        <FieldLabel>N° DDU</FieldLabel>
+        <FieldLabel>Numéro Direction/Service</FieldLabel>
         <FieldContent>
-          <Input {...register("numeroDdu")} />
-          <FieldError errors={[errors.numeroDdu]} />
+          <Input {...register("numeroDirectionService")} />
+          <FieldError errors={[errors.numeroDirectionService]} />
         </FieldContent>
       </Field>
 
@@ -103,5 +114,75 @@ export function StepIdentification({
         </FieldContent>
       </Field>
     </div>
+  );
+}
+
+/**
+ * Direction/Service concerné(e) (anciennement "N° DDU") : liste fermée
+ * (DIRECTION_SERVICE_OPTIONS) + "Autres" qui bascule vers une saisie libre.
+ * L'état local `autres` ne stocke rien lui-même — il pilote seulement
+ * l'affichage ; la valeur réelle reste entièrement dans `numeroDdu` (form
+ * React Hook Form), y compris en mode "Autres". Réinitialisé à chaque
+ * montage à partir de la valeur courante du formulaire : robuste au
+ * démontage/remontage de cette étape quand on navigue entre les étapes du
+ * wizard (CollecteWizard ne garde que l'étape active montée).
+ */
+function DirectionServiceField({ form }: { form: UseFormReturn<DossierFormValues> }) {
+  const { control, formState } = form;
+  const errors = formState.errors;
+  const [autres, setAutres] = useState(() => {
+    const current = form.getValues("numeroDdu");
+    return !!current && !(DIRECTION_SERVICE_OPTIONS as readonly string[]).includes(current);
+  });
+
+  return (
+    <Field>
+      <FieldLabel>Direction/Service concerné(e)</FieldLabel>
+      <FieldContent>
+        <Controller
+          control={control}
+          name="numeroDdu"
+          render={({ field }) => (
+            <>
+              <Select
+                items={DIRECTION_SERVICE_ITEMS}
+                value={autres ? AUTRES : field.value || null}
+                onValueChange={(value) => {
+                  if (value === AUTRES) {
+                    setAutres(true);
+                    field.onChange("");
+                  } else {
+                    setAutres(false);
+                    field.onChange(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sélectionner une direction/service" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DIRECTION_SERVICE_ITEMS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {autres ? (
+                <Input
+                  value={field.value ?? ""}
+                  onChange={(e) => field.onChange(e.target.value)}
+                  onBlur={field.onBlur}
+                  placeholder="Préciser la direction/service"
+                  className="mt-2"
+                  autoFocus
+                />
+              ) : null}
+            </>
+          )}
+        />
+        <FieldError errors={[errors.numeroDdu]} />
+      </FieldContent>
+    </Field>
   );
 }

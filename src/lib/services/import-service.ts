@@ -22,6 +22,7 @@ export interface ImportRowData {
   codeBarres?: string;
   numeroGuichet?: string;
   numeroDdu?: string;
+  numeroDirectionService?: string;
   referenceClassement?: string;
   numeroIlot?: string;
   numeroLot?: string;
@@ -264,6 +265,7 @@ export async function confirmImport(userId: number, fileName: string, dataRows: 
             codeBarres: d.codeBarres || null,
             numeroGuichet: d.numeroGuichet || null,
             numeroDdu: d.numeroDdu || null,
+            numeroDirectionService: d.numeroDirectionService || null,
             referenceClassement: d.referenceClassement || null,
             numeroIlot: d.numeroIlot || null,
             numeroLot: d.numeroLot || null,

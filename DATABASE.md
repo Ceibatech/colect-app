@@ -41,12 +41,22 @@ le cahier des charges §9 à §32).
 Sur `dossiers`, seuls les champs suivants proviennent de la fiche papier **CG1020** :
 
 ```
-libelleCarton, codeBarres, numeroGuichet, numeroDdu, referenceClassement,
+libelleCarton, codeBarres, numeroGuichet, numeroDdu, numeroDirectionService, referenceClassement,
 numeroIlot, numeroLot, superficie, numeroTitreFoncier,
 communeId, lotissementId, natureDossierId,
 nom, prenoms, adresse, telephone, email,
 personneContact, mobile
 ```
+
+> **Note (Phase 15+)** : `numeroDdu` — anciennement libellé « N° DDU » (saisie libre) — a
+> été repurposé en **« Direction/Service concerné(e) »**, une liste fermée (voir
+> `DIRECTION_SERVICE_OPTIONS` dans `src/lib/validation/dossier.ts` : GUF, DDU, DUDU, DGUF,
+> DTC, GUPCCU, AGEF, SDA, SCPA, SBICU, DGCMA, DEMA, DCM, DMISSA, DGLCV, DICAF, DGLPI, DCCV,
+> SALA, DARRU, ANAH, SONAPIE, DAJC) avec une option « Autres » qui bascule la saisie en
+> texte libre. Le nom de colonne (`numero_ddu`) a été conservé pour éviter une migration de
+> renommage sur une colonne déjà en usage — seule sa sémantique a changé. `numeroDirectionService`
+> est un nouveau champ ajouté juste à côté, portant le numéro de référence propre à la
+> direction/service choisie (« Numéro Direction/Service » dans l'interface).
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le

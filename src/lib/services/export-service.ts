@@ -19,7 +19,7 @@ export interface ExportFilters {
 const MAX_EXPORT_ROWS = 20_000;
 
 const EXPORT_COLUMNS = [
-  "Référence", "Code-barres", "N° guichet", "N° DDU", "Référence classement",
+  "Référence", "Code-barres", "N° guichet", "Direction/Service concerné(e)", "Numéro Direction/Service", "Référence classement",
   "N° îlot", "N° lot", "Superficie", "N° titre foncier", "Commune", "Lotissement", "Nature dossier",
   "Nom", "Prénoms", "Adresse", "Téléphone", "E-mail", "Personne à contacter", "Mobile", "Opérateur",
   "Statut collecte", "Statut validation", "Statut numérisation", "Statut indexation", "Statut archivage",
@@ -45,6 +45,7 @@ async function loadExportRows(filters: ExportFilters, session: SessionPayload) {
         { reference: { contains: q } },
         { codeBarres: { contains: q } },
         { numeroDdu: { contains: q } },
+        { numeroDirectionService: { contains: q } },
         { nom: { contains: q } },
         { prenoms: { contains: q } },
       ];
@@ -80,6 +81,7 @@ function toRow(d: Awaited<ReturnType<typeof loadExportRows>>[number]): (string |
     d.codeBarres ?? "",
     d.numeroGuichet ?? "",
     d.numeroDdu ?? "",
+    d.numeroDirectionService ?? "",
     d.referenceClassement ?? "",
     d.numeroIlot ?? "",
     d.numeroLot ?? "",

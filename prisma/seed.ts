@@ -8,6 +8,7 @@ import { PrismaClient, WorkflowType } from "@prisma/client";
 import { faker } from "@faker-js/faker";
 import bcrypt from "bcryptjs";
 import { PERMISSIONS, ROLE_PERMISSIONS } from "../src/lib/permissions/constants";
+import { DIRECTION_SERVICE_OPTIONS } from "../src/lib/validation/dossier";
 
 const prisma = new PrismaClient();
 
@@ -250,7 +251,8 @@ async function main() {
         libelleCarton: `Carton ${faker.string.alphanumeric(6).toUpperCase()}`,
         codeBarres: faker.string.numeric(13),
         numeroGuichet: faker.string.numeric(6),
-        numeroDdu: `DDU-${faker.string.numeric(8)}`,
+        numeroDdu: faker.helpers.arrayElement(DIRECTION_SERVICE_OPTIONS),
+        numeroDirectionService: faker.string.numeric(8),
         referenceClassement: `CLA-${faker.string.alphanumeric(8).toUpperCase()}`,
         numeroIlot: faker.string.numeric(3),
         numeroLot: faker.string.numeric(3),

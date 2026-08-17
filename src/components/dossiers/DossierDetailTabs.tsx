@@ -21,6 +21,7 @@ interface DossierDetail {
   codeBarres: string | null;
   numeroGuichet: string | null;
   numeroDdu: string | null;
+  numeroDirectionService: string | null;
   referenceClassement: string | null;
   numeroIlot: string | null;
   numeroLot: string | null;
@@ -115,7 +116,8 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
               <Field label="Libellé du carton" value={dossier.libelleCarton} />
               <Field label="Code-barres" value={dossier.codeBarres} />
               <Field label="N° guichet" value={dossier.numeroGuichet} />
-              <Field label="N° DDU" value={dossier.numeroDdu} />
+              <Field label="Direction/Service concerné(e)" value={dossier.numeroDdu} />
+              <Field label="Numéro Direction/Service" value={dossier.numeroDirectionService} />
               <Field label="Référence de classement" value={dossier.referenceClassement} />
               <Field label="Opérateur" value={`${dossier.operateur.nom} ${dossier.operateur.prenoms ?? ""} (${dossier.operateur.matricule})`} />
               <Field label="Créé le" value={dateFmt.format(new Date(dossier.createdAt))} />

@@ -135,7 +135,7 @@ cloisonnement par rôle que `/dossiers`. Journalise `exports` + `audit_logs`.
 | Paramètre | Description |
 |---|---|
 | `format` | `csv` (défaut) ou `xlsx` |
-| `q` | recherche texte (référence, code-barres, N° DDU, nom, prénoms) |
+| `q` | recherche texte (référence, code-barres, Direction/Service, N° Direction/Service, nom, prénoms) |
 | `commune` | id commune |
 | `operateur` | id opérateur (ignoré pour le rôle OPERATEUR — toujours ses propres dossiers) |
 | `statutValidation` | `VALIDE`, `REJETE`, `EN_CONTROLE`... |

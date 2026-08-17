@@ -42,7 +42,7 @@ export function DossiersFilterBar({
           <Input
             name="q"
             defaultValue={current.q ?? ""}
-            placeholder="Référence, code-barres, N° DDU, nom, prénoms..."
+            placeholder="Référence, code-barres, Direction/Service, nom, prénoms..."
             className="pl-8"
           />
         </div>

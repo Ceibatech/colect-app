@@ -52,6 +52,7 @@ function cleanForDb(values: DossierFormValues) {
     codeBarres: clean(values.codeBarres) ?? null,
     numeroGuichet: clean(values.numeroGuichet) ?? null,
     numeroDdu: clean(values.numeroDdu) ?? null,
+    numeroDirectionService: clean(values.numeroDirectionService) ?? null,
     referenceClassement: clean(values.referenceClassement) ?? null,
     numeroIlot: clean(values.numeroIlot) ?? null,
     numeroLot: clean(values.numeroLot) ?? null,

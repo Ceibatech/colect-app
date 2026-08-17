@@ -28,7 +28,7 @@ const FIELD_CHECKS: FieldCheck[] = [
   { key: "libelleCarton", label: "Libellé du carton", missingGravite: "FAIBLE" },
   { key: "codeBarres", label: "Code-barres", missingGravite: "ELEVEE" },
   { key: "numeroGuichet", label: "N° guichet", missingGravite: "FAIBLE" },
-  { key: "numeroDdu", label: "N° DDU", missingGravite: "MOYENNE" },
+  { key: "numeroDdu", label: "Direction/Service concerné(e)", missingGravite: "MOYENNE" },
   { key: "referenceClassement", label: "Référence de classement", missingGravite: "FAIBLE" },
   { key: "numeroIlot", label: "N° îlot", missingGravite: "MOYENNE" },
   { key: "numeroLot", label: "N° lot", missingGravite: "MOYENNE" },

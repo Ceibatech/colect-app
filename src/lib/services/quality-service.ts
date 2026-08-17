@@ -34,14 +34,14 @@ export interface QualityOverview {
   totalIncomplets: number; // score < 100
   totalRejetes: number;
   totalDoublonsCodeBarres: number;
-  totalDoublonsNumeroDdu: number;
+  totalDoublonsNumeroDirectionService: number;
   totalAnomaliesOuvertes: number;
 }
 
 export async function getQualityOverview(): Promise<QualityOverview> {
   await requirePermission("QUALITY_VIEW");
 
-  const [scored, totalRejetes, doublonsCodeBarres, doublonsNumeroDdu, totalAnomaliesOuvertes] = await Promise.all([
+  const [scored, totalRejetes, doublonsCodeBarres, doublonsNumeroDirectionService, totalAnomaliesOuvertes] = await Promise.all([
     getScoredDossiers(),
     prisma.dossier.count({ where: { statutValidation: "REJETE" } }),
     prisma.dossier.groupBy({
@@ -50,11 +50,16 @@ export async function getQualityOverview(): Promise<QualityOverview> {
       _count: { _all: true },
       having: { codeBarres: { _count: { gt: 1 } } },
     }),
+    // "numeroDdu" est désormais une direction/service (liste fermée) —
+    // partagée légitimement par de nombreux dossiers, ce n'est plus un
+    // identifiant à détecter en doublon. Le doublon pertinent est
+    // "numeroDirectionService" (référence propre à ce dossier au sein de
+    // cette direction/service).
     prisma.dossier.groupBy({
-      by: ["numeroDdu"],
-      where: { numeroDdu: { not: null } },
+      by: ["numeroDirectionService"],
+      where: { numeroDirectionService: { not: null } },
       _count: { _all: true },
-      having: { numeroDdu: { _count: { gt: 1 } } },
+      having: { numeroDirectionService: { _count: { gt: 1 } } },
     }),
     prisma.anomalie.count({ where: { statut: "OUVERTE" } }),
   ]);
@@ -69,7 +74,7 @@ export async function getQualityOverview(): Promise<QualityOverview> {
     totalIncomplets,
     totalRejetes,
     totalDoublonsCodeBarres: doublonsCodeBarres.length,
-    totalDoublonsNumeroDdu: doublonsNumeroDdu.length,
+    totalDoublonsNumeroDirectionService: doublonsNumeroDirectionService.length,
     totalAnomaliesOuvertes,
   };
 }

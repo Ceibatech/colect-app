@@ -67,7 +67,7 @@ export default async function QualitePage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard icon={ShieldCheck} label="Score qualité global" value={`${overview.scoreGlobal}%`} />
         <KpiCard icon={AlertTriangle} label="Dossiers incomplets" value={overview.totalIncomplets} hint={`sur ${overview.totalDossiers}`} />
-        <KpiCard icon={Copy} label="Doublons détectés" value={overview.totalDoublonsCodeBarres + overview.totalDoublonsNumeroDdu} hint="code-barres + N° DDU" />
+        <KpiCard icon={Copy} label="Doublons détectés" value={overview.totalDoublonsCodeBarres + overview.totalDoublonsNumeroDirectionService} hint="code-barres + N° Direction/Service" />
         <KpiCard icon={FileX2} label="Dossiers rejetés" value={overview.totalRejetes} />
         <KpiCard icon={ShieldAlert} label="Anomalies ouvertes" value={overview.totalAnomaliesOuvertes} />
       </div>

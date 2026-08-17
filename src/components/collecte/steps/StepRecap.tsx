@@ -71,7 +71,8 @@ export function StepRecap({
         <Row label="Libellé du carton" value={v.libelleCarton} />
         <Row label="Code-barres" value={v.codeBarres} />
         <Row label="N° guichet" value={v.numeroGuichet} />
-        <Row label="N° DDU" value={v.numeroDdu} />
+        <Row label="Direction/Service concerné(e)" value={v.numeroDdu} />
+        <Row label="Numéro Direction/Service" value={v.numeroDirectionService} />
         <Row label="Référence de classement" value={v.referenceClassement} />
       </Section>
 
