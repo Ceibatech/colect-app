@@ -132,6 +132,16 @@ composition de frames peu fiable dans cet environnement précis), Playwright pil
 propre Chromium via CDP directement et s'est montré fiable dès la première exécution
 stable une fois les sélecteurs corrects trouvés.
 
+**Flakiness connue (Phase 15+, dev uniquement)** : `change-password.spec.ts` échoue
+occasionnellement (timeout sur un clic de menu) uniquement quand la suite E2E complète
+tourne d'un coup contre `next dev` (Turbopack) — jamais en isolation (`npx playwright
+test tests/e2e/change-password.spec.ts` seul, systématiquement vert). Cause probable :
+compilation à la demande de nouvelles routes sous forte charge quand plusieurs fichiers
+de test s'exécutent à la suite, chacun visitant des pages potentiellement jamais
+compilées. N'affecte jamais la production (`next build` précompile tout) ; pas de
+correctif appliqué pour l'instant, la fiabilité individuelle de chaque test étant
+confirmée à 100 %.
+
 ## Nettoyage
 
 Tous les enregistrements créés par les tests API/E2E sont préfixés de façon

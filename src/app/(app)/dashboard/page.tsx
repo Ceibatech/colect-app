@@ -5,12 +5,14 @@ import {
   getPipelineFunnel,
   getRepartitionByNature,
   getRepartitionByStatut,
+  getCartonsDossiersEtatOverview,
 } from "@/lib/services/dashboard-service";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { PipelineEvolutionChart } from "@/components/dashboard/PipelineEvolutionChart";
 import { PipelineFunnelChart } from "@/components/dashboard/PipelineFunnelChart";
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   FolderKanban, FilePlus2, Send, ShieldQuestion, ShieldCheck, ShieldX,
   ScanLine, Tags, Archive, Gauge,
@@ -21,12 +23,13 @@ export const metadata = { title: "Tableau de bord — GeoArchives-MULCV" };
 export default async function DashboardPage() {
   await requirePermission("DASHBOARD_VIEW");
 
-  const [kpis, evolution, funnel, byNature, byStatut] = await Promise.all([
+  const [kpis, evolution, funnel, byNature, byStatut, etatOverview] = await Promise.all([
     getDashboardKpis(),
     getPipelineEvolution(),
     getPipelineFunnel(),
     getRepartitionByNature(),
     getRepartitionByStatut(),
+    getCartonsDossiersEtatOverview(),
   ]);
 
   return (
@@ -92,6 +95,49 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>État de conservation des cartons et dossiers</CardTitle>
+          <CardDescription>
+            Renseigné à la collecte (§40) — un carton/dossier « Dégradé » porte une description de son état.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead>Nbre de cartons</TableHead>
+                  <TableHead>Nbre de dossiers</TableHead>
+                  <TableHead>Nbre de cartons dégradés</TableHead>
+                  <TableHead>Nbre de dossiers dégradés</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="text-base font-medium">{etatOverview.nombreCartons}</TableCell>
+                  <TableCell className="text-base font-medium">{etatOverview.nombreDossiers}</TableCell>
+                  <TableCell className="text-base font-medium">
+                    {etatOverview.nombreCartonsDegrades > 0 ? (
+                      <span className="text-destructive">{etatOverview.nombreCartonsDegrades}</span>
+                    ) : (
+                      etatOverview.nombreCartonsDegrades
+                    )}
+                  </TableCell>
+                  <TableCell className="text-base font-medium">
+                    {etatOverview.nombreDossiersDegrades > 0 ? (
+                      <span className="text-destructive">{etatOverview.nombreDossiersDegrades}</span>
+                    ) : (
+                      etatOverview.nombreDossiersDegrades
+                    )}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

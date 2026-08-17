@@ -284,7 +284,7 @@ entre `quality-scoring.ts` (pur) et `quality-service.ts` (`"use server"`) en Pha
 | 10 | Import / Export (Excel/CSV) | ✅ Fait — testé (aperçu, doublons, confirmation, export filtré) |
 | 11 | Documents | ✅ Fait — testé (upload, téléchargement, suppression, cloisonnement) |
 | 12 | Audit | ✅ Fait — testé (filtres, permissions, 21 événements réels vérifiés) |
-| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 82 tests unitaires (Vitest) + 53 tests API + 7 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
+| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 82 tests unitaires (Vitest) + 53 tests API + 8 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
 | 14 | Optimisation | ✅ Fait — requêtes dupliquées mémoïsées, fuite mémoire rate-limit corrigée, error.tsx ajouté, bug réel `loading.tsx`/`redirect()` trouvé et corrigé (retiré) |
 | 15 | Production (GitHub → Render → cPanel) | ✅ Fait et **déployé en réel** — https://geoarchives.ceiba-analytics.com, base cPanel `col_invent`, voir [DEPLOYMENT.md](DEPLOYMENT.md) |
 
@@ -342,6 +342,19 @@ reste la FK utilisée partout (dashboards, exports, score qualité) ; la saisie 
 (`natureDossierAutre`) est résolue côté serveur vers une fiche `natures_dossier` réelle,
 find-or-create global (pas de scope par commune, contrairement au Lotissement) — voir
 `resolveNatureDossierId()` dans `dossier-service.ts`.
+
+**État de conservation carton/dossier + indicateurs dashboard (Phase 15+)** : deux
+nouveaux champs sur `Dossier` — `etatCarton`/`etatDossier` (enum `EtatConservation` :
+`BON_ETAT`/`DEGRADE`), chacun avec une description en texte libre
+(`etatCartonDescription`/`etatDossierDescription`) qui n'apparaît et n'est persistée que
+si l'état est "Dégradé" (`EtatConservationField.tsx`, composant partagé entre
+`StepIdentification.tsx` pour le carton et `StepDossier.tsx` pour le dossier — un simple
+`RadioGroup` à 2 options, pas besoin du mécanisme Select+Autres ici). Nouveau tableau sur
+`/dashboard` (§48) : Nbre de cartons / Nbre de dossiers / Nbre de cartons dégradés / Nbre
+de dossiers dégradés (`getCartonsDossiersEtatOverview()`, `dashboard-service.ts`) —
+`codeBarres` étant unique par dossier dans ce modèle, "nombre de cartons" est calculé
+comme le nombre de dossiers avec un code-barres renseigné (pas de `groupBy` distinct
+nécessaire).
 
 **Bug de production non résolu (constaté, non bloquant)** : une erreur d'hydratation
 React (#418) apparaît sur *toutes* les pages en production (Render) — jamais reproduite

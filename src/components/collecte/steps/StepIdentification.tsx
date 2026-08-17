@@ -7,6 +7,7 @@ import { DIRECTION_SERVICE_OPTIONS, type DossierFormValues } from "@/lib/validat
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EtatConservationField } from "./EtatConservationField";
 
 /** Sentinelle d'interface uniquement — jamais stockée (cf. dossier.ts). */
 const AUTRES = "__AUTRES__";
@@ -113,6 +114,8 @@ export function StepIdentification({
           <FieldError errors={[errors.referenceClassement]} />
         </FieldContent>
       </Field>
+
+      <EtatConservationField form={form} label="État du carton" etatField="etatCarton" descriptionField="etatCartonDescription" />
     </div>
   );
 }

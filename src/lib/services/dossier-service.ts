@@ -61,11 +61,18 @@ function cleanForDb(values: DossierFormValues) {
     numeroDdu: clean(values.numeroDdu) ?? null,
     numeroDirectionService: clean(values.numeroDirectionService) ?? null,
     referenceClassement: clean(values.referenceClassement) ?? null,
+    etatCarton: clean(values.etatCarton) ?? null,
+    // Description ignorée si l'état n'est pas DEGRADE — évite de garder une
+    // description périmée si l'utilisateur repasse en "Bon état" après avoir
+    // rédigé un texte puis changé d'avis (retour en arrière via "Modifier").
+    etatCartonDescription: values.etatCarton === "DEGRADE" ? clean(values.etatCartonDescription) ?? null : null,
     numeroIlot: clean(values.numeroIlot) ?? null,
     numeroLot: clean(values.numeroLot) ?? null,
     superficie: toNullableNumber(values.superficie),
     numeroTitreFoncier: clean(values.numeroTitreFoncier) ?? null,
     communeId: toNullableNumber(values.communeId),
+    etatDossier: clean(values.etatDossier) ?? null,
+    etatDossierDescription: values.etatDossier === "DEGRADE" ? clean(values.etatDossierDescription) ?? null : null,
     nom: clean(values.nom) ?? null,
     prenoms: clean(values.prenoms) ?? null,
     adresse: clean(values.adresse) ?? null,

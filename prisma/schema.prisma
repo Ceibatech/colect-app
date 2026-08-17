@@ -294,6 +294,11 @@ model Dossier {
   numeroDdu              String? @map("numero_ddu")
   numeroDirectionService String? @map("numero_direction_service")
   referenceClassement    String? @map("reference_classement")
+  // État physique du carton constaté à la collecte (Phase 15+) ; description
+  // uniquement pertinente si DEGRADE (non contrainte en base — l'UI ne
+  // l'affiche que dans ce cas, cf. StepIdentification.tsx).
+  etatCarton            EtatConservation? @map("etat_carton")
+  etatCartonDescription String?           @db.Text @map("etat_carton_description")
 
   // --- INFORMATIONS FONCIÈRES (fiche CG1020) ---
   numeroIlot         String?  @map("numero_ilot")
@@ -306,6 +311,10 @@ model Dossier {
 
   // --- DOSSIER (fiche CG1020) ---
   natureDossierId Int? @map("nature_dossier_id")
+  // État physique du dossier constaté à la collecte (Phase 15+), même
+  // principe que l'état du carton.
+  etatDossier            EtatConservation? @map("etat_dossier")
+  etatDossierDescription String?           @db.Text @map("etat_dossier_description")
 
   // --- TITULAIRE (fiche CG1020) ---
   nom       String?
@@ -422,6 +431,12 @@ enum NiveauQualite {
   BONNE
   MOYENNE
   FAIBLE
+}
+
+/** État physique constaté du carton / du dossier à la collecte (Phase 15+). */
+enum EtatConservation {
+  BON_ETAT
+  DEGRADE
 }
 
 model Numerisation {

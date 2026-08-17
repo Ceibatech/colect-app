@@ -13,6 +13,11 @@ import {
 import { ControleActions, NumerisationActions, IndexationActions, ArchivageActions } from "@/components/dossiers/WorkflowActions";
 import { DocumentsPanel } from "@/components/dossiers/DocumentsPanel";
 import type { PermissionCode } from "@/lib/permissions/constants";
+import { ETAT_CONSERVATION_OPTIONS } from "@/lib/validation/dossier";
+
+function etatLabel(value: "BON_ETAT" | "DEGRADE" | null) {
+  return ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label ?? null;
+}
 
 interface DossierDetail {
   id: number;
@@ -23,6 +28,8 @@ interface DossierDetail {
   numeroDdu: string | null;
   numeroDirectionService: string | null;
   referenceClassement: string | null;
+  etatCarton: "BON_ETAT" | "DEGRADE" | null;
+  etatCartonDescription: string | null;
   numeroIlot: string | null;
   numeroLot: string | null;
   superficie: number | null;
@@ -30,6 +37,8 @@ interface DossierDetail {
   commune: { nom: string } | null;
   lotissement: { nom: string } | null;
   natureDossier: { libelle: string } | null;
+  etatDossier: "BON_ETAT" | "DEGRADE" | null;
+  etatDossierDescription: string | null;
   operateur: { nom: string; prenoms: string | null; matricule: string };
   nom: string | null;
   prenoms: string | null;
@@ -119,6 +128,10 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
               <Field label="Direction/Service concerné(e)" value={dossier.numeroDdu} />
               <Field label="Numéro Direction/Service" value={dossier.numeroDirectionService} />
               <Field label="Référence de classement" value={dossier.referenceClassement} />
+              <Field label="État du carton" value={etatLabel(dossier.etatCarton)} />
+              {dossier.etatCarton === "DEGRADE" ? (
+                <Field label="Description de l'état (carton)" value={dossier.etatCartonDescription} />
+              ) : null}
               <Field label="Opérateur" value={`${dossier.operateur.nom} ${dossier.operateur.prenoms ?? ""} (${dossier.operateur.matricule})`} />
               <Field label="Créé le" value={dateFmt.format(new Date(dossier.createdAt))} />
             </CardContent>
@@ -147,6 +160,10 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
               <Field label="Téléphone" value={dossier.telephone} />
               <Field label="E-mail" value={dossier.email} />
               <Field label="Nature du dossier" value={dossier.natureDossier?.libelle} />
+              <Field label="État du dossier" value={etatLabel(dossier.etatDossier)} />
+              {dossier.etatDossier === "DEGRADE" ? (
+                <Field label="Description de l'état (dossier)" value={dossier.etatDossierDescription} />
+              ) : null}
               <Field label="Personne à contacter" value={dossier.personneContact} />
               <Field label="Mobile" value={dossier.mobile} />
             </CardContent>

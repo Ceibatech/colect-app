@@ -1,7 +1,7 @@
 "use client";
 
 import type { UseFormReturn } from "react-hook-form";
-import type { DossierFormValues } from "@/lib/validation/dossier";
+import { ETAT_CONSERVATION_OPTIONS, type DossierFormValues } from "@/lib/validation/dossier";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Pencil } from "lucide-react";
@@ -52,6 +52,7 @@ export function StepRecap({
   const v = form.getValues();
   const commune = lookups.communes.find((c) => c.id === v.communeId);
   const nature = lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
+  const etatLabel = (value?: string) => ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label;
   const operateur = lookups.isOperateurRole
     ? lookups.currentUserName
     : (() => {
@@ -73,6 +74,8 @@ export function StepRecap({
         <Row label="Direction/Service concerné(e)" value={v.numeroDdu} />
         <Row label="Numéro Direction/Service" value={v.numeroDirectionService} />
         <Row label="Référence de classement" value={v.referenceClassement} />
+        <Row label="État du carton" value={etatLabel(v.etatCarton)} />
+        {v.etatCarton === "DEGRADE" ? <Row label="Description de l'état (carton)" value={v.etatCartonDescription} /> : null}
       </Section>
 
       <Section title="Informations foncières" onEdit={() => onEditStep(2)}>
@@ -86,6 +89,8 @@ export function StepRecap({
 
       <Section title="Dossier" onEdit={() => onEditStep(3)}>
         <Row label="Nature du dossier" value={nature} />
+        <Row label="État du dossier" value={etatLabel(v.etatDossier)} />
+        {v.etatDossier === "DEGRADE" ? <Row label="Description de l'état (dossier)" value={v.etatDossierDescription} /> : null}
       </Section>
 
       <Section title="Titulaire" onEdit={() => onEditStep(4)}>

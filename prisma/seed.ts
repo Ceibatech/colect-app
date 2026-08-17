@@ -47,6 +47,21 @@ const NATURES_DOSSIER = [
   { code: "NAT-AU", libelle: "Autre" },
 ];
 
+// Descriptions fictives pour l'état "Dégradé" (Phase 15+) — exemples de
+// démonstration uniquement, jamais des observations réelles.
+const CARTON_DEGRADE_DESCRIPTIONS = [
+  "Carton troué, coins abîmés par l'humidité",
+  "Couvercle manquant",
+  "Traces de moisissure sur une face",
+  "Carton écrasé, structure fragilisée",
+];
+const DOSSIER_DEGRADE_DESCRIPTIONS = [
+  "Pages jaunies et cassantes",
+  "Reliure défaite, feuillets détachés",
+  "Encre partiellement effacée sur plusieurs pages",
+  "Trace d'humidité sur la couverture",
+];
+
 const WORKFLOW_STATUSES: Array<{ workflowType: WorkflowType; code: string; libelle: string; ordre: number; isFinal: boolean }> = [
   { workflowType: "COLLECTE", code: "BROUILLON", libelle: "Brouillon", ordre: 1, isFinal: false },
   { workflowType: "COLLECTE", code: "SOUMIS", libelle: "Soumis", ordre: 2, isFinal: true },
@@ -244,6 +259,11 @@ async function main() {
       stage === "INDEXE" || stage === "ARCHIVE" ? faker.date.soon({ days: 4, refDate: dateNumerisation ?? createdAt }) : null;
     const dateArchivage = stage === "ARCHIVE" ? faker.date.soon({ days: 6, refDate: dateIndexation ?? createdAt }) : null;
 
+    // État de conservation (Phase 15+) — minoritairement dégradé, cohérent
+    // avec un fonds documentaire globalement bien conservé.
+    const cartonDegrade = faker.datatype.boolean({ probability: 0.1 });
+    const dossierDegrade = faker.datatype.boolean({ probability: 0.08 });
+
     const dossier = await prisma.dossier.create({
       data: {
         reference,
@@ -254,6 +274,8 @@ async function main() {
         numeroDdu: faker.helpers.arrayElement(DIRECTION_SERVICE_OPTIONS),
         numeroDirectionService: faker.string.numeric(8),
         referenceClassement: `CLA-${faker.string.alphanumeric(8).toUpperCase()}`,
+        etatCarton: cartonDegrade ? "DEGRADE" : "BON_ETAT",
+        etatCartonDescription: cartonDegrade ? faker.helpers.arrayElement(CARTON_DEGRADE_DESCRIPTIONS) : null,
         numeroIlot: faker.string.numeric(3),
         numeroLot: faker.string.numeric(3),
         superficie: faker.number.float({ min: 100, max: 5000, fractionDigits: 2 }),
@@ -261,6 +283,8 @@ async function main() {
         communeId: commune.id,
         lotissementId: lotissement.id,
         natureDossierId: nature.id,
+        etatDossier: dossierDegrade ? "DEGRADE" : "BON_ETAT",
+        etatDossierDescription: dossierDegrade ? faker.helpers.arrayElement(DOSSIER_DEGRADE_DESCRIPTIONS) : null,
         nom: faker.person.lastName(),
         prenoms: faker.person.firstName(),
         adresse: faker.location.streetAddress(),

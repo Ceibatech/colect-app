@@ -42,8 +42,9 @@ Sur `dossiers`, seuls les champs suivants proviennent de la fiche papier **CG102
 
 ```
 libelleCarton, codeBarres, numeroGuichet, numeroDdu, numeroDirectionService, referenceClassement,
+etatCarton, etatCartonDescription,
 numeroIlot, numeroLot, superficie, numeroTitreFoncier,
-communeId, lotissementId, natureDossierId,
+communeId, lotissementId, natureDossierId, etatDossier, etatDossierDescription,
 nom, prenoms, adresse, telephone, email,
 personneContact, mobile
 ```
@@ -76,6 +77,12 @@ personneContact, mobile
 > dans la Collecte, remplacé par un `<Select>` + option « Autres » (saisie libre
 > `natureDossierAutre`, résolue côté serveur — `resolveNatureDossierId()` — vers une fiche
 > existante ou créée à la volée, sans scope par commune contrairement au lotissement).
+>
+> **Ajout (Phase 15+)** : `etatCarton`/`etatDossier` (enum `EtatConservation` :
+> `BON_ETAT`/`DEGRADE`) et leur description associée
+> (`etatCartonDescription`/`etatDossierDescription`, uniquement renseignée si dégradé) —
+> demande métier directe, alimentent le nouveau tableau d'indicateurs du dashboard
+> principal (§48 : Nbre de cartons / dossiers / cartons dégradés / dossiers dégradés).
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le

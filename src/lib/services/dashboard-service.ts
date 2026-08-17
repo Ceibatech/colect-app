@@ -320,3 +320,30 @@ export async function getDirectionOverview(): Promise<DirectionOverview> {
 
   return { ...kpis, dossiersEnRetard, anomaliesCritiques };
 }
+
+export interface CartonsDossiersEtatOverview {
+  nombreCartons: number;
+  nombreDossiers: number;
+  nombreCartonsDegrades: number;
+  nombreDossiersDegrades: number;
+}
+
+/**
+ * Indicateurs état de conservation des cartons/dossiers (Phase 15+),
+ * renseignés à la collecte (`etatCarton`/`etatDossier`, cf. schema.prisma).
+ * `codeBarres` est unique par dossier — dans ce modèle un code-barres
+ * identifie un carton unique, donc "nombre de cartons" = nombre de dossiers
+ * avec un code-barres renseigné (pas besoin d'un groupBy distinct).
+ */
+export async function getCartonsDossiersEtatOverview(): Promise<CartonsDossiersEtatOverview> {
+  await requirePermission("DASHBOARD_VIEW");
+
+  const [nombreCartons, nombreDossiers, nombreCartonsDegrades, nombreDossiersDegrades] = await Promise.all([
+    prisma.dossier.count({ where: { codeBarres: { not: null } } }),
+    prisma.dossier.count(),
+    prisma.dossier.count({ where: { codeBarres: { not: null }, etatCarton: "DEGRADE" } }),
+    prisma.dossier.count({ where: { etatDossier: "DEGRADE" } }),
+  ]);
+
+  return { nombreCartons, nombreDossiers, nombreCartonsDegrades, nombreDossiersDegrades };
+}

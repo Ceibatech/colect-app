@@ -32,6 +32,12 @@ export const DIRECTION_SERVICE_OPTIONS = [
   "DAJC",
 ] as const;
 
+/** État physique constaté du carton / du dossier à la collecte (Phase 15+). */
+export const ETAT_CONSERVATION_OPTIONS = [
+  { value: "BON_ETAT", label: "Bon état" },
+  { value: "DEGRADE", label: "Dégradé" },
+] as const;
+
 /**
  * Schéma "souple" utilisé par React Hook Form pendant la saisie (brouillon
  * inclus) : les formats sont vérifiés mais rien n'est obligatoire, pour ne
@@ -56,6 +62,11 @@ export const dossierFormSchema = z.object({
   numeroDdu: z.string().max(50).optional().or(z.literal("")),
   numeroDirectionService: z.string().max(50).optional().or(z.literal("")),
   referenceClassement: z.string().max(150).optional().or(z.literal("")),
+  // État physique du carton constaté à la collecte — description uniquement
+  // affichée/utile si DEGRADE (cf. StepIdentification.tsx), jamais imposée
+  // ici : un carton en bon état n'a rien à décrire.
+  etatCarton: z.enum(["BON_ETAT", "DEGRADE"]).optional(),
+  etatCartonDescription: z.string().max(1000).optional().or(z.literal("")),
 
   // ÉTAPE 2 — Informations foncières
   numeroIlot: z.string().max(50).optional().or(z.literal("")),
@@ -84,6 +95,10 @@ export const dossierFormSchema = z.object({
   // vide tant que "Autres" est sélectionné ; l'un ou l'autre doit être
   // renseigné à la soumission (voir le .refine ci-dessous).
   natureDossierAutre: z.string().max(150).optional().or(z.literal("")),
+  // État physique du dossier constaté à la collecte, même principe que
+  // l'état du carton ci-dessus.
+  etatDossier: z.enum(["BON_ETAT", "DEGRADE"]).optional(),
+  etatDossierDescription: z.string().max(1000).optional().or(z.literal("")),
 
   // ÉTAPE 4 — Titulaire
   nom: z.string().max(150).optional().or(z.literal("")),
@@ -121,9 +136,9 @@ export const dossierSubmitSchema = dossierFormSchema
   });
 
 export const DOSSIER_STEPS = [
-  { id: 1, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement"] },
+  { id: 1, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
   { id: 2, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
-  { id: 3, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre"] },
+  { id: 3, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
   { id: 4, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
   { id: 5, title: "Contact", fields: ["personneContact", "mobile"] },
   { id: 6, title: "Suivi", fields: ["nombrePages", "observations"] },
