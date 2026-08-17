@@ -68,7 +68,13 @@ export const dossierFormSchema = z.object({
     .or(z.literal("")),
   numeroTitreFoncier: z.string().max(100).optional().or(z.literal("")),
   communeId: z.coerce.number().int().positive().optional(),
-  lotissementId: z.coerce.number().int().positive().optional(),
+  // Saisie libre (Phase 15+, remplace le Select dépendant de la commune) :
+  // le référentiel `lotissements` n'est pas systématiquement pré-rempli
+  // pour chaque commune, ce qui bloquait la saisie. Résolu côté serveur
+  // (find-or-create scopé à la commune) dans dossier-service.ts — la
+  // colonne `lotissementId` (FK) est inchangée et continue d'alimenter
+  // dashboards/exports/filtres sans changement.
+  lotissementNom: z.string().max(150).optional().or(z.literal("")),
 
   // ÉTAPE 3 — Dossier
   natureDossierId: z.coerce.number().int().positive().optional(),
@@ -94,7 +100,7 @@ export type DossierFormValues = z.infer<typeof dossierFormSchema>;
 /** Vérification stricte exécutée uniquement au moment de "Soumettre" (§41). */
 export const dossierSubmitSchema = dossierFormSchema.extend({
   communeId: z.coerce.number({ message: "La commune est requise" }).int().positive("La commune est requise"),
-  lotissementId: z.coerce.number({ message: "Le lotissement est requis" }).int().positive("Le lotissement est requis"),
+  lotissementNom: z.string().min(1, "Le lotissement est requis").max(150),
   natureDossierId: z.coerce
     .number({ message: "La nature de dossier est requise" })
     .int()
@@ -105,7 +111,7 @@ export const dossierSubmitSchema = dossierFormSchema.extend({
 
 export const DOSSIER_STEPS = [
   { id: 1, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement"] },
-  { id: 2, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementId"] },
+  { id: 2, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
   { id: 3, title: "Dossier", fields: ["natureDossierId"] },
   { id: 4, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
   { id: 5, title: "Contact", fields: ["personneContact", "mobile"] },

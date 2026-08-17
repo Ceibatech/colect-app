@@ -51,7 +51,6 @@ export function StepRecap({
 }) {
   const v = form.getValues();
   const commune = lookups.communes.find((c) => c.id === v.communeId);
-  const lotissement = commune?.lotissements.find((l) => l.id === v.lotissementId);
   const nature = lookups.natures.find((n) => n.id === v.natureDossierId);
   const operateur = lookups.isOperateurRole
     ? lookups.currentUserName
@@ -82,7 +81,7 @@ export function StepRecap({
         <Row label="Superficie" value={v.superficie ? `${v.superficie} m²` : undefined} />
         <Row label="N° titre foncier" value={v.numeroTitreFoncier} />
         <Row label="Commune" value={commune?.nom} />
-        <Row label="Lotissement" value={lotissement?.nom} />
+        <Row label="Lotissement" value={v.lotissementNom} />
       </Section>
 
       <Section title="Dossier" onEdit={() => onEditStep(3)}>

@@ -64,8 +64,8 @@ describe("dossierFormSchema (saisie/brouillon — tout optionnel, §40)", () => 
     // Seuls les champs numériques saisis via <input type="number"> (superficie,
     // nombrePages) reçoivent "" d'un champ vide côté RHF et ont donc le
     // fallback `.or(z.literal(""))`. Les identifiants pilotés par un <Select>
-    // (communeId, lotissementId, natureDossierId, operateurId) n'envoient
-    // jamais "" — ils restent `undefined` tant qu'aucune option n'est choisie.
+    // (communeId, natureDossierId, operateurId) n'envoient jamais "" — ils
+    // restent `undefined` tant qu'aucune option n'est choisie.
     const result = dossierFormSchema.safeParse({ superficie: "", nombrePages: "" });
     expect(result.success).toBe(true);
   });
@@ -103,7 +103,7 @@ describe("dossierFormSchema (saisie/brouillon — tout optionnel, §40)", () => 
 describe("dossierSubmitSchema (soumission finale — champs obligatoires, §41)", () => {
   const validSubmission = {
     communeId: 1,
-    lotissementId: 1,
+    lotissementNom: "Lotissement Test",
     natureDossierId: 1,
     nom: "Kouassi",
     prenoms: "Jean",
@@ -120,9 +120,13 @@ describe("dossierSubmitSchema (soumission finale — champs obligatoires, §41)"
   });
 
   it("rejette une soumission sans lotissement", () => {
-    const { lotissementId, ...rest } = validSubmission;
-    void lotissementId;
+    const { lotissementNom, ...rest } = validSubmission;
+    void lotissementNom;
     expect(dossierSubmitSchema.safeParse(rest).success).toBe(false);
+  });
+
+  it("rejette une soumission avec un lotissement vide (chaîne vide)", () => {
+    expect(dossierSubmitSchema.safeParse({ ...validSubmission, lotissementNom: "" }).success).toBe(false);
   });
 
   it("rejette une soumission sans nature de dossier", () => {

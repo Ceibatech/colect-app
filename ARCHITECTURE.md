@@ -284,7 +284,7 @@ entre `quality-scoring.ts` (pur) et `quality-service.ts` (`"use server"`) en Pha
 | 10 | Import / Export (Excel/CSV) | ✅ Fait — testé (aperçu, doublons, confirmation, export filtré) |
 | 11 | Documents | ✅ Fait — testé (upload, téléchargement, suppression, cloisonnement) |
 | 12 | Audit | ✅ Fait — testé (filtres, permissions, 21 événements réels vérifiés) |
-| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 81 tests unitaires (Vitest) + 53 tests API + 4 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
+| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 82 tests unitaires (Vitest) + 53 tests API + 6 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
 | 14 | Optimisation | ✅ Fait — requêtes dupliquées mémoïsées, fuite mémoire rate-limit corrigée, error.tsx ajouté, bug réel `loading.tsx`/`redirect()` trouvé et corrigé (retiré) |
 | 15 | Production (GitHub → Render → cPanel) | ✅ Fait et **déployé en réel** — https://geoarchives.ceiba-analytics.com, base cPanel `col_invent`, voir [DEPLOYMENT.md](DEPLOYMENT.md) |
 
@@ -322,6 +322,23 @@ référence) et doublait le toast de succès. Corrigé en enveloppant chaque cal
 `UsersManager`) — constaté uniquement via un vrai test E2E Playwright (`getByText`
 strict-mode a détecté les deux éléments dupliqués), invisible en lecture de code ou en
 test unitaire.
+
+**Lotissement en saisie libre (Phase 15+)** : le `<Select>` "Lotissement" de la Collecte,
+dépendant de la commune choisie, restait bloqué sans option pour toute commune sans
+lotissement pré-chargé (cas de toutes les 201 communes officielles importées, référentiel
+lotissements vide). Remplacé par une saisie libre (`lotissementNom`) résolue côté serveur
+vers une fiche réelle (existante réutilisée, sinon créée à la volée) — voir DATABASE.md §3.
+En corrigeant ce champ, deux bugs annexes trouvés et corrigés dans le même passage :
+`numeroDirectionService` manquait dans les valeurs pré-remplies à la reprise d'un
+brouillon (`/collecte/page.tsx`), oublié lors du refactor Direction/Service précédent.
+
+**Bug de production non résolu (constaté, non bloquant)** : une erreur d'hydratation
+React (#418) apparaît sur *toutes* les pages en production (Render) — jamais reproduite
+en local (dev ni build de production identique). L'application reste pleinement
+fonctionnelle (React régénère silencieusement l'arbre côté client) ; cause probable :
+différence d'environnement serveur (version Node/ICU) entre Render et la machine de
+développement locale, non diagnostiquée faute d'accès direct aux logs serveur détaillés
+de l'instance Render. À revisiter si un accès shell à l'instance devient nécessaire.
 
 ## 7. Préparation IA (V2, hors périmètre V1)
 

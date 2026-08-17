@@ -39,6 +39,11 @@ async function resolveOperateurId(session: SessionPayload, formOperateurId?: num
  * vides -> `null`, champs numériques robustement coercés (ne jamais faire
  * confiance au client — un <input type="number"> vide envoie `""`, pas
  * `undefined`, ce que Prisma refuse pour un champ Decimal/Int).
+ *
+ * `lotissementId` (FK réelle) n'est volontairement PAS calculé ici : la
+ * saisie est libre côté formulaire (`lotissementNom`) et résolue séparément
+ * par `resolveLotissementId()`, qui a besoin d'un accès base (find-or-create)
+ * — cette fonction reste synchrone et pure.
  */
 function cleanForDb(values: DossierFormValues) {
   const clean = <T>(v: T | "" | undefined): T | undefined => (v === "" ? undefined : v);
@@ -59,7 +64,6 @@ function cleanForDb(values: DossierFormValues) {
     superficie: toNullableNumber(values.superficie),
     numeroTitreFoncier: clean(values.numeroTitreFoncier) ?? null,
     communeId: toNullableNumber(values.communeId),
-    lotissementId: toNullableNumber(values.lotissementId),
     natureDossierId: toNullableNumber(values.natureDossierId),
     nom: clean(values.nom) ?? null,
     prenoms: clean(values.prenoms) ?? null,
@@ -71,6 +75,45 @@ function cleanForDb(values: DossierFormValues) {
     nombrePages: toNullableNumber(values.nombrePages),
     observations: clean(values.observations) ?? null,
   };
+}
+
+/** Génère un code de lotissement unique, dérivé du code commune. */
+async function generateLotissementCode(communeId: number): Promise<string> {
+  const commune = await prisma.commune.findUnique({ where: { id: communeId }, select: { code: true } });
+  const base = commune?.code ?? `C${communeId}`;
+  const count = await prisma.lotissement.count({ where: { communeId } });
+  let n = count + 1;
+  for (let attempts = 0; attempts < 1000; attempts++) {
+    const candidate = `${base}-LOT-${String(n).padStart(3, "0")}`;
+    const exists = await prisma.lotissement.findUnique({ where: { code: candidate } });
+    if (!exists) return candidate;
+    n++;
+  }
+  throw new Error("Impossible de générer un code de lotissement unique.");
+}
+
+/**
+ * Résout la saisie libre "Lotissement" (Phase 15+) vers une fiche réelle du
+ * référentiel `lotissements`, scopée à la commune choisie :
+ * - correspondance existante (insensible à la casse/aux espaces) -> réutilisée ;
+ * - sinon création à la volée, jamais de doublon silencieux pour la même commune.
+ * Ne fait jamais confiance au client — la résolution est refaite à chaque
+ * enregistrement, comme le reste de `cleanForDb`.
+ */
+async function resolveLotissementId(communeId: number | null | undefined, nomLibre: string | undefined): Promise<number | null> {
+  const nom = nomLibre?.trim();
+  if (!communeId || !nom) return null;
+
+  const existing = await prisma.lotissement.findFirst({
+    where: { communeId, nom: { equals: nom } },
+  });
+  if (existing) return existing.id;
+
+  const code = await generateLotissementCode(communeId);
+  const created = await prisma.lotissement.create({
+    data: { communeId, code, nom, isActive: true },
+  });
+  return created.id;
 }
 
 /**
@@ -111,7 +154,9 @@ export interface DraftResult {
 export async function saveDraft(values: DossierFormValues, draftId?: number | null): Promise<DraftResult> {
   const session = await requirePermission("DOSSIER_CREATE");
   const operateurId = await resolveOperateurId(session, values.operateurId);
-  const data = cleanForDb(values);
+  const cleaned = cleanForDb(values);
+  const lotissementId = await resolveLotissementId(cleaned.communeId, values.lotissementNom);
+  const data = { ...cleaned, lotissementId };
 
   if (values.codeBarres) {
     const existing = await prisma.dossier.findFirst({
@@ -251,7 +296,9 @@ export async function listMyDrafts() {
 
 export async function getDraftById(id: number) {
   const session = await requirePermission("DOSSIER_CREATE");
-  const dossier = await prisma.dossier.findUnique({ where: { id } });
+  // `lotissement` inclus pour reconstituer `lotissementNom` (saisie libre,
+  // cf. resolveLotissementId ci-dessus) lors de la reprise d'un brouillon.
+  const dossier = await prisma.dossier.findUnique({ where: { id }, include: { lotissement: true } });
   if (!dossier || dossier.statutCollecte !== "BROUILLON") return null;
 
   if (session.roleCode === "OPERATEUR") {

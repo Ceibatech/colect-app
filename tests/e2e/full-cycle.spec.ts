@@ -72,7 +72,7 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
   await fillField(page, "N° lot", "L-E2E");
   await fillField(page, "Superficie (m²)", "375");
   await selectCombobox(page, "Commune", commune.nom);
-  await selectCombobox(page, "Lotissement", lotissement.nom);
+  await fillField(page, "Lotissement", lotissement.nom);
   await clickNext(page);
 
   // Étape 3 — Dossier (nature, RadioGroup avec vrai label/for). Le Base UI

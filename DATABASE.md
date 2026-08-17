@@ -57,6 +57,18 @@ personneContact, mobile
 > renommage sur une colonne déjà en usage — seule sa sémantique a changé. `numeroDirectionService`
 > est un nouveau champ ajouté juste à côté, portant le numéro de référence propre à la
 > direction/service choisie (« Numéro Direction/Service » dans l'interface).
+>
+> **Note (Phase 15+)** : `lotissementId` (FK vers `lotissements`) n'est plus renseigné via
+> un `<Select>` dépendant de la commune dans la Collecte — le référentiel lotissements
+> n'étant pas systématiquement pré-rempli pour chaque commune (contrairement aux 201
+> communes officielles importées), ce Select restait bloqué sur « Choisir d'abord une
+> commune » sans option disponible. Le formulaire collecte désormais un nom en saisie
+> libre (`lotissementNom`, non persisté tel quel), résolu côté serveur vers une fiche
+> `lotissements` réelle — réutilisée si elle existe déjà pour cette commune (comparaison
+> insensible à la casse), sinon créée à la volée (code généré, ex. `CI-001-LOT-001`) — voir
+> `resolveLotissementId()` dans `src/lib/services/dossier-service.ts`. La colonne
+> `lotissementId` du modèle `Dossier` reste une FK inchangée ; dashboards, exports et
+> filtres n'ont donc nécessité aucune modification.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le
