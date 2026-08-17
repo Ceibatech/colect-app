@@ -16,14 +16,31 @@ cPanel existant — jamais de MySQL local en production.
 | Compte admin | 1 compte réel créé via `scripts/create-user.ts` |
 | Restant | Communes/lotissements/natures de dossier réels non encore chargés (0) — à fournir avant utilisation réelle de la Collecte |
 
-**Piège rencontré et corrigé** : le premier build Render a échoué (`Build failed`, erreur PostCSS sur
-`globals.css`). Cause : la variable d'environnement `NODE_ENV=production` posée dans Render
-affecte aussi `npm install`, qui saute alors les `devDependencies` — or `tailwindcss`,
-`@tailwindcss/postcss`, `typescript` et `prisma` en font partie et sont nécessaires pour
-*construire* l'app (pas seulement l'exécuter). Corrigé en changeant le **Build Command** Render en :
-```
-npm install --include=dev && npm run build
-```
+**Pièges rencontrés et corrigés** :
+- Le premier build Render a échoué (`Build failed`, erreur PostCSS sur `globals.css`).
+  Cause : la variable d'environnement `NODE_ENV=production` posée dans Render affecte
+  aussi `npm install`, qui saute alors les `devDependencies` — or `tailwindcss`,
+  `@tailwindcss/postcss`, `typescript` et `prisma` en font partie et sont nécessaires pour
+  *construire* l'app (pas seulement l'exécuter). Corrigé en changeant le **Build Command**
+  Render en :
+  ```
+  npm install --include=dev && npm run build
+  ```
+- Un déploiement ultérieur (ajout d'un champ au schéma Prisma) a échoué en `tsc` avec des
+  erreurs `Object literal may only specify known properties` sur le nouveau champ — alors
+  que `schema.prisma` était bien à jour et que le build passait en local. Cause : Render
+  restaure un `node_modules` mis en cache entre deux builds ; comme aucune dépendance
+  n'avait changé, `npm install` n'a rien réinstallé et le hook `postinstall` de
+  `@prisma/client` (qui régénère normalement le client depuis `schema.prisma`) ne s'est
+  jamais redéclenché — le build a compilé contre un client Prisma périmé. Corrigé en
+  rendant la régénération explicite plutôt que de compter sur ce hook implicite,
+  peu fiable avec le cache de build (`package.json`) :
+  ```json
+  "build": "prisma generate && next build"
+  ```
+  Après toute modification de `prisma/schema.prisma`, s'assurer que ce changement est bien
+  en place avant de pousser — sinon un déploiement peut sembler « réussir localement » et
+  échouer sur Render pour cette seule raison de cache.
 
 ## 0. Checklist avant de commencer
 
