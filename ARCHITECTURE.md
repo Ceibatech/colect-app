@@ -284,7 +284,7 @@ entre `quality-scoring.ts` (pur) et `quality-service.ts` (`"use server"`) en Pha
 | 10 | Import / Export (Excel/CSV) | ✅ Fait — testé (aperçu, doublons, confirmation, export filtré) |
 | 11 | Documents | ✅ Fait — testé (upload, téléchargement, suppression, cloisonnement) |
 | 12 | Audit | ✅ Fait — testé (filtres, permissions, 21 événements réels vérifiés) |
-| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 63 tests unitaires (Vitest) + 53 tests API + 2 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
+| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 81 tests unitaires (Vitest) + 53 tests API + 4 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
 | 14 | Optimisation | ✅ Fait — requêtes dupliquées mémoïsées, fuite mémoire rate-limit corrigée, error.tsx ajouté, bug réel `loading.tsx`/`redirect()` trouvé et corrigé (retiré) |
 | 15 | Production (GitHub → Render → cPanel) | ✅ Fait et **déployé en réel** — https://geoarchives.ceiba-analytics.com, base cPanel `col_invent`, voir [DEPLOYMENT.md](DEPLOYMENT.md) |
 
@@ -295,6 +295,33 @@ de passe actuel côté serveur, jamais de confiance dans le seul formulaire).
 Protégé uniquement par `requireUser()` (pas de permission dédiée : ce n'est pas
 une action administrative sur un tiers, à la différence de `USER_MANAGE`).
 Accessible depuis le menu utilisateur (`UserMenu.tsx`).
+
+**Écrans d'administration CRUD (Phase 15+, hors périmètre initial des 15 phases)** :
+`/administration/communes`, `/lotissements`, `/natures` (référentiels géographiques —
+création/édition, jamais de suppression physique : un référentiel déjà utilisé par un
+dossier reste intègre, seule la désactivation `isActive` le retire des listes proposées
+à la Collecte) et `/administration/utilisateurs` (comptes — création avec mot de passe
+initial, modification, réinitialisation de mot de passe par un administrateur,
+désactivation). Un utilisateur créé/modifié avec le rôle OPERATEUR obtient/perd
+automatiquement une fiche `operateurs` liée (`user-admin-service.ts::nextOperateurMatricule`)
+— sans ce lien, il ne pourrait pas apparaître dans les listes d'opérateurs actifs ni se
+voir attribuer des dossiers (cf. `resolveOperateurId` dans `workflow-service.ts`).
+`/administration/roles` reste **volontairement en lecture seule** (matrice
+rôles × permissions telle qu'en base) : l'éditer en ligne risquerait de retirer par
+erreur une permission à son propre compte et de se retrouver bloqué hors de
+l'application — modification à faire via la source canonique
+`src/lib/permissions/constants.ts` + revue humaine.
+
+**Bug réel trouvé et corrigé pendant les tests E2E de ces écrans** : les callbacks
+`onSuccess` passés aux formulaires (fermeture de dialogue + toast + `router.refresh()`)
+n'étaient pas mémoïsés dans les composants parents. Comme `router.refresh()` provoque
+un nouveau rendu du parent, une nouvelle identité de fonction était recréée à chaque
+fois, ce qui redéclenchait le `useEffect` du formulaire enfant (dépendant de cette
+référence) et doublait le toast de succès. Corrigé en enveloppant chaque callback dans
+`useCallback` côté parent (`CommunesManager`, `LotissementsManager`, `NaturesManager`,
+`UsersManager`) — constaté uniquement via un vrai test E2E Playwright (`getByText`
+strict-mode a détecté les deux éléments dupliqués), invisible en lecture de code ou en
+test unitaire.
 
 ## 7. Préparation IA (V2, hors périmètre V1)
 

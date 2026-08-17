@@ -8,10 +8,12 @@ dossiers fonciers, avec dashboard analytique de reporting.
 > import/export, documents, audit, tests, optimisation, production) sont terminées,
 > testées, et **déployées en production** : https://geoarchives.ceiba-analytics.com
 > (Render + base MySQL cPanel `col_invent`, voir [DEPLOYMENT.md](DEPLOYMENT.md)).
-> Quelques décisions métier restent ouvertes (marquées « à confirmer avec le métier »),
-> les référentiels géographiques réels (communes/lotissements/natures) restent à
-> charger, et les écrans CRUD d'administration (utilisateurs/rôles/référentiels, hors
-> périmètre des 15 phases) sont en empty state — voir [ARCHITECTURE.md](ARCHITECTURE.md).
+> Les écrans d'administration (utilisateurs, communes/lotissements/natures) sont
+> construits — les référentiels géographiques réels restent à saisir par
+> `/administration/communes`, `/lotissements`, `/natures`. `/administration/roles`
+> reste en lecture seule par choix (voir ARCHITECTURE.md). Quelques décisions métier
+> restent ouvertes (marquées « à confirmer avec le métier ») — voir
+> [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Stack technique
 

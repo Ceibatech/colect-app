@@ -1,15 +1,33 @@
 import { requirePermission } from "@/lib/auth/current-user";
-import { ModulePlaceholder } from "@/components/layout/ModulePlaceholder";
+import { listUsersWithRoles, listRoles } from "@/lib/services/user-admin-service";
+import { UsersManager } from "@/components/administration/UsersManager";
 
 export const metadata = { title: "Utilisateurs — Administration" };
 
 export default async function AdminUtilisateursPage() {
-  await requirePermission("USER_MANAGE");
+  const session = await requirePermission("USER_MANAGE");
+  const [users, roles] = await Promise.all([listUsersWithRoles(), listRoles()]);
+
+  const serialized = users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    isActive: u.isActive,
+    lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+    role: { id: u.role.id, code: u.role.code, name: u.role.name },
+    operateur: u.operateur ? { id: u.operateur.id, matricule: u.operateur.matricule, isActive: u.operateur.isActive } : null,
+  }));
+
   return (
-    <ModulePlaceholder
-      title="Utilisateurs"
-      phase="Phase 3+ (extension admin)"
-      description="Création, modification, activation/désactivation des comptes et attribution des rôles."
-    />
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">Utilisateurs</h1>
+        <p className="text-sm text-muted-foreground">
+          {users.length} compte{users.length > 1 ? "s" : ""}. La désactivation retire l&apos;accès sans supprimer
+          l&apos;historique (§60).
+        </p>
+      </div>
+      <UsersManager users={serialized} roles={roles} currentUserId={session.userId} />
+    </div>
   );
 }

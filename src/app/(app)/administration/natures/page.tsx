@@ -1,15 +1,22 @@
 import { requirePermission } from "@/lib/auth/current-user";
-import { ModulePlaceholder } from "@/components/layout/ModulePlaceholder";
+import { listAllNatures } from "@/lib/services/referentiels-admin-service";
+import { NaturesManager } from "@/components/administration/NaturesManager";
 
 export const metadata = { title: "Natures de dossier — Administration" };
 
 export default async function AdminNaturesPage() {
   await requirePermission("REFERENTIEL_MANAGE");
+  const natures = await listAllNatures();
+
   return (
-    <ModulePlaceholder
-      title="Natures de dossier"
-      phase="Phase 6+ (référentiels)"
-      description="Gestion du référentiel des natures de dossier (titre foncier, attestation villageoise, etc.)."
-    />
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold">Natures de dossier</h1>
+        <p className="text-sm text-muted-foreground">
+          {natures.length} nature{natures.length > 1 ? "s" : ""} de dossier (titre foncier, attestation villageoise...).
+        </p>
+      </div>
+      <NaturesManager natures={natures} />
+    </div>
   );
 }

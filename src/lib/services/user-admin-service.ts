@@ -1,0 +1,179 @@
+"use server";
+
+import { prisma } from "@/lib/prisma/client";
+import { requirePermission } from "@/lib/auth/current-user";
+import { getClientIp } from "@/lib/utils/server-request";
+import { hashPassword } from "@/lib/auth/password";
+import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/validation/user-admin";
+
+/**
+ * CRUD administration des utilisateurs (Phase 15+, §11) — jamais de
+ * suppression physique : un utilisateur est référencé par de nombreux
+ * historiques (dossier_history, audit_logs, workflow_transitions...),
+ * une suppression casserait l'intégrité de ces journaux. Seule la
+ * désactivation (`isActive`) empêche la connexion sans perdre l'historique.
+ *
+ * Lien Opérateur : un utilisateur de rôle OPERATEUR a besoin d'une fiche
+ * `operateurs` (1:1, `userId`) pour apparaître dans les listes d'opérateurs
+ * actifs et pouvoir créer/soumettre des dossiers (cf. dossier-service.ts,
+ * workflow-service.ts::resolveOperateurId). Ce lien est créé/désactivé
+ * automatiquement ici selon le rôle choisi — jamais à la charge de
+ * l'administrateur de le faire manuellement ailleurs.
+ */
+
+export interface ActionResult {
+  error?: string;
+  success?: boolean;
+}
+
+export async function listUsersWithRoles() {
+  await requirePermission("USER_MANAGE");
+  return prisma.user.findMany({
+    orderBy: { name: "asc" },
+    include: { role: true, operateur: { select: { id: true, matricule: true, isActive: true } } },
+  });
+}
+
+export async function listRoles() {
+  await requirePermission("USER_MANAGE");
+  return prisma.role.findMany({ orderBy: { name: "asc" } });
+}
+
+async function nextOperateurMatricule(): Promise<string> {
+  const count = await prisma.operateur.count();
+  let n = count + 1;
+  // Boucle de sécurité si une matricule a été supprimée/réutilisée entre-temps (unique constraint).
+  for (let attempts = 0; attempts < 1000; attempts++) {
+    const candidate = `OP-${String(n).padStart(3, "0")}`;
+    const exists = await prisma.operateur.findUnique({ where: { matricule: candidate } });
+    if (!exists) return candidate;
+    n++;
+  }
+  throw new Error("Impossible de générer une matricule opérateur unique.");
+}
+
+export async function createUser(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("USER_MANAGE");
+  const parsed = createUserSchema.safeParse({
+    name: formData.get("name"),
+    email: formData.get("email"),
+    password: formData.get("password"),
+    roleId: formData.get("roleId"),
+    telephone: formData.get("telephone"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const email = parsed.data.email.toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) return { error: `L'e-mail "${email}" est déjà utilisé.` };
+
+  const role = await prisma.role.findUnique({ where: { id: parsed.data.roleId } });
+  if (!role) return { error: "Rôle introuvable." };
+
+  const passwordHash = await hashPassword(parsed.data.password);
+  const ip = await getClientIp();
+
+  const user = await prisma.user.create({
+    data: { name: parsed.data.name, email, passwordHash, roleId: role.id },
+  });
+
+  if (role.code === "OPERATEUR") {
+    const matricule = await nextOperateurMatricule();
+    await prisma.operateur.create({
+      data: {
+        userId: user.id,
+        matricule,
+        nom: parsed.data.name,
+        telephone: parsed.data.telephone || null,
+        email,
+        isActive: true,
+      },
+    });
+  }
+
+  await prisma.auditLog.create({
+    data: { userId: session.userId, action: "USER_CREATE", entity: "USER", entityId: user.id, newValue: { name: user.name, email, role: role.code }, ipAddress: ip },
+  });
+
+  return { success: true };
+}
+
+export async function updateUser(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("USER_MANAGE");
+  const parsed = updateUserSchema.safeParse({
+    name: formData.get("name"),
+    roleId: formData.get("roleId"),
+    isActive: formData.get("isActive") === "on",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const before = await prisma.user.findUnique({ where: { id }, include: { role: true, operateur: true } });
+  if (!before) return { error: "Utilisateur introuvable." };
+
+  const newRole = await prisma.role.findUnique({ where: { id: parsed.data.roleId } });
+  if (!newRole) return { error: "Rôle introuvable." };
+
+  if (before.id === session.userId && !parsed.data.isActive) {
+    return { error: "Vous ne pouvez pas désactiver votre propre compte." };
+  }
+
+  const ip = await getClientIp();
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id },
+      data: { name: parsed.data.name, roleId: newRole.id, isActive: parsed.data.isActive },
+    });
+
+    if (newRole.code === "OPERATEUR" && !before.operateur) {
+      const matricule = await nextOperateurMatricule();
+      await tx.operateur.create({
+        data: { userId: id, matricule, nom: parsed.data.name, email: before.email, isActive: true },
+      });
+    } else if (newRole.code === "OPERATEUR" && before.operateur) {
+      await tx.operateur.update({ where: { id: before.operateur.id }, data: { nom: parsed.data.name, isActive: parsed.data.isActive } });
+    } else if (newRole.code !== "OPERATEUR" && before.operateur?.isActive) {
+      // Rôle changé hors OPERATEUR : désactive la fiche opérateur (jamais de
+      // suppression — les dossiers déjà traités par cette fiche restent valides).
+      await tx.operateur.update({ where: { id: before.operateur.id }, data: { isActive: false } });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        userId: session.userId,
+        action: "USER_UPDATE",
+        entity: "USER",
+        entityId: id,
+        oldValue: { name: before.name, role: before.role.code, isActive: before.isActive },
+        newValue: { name: parsed.data.name, role: newRole.code, isActive: parsed.data.isActive },
+        ipAddress: ip,
+      },
+    });
+  });
+
+  return { success: true };
+}
+
+export async function resetUserPassword(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("USER_MANAGE");
+  const parsed = resetPasswordSchema.safeParse({
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (!user) return { error: "Utilisateur introuvable." };
+
+  const passwordHash = await hashPassword(parsed.data.newPassword);
+  const ip = await getClientIp();
+
+  await prisma.$transaction([
+    prisma.user.update({ where: { id }, data: { passwordHash } }),
+    prisma.auditLog.create({
+      data: { userId: session.userId, action: "PASSWORD_RESET_ADMIN", entity: "USER", entityId: id, ipAddress: ip },
+    }),
+  ]);
+
+  return { success: true };
+}
