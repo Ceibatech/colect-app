@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Archive } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -34,7 +34,14 @@ export function AppSidebar({ permissions }: { permissions: PermissionCode[] }) {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <Archive className="h-5 w-5 shrink-0 text-primary" />
+          <Image
+            src="/brand/ceiba-icon.png"
+            alt=""
+            width={28}
+            height={28}
+            className="h-7 w-7 shrink-0"
+            priority
+          />
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
             <span className="text-sm font-semibold">GeoArchives-MULCV</span>
             <span className="text-xs text-muted-foreground">Numérisation &amp; Indexation</span>

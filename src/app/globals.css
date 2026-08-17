@@ -39,6 +39,9 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-green: var(--brand-green);
+  --color-brand-gray: var(--brand-gray);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,13 +52,23 @@
 }
 
 :root {
+  /* Couleurs de marque CEIBA Analytics — extraites du logo officiel
+     (public/brand/ceiba-analytics-logo.png) : bleu du texte "CEIBA",
+     vert de l'arbre/flèche, gris de "ANALYTICS". Servent de base aux
+     tokens primary/ring/sidebar ci-dessous et sont exposées telles
+     quelles via --color-brand-* (ex. bg-brand-blue) pour un usage
+     ponctuel dans les composants. */
+  --brand-blue: #28519f;
+  --brand-green: #068c78;
+  --brand-gray: #8f8d8e;
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: var(--brand-blue);
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -66,7 +79,7 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --ring: var(--brand-blue);
   /* Palette catégorielle data-viz — ordre fixe, jamais permuté (voir
      ARCHITECTURE.md § Dashboard). Utilisée pour les 5 étapes du pipeline
      (Collecte/Validation/Numérisation/Indexation/Archivage) et toute série
@@ -79,23 +92,30 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary: var(--brand-blue);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar-ring: var(--brand-blue);
 }
 
 .dark {
+  /* Même bleu de marque éclairci pour rester lisible sur fond sombre
+     (le bleu du logo, trop sombre à pleine saturation sur un fond
+     proche du noir, perdrait en contraste sinon). */
+  --brand-blue: #6f97d6;
+  --brand-green: #2fb39d;
+  --brand-gray: #a8a6a7;
+
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: var(--brand-blue);
+  --primary-foreground: oklch(0.145 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
@@ -105,7 +125,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: var(--brand-blue);
   --chart-1: #3987e5; /* bleu */
   --chart-2: #d95926; /* orange */
   --chart-3: #199e70; /* aqua */
@@ -113,12 +133,12 @@
   --chart-5: #d55181; /* magenta */
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: var(--brand-blue);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: var(--brand-blue);
 }
 
 @layer base {
