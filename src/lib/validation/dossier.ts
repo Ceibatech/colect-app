@@ -78,6 +78,12 @@ export const dossierFormSchema = z.object({
 
   // ÉTAPE 3 — Dossier
   natureDossierId: z.coerce.number().int().positive().optional(),
+  // Saisie libre si "Autres" est choisi (cf. StepDossier.tsx) — résolue
+  // côté serveur vers une fiche `natures_dossier` réelle (existante ou
+  // créée à la volée), comme pour le Lotissement. `natureDossierId` reste
+  // vide tant que "Autres" est sélectionné ; l'un ou l'autre doit être
+  // renseigné à la soumission (voir le .refine ci-dessous).
+  natureDossierAutre: z.string().max(150).optional().or(z.literal("")),
 
   // ÉTAPE 4 — Titulaire
   nom: z.string().max(150).optional().or(z.literal("")),
@@ -98,21 +104,26 @@ export const dossierFormSchema = z.object({
 export type DossierFormValues = z.infer<typeof dossierFormSchema>;
 
 /** Vérification stricte exécutée uniquement au moment de "Soumettre" (§41). */
-export const dossierSubmitSchema = dossierFormSchema.extend({
-  communeId: z.coerce.number({ message: "La commune est requise" }).int().positive("La commune est requise"),
-  lotissementNom: z.string().min(1, "Le lotissement est requis").max(150),
-  natureDossierId: z.coerce
-    .number({ message: "La nature de dossier est requise" })
-    .int()
-    .positive("La nature de dossier est requise"),
-  nom: z.string().min(1, "Le nom du titulaire est requis").max(150),
-  prenoms: z.string().min(1, "Le(s) prénom(s) du titulaire sont requis").max(150),
-});
+export const dossierSubmitSchema = dossierFormSchema
+  .extend({
+    communeId: z.coerce.number({ message: "La commune est requise" }).int().positive("La commune est requise"),
+    lotissementNom: z.string().min(1, "Le lotissement est requis").max(150),
+    nom: z.string().min(1, "Le nom du titulaire est requis").max(150),
+    prenoms: z.string().min(1, "Le(s) prénom(s) du titulaire sont requis").max(150),
+  })
+  // natureDossierId (liste fermée) OU natureDossierAutre (saisie "Autres")
+  // — l'un des deux est requis, jamais les deux à la fois côté UI mais le
+  // serveur ne fait confiance à aucun des deux isolément (dossier-service.ts
+  // revérifie et résout la valeur finale).
+  .refine((data) => !!data.natureDossierId || !!data.natureDossierAutre?.trim(), {
+    message: "La nature de dossier est requise",
+    path: ["natureDossierId"],
+  });
 
 export const DOSSIER_STEPS = [
   { id: 1, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement"] },
   { id: 2, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
-  { id: 3, title: "Dossier", fields: ["natureDossierId"] },
+  { id: 3, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre"] },
   { id: 4, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
   { id: 5, title: "Contact", fields: ["personneContact", "mobile"] },
   { id: 6, title: "Suivi", fields: ["nombrePages", "observations"] },

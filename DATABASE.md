@@ -69,6 +69,13 @@ personneContact, mobile
 > `resolveLotissementId()` dans `src/lib/services/dossier-service.ts`. La colonne
 > `lotissementId` du modèle `Dossier` reste une FK inchangée ; dashboards, exports et
 > filtres n'ont donc nécessité aucune modification.
+>
+> **Note (Phase 15+)** : `natureDossierId` (FK vers `natures_dossier`) suit le même
+> principe. Les 41 natures réelles fournies par le métier (`scripts/import-natures.ts`)
+> remplacent les 5 natures fictives du seed — trop nombreuses pour rester un `RadioGroup`
+> dans la Collecte, remplacé par un `<Select>` + option « Autres » (saisie libre
+> `natureDossierAutre`, résolue côté serveur — `resolveNatureDossierId()` — vers une fiche
+> existante ou créée à la volée, sans scope par commune contrairement au lotissement).
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le

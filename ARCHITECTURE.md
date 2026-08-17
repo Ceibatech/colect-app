@@ -284,7 +284,7 @@ entre `quality-scoring.ts` (pur) et `quality-service.ts` (`"use server"`) en Pha
 | 10 | Import / Export (Excel/CSV) | ✅ Fait — testé (aperçu, doublons, confirmation, export filtré) |
 | 11 | Documents | ✅ Fait — testé (upload, téléchargement, suppression, cloisonnement) |
 | 12 | Audit | ✅ Fait — testé (filtres, permissions, 21 événements réels vérifiés) |
-| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 82 tests unitaires (Vitest) + 53 tests API + 6 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
+| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 82 tests unitaires (Vitest) + 53 tests API + 7 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
 | 14 | Optimisation | ✅ Fait — requêtes dupliquées mémoïsées, fuite mémoire rate-limit corrigée, error.tsx ajouté, bug réel `loading.tsx`/`redirect()` trouvé et corrigé (retiré) |
 | 15 | Production (GitHub → Render → cPanel) | ✅ Fait et **déployé en réel** — https://geoarchives.ceiba-analytics.com, base cPanel `col_invent`, voir [DEPLOYMENT.md](DEPLOYMENT.md) |
 
@@ -331,6 +331,17 @@ vers une fiche réelle (existante réutilisée, sinon créée à la volée) — 
 En corrigeant ce champ, deux bugs annexes trouvés et corrigés dans le même passage :
 `numeroDirectionService` manquait dans les valeurs pré-remplies à la reprise d'un
 brouillon (`/collecte/page.tsx`), oublié lors du refactor Direction/Service précédent.
+
+**Nature du dossier — liste réelle + Autres (Phase 15+)** : les 5 natures fictives du
+seed remplacées par les **41 natures réelles** fournies par le métier (`scripts/import-natures.ts`,
+retranscrites sans correction orthographique de notre part, un doublon exact dans la
+liste source dédupliqué). Le `RadioGroup` de `StepDossier.tsx` — praticable pour 5
+options, plus du tout pour 41 — remplacé par un `<Select>` + option "Autres" qui bascule
+en saisie libre (même mécanique d'interface que Direction/Service). `natureDossierId`
+reste la FK utilisée partout (dashboards, exports, score qualité) ; la saisie "Autres"
+(`natureDossierAutre`) est résolue côté serveur vers une fiche `natures_dossier` réelle,
+find-or-create global (pas de scope par commune, contrairement au Lotissement) — voir
+`resolveNatureDossierId()` dans `dossier-service.ts`.
 
 **Bug de production non résolu (constaté, non bloquant)** : une erreur d'hydratation
 React (#418) apparaît sur *toutes* les pages en production (Render) — jamais reproduite

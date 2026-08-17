@@ -51,7 +51,7 @@ export function StepRecap({
 }) {
   const v = form.getValues();
   const commune = lookups.communes.find((c) => c.id === v.communeId);
-  const nature = lookups.natures.find((n) => n.id === v.natureDossierId);
+  const nature = lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
   const operateur = lookups.isOperateurRole
     ? lookups.currentUserName
     : (() => {
@@ -85,7 +85,7 @@ export function StepRecap({
       </Section>
 
       <Section title="Dossier" onEdit={() => onEditStep(3)}>
-        <Row label="Nature du dossier" value={nature?.libelle} />
+        <Row label="Nature du dossier" value={nature} />
       </Section>
 
       <Section title="Titulaire" onEdit={() => onEditStep(4)}>

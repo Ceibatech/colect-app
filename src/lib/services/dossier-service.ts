@@ -40,10 +40,12 @@ async function resolveOperateurId(session: SessionPayload, formOperateurId?: num
  * confiance au client — un <input type="number"> vide envoie `""`, pas
  * `undefined`, ce que Prisma refuse pour un champ Decimal/Int).
  *
- * `lotissementId` (FK réelle) n'est volontairement PAS calculé ici : la
- * saisie est libre côté formulaire (`lotissementNom`) et résolue séparément
- * par `resolveLotissementId()`, qui a besoin d'un accès base (find-or-create)
- * — cette fonction reste synchrone et pure.
+ * `lotissementId` et `natureDossierId` (FK réelles) ne sont volontairement
+ * PAS calculés ici : la saisie peut être libre côté formulaire
+ * (`lotissementNom`, `natureDossierAutre` si "Autres") et est résolue
+ * séparément par `resolveLotissementId()`/`resolveNatureDossierId()`, qui
+ * ont besoin d'un accès base (find-or-create) — cette fonction reste
+ * synchrone et pure.
  */
 function cleanForDb(values: DossierFormValues) {
   const clean = <T>(v: T | "" | undefined): T | undefined => (v === "" ? undefined : v);
@@ -64,7 +66,6 @@ function cleanForDb(values: DossierFormValues) {
     superficie: toNullableNumber(values.superficie),
     numeroTitreFoncier: clean(values.numeroTitreFoncier) ?? null,
     communeId: toNullableNumber(values.communeId),
-    natureDossierId: toNullableNumber(values.natureDossierId),
     nom: clean(values.nom) ?? null,
     prenoms: clean(values.prenoms) ?? null,
     adresse: clean(values.adresse) ?? null,
@@ -116,6 +117,41 @@ async function resolveLotissementId(communeId: number | null | undefined, nomLib
   return created.id;
 }
 
+/** Génère un code de nature de dossier unique. */
+async function generateNatureCode(): Promise<string> {
+  const count = await prisma.natureDossier.count();
+  let n = count + 1;
+  for (let attempts = 0; attempts < 1000; attempts++) {
+    const candidate = `NAT-${String(n).padStart(3, "0")}`;
+    const exists = await prisma.natureDossier.findUnique({ where: { code: candidate } });
+    if (!exists) return candidate;
+    n++;
+  }
+  throw new Error("Impossible de générer un code de nature de dossier unique.");
+}
+
+/**
+ * Résout la "Nature du dossier" (Phase 15+) : soit l'identifiant choisi
+ * dans la liste fermée (`natureDossierId`), soit — si "Autres" a été
+ * sélectionné dans le formulaire — la saisie libre `natureDossierAutre`,
+ * résolue vers une fiche `natures_dossier` existante (insensible à la
+ * casse) ou créée à la volée. Pas de scope par commune ici (contrairement
+ * au Lotissement) : une nature de dossier n'est pas rattachée à une
+ * commune.
+ */
+async function resolveNatureDossierId(natureDossierId: number | null, autreLibre: string | undefined): Promise<number | null> {
+  if (natureDossierId) return natureDossierId;
+  const libelle = autreLibre?.trim();
+  if (!libelle) return null;
+
+  const existing = await prisma.natureDossier.findFirst({ where: { libelle: { equals: libelle } } });
+  if (existing) return existing.id;
+
+  const code = await generateNatureCode();
+  const created = await prisma.natureDossier.create({ data: { code, libelle, isActive: true } });
+  return created.id;
+}
+
 /**
  * Génère une référence unique DOS-{année}-{séquence}. Approche "count + retry
  * sur conflit" — suffisante pour le volume attendu en V1. Sous forte
@@ -156,7 +192,8 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
   const operateurId = await resolveOperateurId(session, values.operateurId);
   const cleaned = cleanForDb(values);
   const lotissementId = await resolveLotissementId(cleaned.communeId, values.lotissementNom);
-  const data = { ...cleaned, lotissementId };
+  const natureDossierId = await resolveNatureDossierId(values.natureDossierId ?? null, values.natureDossierAutre);
+  const data = { ...cleaned, lotissementId, natureDossierId };
 
   if (values.codeBarres) {
     const existing = await prisma.dossier.findFirst({

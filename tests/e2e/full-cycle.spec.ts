@@ -75,11 +75,8 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
   await fillField(page, "Lotissement", lotissement.nom);
   await clickNext(page);
 
-  // Étape 3 — Dossier (nature, RadioGroup avec vrai label/for). Le Base UI
-  // RadioGroupItem (role="radio") et son <input> natif caché partagent le
-  // même label -> on cible explicitement le rôle radio pour lever
-  // l'ambiguïté de "strict mode" de Playwright.
-  await page.getByRole("radio", { name: nature.libelle }).click();
+  // Étape 3 — Dossier (nature, Select à liste fermée + "Autres", Phase 15+)
+  await selectCombobox(page, "Nature du dossier", nature.libelle);
   await clickNext(page);
 
   // Étape 4 — Titulaire (champs obligatoires à la soumission, §41)

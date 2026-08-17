@@ -1,16 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import type { DossierFormValues } from "@/lib/validation/dossier";
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface NatureDossier {
   id: number;
   libelle: string;
 }
+
+/** Sentinelle d'interface uniquement — jamais stockée (résolue côté serveur). */
+const AUTRES = "__AUTRES__";
 
 export function StepDossier({
   form,
@@ -19,8 +23,12 @@ export function StepDossier({
   form: UseFormReturn<DossierFormValues>;
   natures: NatureDossier[];
 }) {
-  const { control, formState } = form;
+  const { register, control, formState, setValue } = form;
   const errors = formState.errors;
+
+  const items = [...natures.map((n) => ({ label: n.libelle, value: String(n.id) })), { label: "Autres (préciser)", value: AUTRES }];
+
+  const [autres, setAutres] = useState(() => !form.getValues("natureDossierId") && !!form.getValues("natureDossierAutre"));
 
   return (
     <Field>
@@ -30,23 +38,39 @@ export function StepDossier({
           control={control}
           name="natureDossierId"
           render={({ field }) => (
-            <RadioGroup
-              value={field.value ? String(field.value) : ""}
-              onValueChange={(v) => field.onChange(Number(v))}
-              className="gap-2"
-            >
-              {natures.map((n) => (
-                <div key={n.id} className="flex items-center gap-2 rounded-md border p-2.5">
-                  <RadioGroupItem value={String(n.id)} id={`nature-${n.id}`} />
-                  <Label htmlFor={`nature-${n.id}`} className="font-normal">
-                    {n.libelle}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
+            <>
+              <Select
+                items={items}
+                value={autres ? AUTRES : field.value ? String(field.value) : null}
+                onValueChange={(value) => {
+                  if (value === AUTRES) {
+                    setAutres(true);
+                    field.onChange(undefined);
+                  } else {
+                    setAutres(false);
+                    setValue("natureDossierAutre", "");
+                    field.onChange(Number(value));
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Sélectionner une nature de dossier" />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {autres ? (
+                <Input {...register("natureDossierAutre")} placeholder="Préciser la nature du dossier" className="mt-2" autoFocus />
+              ) : null}
+            </>
           )}
         />
-        <FieldError errors={[errors.natureDossierId]} />
+        <FieldError errors={[errors.natureDossierId, errors.natureDossierAutre]} />
       </FieldContent>
     </Field>
   );
