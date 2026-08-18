@@ -34,8 +34,13 @@ export function AppSidebar({ permissions }: { permissions: PermissionCode[] }) {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
+          {/* Version "simplifiée" (fusion des petites feuilles par
+              fermeture morphologique) plutôt que ceiba-icon.png (détaillé,
+              utilisé pour apple-icon.png à 180px) : à 28px le tracé fin des
+              feuilles individuelles se réduisait à un bruit de pixels
+              verts illisible — voir public/brand/ceiba-icon-simple.png. */}
           <Image
-            src="/brand/ceiba-icon.png"
+            src="/brand/ceiba-icon-simple.png"
             alt=""
             width={28}
             height={28}
