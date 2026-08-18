@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Pencil } from "lucide-react";
 
 interface Lookups {
+  sites: { id: number; nom: string; code: string }[];
   communes: { id: number; nom: string; lotissements: { id: number; nom: string }[] }[];
   natures: { id: number; libelle: string }[];
   operateurs: { id: number; nom: string; prenoms: string | null }[];
@@ -50,6 +51,7 @@ export function StepRecap({
   onEditStep: (step: number) => void;
 }) {
   const v = form.getValues();
+  const site = lookups.sites.find((s) => s.id === v.siteId);
   const commune = lookups.communes.find((c) => c.id === v.communeId);
   const nature = lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
   const etatLabel = (value?: string) => ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label;
@@ -66,7 +68,11 @@ export function StepRecap({
         Vérifiez les informations avant de soumettre le dossier. Cliquez sur « Modifier » pour corriger une section.
       </p>
 
-      <Section title="Identification" onEdit={() => onEditStep(1)}>
+      <Section title="Site" onEdit={() => onEditStep(1)}>
+        <Row label="Site d'archivage" value={site ? `${site.nom} (${site.code})` : undefined} />
+      </Section>
+
+      <Section title="Identification" onEdit={() => onEditStep(2)}>
         <Row label="Opérateur" value={operateur} />
         <Row label="Libellé du carton" value={v.libelleCarton} />
         <Row label="Code-barres" value={v.codeBarres} />
@@ -78,7 +84,7 @@ export function StepRecap({
         {v.etatCarton === "DEGRADE" ? <Row label="Description de l'état (carton)" value={v.etatCartonDescription} /> : null}
       </Section>
 
-      <Section title="Informations foncières" onEdit={() => onEditStep(2)}>
+      <Section title="Informations foncières" onEdit={() => onEditStep(3)}>
         <Row label="N° îlot" value={v.numeroIlot} />
         <Row label="N° lot" value={v.numeroLot} />
         <Row label="Superficie" value={v.superficie ? `${v.superficie} m²` : undefined} />
@@ -87,13 +93,13 @@ export function StepRecap({
         <Row label="Lotissement" value={v.lotissementNom} />
       </Section>
 
-      <Section title="Dossier" onEdit={() => onEditStep(3)}>
+      <Section title="Dossier" onEdit={() => onEditStep(4)}>
         <Row label="Nature du dossier" value={nature} />
         <Row label="État du dossier" value={etatLabel(v.etatDossier)} />
         {v.etatDossier === "DEGRADE" ? <Row label="Description de l'état (dossier)" value={v.etatDossierDescription} /> : null}
       </Section>
 
-      <Section title="Titulaire" onEdit={() => onEditStep(4)}>
+      <Section title="Titulaire" onEdit={() => onEditStep(5)}>
         <Row label="Nom" value={v.nom} />
         <Row label="Prénoms" value={v.prenoms} />
         <Row label="Adresse" value={v.adresse} />
@@ -101,12 +107,12 @@ export function StepRecap({
         <Row label="E-mail" value={v.email} />
       </Section>
 
-      <Section title="Contact" onEdit={() => onEditStep(5)}>
+      <Section title="Contact" onEdit={() => onEditStep(6)}>
         <Row label="Personne à contacter" value={v.personneContact} />
         <Row label="Mobile" value={v.mobile} />
       </Section>
 
-      <Section title="Suivi" onEdit={() => onEditStep(6)}>
+      <Section title="Suivi" onEdit={() => onEditStep(7)}>
         <Row label="Nombre de pages" value={v.nombrePages} />
         <Row label="Observations" value={v.observations} />
       </Section>

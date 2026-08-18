@@ -39,6 +39,13 @@ const COMMUNES = [
   { code: "COM-05", nom: "Commune Démo Centre" },
 ];
 
+// Sites d'archivage fictifs (Phase 16+) — mêmes réserves que COMMUNES ci-dessus.
+const SITES = [
+  { code: "SITE-DEMO-01", nom: "Site Démo Central", typeSite: "Siège" },
+  { code: "SITE-DEMO-02", nom: "Site Démo Dépôt Nord", typeSite: "Dépôt" },
+  { code: "SITE-DEMO-03", nom: "Site Démo Antenne Sud", typeSite: "Antenne" },
+];
+
 const NATURES_DOSSIER = [
   { code: "NAT-TF", libelle: "Titre foncier" },
   { code: "NAT-AV", libelle: "Attestation villageoise" },
@@ -197,6 +204,18 @@ async function main() {
   const lotissements = await prisma.lotissement.findMany();
   console.log(`✔ ${communes.length} communes / ${lotissements.length} lotissements`);
 
+  // 6bis. Sites d'archivage (Phase 16+)
+  const sites = [];
+  for (const [i, s] of SITES.entries()) {
+    const site = await prisma.site.upsert({
+      where: { code: s.code },
+      update: {},
+      create: { ...s, communeId: communes[i % communes.length]?.id, ville: "Abidjan", region: "Abidjan" },
+    });
+    sites.push(site);
+  }
+  console.log(`✔ ${sites.length} sites d'archivage`);
+
   // 7. Natures de dossier
   const natures = [];
   for (const n of NATURES_DOSSIER) {
@@ -233,6 +252,7 @@ async function main() {
   for (let i = 0; i < TOTAL_DOSSIERS; i++) {
     const createdAt = faker.date.between({ from: startDate, to: endDate });
     const operateur = faker.helpers.arrayElement(operateurs);
+    const site = faker.helpers.arrayElement(sites);
     const commune = faker.helpers.arrayElement(communes);
     const communeLots = lotissements.filter((l) => l.communeId === commune.id);
     const lotissement = faker.helpers.arrayElement(communeLots);
@@ -274,6 +294,7 @@ async function main() {
       data: {
         reference,
         operateurId: operateur.id,
+        siteId: site.id,
         libelleCarton: `Carton ${faker.string.alphanumeric(6).toUpperCase()}`,
         codeBarres: faker.string.numeric(13),
         numeroGuichet: faker.string.numeric(6),

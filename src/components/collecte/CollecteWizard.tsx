@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { StepIndicator } from "./StepIndicator";
+import { StepSite, type SiteOption } from "./steps/StepSite";
 import { StepIdentification } from "./steps/StepIdentification";
 import { StepFoncier } from "./steps/StepFoncier";
 import { StepDossier } from "./steps/StepDossier";
@@ -52,6 +53,7 @@ interface Operateur {
 export interface CollecteWizardProps {
   initialValues?: Partial<DossierFormValues>;
   initialDraftId?: number;
+  sites: SiteOption[];
   communes: CommuneWithLotissements[];
   natures: NatureDossier[];
   operateurs: Operateur[];
@@ -64,6 +66,7 @@ const EMPTY_VALUES: DossierFormValues = {};
 export function CollecteWizard({
   initialValues,
   initialDraftId,
+  sites,
   communes,
   natures,
   operateurs,
@@ -189,19 +192,20 @@ export function CollecteWizard({
       </CardHeader>
       <CardContent className="space-y-6">
         <form onSubmit={(e) => e.preventDefault()}>
-          {currentStep === 1 && (
+          {currentStep === 1 && <StepSite form={form} sites={sites} />}
+          {currentStep === 2 && (
             <StepIdentification form={form} operateurs={operateurs} isOperateurRole={isOperateurRole} currentUserName={currentUserName} />
           )}
-          {currentStep === 2 && <StepFoncier form={form} communes={communes} />}
-          {currentStep === 3 && <StepDossier form={form} natures={natures} />}
-          {currentStep === 4 && <StepTitulaire form={form} />}
-          {currentStep === 5 && <StepContact form={form} />}
-          {currentStep === 6 && <StepSuivi form={form} />}
-          {currentStep === 7 && (
+          {currentStep === 3 && <StepFoncier form={form} communes={communes} />}
+          {currentStep === 4 && <StepDossier form={form} natures={natures} />}
+          {currentStep === 5 && <StepTitulaire form={form} />}
+          {currentStep === 6 && <StepContact form={form} />}
+          {currentStep === 7 && <StepSuivi form={form} />}
+          {currentStep === 8 && (
             <StepRecap
               form={form}
               onEditStep={setCurrentStep}
-              lookups={{ communes, natures, operateurs, isOperateurRole, currentUserName }}
+              lookups={{ sites, communes, natures, operateurs, isOperateurRole, currentUserName }}
             />
           )}
         </form>

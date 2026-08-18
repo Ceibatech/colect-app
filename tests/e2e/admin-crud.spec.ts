@@ -42,6 +42,37 @@ test("administration : création d'une commune", async ({ page }) => {
   }
 });
 
+test("administration : création d'un site (Phase 16+)", async ({ page }) => {
+  // "code" limité à 20 caractères (siteSchema.code) — mêmes contraintes que Commune ci-dessus.
+  const code = `E2E-STE-${String(UNIQUE).slice(-8)}`;
+  let siteId: number | undefined;
+
+  try {
+    await page.goto("/login");
+    await page.getByLabel("E-mail").fill(DEMO_USERS.admin);
+    await page.getByLabel("Mot de passe").fill("Demo@2026!");
+    await page.getByRole("button", { name: "Se connecter" }).click();
+    await page.waitForURL("**/dashboard");
+
+    await page.goto("/administration/sites");
+    await page.getByRole("button", { name: "Nouveau site" }).click();
+
+    await page.getByLabel("Code site").fill(code);
+    await page.getByLabel("Nom du site").fill(`Site E2E ${UNIQUE}`);
+    await page.getByRole("button", { name: "Enregistrer" }).click();
+
+    await expect(page.getByText("Site créé.")).toBeVisible();
+    await expect(page.getByText(code)).toBeVisible();
+
+    const site = await testPrisma.site.findUniqueOrThrow({ where: { code } });
+    siteId = site.id;
+    expect(site.nom).toBe(`Site E2E ${UNIQUE}`);
+    expect(site.isActive).toBe(true);
+  } finally {
+    if (siteId) await testPrisma.site.delete({ where: { id: siteId } }).catch(() => {});
+  }
+});
+
 test("administration : création d'un utilisateur Opérateur crée automatiquement sa fiche opérateur", async ({ page }) => {
   const email = `e2e-admin-crud-${UNIQUE}@example.com`;
   let userId: number | undefined;

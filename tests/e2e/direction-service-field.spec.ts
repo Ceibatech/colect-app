@@ -36,6 +36,9 @@ test("Direction/Service : sélection dans la liste fermée, puis bascule vers Au
     await page.goto("/collecte/nouveau");
     await expect(page.getByText("Collecte — Fiche d'inventaire CG1020")).toBeVisible();
 
+    // --- Étape 1 : Site (Phase 16+, optionnel) — on passe directement ---
+    await page.getByRole("button", { name: "Suivant", exact: true }).click();
+
     await fillField(page, "Code-barres", codeBarres);
 
     // --- 1. Sélectionner une valeur de la liste fermée (GUF) ---

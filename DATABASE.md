@@ -24,7 +24,7 @@ npm run db:verify
 |---|---|---|
 | RBAC | `roles`, `permissions`, `role_permissions` | Contrôle d'accès basé sur les rôles |
 | Identité | `users`, `operateurs` | Comptes applicatifs et fiches opérateur terrain |
-| Référentiels | `communes`, `lotissements`, `natures_dossier` | Listes de valeurs pour la collecte |
+| Référentiels | `sites`, `communes`, `lotissements`, `natures_dossier` | Listes de valeurs pour la collecte |
 | Workflow | `workflow_statuses`, `workflow_transitions`, `dossier_history` | Configuration et traçabilité du cycle métier |
 | Métier | `dossiers` | Table centrale — fiche CG1020 + suivi applicatif |
 | Documents | `documents` | Métadonnées des fichiers numérisés (pas de blob en base) |
@@ -90,6 +90,19 @@ personneContact, mobile
 > validation ET de consultation d'un compte SUPERVISEUR (dossiers, export, qualité,
 > dashboard) — voir `src/lib/services/access-scope.ts` et ARCHITECTURE.md §6. Gérée depuis
 > `/administration/utilisateurs`, jamais directement en base.
+>
+> **Ajout (Phase 16+)** : `dossiers.site_id` (FK nullable vers `sites.id`, `ON DELETE
+> SET NULL`) — site d'archivage physique auquel le dossier est rattaché, choisi en
+> première étape de la Collecte (avant Identification). Table `sites` : référentiel géré
+> depuis `/administration/sites` (mêmes conventions que `communes`/`lotissements` —
+> jamais de suppression physique, `is_active` retire une entrée des listes proposées).
+> Champs alignés sur la fiche "Informations générales du site" fournie par le métier
+> (code, nom, type, description, statut, date de mise en service, responsable,
+> téléphone, email, adresse, commune — FK vers `communes` existant, quartier, ville,
+> région). `site_id` reste **optionnel** à la soumission (contrairement à `communeId`) :
+> le référentiel est vide à l'introduction de ce champ, le rendre obligatoire aurait
+> bloqué toute la Collecte tant qu'aucun site n'existe — à réévaluer une fois le
+> référentiel peuplé.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le

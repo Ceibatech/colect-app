@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current-user";
-import { getCommunesWithLotissements, getNaturesDossier, getActiveOperateurs } from "@/lib/services/referentiels-service";
+import { getCommunesWithLotissements, getNaturesDossier, getActiveOperateurs, getActiveSites } from "@/lib/services/referentiels-service";
 import { listMyDrafts, getDraftById } from "@/lib/services/dossier-service";
 import { CollecteWizard } from "@/components/collecte/CollecteWizard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +20,8 @@ export default async function CollectePage({
   const { draft } = await searchParams;
   const draftId = draft ? Number(draft) : undefined;
 
-  const [communes, natures, operateurs] = await Promise.all([
+  const [sites, communes, natures, operateurs] = await Promise.all([
+    getActiveSites(),
     getCommunesWithLotissements(),
     getNaturesDossier(),
     session.roleCode === "OPERATEUR" ? Promise.resolve([]) : getActiveOperateurs(),
@@ -33,6 +34,7 @@ export default async function CollectePage({
     const dossier = await getDraftById(draftId);
     if (dossier) {
       const initialValues: Partial<DossierFormValues> = {
+        siteId: dossier.siteId ?? undefined,
         operateurId: dossier.operateurId,
         libelleCarton: dossier.libelleCarton ?? undefined,
         codeBarres: dossier.codeBarres ?? undefined,
@@ -61,6 +63,7 @@ export default async function CollectePage({
         <CollecteWizard
           initialValues={initialValues}
           initialDraftId={dossier.id}
+          sites={sites}
           communes={communes}
           natures={natures}
           operateurs={operateurs}
@@ -112,6 +115,7 @@ export default async function CollectePage({
 
   return (
     <CollecteWizard
+      sites={sites}
       communes={communes}
       natures={natures}
       operateurs={operateurs}

@@ -41,6 +41,9 @@ test("Lotissement : un nom encore inconnu pour la commune crée une nouvelle fic
     await page.goto("/collecte/nouveau");
     await expect(page.getByText("Collecte — Fiche d'inventaire CG1020")).toBeVisible();
 
+    // --- Étape 1 : Site (Phase 16+, optionnel) — on passe directement ---
+    await page.getByRole("button", { name: "Suivant", exact: true }).click();
+
     await fillField(page, "Code-barres", codeBarres);
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
 

@@ -20,7 +20,7 @@ export interface ExportFilters {
 const MAX_EXPORT_ROWS = 20_000;
 
 const EXPORT_COLUMNS = [
-  "Référence", "Code-barres", "N° guichet", "Direction/Service concerné(e)", "Numéro Direction/Service", "Référence classement",
+  "Site", "Référence", "Code-barres", "N° guichet", "Direction/Service concerné(e)", "Numéro Direction/Service", "Référence classement",
   "N° îlot", "N° lot", "Superficie", "N° titre foncier", "Commune", "Lotissement", "Nature dossier",
   "Nom", "Prénoms", "Adresse", "Téléphone", "E-mail", "Personne à contacter", "Mobile", "Opérateur",
   "Statut collecte", "Statut validation", "Statut numérisation", "Statut indexation", "Statut archivage",
@@ -75,6 +75,7 @@ async function loadExportRows(filters: ExportFilters, session: SessionPayload) {
     take: MAX_EXPORT_ROWS,
     orderBy: { createdAt: "desc" },
     include: {
+      site: { select: { nom: true, code: true } },
       commune: { select: { nom: true } },
       lotissement: { select: { nom: true } },
       natureDossier: { select: { libelle: true } },
@@ -85,6 +86,7 @@ async function loadExportRows(filters: ExportFilters, session: SessionPayload) {
 
 function toRow(d: Awaited<ReturnType<typeof loadExportRows>>[number]): (string | number)[] {
   return [
+    d.site ? `${d.site.nom} (${d.site.code})` : "",
     d.reference,
     d.codeBarres ?? "",
     d.numeroGuichet ?? "",

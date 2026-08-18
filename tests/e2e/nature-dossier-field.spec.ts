@@ -38,11 +38,14 @@ test("Nature du dossier : Autres crée une nouvelle fiche référentiel à la vo
     await page.goto("/collecte/nouveau");
     await expect(page.getByText("Collecte — Fiche d'inventaire CG1020")).toBeVisible();
 
+    // --- Étape 1 : Site (Phase 16+, optionnel) — on passe directement ---
+    await page.getByRole("button", { name: "Suivant", exact: true }).click();
+
     await fillField(page, "Code-barres", codeBarres);
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
 
-    // --- Étape 3 : basculer directement sur "Autres" ---
+    // --- Étape 4 : basculer directement sur "Autres" ---
     await selectCombobox(page, "Nature du dossier", "Autres (préciser)");
     const freeText = page.getByPlaceholder("Préciser la nature du dossier");
     await expect(freeText).toBeVisible();

@@ -51,7 +51,15 @@ export const ETAT_CONSERVATION_OPTIONS = [
  * confiance à ce que le client envoie).
  */
 export const dossierFormSchema = z.object({
-  // ÉTAPE 1 — Identification
+  // ÉTAPE 1 — Site
+  // Site d'archivage physique (Phase 16+) — référentiel géré depuis
+  // /administration/sites. Optionnel pour l'instant : le référentiel est
+  // vide à l'introduction de ce champ (aucun site n'existe encore), le
+  // rendre obligatoire à la soumission bloquerait toute la Collecte tant
+  // qu'un administrateur n'a pas créé au moins un site.
+  siteId: z.coerce.number().int().positive().optional(),
+
+  // ÉTAPE 2 — Identification
   operateurId: z.coerce.number().int().positive().optional(),
   libelleCarton: z.string().max(255).optional().or(z.literal("")),
   codeBarres: z.string().max(100).optional().or(z.literal("")),
@@ -68,7 +76,7 @@ export const dossierFormSchema = z.object({
   etatCarton: z.enum(["BON_ETAT", "DEGRADE"]).optional(),
   etatCartonDescription: z.string().max(1000).optional().or(z.literal("")),
 
-  // ÉTAPE 2 — Informations foncières
+  // ÉTAPE 3 — Informations foncières
   numeroIlot: z.string().max(50).optional().or(z.literal("")),
   numeroLot: z.string().max(50).optional().or(z.literal("")),
   superficie: z.coerce
@@ -87,7 +95,7 @@ export const dossierFormSchema = z.object({
   // dashboards/exports/filtres sans changement.
   lotissementNom: z.string().max(150).optional().or(z.literal("")),
 
-  // ÉTAPE 3 — Dossier
+  // ÉTAPE 4 — Dossier
   natureDossierId: z.coerce.number().int().positive().optional(),
   // Saisie libre si "Autres" est choisi (cf. StepDossier.tsx) — résolue
   // côté serveur vers une fiche `natures_dossier` réelle (existante ou
@@ -100,18 +108,18 @@ export const dossierFormSchema = z.object({
   etatDossier: z.enum(["BON_ETAT", "DEGRADE"]).optional(),
   etatDossierDescription: z.string().max(1000).optional().or(z.literal("")),
 
-  // ÉTAPE 4 — Titulaire
+  // ÉTAPE 5 — Titulaire
   nom: z.string().max(150).optional().or(z.literal("")),
   prenoms: z.string().max(150).optional().or(z.literal("")),
   adresse: z.string().max(500).optional().or(z.literal("")),
   telephone: z.string().max(30).optional().or(z.literal("")),
   email: z.string().email("E-mail invalide").max(150).optional().or(z.literal("")),
 
-  // ÉTAPE 5 — Contact
+  // ÉTAPE 6 — Contact
   personneContact: z.string().max(150).optional().or(z.literal("")),
   mobile: z.string().max(30).optional().or(z.literal("")),
 
-  // ÉTAPE 6 — Suivi
+  // ÉTAPE 7 — Suivi
   nombrePages: z.coerce.number().int().positive().max(100_000).optional().or(z.literal("")),
   observations: z.string().max(2000).optional().or(z.literal("")),
 });
@@ -136,11 +144,12 @@ export const dossierSubmitSchema = dossierFormSchema
   });
 
 export const DOSSIER_STEPS = [
-  { id: 1, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
-  { id: 2, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
-  { id: 3, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
-  { id: 4, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
-  { id: 5, title: "Contact", fields: ["personneContact", "mobile"] },
-  { id: 6, title: "Suivi", fields: ["nombrePages", "observations"] },
-  { id: 7, title: "Récapitulatif", fields: [] },
+  { id: 1, title: "Site", fields: ["siteId"] },
+  { id: 2, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
+  { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
+  { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
+  { id: 5, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
+  { id: 6, title: "Contact", fields: ["personneContact", "mobile"] },
+  { id: 7, title: "Suivi", fields: ["nombrePages", "observations"] },
+  { id: 8, title: "Récapitulatif", fields: [] },
 ] as const satisfies ReadonlyArray<{ id: number; title: string; fields: readonly (keyof DossierFormValues)[] }>;

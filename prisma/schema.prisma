@@ -156,6 +156,7 @@ model Commune {
 
   lotissements Lotissement[]
   dossiers     Dossier[]
+  sites        Site[]
 
   @@map("communes")
 }
@@ -189,6 +190,41 @@ model NatureDossier {
   dossiers Dossier[]
 
   @@map("natures_dossier")
+}
+
+// Site d'archivage physique (siège, dépôt, antenne...) — Phase 16+. Choisi
+// en première étape de la Collecte (avant Identification) : chaque dossier
+// est rattaché au site où le carton est/sera physiquement conservé. Ordre
+// des champs aligné sur la fiche "Informations générales du site" fournie
+// par le métier. `code`/`nom`/`isActive`/`description` suivent la même
+// convention que les autres référentiels (Commune, Lotissement,
+// NatureDossier) ; `communeId` réutilise le référentiel `communes` existant
+// (les exemples métier — "Cocody" — sont déjà dans les 201 communes
+// importées) plutôt qu'un champ texte libre dupliqué.
+model Site {
+  id                Int       @id @default(autoincrement())
+  code              String    @unique
+  nom               String
+  typeSite          String?   @map("type_site")
+  description       String?   @db.Text
+  isActive          Boolean   @default(true) @map("is_active")
+  dateMiseEnService DateTime? @map("date_mise_en_service")
+  responsable       String?
+  telephone         String?
+  email             String?
+  adresse           String?   @db.Text
+  communeId         Int?      @map("commune_id")
+  quartier          String?
+  ville             String?
+  region            String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  commune  Commune?  @relation(fields: [communeId], references: [id])
+  dossiers Dossier[]
+
+  @@index([communeId])
+  @@map("sites")
 }
 
 // ================================================================
@@ -297,6 +333,14 @@ model Dossier {
 
   operateurId Int @map("operateur_id")
 
+  // --- SITE (Phase 16+) --- Site d'archivage physique où le dossier est
+  // collecté/conservé — choisi en première étape de la Collecte. Nullable :
+  // optionnel pour l'instant, le référentiel `sites` étant vide à son
+  // introduction (aucun site n'existe encore en production) — passera à
+  // requis à la soumission une fois qu'au moins un site aura été créé par
+  // un administrateur (cf. dossierSubmitSchema, src/lib/validation/dossier.ts).
+  siteId Int? @map("site_id")
+
   // --- IDENTIFICATION (fiche CG1020) ---
   libelleCarton       String? @map("libelle_carton")
   codeBarres          String? @unique @map("code_barres")
@@ -361,6 +405,7 @@ model Dossier {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   operateur     Operateur      @relation(fields: [operateurId], references: [id])
+  site          Site?          @relation(fields: [siteId], references: [id])
   commune       Commune?       @relation(fields: [communeId], references: [id])
   lotissement   Lotissement?   @relation(fields: [lotissementId], references: [id])
   natureDossier NatureDossier? @relation(fields: [natureDossierId], references: [id])
@@ -374,6 +419,7 @@ model Dossier {
   workflowTransitions WorkflowTransition[]
   history             DossierHistory[]
 
+  @@index([siteId])
   @@index([numeroDdu])
   @@index([numeroDirectionService])
   @@index([numeroGuichet])

@@ -29,3 +29,12 @@ export async function getActiveOperateurs(scopeIds?: number[]) {
     select: { id: true, nom: true, prenoms: true, matricule: true },
   });
 }
+
+/** Sites actifs (Phase 16+) proposés en première étape de la Collecte. */
+export async function getActiveSites() {
+  return prisma.site.findMany({
+    where: { isActive: true },
+    orderBy: { nom: "asc" },
+    include: { commune: { select: { id: true, nom: true } } },
+  });
+}

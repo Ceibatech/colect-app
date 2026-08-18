@@ -1,9 +1,10 @@
 "use server";
 
+import type { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
-import { communeSchema, lotissementSchema, natureDossierSchema } from "@/lib/validation/referentiels";
+import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema } from "@/lib/validation/referentiels";
 
 /**
  * CRUD administration des référentiels géographiques (Phase 15+) — jamais de
@@ -171,6 +172,96 @@ export async function createNature(_prevState: ActionResult, formData: FormData)
   });
   await prisma.auditLog.create({
     data: { userId: session.userId, action: "NATURE_CREATE", entity: "NATURE_DOSSIER", entityId: nature.id, newValue: parsed.data, ipAddress: await getClientIp() },
+  });
+  return { success: true };
+}
+
+// ----------------------------------------------------------------- Sites
+
+export async function listAllSites() {
+  await requirePermission("REFERENTIEL_MANAGE");
+  return prisma.site.findMany({
+    orderBy: { nom: "asc" },
+    include: { commune: { select: { id: true, nom: true } }, _count: { select: { dossiers: true } } },
+  });
+}
+
+/** Convertit l'entrée formulaire validée en données Prisma (chaînes vides -> null). */
+function siteDataFromInput(input: z.infer<typeof siteSchema>) {
+  return {
+    code: input.code,
+    nom: input.nom,
+    typeSite: input.typeSite || null,
+    description: input.description || null,
+    isActive: input.isActive,
+    dateMiseEnService: input.dateMiseEnService ? new Date(input.dateMiseEnService) : null,
+    responsable: input.responsable || null,
+    telephone: input.telephone || null,
+    email: input.email || null,
+    adresse: input.adresse || null,
+    communeId: input.communeId ? Number(input.communeId) : null,
+    quartier: input.quartier || null,
+    ville: input.ville || null,
+    region: input.region || null,
+  };
+}
+
+function parseSiteFormData(formData: FormData) {
+  return siteSchema.safeParse({
+    code: formData.get("code"),
+    nom: formData.get("nom"),
+    typeSite: formData.get("typeSite"),
+    description: formData.get("description"),
+    isActive: formData.get("isActive") === "on",
+    dateMiseEnService: formData.get("dateMiseEnService"),
+    responsable: formData.get("responsable"),
+    telephone: formData.get("telephone"),
+    email: formData.get("email"),
+    adresse: formData.get("adresse"),
+    communeId: formData.get("communeId") || undefined,
+    quartier: formData.get("quartier"),
+    ville: formData.get("ville"),
+    region: formData.get("region"),
+  });
+}
+
+export async function createSite(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = parseSiteFormData(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const existing = await prisma.site.findUnique({ where: { code: parsed.data.code } });
+  if (existing) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
+
+  const data = siteDataFromInput(parsed.data);
+  const site = await prisma.site.create({ data });
+  await prisma.auditLog.create({
+    data: { userId: session.userId, action: "SITE_CREATE", entity: "SITE", entityId: site.id, newValue: data, ipAddress: await getClientIp() },
+  });
+  return { success: true };
+}
+
+export async function updateSite(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = parseSiteFormData(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const existing = await prisma.site.findUnique({ where: { code: parsed.data.code } });
+  if (existing && existing.id !== id) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
+
+  const before = await prisma.site.findUnique({ where: { id } });
+  const data = siteDataFromInput(parsed.data);
+  const site = await prisma.site.update({ where: { id }, data });
+  await prisma.auditLog.create({
+    data: {
+      userId: session.userId,
+      action: "SITE_UPDATE",
+      entity: "SITE",
+      entityId: site.id,
+      oldValue: before ? { code: before.code, nom: before.nom, isActive: before.isActive } : undefined,
+      newValue: data,
+      ipAddress: await getClientIp(),
+    },
   });
   return { success: true };
 }

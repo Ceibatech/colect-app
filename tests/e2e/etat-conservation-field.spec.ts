@@ -30,7 +30,10 @@ test("État du carton et du dossier : Dégradé révèle la description, Bon ét
     await page.goto("/collecte/nouveau");
     await expect(page.getByText("Collecte — Fiche d'inventaire CG1020")).toBeVisible();
 
-    // --- Étape 1 : État du carton = Dégradé, avec description ---
+    // --- Étape 1 : Site (Phase 16+, optionnel) — on passe directement ---
+    await page.getByRole("button", { name: "Suivant", exact: true }).click();
+
+    // --- Étape 2 : État du carton = Dégradé, avec description ---
     await fillField(page, "Code-barres", codeBarres);
     await page.getByRole("radio", { name: "Dégradé" }).first().click();
     const cartonDesc = page.getByPlaceholder("Décrire l'état dégradé...");
@@ -40,7 +43,7 @@ test("État du carton et du dossier : Dégradé révèle la description, Bon ét
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
 
-    // --- Étape 3 : État du dossier reste "Bon état" (par défaut, non coché) ---
+    // --- Étape 4 : État du dossier reste "Bon état" (par défaut, non coché) ---
     await expect(page.getByPlaceholder("Décrire l'état dégradé...")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Enregistrer brouillon" }).click();

@@ -114,6 +114,7 @@ export async function getDossierDetail(id: number) {
   return prisma.dossier.findUnique({
     where: { id },
     include: {
+      site: true,
       commune: true,
       lotissement: true,
       natureDossier: true,

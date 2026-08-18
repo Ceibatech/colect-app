@@ -62,12 +62,17 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
   await page.goto("/collecte/nouveau");
   await expect(page.getByText("Collecte — Fiche d'inventaire CG1020")).toBeVisible();
 
-  // Étape 1 — Identification (opérateur = lui-même, champ verrouillé)
+  // Étape 1 — Site (Phase 16+, optionnel tant que le référentiel `sites` du
+  // seed n'a rien de spécifique à sélectionner ici — testé séparément dans
+  // site-field.spec.ts)
+  await clickNext(page);
+
+  // Étape 2 — Identification (opérateur = lui-même, champ verrouillé)
   await fillField(page, "Libellé du carton", `Carton E2E ${UNIQUE}`);
   await fillField(page, "Code-barres", CODE_BARRES);
   await clickNext(page);
 
-  // Étape 2 — Informations foncières
+  // Étape 3 — Informations foncières
   await fillField(page, "N° îlot", "I-E2E");
   await fillField(page, "N° lot", "L-E2E");
   await fillField(page, "Superficie (m²)", "375");
@@ -75,11 +80,11 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
   await fillField(page, "Lotissement", lotissement.nom);
   await clickNext(page);
 
-  // Étape 3 — Dossier (nature, Select à liste fermée + "Autres", Phase 15+)
+  // Étape 4 — Dossier (nature, Select à liste fermée + "Autres", Phase 15+)
   await selectCombobox(page, "Nature du dossier", nature.libelle);
   await clickNext(page);
 
-  // Étape 4 — Titulaire (champs obligatoires à la soumission, §41)
+  // Étape 5 — Titulaire (champs obligatoires à la soumission, §41)
   await fillField(page, "Nom", "Kouadio");
   await fillField(page, "Prénoms", "Aya E2E");
   await fillField(page, "Adresse", "12 Rue des Tests, Abidjan");
@@ -87,16 +92,16 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
   await fillField(page, "E-mail", "aya.kouadio.e2e@example.com");
   await clickNext(page);
 
-  // Étape 5 — Contact
+  // Étape 6 — Contact
   await fillField(page, "Personne à contacter", "Kouadio Aya");
   await fillField(page, "Mobile", "0708091011");
   await clickNext(page);
 
-  // Étape 6 — Suivi
+  // Étape 7 — Suivi
   await fillField(page, "Nombre de pages", "8");
   await clickNext(page);
 
-  // Étape 7 — Récapitulatif -> SOUMISSION (§41)
+  // Étape 8 — Récapitulatif -> SOUMISSION (§41)
   await expect(page.getByText("Vérifiez les informations avant de soumettre")).toBeVisible();
   await page.getByRole("button", { name: "Soumettre" }).click();
 

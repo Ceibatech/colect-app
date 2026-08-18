@@ -1,5 +1,5 @@
 import { requirePermission } from "@/lib/auth/current-user";
-import { getCommunesWithLotissements, getNaturesDossier, getActiveOperateurs } from "@/lib/services/referentiels-service";
+import { getCommunesWithLotissements, getNaturesDossier, getActiveOperateurs, getActiveSites } from "@/lib/services/referentiels-service";
 import { CollecteWizard } from "@/components/collecte/CollecteWizard";
 
 export const metadata = { title: "Nouveau dossier — Collecte" };
@@ -10,7 +10,8 @@ export default async function CollecteNouveauPage() {
   const session = await requirePermission("DOSSIER_CREATE");
   const isOperateurRole = session.roleCode === "OPERATEUR";
 
-  const [communes, natures, operateurs] = await Promise.all([
+  const [sites, communes, natures, operateurs] = await Promise.all([
+    getActiveSites(),
     getCommunesWithLotissements(),
     getNaturesDossier(),
     isOperateurRole ? Promise.resolve([]) : getActiveOperateurs(),
@@ -18,6 +19,7 @@ export default async function CollecteNouveauPage() {
 
   return (
     <CollecteWizard
+      sites={sites}
       communes={communes}
       natures={natures}
       operateurs={operateurs}
