@@ -44,6 +44,7 @@ function KpiCard({
 export default async function QualitePage() {
   const session = await requirePermission("QUALITY_VIEW");
   const canUpdate = session.permissions.includes("QUALITY_UPDATE");
+  const isSuperviseurRole = session.roleCode === "SUPERVISEUR";
 
   const [overview, byOperateur, byCommune, anomalies] = await Promise.all([
     getQualityOverview(),
@@ -59,6 +60,7 @@ export default async function QualitePage() {
           <h1 className="text-xl font-semibold">Contrôle qualité</h1>
           <p className="text-sm text-muted-foreground">
             Score = champs valides / champs contrôlés × 100 (fiche CG1020 — voir DATABASE.md).
+            {isSuperviseurRole ? " Limité aux opérateurs qui vous sont affectés." : ""}
           </p>
         </div>
         {canUpdate && <QualityScanButton />}

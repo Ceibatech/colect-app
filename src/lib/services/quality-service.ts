@@ -5,7 +5,16 @@ import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
 import { scoreDossier, QUALITY_SCORE_SELECT } from "@/lib/services/quality-scoring";
+import { getSupervisorScope, isOperateurInScope } from "@/lib/services/access-scope";
 import type { AnomalieGravite, AnomalieType } from "@prisma/client";
+import type { SessionPayload } from "@/lib/auth/session";
+
+/**
+ * Phase 16+ : un SUPERVISEUR ne voit la qualité que des dossiers des
+ * opérateurs qui lui sont affectés (même principe que dashboard-service.ts,
+ * `getSupervisorScope()` partagée dans access-scope.ts — hors périmètre
+ * pour OPERATEUR/ADMIN/CONSULTATION, comportement inchangé).
+ */
 
 /**
  * Mémoïsée par requête (Phase 14, §94) : `/qualite` (page.tsx) appelle
@@ -17,8 +26,10 @@ import type { AnomalieGravite, AnomalieType } from "@prisma/client";
  * "use server" — seuls les exports doivent être async) réduit ça à un seul
  * appel réel, les deux suivants réutilisant le résultat pour ce rendu.
  */
-const getScoredDossiers = cache(async () => {
-  const dossiers = await prisma.dossier.findMany({ select: QUALITY_SCORE_SELECT });
+const getScoredDossiers = cache(async (session: SessionPayload) => {
+  const scope = await getSupervisorScope(session);
+  const where = scope ? { operateurId: scope.length ? { in: scope } : -1 } : {};
+  const dossiers = await prisma.dossier.findMany({ where, select: QUALITY_SCORE_SELECT });
   return dossiers.map((d) => ({
     ...d,
     scoreResult: scoreDossier(d, {
@@ -39,14 +50,16 @@ export interface QualityOverview {
 }
 
 export async function getQualityOverview(): Promise<QualityOverview> {
-  await requirePermission("QUALITY_VIEW");
+  const session = await requirePermission("QUALITY_VIEW");
+  const scope = await getSupervisorScope(session);
+  const operateurWhere = scope ? { operateurId: scope.length ? { in: scope } : -1 } : {};
 
   const [scored, totalRejetes, doublonsCodeBarres, doublonsNumeroDirectionService, totalAnomaliesOuvertes] = await Promise.all([
-    getScoredDossiers(),
-    prisma.dossier.count({ where: { statutValidation: "REJETE" } }),
+    getScoredDossiers(session),
+    prisma.dossier.count({ where: { statutValidation: "REJETE", ...operateurWhere } }),
     prisma.dossier.groupBy({
       by: ["codeBarres"],
-      where: { codeBarres: { not: null } },
+      where: { codeBarres: { not: null }, ...operateurWhere },
       _count: { _all: true },
       having: { codeBarres: { _count: { gt: 1 } } },
     }),
@@ -57,11 +70,11 @@ export async function getQualityOverview(): Promise<QualityOverview> {
     // cette direction/service).
     prisma.dossier.groupBy({
       by: ["numeroDirectionService"],
-      where: { numeroDirectionService: { not: null } },
+      where: { numeroDirectionService: { not: null }, ...operateurWhere },
       _count: { _all: true },
       having: { numeroDirectionService: { _count: { gt: 1 } } },
     }),
-    prisma.anomalie.count({ where: { statut: "OUVERTE" } }),
+    prisma.anomalie.count({ where: { statut: "OUVERTE", ...(scope ? { dossier: operateurWhere } : {}) } }),
   ]);
 
   const totalValid = scored.reduce((sum, d) => sum + d.scoreResult.validFields, 0);
@@ -87,8 +100,8 @@ export interface ScoreByGroup {
 }
 
 export async function getScoreByOperateur(): Promise<ScoreByGroup[]> {
-  await requirePermission("QUALITY_VIEW");
-  const scored = await getScoredDossiers();
+  const session = await requirePermission("QUALITY_VIEW");
+  const scored = await getScoredDossiers(session);
   const operateurs = await prisma.operateur.findMany({ select: { id: true, nom: true, prenoms: true } });
 
   return operateurs
@@ -108,8 +121,8 @@ export async function getScoreByOperateur(): Promise<ScoreByGroup[]> {
 }
 
 export async function getScoreByCommune(): Promise<ScoreByGroup[]> {
-  await requirePermission("QUALITY_VIEW");
-  const scored = await getScoredDossiers();
+  const session = await requirePermission("QUALITY_VIEW");
+  const scored = await getScoredDossiers(session);
   const communes = await prisma.commune.findMany({ select: { id: true, nom: true } });
 
   return communes
@@ -139,9 +152,13 @@ export interface OpenAnomalyRow {
 }
 
 export async function listOpenAnomalies(limit = 100): Promise<OpenAnomalyRow[]> {
-  await requirePermission("QUALITY_VIEW");
+  const session = await requirePermission("QUALITY_VIEW");
+  const scope = await getSupervisorScope(session);
   return prisma.anomalie.findMany({
-    where: { statut: "OUVERTE" },
+    where: {
+      statut: "OUVERTE",
+      ...(scope ? { dossier: { operateurId: scope.length ? { in: scope } : -1 } } : {}),
+    },
     orderBy: [{ gravite: "desc" }, { createdAt: "desc" }],
     take: limit,
     select: {
@@ -164,7 +181,19 @@ export async function listOpenAnomalies(limit = 100): Promise<OpenAnomalyRow[]> 
 export async function runQualityScan(dossierId?: number): Promise<{ dossiersScanned: number; anomaliesCreated: number }> {
   const session = await requirePermission("QUALITY_UPDATE");
 
-  const where = dossierId ? { id: dossierId } : {};
+  if (dossierId) {
+    const dossier = await prisma.dossier.findUnique({ where: { id: dossierId }, select: { operateurId: true } });
+    if (dossier && !(await isOperateurInScope(session, dossier.operateurId))) {
+      throw new Error("Vous ne pouvez lancer un contrôle que sur les dossiers des opérateurs qui vous sont affectés.");
+    }
+  }
+
+  const scope = await getSupervisorScope(session);
+  const where = dossierId
+    ? { id: dossierId }
+    : scope
+      ? { operateurId: scope.length ? { in: scope } : -1 }
+      : {};
   const dossiers = await prisma.dossier.findMany({
     where,
     select: { ...QUALITY_SCORE_SELECT, id: true },
@@ -230,8 +259,11 @@ export async function runQualityScan(dossierId?: number): Promise<{ dossiersScan
 
 export async function resolveAnomalie(id: number, commentaire?: string) {
   const session = await requirePermission("QUALITY_UPDATE");
-  const anomalie = await prisma.anomalie.findUnique({ where: { id } });
+  const anomalie = await prisma.anomalie.findUnique({ where: { id }, include: { dossier: { select: { operateurId: true } } } });
   if (!anomalie) throw new Error("Anomalie introuvable.");
+  if (!(await isOperateurInScope(session, anomalie.dossier.operateurId))) {
+    throw new Error("Vous ne pouvez traiter que les anomalies des opérateurs qui vous sont affectés.");
+  }
 
   const updated = await prisma.anomalie.update({
     where: { id },

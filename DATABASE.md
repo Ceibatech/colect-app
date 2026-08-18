@@ -83,6 +83,13 @@ personneContact, mobile
 > (`etatCartonDescription`/`etatDossierDescription`, uniquement renseignée si dégradé) —
 > demande métier directe, alimentent le nouveau tableau d'indicateurs du dashboard
 > principal (§48 : Nbre de cartons / dossiers / cartons dégradés / dossiers dégradés).
+>
+> **Ajout (Phase 16+)** : `operateurs.supervisor_id` (FK nullable vers `users.id`,
+> `ON DELETE SET NULL`) — affecte un opérateur à un superviseur. Un opérateur a au plus un
+> superviseur ; un superviseur peut avoir plusieurs opérateurs. Détermine le périmètre de
+> validation ET de consultation d'un compte SUPERVISEUR (dossiers, export, qualité,
+> dashboard) — voir `src/lib/services/access-scope.ts` et ARCHITECTURE.md §6. Gérée depuis
+> `/administration/utilisateurs`, jamais directement en base.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le
@@ -127,7 +134,8 @@ Voir `@@index` dans `prisma/schema.prisma` sur `dossiers` : `reference` (via uni
 `codeBarres` (via unique), `numeroDdu`, `numeroGuichet`, `referenceClassement`,
 `numeroIlot`, `numeroLot`, `numeroTitreFoncier`, `communeId`, `lotissementId`,
 `natureDossierId`, `operateurId`, les 5 `statut*`, `createdAt`, plus deux index composites
-utiles au dashboard (`communeId+statutArchivage`, `operateurId+statutValidation`).
+utiles au dashboard (`communeId+statutArchivage`, `operateurId+statutValidation`). Sur
+`operateurs` : `supervisorId` (Phase 16+, utilisé par tout le cloisonnement SUPERVISEUR).
 
 ## 7. Vues de reporting
 

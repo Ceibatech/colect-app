@@ -155,12 +155,17 @@ async function main() {
   }
   console.log(`✔ ${3 + operateurUsers.length} utilisateurs (admin, superviseur, consultation, ${operateurUsers.length} opérateurs)`);
 
-  // 5. Fiches opérateur
+  // 5. Fiches opérateur — toutes affectées au superviseur de démo (Phase 16+,
+  // § affectation opérateur -> superviseur) : ce compte unique représente
+  // "le" superviseur de l'équipe démo, il supervise donc les 3 opérateurs
+  // démo. `update` réaffecte aussi au ré-exécution du seed (idempotent),
+  // au cas où une exécution précédente aurait laissé une affectation
+  // différente en base.
   const operateurs = [];
   for (let i = 0; i < operateurUsers.length; i++) {
     const op = await prisma.operateur.upsert({
       where: { matricule: `OP-${String(i + 1).padStart(3, "0")}` },
-      update: {},
+      update: { supervisorId: superviseur.id },
       create: {
         userId: operateurUsers[i].id,
         matricule: `OP-${String(i + 1).padStart(3, "0")}`,
@@ -168,11 +173,12 @@ async function main() {
         telephone: faker.phone.number({ style: "international" }),
         email: operateurUsers[i].email,
         isActive: true,
+        supervisorId: superviseur.id,
       },
     });
     operateurs.push(op);
   }
-  console.log(`✔ ${operateurs.length} fiches opérateur`);
+  console.log(`✔ ${operateurs.length} fiches opérateur (affectées à ${superviseur.name})`);
 
   // 6. Communes / lotissements
   const communes = [];

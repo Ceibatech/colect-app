@@ -78,6 +78,11 @@ la vérification manuelle des Phases 3 à 12), jamais par mot de passe en clair.
 - `dossiers-search.spec.ts` — recherche/filtres de `/dossiers` (pas de route `/api/`
   dédiée, page Server Component testée via son rendu HTML) et cloisonnement par
   opérateur.
+- `supervisor-scope.spec.ts` (Phase 16+) — cloisonnement SUPERVISEUR par opérateur affecté
+  (`Operateur.supervisorId`) : validate/reject autorisés sur un opérateur affecté, refusés
+  (403) sur un opérateur non affecté (fiche opérateur jetable créée sans superviseur pour
+  ce cas), ADMIN non soumis à la restriction, et invisibilité du dossier dans la recherche
+  `/dossiers` et sur sa fiche détail (404) pour un SUPERVISEUR hors périmètre.
 
 Chaque test qui a besoin d'un dossier dans un état précis en crée un directement en
 base (`tests/helpers/db.ts`, préfixe `TEST-API-`) plutôt que de dépendre de la

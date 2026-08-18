@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma/client";
 import { requireApiPermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
 import { ApiError } from "@/lib/utils/api-error";
+import { isOperateurInScope } from "@/lib/services/access-scope";
 import type { SessionPayload } from "@/lib/auth/session";
 
 async function getDossierOr404(id: number) {
@@ -18,6 +19,23 @@ async function resolveOperateurId(session: SessionPayload): Promise<number | nul
 }
 
 /**
+ * Phase 16+ (affectation opérateur -> superviseur) : un SUPERVISEUR ne peut
+ * valider/rejeter que les dossiers des opérateurs qui lui sont affectés
+ * (Operateur.supervisorId). Ne s'applique pas aux autres rôles disposant de
+ * DOSSIER_VALIDATE/DOSSIER_REJECT (seul ADMIN les a en plus de SUPERVISEUR
+ * — pas de restriction pour lui).
+ */
+async function assertSupervisorScope(session: SessionPayload, operateurId: number) {
+  if (session.roleCode !== "SUPERVISEUR") return;
+  if (!(await isOperateurInScope(session, operateurId))) {
+    throw new ApiError(
+      "Vous ne pouvez valider que les dossiers des opérateurs qui vous sont affectés.",
+      403
+    );
+  }
+}
+
+/**
  * Le workflow linéaire (§42) : un dossier ne peut pas être ARCHIVÉ s'il n'est
  * pas INDEXÉ, ni INDEXÉ s'il n'est pas NUMÉRISÉ, ni NUMÉRISÉ s'il n'est pas
  * VALIDÉ, ni VALIDÉ/REJETÉ s'il n'est pas EN CONTRÔLE (donc SOUMIS).
@@ -28,6 +46,7 @@ async function resolveOperateurId(session: SessionPayload): Promise<number | nul
 export async function validateDossier(id: number, commentaire?: string) {
   const session = await requireApiPermission("DOSSIER_VALIDATE");
   const dossier = await getDossierOr404(id);
+  await assertSupervisorScope(session, dossier.operateurId);
 
   if (dossier.statutValidation !== "EN_CONTROLE") {
     throw new ApiError(
@@ -65,6 +84,7 @@ export async function rejectDossier(id: number, commentaire: string) {
     throw new ApiError("Un motif de rejet est requis.");
   }
   const dossier = await getDossierOr404(id);
+  await assertSupervisorScope(session, dossier.operateurId);
 
   if (dossier.statutValidation !== "EN_CONTROLE") {
     throw new ApiError(

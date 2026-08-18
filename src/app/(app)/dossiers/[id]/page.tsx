@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma/client";
 import { getDossierDetail } from "@/lib/services/dossier-query-service";
+import { isOperateurInScope } from "@/lib/services/access-scope";
 import { DossierDetailTabs } from "@/components/dossiers/DossierDetailTabs";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,10 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
   if (session.roleCode === "OPERATEUR") {
     const operateur = await prisma.operateur.findUnique({ where: { userId: session.userId } });
     if (!operateur || dossier.operateurId !== operateur.id) notFound();
+  } else if (session.roleCode === "SUPERVISEUR") {
+    // Phase 16+ : un superviseur ne voit que les dossiers des opérateurs
+    // qui lui sont affectés (cf. access-scope.ts).
+    if (!(await isOperateurInScope(session, dossier.operateurId))) notFound();
   }
 
   // Sérialisation : les champs Decimal/Date de Prisma ne traversent pas

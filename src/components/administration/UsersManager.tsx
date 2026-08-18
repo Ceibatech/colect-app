@@ -23,6 +23,7 @@ export interface UserRow {
   lastLoginAt: string | null;
   role: { id: number; code: string; name: string };
   operateur: { id: number; matricule: string; isActive: boolean } | null;
+  supervisedCount: number;
 }
 
 export interface RoleOption {
@@ -31,12 +32,41 @@ export interface RoleOption {
   name: string;
 }
 
+/** Opérateur actif disponible pour affectation à un superviseur (Phase 16+). */
+export interface OperateurOption {
+  id: number;
+  matricule: string;
+  nom: string;
+  prenoms: string | null;
+  supervisorId: number | null;
+  supervisorName: string | null;
+}
+
 const initialState: ActionResult = {};
 
-function RoleSelect({ roles, defaultRoleId, disabled }: { roles: RoleOption[]; defaultRoleId?: number; disabled?: boolean }) {
+function RoleSelect({
+  roles,
+  defaultRoleId,
+  disabled,
+  value,
+  onValueChange,
+}: {
+  roles: RoleOption[];
+  defaultRoleId?: number;
+  disabled?: boolean;
+  value?: string;
+  onValueChange?: (value: string) => void;
+}) {
   const items = roles.map((r) => ({ label: r.name, value: String(r.id) }));
   return (
-    <Select name="roleId" items={items} defaultValue={defaultRoleId ? String(defaultRoleId) : undefined} disabled={disabled}>
+    <Select
+      name="roleId"
+      items={items}
+      defaultValue={value === undefined && defaultRoleId ? String(defaultRoleId) : undefined}
+      value={value}
+      onValueChange={(v) => onValueChange?.(v ?? "")}
+      disabled={disabled}
+    >
       <SelectTrigger className="w-full" id="roleId">
         <SelectValue placeholder="Choisir un rôle" />
       </SelectTrigger>
@@ -48,6 +78,67 @@ function RoleSelect({ roles, defaultRoleId, disabled }: { roles: RoleOption[]; d
         ))}
       </SelectContent>
     </Select>
+  );
+}
+
+/**
+ * Case à cocher par opérateur pour affecter un groupe à un superviseur
+ * (Phase 16+, cf. Operateur.supervisorId). Coché/décoché est géré en état
+ * local (pas de participation native au form via `name` sur chaque
+ * Checkbox — trop incertain à travers les rerenders de Base UI) ; la
+ * sélection finale est soumise via des `<input type="hidden">` dédiés.
+ */
+function OperateurAssignmentField({
+  operateurs,
+  currentSupervisorUserId,
+  selected,
+  onToggle,
+  disabled,
+}: {
+  operateurs: OperateurOption[];
+  currentSupervisorUserId: number;
+  selected: number[];
+  onToggle: (id: number, checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>Opérateurs affectés</Label>
+      <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border p-2">
+        {operateurs.length === 0 ? (
+          <p className="p-1 text-xs text-muted-foreground">Aucun opérateur actif.</p>
+        ) : (
+          operateurs.map((o) => {
+            const checked = selected.includes(o.id);
+            const assignedElsewhere = o.supervisorId !== null && o.supervisorId !== currentSupervisorUserId;
+            return (
+              <div key={o.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50">
+                <Checkbox
+                  id={`op-assign-${o.id}`}
+                  checked={checked}
+                  onCheckedChange={(v) => onToggle(o.id, v === true)}
+                  disabled={disabled}
+                />
+                <Label htmlFor={`op-assign-${o.id}`} className="flex-1 cursor-pointer font-normal">
+                  {o.nom} {o.prenoms ?? ""} <span className="text-xs text-muted-foreground">{o.matricule}</span>
+                </Label>
+                {assignedElsewhere ? (
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    actuel : {o.supervisorName}
+                  </span>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Ce superviseur ne pourra valider et consulter que les dossiers de ces opérateurs.
+      </p>
+      {selected.map((id) => (
+        <input key={id} type="hidden" name="operateurIds" value={id} />
+      ))}
+    </div>
   );
 }
 
@@ -98,9 +189,32 @@ function CreateUserForm({ roles, onSuccess }: { roles: RoleOption[]; onSuccess: 
   );
 }
 
-function EditUserForm({ user, roles, onSuccess, canDeactivate }: { user: UserRow; roles: RoleOption[]; onSuccess: () => void; canDeactivate: boolean }) {
+function EditUserForm({
+  user,
+  roles,
+  operateurs,
+  onSuccess,
+  canDeactivate,
+}: {
+  user: UserRow;
+  roles: RoleOption[];
+  operateurs: OperateurOption[];
+  onSuccess: () => void;
+  canDeactivate: boolean;
+}) {
   const boundAction = updateUser.bind(null, user.id);
   const [state, formAction, isPending] = useActionState(boundAction, initialState);
+
+  const [roleId, setRoleId] = useState(String(user.role.id));
+  const selectedRoleCode = roles.find((r) => String(r.id) === roleId)?.code;
+  const isSuperviseur = selectedRoleCode === "SUPERVISEUR";
+
+  const [selectedOperateurs, setSelectedOperateurs] = useState<number[]>(() =>
+    operateurs.filter((o) => o.supervisorId === user.id).map((o) => o.id)
+  );
+  const toggleOperateur = useCallback((id: number, checked: boolean) => {
+    setSelectedOperateurs((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)));
+  }, []);
 
   // `onSuccess` doit être mémoïsé (useCallback) côté appelant — voir
   // CommunesManager.tsx pour le détail.
@@ -126,7 +240,7 @@ function EditUserForm({ user, roles, onSuccess, canDeactivate }: { user: UserRow
       </div>
       <div className="space-y-2">
         <Label htmlFor="edit-roleId">Rôle</Label>
-        <RoleSelect roles={roles} defaultRoleId={user.role.id} disabled={isPending} />
+        <RoleSelect roles={roles} value={roleId} onValueChange={setRoleId} disabled={isPending} />
       </div>
       <div className="flex items-center gap-2">
         <Checkbox id="edit-isActive" name="isActive" defaultChecked={user.isActive} disabled={isPending || !canDeactivate} />
@@ -134,6 +248,15 @@ function EditUserForm({ user, roles, onSuccess, canDeactivate }: { user: UserRow
           Compte actif {!canDeactivate ? "(vous ne pouvez pas désactiver votre propre compte)" : ""}
         </Label>
       </div>
+      {isSuperviseur ? (
+        <OperateurAssignmentField
+          operateurs={operateurs}
+          currentSupervisorUserId={user.id}
+          selected={selectedOperateurs}
+          onToggle={toggleOperateur}
+          disabled={isPending}
+        />
+      ) : null}
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
@@ -179,7 +302,17 @@ function ResetPasswordForm({ userId, onSuccess }: { userId: number; onSuccess: (
   );
 }
 
-export function UsersManager({ users, roles, currentUserId }: { users: UserRow[]; roles: RoleOption[]; currentUserId: number }) {
+export function UsersManager({
+  users,
+  roles,
+  operateurs,
+  currentUserId,
+}: {
+  users: UserRow[];
+  roles: RoleOption[];
+  operateurs: OperateurOption[];
+  currentUserId: number;
+}) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -246,6 +379,11 @@ export function UsersManager({ users, roles, currentUserId }: { users: UserRow[]
                   {u.operateur ? (
                     <span className="ml-1 text-xs text-muted-foreground">{u.operateur.matricule}</span>
                   ) : null}
+                  {u.role.code === "SUPERVISEUR" ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      {u.supervisedCount} opérateur{u.supervisedCount > 1 ? "s" : ""}
+                    </span>
+                  ) : null}
                 </TableCell>
                 <TableCell>
                   <Badge variant={u.isActive ? "default" : "destructive"}>{u.isActive ? "Actif" : "Désactivé"}</Badge>
@@ -276,7 +414,13 @@ export function UsersManager({ users, roles, currentUserId }: { users: UserRow[]
             <DialogDescription>Le changement de rôle prendra effet à la prochaine connexion de l&apos;utilisateur.</DialogDescription>
           </DialogHeader>
           {editing ? (
-            <EditUserForm user={editing} roles={roles} onSuccess={onSuccessEdit} canDeactivate={editing.id !== currentUserId} />
+            <EditUserForm
+              user={editing}
+              roles={roles}
+              operateurs={operateurs}
+              onSuccess={onSuccessEdit}
+              canDeactivate={editing.id !== currentUserId}
+            />
           ) : null}
         </DialogContent>
       </Dialog>

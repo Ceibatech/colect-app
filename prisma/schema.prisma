@@ -84,6 +84,9 @@ model User {
   role Role @relation(fields: [roleId], references: [id])
 
   operateur           Operateur?
+  // Phase 16+ (§ affectation superviseur) : opérateurs dont ce user
+  // (rôle SUPERVISEUR) a la charge — voir Operateur.supervisorId ci-dessous.
+  supervisedOperateurs Operateur[]      @relation("OperateurSupervisor")
   dossierHistory      DossierHistory[]
   workflowTransitions WorkflowTransition[]
   documentsUploaded   Document[]           @relation("DocumentUploadedBy")
@@ -114,16 +117,27 @@ model Operateur {
   telephone String?
   email     String?
   isActive  Boolean  @default(true) @map("is_active")
+  // Phase 16+ : superviseur (User de rôle SUPERVISEUR) ayant la charge de
+  // cet opérateur — un opérateur a au plus UN superviseur ; un superviseur
+  // peut avoir plusieurs opérateurs ("groupe"). Nullable : un opérateur
+  // peut rester non affecté (visible/validable par tout SUPERVISEUR tant
+  // qu'aucune affectation n'existe n'est PAS le comportement — voir
+  // access-scope.ts : un SUPERVISEUR ne voit/valide que ses affectations
+  // explicites, jamais les opérateurs non affectés). Affectation gérée
+  // depuis /administration/utilisateurs (édition d'un compte SUPERVISEUR).
+  supervisorId Int?    @map("supervisor_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user User? @relation(fields: [userId], references: [id])
+  user       User? @relation(fields: [userId], references: [id])
+  supervisor User? @relation("OperateurSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
 
   dossiers      Dossier[]
   numerisations Numerisation[]
   indexations   Indexation[]
   archivages    Archivage[]
 
+  @@index([supervisorId])
   @@map("operateurs")
 }
 

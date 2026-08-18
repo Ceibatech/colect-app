@@ -356,6 +356,27 @@ de dossiers dégradés (`getCartonsDossiersEtatOverview()`, `dashboard-service.t
 comme le nombre de dossiers avec un code-barres renseigné (pas de `groupBy` distinct
 nécessaire).
 
+**Affectation opérateur -> superviseur + cloisonnement (Phase 16+)** : un SUPERVISEUR ne
+peut désormais valider/rejeter, ni même consulter (dossiers, export, qualité, dashboard),
+que les dossiers des opérateurs qui lui sont explicitement affectés — jamais un accès
+global par défaut, y compris s'il n'a aucune affectation (0 opérateur affecté = 0 résultat,
+pas "tout voir"). Modélisé par une simple FK nullable `Operateur.supervisorId -> User.id`
+(un opérateur a au plus un superviseur ; un superviseur peut avoir plusieurs opérateurs —
+pas de table de jointure nécessaire). Affectation gérée depuis
+`/administration/utilisateurs` (édition d'un compte de rôle Superviseur : liste à cocher
+des opérateurs actifs, avec indication si un opérateur est déjà affecté à un autre
+superviseur avant de le "voler"). Logique de cloisonnement centralisée dans
+`src/lib/services/access-scope.ts` (`getOperateurScopeFilter()`,
+`isOperateurInScope()`, `getSupervisorScope()`), réutilisée par `workflow-service.ts`
+(validate/reject), les pages `/dossiers`, `/dossiers/[id]`, `/export`, `document-service.ts`,
+`quality-service.ts` et `dashboard-service.ts`. Ce dernier est le point le plus délicat :
+ses agrégats globaux reposent sur des vues SQL (`vw_*`, non paramétrables) — un
+SUPERVISEUR scopé bascule donc sur un recalcul équivalent via l'API Prisma
+(`where operateurId IN (...)`) plutôt que d'interroger la vue, fonction par fonction,
+sans toucher au chemin non scopé utilisé par ADMIN/CONSULTATION (et OPERATEUR, dont le
+dashboard reste global comme avant cette phase — non demandé, non modifié). ADMIN n'est
+jamais soumis à cette restriction.
+
 **Bug de production non résolu (constaté, non bloquant)** : une erreur d'hydratation
 React (#418) apparaît sur *toutes* les pages en production (Render) — jamais reproduite
 en local (dev ni build de production identique). L'application reste pleinement

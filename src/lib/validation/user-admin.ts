@@ -15,6 +15,9 @@ export const updateUserSchema = z.object({
   name: z.string().min(1, "Le nom est requis").max(150),
   roleId: z.coerce.number({ message: "Le rôle est requis" }).int().positive("Le rôle est requis"),
   isActive: z.coerce.boolean().default(true),
+  // Phase 16+ : opérateurs affectés à ce compte, uniquement pertinent si le
+  // rôle choisi est SUPERVISEUR (ignoré sinon, cf. updateUser()).
+  operateurIds: z.array(z.coerce.number().int().positive()).default([]),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 

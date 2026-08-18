@@ -30,13 +30,39 @@ export async function listUsersWithRoles() {
   await requirePermission("USER_MANAGE");
   return prisma.user.findMany({
     orderBy: { name: "asc" },
-    include: { role: true, operateur: { select: { id: true, matricule: true, isActive: true } } },
+    include: {
+      role: true,
+      operateur: { select: { id: true, matricule: true, isActive: true } },
+      _count: { select: { supervisedOperateurs: true } },
+    },
   });
 }
 
 export async function listRoles() {
   await requirePermission("USER_MANAGE");
   return prisma.role.findMany({ orderBy: { name: "asc" } });
+}
+
+/**
+ * Opérateurs actifs disponibles pour l'affectation à un superviseur
+ * (Phase 16+), avec leur affectation actuelle le cas échéant — un
+ * administrateur peut ainsi voir qu'il "vole" un opérateur déjà affecté à
+ * un autre superviseur avant de confirmer.
+ */
+export async function listActiveOperateursForAssignment() {
+  await requirePermission("USER_MANAGE");
+  return prisma.operateur.findMany({
+    where: { isActive: true },
+    orderBy: { nom: "asc" },
+    select: {
+      id: true,
+      matricule: true,
+      nom: true,
+      prenoms: true,
+      supervisorId: true,
+      supervisor: { select: { id: true, name: true } },
+    },
+  });
 }
 
 async function nextOperateurMatricule(): Promise<string> {
@@ -104,6 +130,7 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
     name: formData.get("name"),
     roleId: formData.get("roleId"),
     isActive: formData.get("isActive") === "on",
+    operateurIds: formData.getAll("operateurIds"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
 
@@ -136,6 +163,26 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
       // Rôle changé hors OPERATEUR : désactive la fiche opérateur (jamais de
       // suppression — les dossiers déjà traités par cette fiche restent valides).
       await tx.operateur.update({ where: { id: before.operateur.id }, data: { isActive: false } });
+    }
+
+    // Phase 16+ (affectation opérateur -> superviseur, §workflow validation) :
+    // synchronise Operateur.supervisorId sur la liste choisie dans le
+    // formulaire. `notIn: desired` avec `desired` vide équivaut à "pas de
+    // filtre" côté Prisma (undefined ignoré) -> libère tout le monde.
+    if (newRole.code === "SUPERVISEUR") {
+      const desired = parsed.data.operateurIds;
+      await tx.operateur.updateMany({
+        where: { supervisorId: id, ...(desired.length ? { id: { notIn: desired } } : {}) },
+        data: { supervisorId: null },
+      });
+      if (desired.length > 0) {
+        await tx.operateur.updateMany({ where: { id: { in: desired } }, data: { supervisorId: id } });
+      }
+    } else if (before.role.code === "SUPERVISEUR") {
+      // Rôle changé hors SUPERVISEUR : libère les opérateurs qu'il supervisait
+      // (sinon une affectation resterait en base sans effet visible mais
+      // incohérente si ce compte redevient superviseur plus tard).
+      await tx.operateur.updateMany({ where: { supervisorId: id }, data: { supervisorId: null } });
     }
 
     await tx.auditLog.create({

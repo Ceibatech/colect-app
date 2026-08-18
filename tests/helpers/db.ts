@@ -16,14 +16,16 @@ export async function createTestDossier(overrides: {
   statutNumerisation?: StatutNumerisation;
   statutIndexation?: StatutIndexation;
   statutArchivage?: StatutArchivage;
+  operateurId?: number;
 } = {}) {
-  const operateur = await testPrisma.operateur.findFirstOrThrow({ where: { isActive: true } });
+  const operateurId =
+    overrides.operateurId ?? (await testPrisma.operateur.findFirstOrThrow({ where: { isActive: true } })).id;
   const reference = `TEST-API-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
   return testPrisma.dossier.create({
     data: {
       reference,
-      operateurId: operateur.id,
+      operateurId,
       statutCollecte: "SOUMIS",
       statutValidation: overrides.statutValidation ?? "EN_CONTROLE",
       statutNumerisation: overrides.statutNumerisation ?? "EN_ATTENTE",

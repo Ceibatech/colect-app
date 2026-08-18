@@ -14,7 +14,7 @@ export interface DossierSearchFilters {
   communeId?: number;
   lotissementId?: number;
   natureDossierId?: number;
-  operateurId?: number;
+  operateurId?: number | { in: number[] };
   statutCollecte?: StatutCollecte;
   statutValidation?: StatutValidation;
   statutNumerisation?: StatutNumerisation;

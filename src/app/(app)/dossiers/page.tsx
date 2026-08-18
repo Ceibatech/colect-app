@@ -1,8 +1,8 @@
 import { requirePermission } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/prisma/client";
 import { parseDossierSearchParams } from "@/lib/validation/dossier-search";
 import { searchDossiers, DOSSIERS_PAGE_SIZE } from "@/lib/services/dossier-query-service";
 import { getCommunesWithLotissements, getNaturesDossier, getActiveOperateurs } from "@/lib/services/referentiels-service";
+import { getOperateurScopeFilter } from "@/lib/services/access-scope";
 import { DossiersFilterBar } from "@/components/dossiers/DossiersFilterBar";
 import { DossiersTable } from "@/components/dossiers/DossiersTable";
 import { DataPagination } from "@/components/shared/DataPagination";
@@ -18,24 +18,28 @@ export default async function DossiersPage({
   const rawParams = await searchParams;
   const params = parseDossierSearchParams(rawParams);
 
+  // OPERATEUR : toujours sa propre fiche. SUPERVISEUR : ses opérateurs
+  // affectés (Phase 16+, cf. access-scope.ts). ADMIN/CONSULTATION : filtre
+  // libre via `params.operateur`.
   const isOperateurRole = session.roleCode === "OPERATEUR";
-  let operateurScope: number | undefined;
-  if (isOperateurRole) {
-    const operateur = await prisma.operateur.findUnique({ where: { userId: session.userId } });
-    operateurScope = operateur?.id ?? -1; // -1 => aucun résultat si pas de fiche opérateur
-  }
+  const isSuperviseurRole = session.roleCode === "SUPERVISEUR";
+  const isScopedRole = isOperateurRole || isSuperviseurRole;
+  const scope = await getOperateurScopeFilter(session);
+  // `-1` (aucun opérateur affecté) doit vider le filtre du menu déroulant,
+  // pas l'ouvrir à tous les opérateurs (cf. ExportPage, même sentinelle).
+  const scopeIds = isSuperviseurRole ? (typeof scope === "object" ? scope.in : []) : undefined;
 
   const [communes, natures, operateurs, results] = await Promise.all([
     getCommunesWithLotissements(),
     getNaturesDossier(),
-    isOperateurRole ? Promise.resolve([]) : getActiveOperateurs(),
+    isOperateurRole ? Promise.resolve([]) : getActiveOperateurs(scopeIds),
     searchDossiers(
       {
         q: params.q,
         communeId: params.commune,
         lotissementId: params.lotissement,
         natureDossierId: params.nature,
-        operateurId: isOperateurRole ? operateurScope : params.operateur,
+        operateurId: isScopedRole ? scope : params.operateur,
         statutCollecte: params.statutCollecte,
         statutValidation: params.statutValidation,
         statutNumerisation: params.statutNumerisation,

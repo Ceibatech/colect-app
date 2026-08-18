@@ -7,6 +7,7 @@ import { getStorageProvider } from "@/lib/storage";
 import { getClientIp } from "@/lib/utils/server-request";
 import type { SessionPayload } from "@/lib/auth/session";
 import { ApiError } from "@/lib/utils/api-error";
+import { isOperateurInScope } from "@/lib/services/access-scope";
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20 Mo
 const ALLOWED_MIME_TYPES = new Set([
@@ -26,9 +27,10 @@ async function assertDossierAccessible(dossierId: number, session: SessionPayloa
   const dossier = await prisma.dossier.findUnique({ where: { id: dossierId }, select: { id: true, operateurId: true } });
   if (!dossier) throw new ApiError("Dossier introuvable.", 404);
 
-  if (session.roleCode === "OPERATEUR") {
-    const operateur = await prisma.operateur.findUnique({ where: { userId: session.userId } });
-    if (!operateur || dossier.operateurId !== operateur.id) throw new ApiError("Dossier introuvable.", 404);
+  if (session.roleCode === "OPERATEUR" || session.roleCode === "SUPERVISEUR") {
+    if (!(await isOperateurInScope(session, dossier.operateurId))) {
+      throw new ApiError("Dossier introuvable.", 404);
+    }
   }
   return dossier;
 }

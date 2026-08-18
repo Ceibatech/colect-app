@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@prisma/client";
 import { stringifyCsv } from "@/lib/utils/csv";
+import { getOperateurScopeFilter } from "@/lib/services/access-scope";
 import type { SessionPayload } from "@/lib/auth/session";
 
 export interface ExportFilters {
@@ -31,9 +32,16 @@ const fmtDate = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
 async function loadExportRows(filters: ExportFilters, session: SessionPayload) {
   const where: Prisma.DossierWhereInput = {};
 
-  if (session.roleCode === "OPERATEUR") {
-    const operateur = await prisma.operateur.findUnique({ where: { userId: session.userId } });
-    where.operateurId = operateur?.id ?? -1;
+  // OPERATEUR : toujours sa propre fiche. SUPERVISEUR (Phase 16+) : ses
+  // opérateurs affectés — un filtre `operateurId` du formulaire n'est
+  // honoré que s'il tombe dans ce périmètre (jamais de confiance dans une
+  // valeur client pour l'élargir, cf. access-scope.ts).
+  const scope = await getOperateurScopeFilter(session);
+  if (scope !== undefined) {
+    const filterInScope =
+      filters.operateurId !== undefined &&
+      (scope === filters.operateurId || (typeof scope === "object" && scope.in.includes(filters.operateurId)));
+    where.operateurId = filterInScope ? filters.operateurId! : scope;
   } else if (filters.operateurId) {
     where.operateurId = filters.operateurId;
   }

@@ -17,9 +17,14 @@ export async function getNaturesDossier() {
   });
 }
 
-export async function getActiveOperateurs() {
+/**
+ * `scopeIds`, si fourni (Phase 16+, superviseur), restreint la liste aux
+ * opérateurs affectés — utilisé pour peupler les filtres/déroulants d'un
+ * SUPERVISEUR (dossiers, export) sans lui exposer les autres opérateurs.
+ */
+export async function getActiveOperateurs(scopeIds?: number[]) {
   return prisma.operateur.findMany({
-    where: { isActive: true },
+    where: { isActive: true, ...(scopeIds ? { id: { in: scopeIds } } : {}) },
     orderBy: { nom: "asc" },
     select: { id: true, nom: true, prenoms: true, matricule: true },
   });
