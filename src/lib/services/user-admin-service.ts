@@ -144,6 +144,25 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
     return { error: "Vous ne pouvez pas désactiver votre propre compte." };
   }
 
+  // Phase 16+ : un opérateur déjà affecté à un AUTRE superviseur ne peut
+  // plus être affecté ici — il faut d'abord retirer son affectation
+  // actuelle (depuis la fiche de ce superviseur) avant de pouvoir le
+  // réaffecter. Contrôlé aussi côté client (case décochée/désactivée dans
+  // OperateurAssignmentField) mais revérifié ici, jamais de confiance dans
+  // le formulaire (§60).
+  if (newRole.code === "SUPERVISEUR" && parsed.data.operateurIds.length > 0) {
+    const conflicting = await prisma.operateur.findMany({
+      where: { id: { in: parsed.data.operateurIds }, supervisorId: { not: null, notIn: [id] } },
+      select: { nom: true, prenoms: true },
+    });
+    if (conflicting.length > 0) {
+      const names = conflicting.map((o) => `${o.nom} ${o.prenoms ?? ""}`.trim()).join(", ");
+      return {
+        error: `Déjà affecté(s) à un autre superviseur : ${names}. Retirez d'abord leur affectation actuelle avant de les réaffecter ici.`,
+      };
+    }
+  }
+
   const ip = await getClientIp();
 
   await prisma.$transaction(async (tx) => {
@@ -176,7 +195,14 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
         data: { supervisorId: null },
       });
       if (desired.length > 0) {
-        await tx.operateur.updateMany({ where: { id: { in: desired } }, data: { supervisorId: id } });
+        // `OR supervisorId null/mine` : re-garde-fou contre une réaffectation
+        // concurrente survenue entre la vérification ci-dessus et cette
+        // écriture (§60) — un opérateur affecté entre-temps à un autre
+        // superviseur reste inchangé plutôt que d'être silencieusement volé.
+        await tx.operateur.updateMany({
+          where: { id: { in: desired }, OR: [{ supervisorId: null }, { supervisorId: id }] },
+          data: { supervisorId: id },
+        });
       }
     } else if (before.role.code === "SUPERVISEUR") {
       // Rôle changé hors SUPERVISEUR : libère les opérateurs qu'il supervisait

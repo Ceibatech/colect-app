@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createUser, updateUser, resetUserPassword, type ActionResult } from "@/lib/services/user-admin-service";
+import { cn } from "@/lib/utils";
 
 export interface UserRow {
   id: number;
@@ -112,19 +113,28 @@ function OperateurAssignmentField({
             const checked = selected.includes(o.id);
             const assignedElsewhere = o.supervisorId !== null && o.supervisorId !== currentSupervisorUserId;
             return (
-              <div key={o.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50">
+              <div
+                key={o.id}
+                className={cn(
+                  "flex items-center gap-2 rounded px-1 py-1",
+                  assignedElsewhere ? "opacity-60" : "hover:bg-muted/50"
+                )}
+              >
                 <Checkbox
                   id={`op-assign-${o.id}`}
                   checked={checked}
                   onCheckedChange={(v) => onToggle(o.id, v === true)}
-                  disabled={disabled}
+                  disabled={disabled || assignedElsewhere}
                 />
-                <Label htmlFor={`op-assign-${o.id}`} className="flex-1 cursor-pointer font-normal">
+                <Label
+                  htmlFor={`op-assign-${o.id}`}
+                  className={cn("flex-1 font-normal", assignedElsewhere ? "cursor-not-allowed" : "cursor-pointer")}
+                >
                   {o.nom} {o.prenoms ?? ""} <span className="text-xs text-muted-foreground">{o.matricule}</span>
                 </Label>
                 {assignedElsewhere ? (
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
-                    actuel : {o.supervisorName}
+                    déjà affecté à {o.supervisorName}
                   </span>
                 ) : null}
               </div>
@@ -133,7 +143,9 @@ function OperateurAssignmentField({
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Ce superviseur ne pourra valider et consulter que les dossiers de ces opérateurs.
+        Ce superviseur ne pourra valider et consulter que les dossiers de ces opérateurs. Un opérateur déjà
+        affecté à un autre superviseur (grisé ci-dessus) doit d&apos;abord être retiré de sa fiche avant de
+        pouvoir être réaffecté ici.
       </p>
       {selected.map((id) => (
         <input key={id} type="hidden" name="operateurIds" value={id} />
