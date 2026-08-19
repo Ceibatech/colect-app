@@ -28,6 +28,19 @@ export const natureDossierSchema = z.object({
 export type NatureDossierInput = z.infer<typeof natureDossierSchema>;
 
 /**
+ * Type de pièce jointe au dossier (Phase 18+) — liste fermée mais
+ * extensible depuis la Collecte (StepDossier.tsx), même principe que
+ * NatureDossier "Autres" ci-dessus.
+ */
+export const typePieceSchema = z.object({
+  code: z.string().min(1, "Le code est requis").max(20),
+  libelle: z.string().min(1, "Le libellé est requis").max(150),
+  description: z.string().max(1000).optional().or(z.literal("")),
+  isActive: z.coerce.boolean().default(true),
+});
+export type TypePieceInput = z.infer<typeof typePieceSchema>;
+
+/**
  * Site d'archivage physique (Phase 16+) — ordre des champs aligné sur la
  * fiche "Informations générales du site" fournie par le métier. Seuls
  * `code` et `nom` sont obligatoires : les autres champs (contact, adresse,

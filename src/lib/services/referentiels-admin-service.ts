@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
-import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema, entrepotSchema, equipementSchema } from "@/lib/validation/referentiels";
+import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema, entrepotSchema, equipementSchema, typePieceSchema } from "@/lib/validation/referentiels";
 
 /**
  * CRUD administration des référentiels géographiques (Phase 15+) — jamais de
@@ -172,6 +172,67 @@ export async function createNature(_prevState: ActionResult, formData: FormData)
   });
   await prisma.auditLog.create({
     data: { userId: session.userId, action: "NATURE_CREATE", entity: "NATURE_DOSSIER", entityId: nature.id, newValue: parsed.data, ipAddress: await getClientIp() },
+  });
+  return { success: true };
+}
+
+// ------------------------------------------------------------ Types pièce
+
+export async function listAllTypesPiece() {
+  await requirePermission("REFERENTIEL_MANAGE");
+  return prisma.typePiece.findMany({ orderBy: { libelle: "asc" }, include: { _count: { select: { dossiers: true } } } });
+}
+
+export async function createTypePiece(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = typePieceSchema.safeParse({
+    code: formData.get("code"),
+    libelle: formData.get("libelle"),
+    description: formData.get("description"),
+    isActive: formData.get("isActive") === "on",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const existing = await prisma.typePiece.findUnique({ where: { code: parsed.data.code } });
+  if (existing) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
+
+  const typePiece = await prisma.typePiece.create({
+    data: { ...parsed.data, description: parsed.data.description || null },
+  });
+  await prisma.auditLog.create({
+    data: { userId: session.userId, action: "TYPE_PIECE_CREATE", entity: "TYPE_PIECE", entityId: typePiece.id, newValue: parsed.data, ipAddress: await getClientIp() },
+  });
+  return { success: true };
+}
+
+export async function updateTypePiece(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = typePieceSchema.safeParse({
+    code: formData.get("code"),
+    libelle: formData.get("libelle"),
+    description: formData.get("description"),
+    isActive: formData.get("isActive") === "on",
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const existing = await prisma.typePiece.findUnique({ where: { code: parsed.data.code } });
+  if (existing && existing.id !== id) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
+
+  const before = await prisma.typePiece.findUnique({ where: { id } });
+  const typePiece = await prisma.typePiece.update({
+    where: { id },
+    data: { ...parsed.data, description: parsed.data.description || null },
+  });
+  await prisma.auditLog.create({
+    data: {
+      userId: session.userId,
+      action: "TYPE_PIECE_UPDATE",
+      entity: "TYPE_PIECE",
+      entityId: typePiece.id,
+      oldValue: before ? { code: before.code, libelle: before.libelle, isActive: before.isActive } : undefined,
+      newValue: parsed.data,
+      ipAddress: await getClientIp(),
+    },
   });
   return { success: true };
 }

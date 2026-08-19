@@ -17,6 +17,14 @@ export async function getNaturesDossier() {
   });
 }
 
+/** Types de pièces actifs (Phase 18+), proposés en étape 4 "Dossier" de la Collecte. */
+export async function getActiveTypesPiece() {
+  return prisma.typePiece.findMany({
+    where: { isActive: true },
+    orderBy: { libelle: "asc" },
+  });
+}
+
 /**
  * `scopeIds`, si fourni (Phase 16+, superviseur), restreint la liste aux
  * opérateurs affectés — utilisé pour peupler les filtres/déroulants d'un

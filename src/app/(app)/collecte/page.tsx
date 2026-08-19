@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current-user";
-import { getCommunesWithLotissements, getNaturesDossier, getActiveOperateurs, getActiveSites } from "@/lib/services/referentiels-service";
+import { getCommunesWithLotissements, getNaturesDossier, getActiveOperateurs, getActiveSites, getActiveTypesPiece } from "@/lib/services/referentiels-service";
 import { listMyDrafts, getDraftById } from "@/lib/services/dossier-service";
 import { CollecteWizard } from "@/components/collecte/CollecteWizard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,10 +20,11 @@ export default async function CollectePage({
   const { draft } = await searchParams;
   const draftId = draft ? Number(draft) : undefined;
 
-  const [sites, communes, natures, operateurs] = await Promise.all([
+  const [sites, communes, natures, typesPiece, operateurs] = await Promise.all([
     getActiveSites(),
     getCommunesWithLotissements(),
     getNaturesDossier(),
+    getActiveTypesPiece(),
     session.roleCode === "OPERATEUR" ? Promise.resolve([]) : getActiveOperateurs(),
   ]);
 
@@ -50,6 +51,9 @@ export default async function CollectePage({
         communeId: dossier.communeId ?? undefined,
         lotissementNom: dossier.lotissement?.nom ?? undefined,
         natureDossierId: dossier.natureDossierId ?? undefined,
+        nombrePieces: dossier.nombrePieces ?? undefined,
+        typesPieces: dossier.typesPieces.map((t) => String(t.id)),
+        autresPieces: dossier.autresPieces ?? undefined,
         nom: dossier.nom ?? undefined,
         prenoms: dossier.prenoms ?? undefined,
         adresse: dossier.adresse ?? undefined,
@@ -67,6 +71,7 @@ export default async function CollectePage({
           sites={sites}
           communes={communes}
           natures={natures}
+          typesPiece={typesPiece}
           operateurs={operateurs}
           isOperateurRole={isOperateurRole}
           currentUserName={session.name}
@@ -119,6 +124,7 @@ export default async function CollectePage({
       sites={sites}
       communes={communes}
       natures={natures}
+      typesPiece={typesPiece}
       operateurs={operateurs}
       isOperateurRole={isOperateurRole}
       currentUserName={session.name}

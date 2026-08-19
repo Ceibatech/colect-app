@@ -192,6 +192,27 @@ model NatureDossier {
   @@map("natures_dossier")
 }
 
+// Type de pièce jointe au dossier (CNI, Carte résident, Extrait topo...) —
+// liste fermée mais extensible : la Collecte (StepDossier.tsx) permet de
+// sélectionner plusieurs types existants ET d'en ajouter un nouveau à la
+// volée (saisie libre), résolu côté serveur en find-or-create comme pour
+// Lotissement/NatureDossier "Autres". Relation many-to-many implicite avec
+// Dossier (un dossier référence plusieurs types de pièces, un type de pièce
+// est utilisé par plusieurs dossiers).
+model TypePiece {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  libelle     String
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  dossiers Dossier[] @relation("DossierTypesPieces")
+
+  @@map("types_piece")
+}
+
 // Site d'archivage physique (siège, dépôt, antenne...) — Phase 16+. Choisi
 // en première étape de la Collecte (avant Identification) : chaque dossier
 // est rattaché au site où le carton est/sera physiquement conservé. Ordre
@@ -530,6 +551,14 @@ model Dossier {
   // principe que l'état du carton.
   etatDossier            EtatConservation? @map("etat_dossier")
   etatDossierDescription String?           @db.Text @map("etat_dossier_description")
+  // Nombre de pièces contenues dans le dossier et liste des types de pièces
+  // présentes (Phase 18+) — cf. fiche métier "Dossier". `typesPieces` est une
+  // relation many-to-many vers le référentiel extensible `TypePiece`
+  // (sélection multiple + ajout à la volée, résolu côté serveur) ;
+  // `autresPieces` est un champ texte libre distinct, pour toute pièce ne
+  // relevant pas d'un "type" catégorisable (cf. StepDossier.tsx).
+  nombrePieces Int?    @map("nombre_pieces")
+  autresPieces String? @db.Text @map("autres_pieces")
 
   // --- TITULAIRE (fiche CG1020) ---
   nom       String?
@@ -567,6 +596,7 @@ model Dossier {
   commune       Commune?       @relation(fields: [communeId], references: [id])
   lotissement   Lotissement?   @relation(fields: [lotissementId], references: [id])
   natureDossier NatureDossier? @relation(fields: [natureDossierId], references: [id])
+  typesPieces   TypePiece[]    @relation("DossierTypesPieces")
 
   documents           Document[]
   numerisations       Numerisation[]

@@ -20,6 +20,7 @@ import {
   Warehouse,
   PackageOpen,
   Wrench,
+  FileStack,
 } from "lucide-react";
 import type { PermissionCode } from "@/lib/permissions/constants";
 
@@ -63,6 +64,7 @@ export const NAV_ITEMS: NavItem[] = [
       { title: "Communes", href: "/administration/communes", icon: Building2, permission: "REFERENTIEL_MANAGE" },
       { title: "Lotissements", href: "/administration/lotissements", icon: MapPinned, permission: "REFERENTIEL_MANAGE" },
       { title: "Natures de dossier", href: "/administration/natures", icon: Tags, permission: "REFERENTIEL_MANAGE" },
+      { title: "Types de pièces", href: "/administration/types-piece", icon: FileStack, permission: "REFERENTIEL_MANAGE" },
       { title: "Paramètres", href: "/administration/parametres", icon: SlidersHorizontal, permission: "SETTINGS_MANAGE" },
       { title: "Audit", href: "/administration/audit", icon: ScrollText, permission: "AUDIT_VIEW" },
     ],

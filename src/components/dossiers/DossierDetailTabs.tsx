@@ -41,6 +41,9 @@ interface DossierDetail {
   natureDossier: { libelle: string } | null;
   etatDossier: "BON_ETAT" | "DEGRADE" | null;
   etatDossierDescription: string | null;
+  nombrePieces: number | null;
+  typesPieces: Array<{ id: number; libelle: string }>;
+  autresPieces: string | null;
   operateur: { nom: string; prenoms: string | null; matricule: string };
   nom: string | null;
   prenoms: string | null;
@@ -168,6 +171,9 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
               {dossier.etatDossier === "DEGRADE" ? (
                 <Field label="Description de l'état (dossier)" value={dossier.etatDossierDescription} />
               ) : null}
+              <Field label="Nombre de pièces" value={dossier.nombrePieces} />
+              <Field label="Types de pièces" value={dossier.typesPieces.map((t) => t.libelle).join(", ") || null} />
+              <Field label="Autres pièces" value={dossier.autresPieces} />
               <Field label="Personne à contacter" value={dossier.personneContact} />
               <Field label="Mobile" value={dossier.mobile} />
             </CardContent>

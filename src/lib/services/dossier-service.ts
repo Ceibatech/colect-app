@@ -75,6 +75,8 @@ function cleanForDb(values: DossierFormValues) {
     communeId: toNullableNumber(values.communeId),
     etatDossier: clean(values.etatDossier) ?? null,
     etatDossierDescription: values.etatDossier === "DEGRADE" ? clean(values.etatDossierDescription) ?? null : null,
+    nombrePieces: toNullableNumber(values.nombrePieces),
+    autresPieces: clean(values.autresPieces) ?? null,
     nom: clean(values.nom) ?? null,
     prenoms: clean(values.prenoms) ?? null,
     adresse: clean(values.adresse) ?? null,
@@ -161,6 +163,56 @@ async function resolveNatureDossierId(natureDossierId: number | null, autreLibre
   return created.id;
 }
 
+/** Génère un code de type de pièce unique. */
+async function generateTypePieceCode(): Promise<string> {
+  const count = await prisma.typePiece.count();
+  let n = count + 1;
+  for (let attempts = 0; attempts < 1000; attempts++) {
+    const candidate = `PIE-${String(n).padStart(3, "0")}`;
+    const exists = await prisma.typePiece.findUnique({ where: { code: candidate } });
+    if (!exists) return candidate;
+    n++;
+  }
+  throw new Error("Impossible de générer un code de type de pièce unique.");
+}
+
+/**
+ * Résout les "Types de pièces" (Phase 18+) — sélection multiple dans le
+ * formulaire, chaque entrée étant soit l'id (chaîne numérique) d'un
+ * `TypePiece` existant, soit une saisie libre ajoutée à la volée (préfixée
+ * "new:" côté interface, cf. TypesPiecesField.tsx), résolue ici vers une
+ * fiche `types_piece` existante (insensible à la casse) ou créée. Ne fait
+ * jamais confiance aux ids envoyés par le client sans les revérifier en base
+ * — même principe que le reste de ce fichier.
+ */
+async function resolveTypesPieceIds(tokens: string[] | undefined): Promise<number[]> {
+  if (!tokens || tokens.length === 0) return [];
+  const ids = new Set<number>();
+
+  for (const token of tokens) {
+    if (token.startsWith("new:")) {
+      const libelle = token.slice(4).trim();
+      if (!libelle) continue;
+      const existing = await prisma.typePiece.findFirst({ where: { libelle: { equals: libelle } } });
+      if (existing) {
+        ids.add(existing.id);
+        continue;
+      }
+      const code = await generateTypePieceCode();
+      const created = await prisma.typePiece.create({ data: { code, libelle, isActive: true } });
+      ids.add(created.id);
+      continue;
+    }
+
+    const id = Number(token);
+    if (!Number.isInteger(id) || id <= 0) continue;
+    const existing = await prisma.typePiece.findUnique({ where: { id } });
+    if (existing) ids.add(existing.id);
+  }
+
+  return Array.from(ids);
+}
+
 /**
  * Génère une référence unique DOS-{année}-{séquence}. Approche "count + retry
  * sur conflit" — suffisante pour le volume attendu en V1. Sous forte
@@ -202,6 +254,7 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
   const cleaned = cleanForDb(values);
   const lotissementId = await resolveLotissementId(cleaned.communeId, values.lotissementNom);
   const natureDossierId = await resolveNatureDossierId(values.natureDossierId ?? null, values.natureDossierAutre);
+  const typePieceIds = await resolveTypesPieceIds(values.typesPieces);
   const data = { ...cleaned, lotissementId, natureDossierId };
 
   if (values.codeBarres) {
@@ -225,7 +278,7 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
     }
     const updated = await prisma.dossier.update({
       where: { id: draftId },
-      data: { ...data, operateurId },
+      data: { ...data, operateurId, typesPieces: { set: typePieceIds.map((id) => ({ id })) } },
     });
     return { id: updated.id, reference: updated.reference };
   }
@@ -234,6 +287,7 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
     ...data,
     operateurId,
     statutCollecte: "BROUILLON",
+    typesPieces: { connect: typePieceIds.map((id) => ({ id })) },
   });
 
   await prisma.dossierHistory.create({
@@ -343,8 +397,9 @@ export async function listMyDrafts() {
 export async function getDraftById(id: number) {
   const session = await requirePermission("DOSSIER_CREATE");
   // `lotissement` inclus pour reconstituer `lotissementNom` (saisie libre,
-  // cf. resolveLotissementId ci-dessus) lors de la reprise d'un brouillon.
-  const dossier = await prisma.dossier.findUnique({ where: { id }, include: { lotissement: true } });
+  // cf. resolveLotissementId ci-dessus) ; `typesPieces` pour reconstituer la
+  // sélection multiple (Phase 18+) lors de la reprise d'un brouillon.
+  const dossier = await prisma.dossier.findUnique({ where: { id }, include: { lotissement: true, typesPieces: true } });
   if (!dossier || dossier.statutCollecte !== "BROUILLON") return null;
 
   if (session.roleCode === "OPERATEUR") {

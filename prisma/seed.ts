@@ -54,6 +54,16 @@ const NATURES_DOSSIER = [
   { code: "NAT-AU", libelle: "Autre" },
 ];
 
+// Types de pièces (Phase 18+) — liste fermée mais extensible, cf. fiche
+// métier "Dossier" / StepDossier.tsx.
+const TYPES_PIECE = [
+  { code: "PIE-001", libelle: "CNI" },
+  { code: "PIE-002", libelle: "Carte résident" },
+  { code: "PIE-003", libelle: "Carte consulaire" },
+  { code: "PIE-004", libelle: "Extrait topo" },
+  { code: "PIE-005", libelle: "Acte de naissance" },
+];
+
 // Descriptions fictives pour l'état "Dégradé" (Phase 15+) — exemples de
 // démonstration uniquement, jamais des observations réelles.
 const CARTON_DEGRADE_DESCRIPTIONS = [
@@ -244,6 +254,14 @@ async function main() {
   }
   console.log(`✔ ${natures.length} natures de dossier`);
 
+  // 7bis. Types de pièces (Phase 18+)
+  const typesPiece = [];
+  for (const t of TYPES_PIECE) {
+    const tp = await prisma.typePiece.upsert({ where: { code: t.code }, update: {}, create: t });
+    typesPiece.push(tp);
+  }
+  console.log(`✔ ${typesPiece.length} types de pièces`);
+
   // 8. Statuts de workflow (référentiel de configuration)
   for (const ws of WORKFLOW_STATUSES) {
     await prisma.workflowStatus.upsert({
@@ -335,6 +353,9 @@ async function main() {
         natureDossierId: nature.id,
         etatDossier: dossierDegrade ? "DEGRADE" : "BON_ETAT",
         etatDossierDescription: dossierDegrade ? faker.helpers.arrayElement(DOSSIER_DEGRADE_DESCRIPTIONS) : null,
+        nombrePieces: faker.number.int({ min: 1, max: 8 }),
+        typesPieces: { connect: faker.helpers.arrayElements(typesPiece, { min: 1, max: 3 }).map((t) => ({ id: t.id })) },
+        autresPieces: faker.datatype.boolean({ probability: 0.15 }) ? "Reçu de dépôt manuscrit" : null,
         nom: faker.person.lastName(),
         prenoms: faker.person.firstName(),
         adresse: faker.location.streetAddress(),

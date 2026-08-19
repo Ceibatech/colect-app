@@ -22,6 +22,7 @@ const MAX_EXPORT_ROWS = 20_000;
 const EXPORT_COLUMNS = [
   "Site", "Entrepôt", "Référence", "Code-barres", "N° guichet", "Direction/Service concerné(e)", "Numéro Direction/Service", "Référence classement",
   "N° îlot", "N° lot", "Superficie", "N° titre foncier", "Commune", "Lotissement", "Nature dossier",
+  "Nombre de pièces", "Types de pièces", "Autres pièces",
   "Nom", "Prénoms", "Adresse", "Téléphone", "E-mail", "Personne à contacter", "Mobile", "Opérateur",
   "Statut collecte", "Statut validation", "Statut numérisation", "Statut indexation", "Statut archivage",
   "Date soumission", "Date validation", "Date numérisation", "Date indexation", "Date archivage", "Créé le",
@@ -80,6 +81,7 @@ async function loadExportRows(filters: ExportFilters, session: SessionPayload) {
       commune: { select: { nom: true } },
       lotissement: { select: { nom: true } },
       natureDossier: { select: { libelle: true } },
+      typesPieces: { select: { libelle: true } },
       operateur: { select: { nom: true, prenoms: true, matricule: true } },
     },
   });
@@ -102,6 +104,9 @@ function toRow(d: Awaited<ReturnType<typeof loadExportRows>>[number]): (string |
     d.commune?.nom ?? "",
     d.lotissement?.nom ?? "",
     d.natureDossier?.libelle ?? "",
+    d.nombrePieces ?? "",
+    d.typesPieces.map((t) => t.libelle).join(", "),
+    d.autresPieces ?? "",
     d.nom ?? "",
     d.prenoms ?? "",
     d.adresse ?? "",

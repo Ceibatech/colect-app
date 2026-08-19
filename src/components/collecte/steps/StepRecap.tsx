@@ -10,6 +10,7 @@ interface Lookups {
   sites: { id: number; nom: string; code: string; entrepots: { id: number; nom: string; code: string }[] }[];
   communes: { id: number; nom: string; lotissements: { id: number; nom: string }[] }[];
   natures: { id: number; libelle: string }[];
+  typesPiece: { id: number; libelle: string }[];
   operateurs: { id: number; nom: string; prenoms: string | null }[];
   isOperateurRole: boolean;
   currentUserName: string;
@@ -56,6 +57,9 @@ export function StepRecap({
   const commune = lookups.communes.find((c) => c.id === v.communeId);
   const nature = lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
   const etatLabel = (value?: string) => ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label;
+  const typesPieceLabels = (v.typesPieces ?? [])
+    .map((token) => (token.startsWith("new:") ? token.slice(4) : (lookups.typesPiece.find((t) => String(t.id) === token)?.libelle ?? token)))
+    .join(", ");
   const operateur = lookups.isOperateurRole
     ? lookups.currentUserName
     : (() => {
@@ -99,6 +103,9 @@ export function StepRecap({
         <Row label="Nature du dossier" value={nature} />
         <Row label="État du dossier" value={etatLabel(v.etatDossier)} />
         {v.etatDossier === "DEGRADE" ? <Row label="Description de l'état (dossier)" value={v.etatDossierDescription} /> : null}
+        <Row label="Nombre de pièces" value={v.nombrePieces} />
+        <Row label="Types de pièces" value={typesPieceLabels || undefined} />
+        <Row label="Autres pièces" value={v.autresPieces} />
       </Section>
 
       <Section title="Titulaire" onEdit={() => onEditStep(5)}>

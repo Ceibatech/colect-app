@@ -24,7 +24,7 @@ npm run db:verify
 |---|---|---|
 | RBAC | `roles`, `permissions`, `role_permissions` | Contrôle d'accès basé sur les rôles |
 | Identité | `users`, `operateurs` | Comptes applicatifs et fiches opérateur terrain |
-| Référentiels | `sites`, `entrepots`, `equipements`, `communes`, `lotissements`, `natures_dossier` | Listes de valeurs pour la collecte |
+| Référentiels | `sites`, `entrepots`, `equipements`, `communes`, `lotissements`, `natures_dossier`, `types_piece` | Listes de valeurs pour la collecte |
 | Workflow | `workflow_statuses`, `workflow_transitions`, `dossier_history` | Configuration et traçabilité du cycle métier |
 | Métier | `dossiers` | Table centrale — fiche CG1020 + suivi applicatif |
 | Documents | `documents` | Métadonnées des fichiers numérisés (pas de blob en base) |
@@ -45,6 +45,7 @@ libelleCarton, codeBarres, numeroGuichet, numeroDdu, numeroDirectionService, ref
 etatCarton, etatCartonDescription,
 numeroIlot, numeroLot, superficie, numeroTitreFoncier,
 communeId, lotissementId, natureDossierId, etatDossier, etatDossierDescription,
+nombrePieces, typesPieces, autresPieces,
 nom, prenoms, adresse, telephone, email,
 personneContact, mobile
 ```
@@ -150,6 +151,20 @@ personneContact, mobile
 > aucun dossier (contrairement à sites/entrepôts/communes/lotissements/natures), le
 > retirer de l'inventaire ne casse donc aucun historique métier — voir
 > `deleteEquipement()` dans `referentiels-admin-service.ts`.
+>
+> **Ajout (Phase 18+)** : `dossiers.nombre_pieces` (nombre de pièces contenues dans le
+> dossier) et `dossiers.autres_pieces` (texte libre, toute pièce ne relevant pas d'un type
+> catégorisable). Et relation many-to-many implicite `dossiers` ↔ nouvelle table
+> `types_piece` (table pivot `_DossierTypesPieces`, générée par Prisma) : « Types de pièces
+> dans le dossier », liste fermée mais extensible depuis la Collecte
+> (`TypesPiecesField.tsx`, étape « Dossier ») — cases à cocher pour les types existants
+> (CNI, Carte résident, Carte consulaire, Extrait topo, Acte de naissance, seedés via
+> `prisma/seed.ts`/`scripts/seed-tmp.js`) + possibilité d'ajouter un type absent de la
+> liste, résolu côté serveur en find-or-create (`resolveTypesPieceIds()` dans
+> `dossier-service.ts`), même principe que Lotissement/NatureDossier « Autres ». Référentiel
+> `types_piece` administrable depuis `/administration/types-piece` (mêmes conventions —
+> jamais de suppression physique). Champ distinct de `autres_pieces` ci-dessus : l'un
+> catégorise (types connus/extensibles), l'autre est un fourre-tout en saisie libre.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le
@@ -184,7 +199,7 @@ processus métier — ils ne figurent pas sur la fiche CG1020.
 ## 5. Contraintes UNIQUE
 
 `users.email`, `roles.code`, `permissions.code`, `communes.code`, `lotissements.code`,
-`natures_dossier.code`, `dossiers.reference`, `dossiers.codeBarres`,
+`natures_dossier.code`, `types_piece.code`, `dossiers.reference`, `dossiers.codeBarres`,
 `operateurs.matricule`, `role_permissions(roleId, permissionId)`,
 `workflow_statuses(workflowType, code)`, `settings.key`.
 

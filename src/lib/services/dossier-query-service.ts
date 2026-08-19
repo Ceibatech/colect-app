@@ -119,6 +119,7 @@ export async function getDossierDetail(id: number) {
       commune: true,
       lotissement: true,
       natureDossier: true,
+      typesPieces: true,
       operateur: true,
       history: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } },
       numerisations: { orderBy: { createdAt: "desc" } },
