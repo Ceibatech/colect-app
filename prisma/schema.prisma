@@ -287,6 +287,41 @@ model Entrepot {
   capaciteBoitesMax  Int? @map("capacite_boites_max")
   capaciteTheorique  Int? @map("capacite_theorique")
 
+  // --- Conditions de conservation (Phase 17+) --- déclaratives, saisies/
+  // mises à jour en administration au fil des relevés/contrôles.
+  temperatureMoyenne         Float?   @map("temperature_moyenne")
+  temperatureMin             Float?   @map("temperature_min")
+  temperatureMax             Float?   @map("temperature_max")
+  systemeClimatisation       Boolean? @map("systeme_climatisation")
+  climatisationFonctionnelle Boolean? @map("climatisation_fonctionnelle")
+  humiditeMoyenne             Float?   @map("humidite_moyenne")
+  humiditeMin                 Float?   @map("humidite_min")
+  humiditeMax                 Float?   @map("humidite_max")
+  deshumidificateur           Boolean? @map("deshumidificateur")
+  systemeControleHumidite     Boolean? @map("systeme_controle_humidite")
+  protectionEau               Boolean? @map("protection_eau")
+  protectionInfiltrations     Boolean? @map("protection_infiltrations")
+  etancheiteBatiment          Boolean? @map("etancheite_batiment")
+  protectionPoussiere         Boolean? @map("protection_poussiere")
+  protectionNuisibles         Boolean? @map("protection_nuisibles")
+
+  // --- Sécurité de l'entrepôt (Phase 17+) ---
+  extincteursDisponibles         Boolean?  @map("extincteurs_disponibles")
+  nombreExtincteurs              Int?      @map("nombre_extincteurs")
+  detecteursFumee                Boolean?  @map("detecteurs_fumee")
+  systemeAlarmeIncendie          Boolean?  @map("systeme_alarme_incendie")
+  systemeExtinctionAutomatique   Boolean?  @map("systeme_extinction_automatique")
+  dateDernierControleIncendie    DateTime? @map("date_dernier_controle_incendie")
+  dateProchainControleIncendie   DateTime? @map("date_prochain_controle_incendie")
+  gardiennage        Boolean? @map("gardiennage")
+  videosurveillance  Boolean? @map("videosurveillance")
+  nombreCameras      Int?     @map("nombre_cameras")
+  alarmeAntiIntrusion Boolean? @map("alarme_anti_intrusion")
+  controleAcces      Boolean? @map("controle_acces")
+  badge              Boolean? @map("badge")
+  serrureSecurisee   Boolean? @map("serrure_securisee")
+  registreVisiteurs  Boolean? @map("registre_visiteurs")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

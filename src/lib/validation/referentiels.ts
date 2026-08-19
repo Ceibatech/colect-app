@@ -93,5 +93,42 @@ export const entrepotSchema = z.object({
   capaciteCartonsMax: z.coerce.number().int().min(0).optional().or(z.literal("")),
   capaciteBoitesMax: z.coerce.number().int().min(0).optional().or(z.literal("")),
   capaciteTheorique: z.coerce.number().int().min(0).optional().or(z.literal("")),
+
+  // Conditions de conservation (Phase 17+) — "pour un entrepôt d'archives,
+  // je recommande de collecter". Les cases à cocher résolvent toujours en
+  // true/false (jamais tri-state depuis le formulaire — même convention
+  // qu'`isActive`) ; nullable en base pour les fiches jamais renseignées.
+  temperatureMoyenne: z.coerce.number().optional().or(z.literal("")),
+  temperatureMin: z.coerce.number().optional().or(z.literal("")),
+  temperatureMax: z.coerce.number().optional().or(z.literal("")),
+  systemeClimatisation: z.boolean().default(false),
+  climatisationFonctionnelle: z.boolean().default(false),
+  humiditeMoyenne: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
+  humiditeMin: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
+  humiditeMax: z.coerce.number().min(0).max(100).optional().or(z.literal("")),
+  deshumidificateur: z.boolean().default(false),
+  systemeControleHumidite: z.boolean().default(false),
+  protectionEau: z.boolean().default(false),
+  protectionInfiltrations: z.boolean().default(false),
+  etancheiteBatiment: z.boolean().default(false),
+  protectionPoussiere: z.boolean().default(false),
+  protectionNuisibles: z.boolean().default(false),
+
+  // Sécurité de l'entrepôt (Phase 17+)
+  extincteursDisponibles: z.boolean().default(false),
+  nombreExtincteurs: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  detecteursFumee: z.boolean().default(false),
+  systemeAlarmeIncendie: z.boolean().default(false),
+  systemeExtinctionAutomatique: z.boolean().default(false),
+  dateDernierControleIncendie: z.string().max(20).optional().or(z.literal("")),
+  dateProchainControleIncendie: z.string().max(20).optional().or(z.literal("")),
+  gardiennage: z.boolean().default(false),
+  videosurveillance: z.boolean().default(false),
+  nombreCameras: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  alarmeAntiIntrusion: z.boolean().default(false),
+  controleAcces: z.boolean().default(false),
+  badge: z.boolean().default(false),
+  serrureSecurisee: z.boolean().default(false),
+  registreVisiteurs: z.boolean().default(false),
 });
 export type EntrepotInput = z.infer<typeof entrepotSchema>;

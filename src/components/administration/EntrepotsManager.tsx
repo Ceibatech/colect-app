@@ -41,6 +41,38 @@ export interface EntrepotRow {
   capaciteCartonsMax: number | null;
   capaciteBoitesMax: number | null;
   capaciteTheorique: number | null;
+  // Conditions de conservation
+  temperatureMoyenne: number | null;
+  temperatureMin: number | null;
+  temperatureMax: number | null;
+  systemeClimatisation: boolean | null;
+  climatisationFonctionnelle: boolean | null;
+  humiditeMoyenne: number | null;
+  humiditeMin: number | null;
+  humiditeMax: number | null;
+  deshumidificateur: boolean | null;
+  systemeControleHumidite: boolean | null;
+  protectionEau: boolean | null;
+  protectionInfiltrations: boolean | null;
+  etancheiteBatiment: boolean | null;
+  protectionPoussiere: boolean | null;
+  protectionNuisibles: boolean | null;
+  // Sécurité de l'entrepôt
+  extincteursDisponibles: boolean | null;
+  nombreExtincteurs: number | null;
+  detecteursFumee: boolean | null;
+  systemeAlarmeIncendie: boolean | null;
+  systemeExtinctionAutomatique: boolean | null;
+  dateDernierControleIncendie: string | null; // ISO (YYYY-MM-DD), déjà sérialisé par la page
+  dateProchainControleIncendie: string | null;
+  gardiennage: boolean | null;
+  videosurveillance: boolean | null;
+  nombreCameras: number | null;
+  alarmeAntiIntrusion: boolean | null;
+  controleAcces: boolean | null;
+  badge: boolean | null;
+  serrureSecurisee: boolean | null;
+  registreVisiteurs: boolean | null;
   // Calculés côté serveur (jamais saisis) — voir listAllEntrepots().
   cartonsOccupes: number;
   capaciteDisponible: number | null;
@@ -54,6 +86,28 @@ const initialState: ActionResult = {};
 // Non contraignant — la fiche métier donne "Principal / secondaire" comme
 // exemple, pas comme liste fermée.
 const TYPE_ENTREPOT_SUGGESTIONS = ["Principal", "Secondaire"];
+
+/** Case à cocher compacte pour les listes "Conditions de conservation" / "Sécurité". */
+function CheckField({
+  name,
+  label,
+  defaultChecked,
+  disabled,
+}: {
+  name: string;
+  label: string;
+  defaultChecked?: boolean | null;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox id={name} name={name} defaultChecked={defaultChecked ?? false} disabled={disabled} />
+      <Label htmlFor={name} className="font-normal">
+        {label}
+      </Label>
+    </div>
+  );
+}
 
 function EntrepotForm({
   action,
@@ -248,6 +302,114 @@ function EntrepotForm({
             automatiquement à partir des dossiers rattachés, non modifiable ici.
           </p>
         ) : null}
+      </div>
+
+      {/* Conditions de conservation (Phase 17+) — "pour un entrepôt d'archives" */}
+      <div className="space-y-4 rounded-md border p-3">
+        <Label className="text-sm font-medium">Conditions de conservation</Label>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Température</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="temperatureMoyenne">Moyenne (°C)</Label>
+              <Input id="temperatureMoyenne" name="temperatureMoyenne" type="number" step="any" defaultValue={defaultValues?.temperatureMoyenne ?? ""} disabled={isPending} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="temperatureMin">Minimale (°C)</Label>
+              <Input id="temperatureMin" name="temperatureMin" type="number" step="any" defaultValue={defaultValues?.temperatureMin ?? ""} disabled={isPending} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="temperatureMax">Maximale (°C)</Label>
+              <Input id="temperatureMax" name="temperatureMax" type="number" step="any" defaultValue={defaultValues?.temperatureMax ?? ""} disabled={isPending} />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
+            <CheckField name="systemeClimatisation" label="Système de climatisation" defaultChecked={defaultValues?.systemeClimatisation} disabled={isPending} />
+            <CheckField name="climatisationFonctionnelle" label="Climatisation fonctionnelle ?" defaultChecked={defaultValues?.climatisationFonctionnelle} disabled={isPending} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Humidité</p>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="humiditeMoyenne">Taux moyen (%)</Label>
+              <Input id="humiditeMoyenne" name="humiditeMoyenne" type="number" step="any" min={0} max={100} defaultValue={defaultValues?.humiditeMoyenne ?? ""} disabled={isPending} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="humiditeMin">Taux minimum (%)</Label>
+              <Input id="humiditeMin" name="humiditeMin" type="number" step="any" min={0} max={100} defaultValue={defaultValues?.humiditeMin ?? ""} disabled={isPending} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="humiditeMax">Taux maximum (%)</Label>
+              <Input id="humiditeMax" name="humiditeMax" type="number" step="any" min={0} max={100} defaultValue={defaultValues?.humiditeMax ?? ""} disabled={isPending} />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-2 pt-1">
+            <CheckField name="deshumidificateur" label="Déshumidificateur" defaultChecked={defaultValues?.deshumidificateur} disabled={isPending} />
+            <CheckField name="systemeControleHumidite" label="Système de contrôle de l'humidité" defaultChecked={defaultValues?.systemeControleHumidite} disabled={isPending} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Protection</p>
+          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            <CheckField name="protectionEau" label="Protection contre l'eau" defaultChecked={defaultValues?.protectionEau} disabled={isPending} />
+            <CheckField name="protectionInfiltrations" label="Protection contre les infiltrations" defaultChecked={defaultValues?.protectionInfiltrations} disabled={isPending} />
+            <CheckField name="etancheiteBatiment" label="Étanchéité du bâtiment" defaultChecked={defaultValues?.etancheiteBatiment} disabled={isPending} />
+            <CheckField name="protectionPoussiere" label="Protection contre la poussière" defaultChecked={defaultValues?.protectionPoussiere} disabled={isPending} />
+            <CheckField name="protectionNuisibles" label="Protection contre les nuisibles" defaultChecked={defaultValues?.protectionNuisibles} disabled={isPending} />
+          </div>
+        </div>
+      </div>
+
+      {/* Sécurité de l'entrepôt (Phase 17+) */}
+      <div className="space-y-4 rounded-md border p-3">
+        <Label className="text-sm font-medium">Sécurité de l&apos;entrepôt</Label>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Incendie</p>
+          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            <CheckField name="extincteursDisponibles" label="Extincteurs disponibles" defaultChecked={defaultValues?.extincteursDisponibles} disabled={isPending} />
+            <CheckField name="detecteursFumee" label="Détecteurs de fumée" defaultChecked={defaultValues?.detecteursFumee} disabled={isPending} />
+            <CheckField name="systemeAlarmeIncendie" label="Système d'alarme incendie" defaultChecked={defaultValues?.systemeAlarmeIncendie} disabled={isPending} />
+            <CheckField name="systemeExtinctionAutomatique" label="Système automatique d'extinction" defaultChecked={defaultValues?.systemeExtinctionAutomatique} disabled={isPending} />
+          </div>
+          <div className="grid gap-4 pt-1 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="nombreExtincteurs">Nombre d&apos;extincteurs</Label>
+              <Input id="nombreExtincteurs" name="nombreExtincteurs" type="number" min={0} defaultValue={defaultValues?.nombreExtincteurs ?? ""} disabled={isPending} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dateDernierControleIncendie">Date du dernier contrôle</Label>
+              <Input id="dateDernierControleIncendie" name="dateDernierControleIncendie" type="date" defaultValue={defaultValues?.dateDernierControleIncendie ?? ""} disabled={isPending} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dateProchainControleIncendie">Date du prochain contrôle</Label>
+              <Input id="dateProchainControleIncendie" name="dateProchainControleIncendie" type="date" defaultValue={defaultValues?.dateProchainControleIncendie ?? ""} disabled={isPending} />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Sécurité physique</p>
+          <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+            <CheckField name="gardiennage" label="Gardiennage" defaultChecked={defaultValues?.gardiennage} disabled={isPending} />
+            <CheckField name="videosurveillance" label="Vidéosurveillance" defaultChecked={defaultValues?.videosurveillance} disabled={isPending} />
+            <CheckField name="alarmeAntiIntrusion" label="Alarme anti-intrusion" defaultChecked={defaultValues?.alarmeAntiIntrusion} disabled={isPending} />
+            <CheckField name="controleAcces" label="Contrôle d'accès" defaultChecked={defaultValues?.controleAcces} disabled={isPending} />
+            <CheckField name="badge" label="Badge" defaultChecked={defaultValues?.badge} disabled={isPending} />
+            <CheckField name="serrureSecurisee" label="Serrure sécurisée" defaultChecked={defaultValues?.serrureSecurisee} disabled={isPending} />
+            <CheckField name="registreVisiteurs" label="Registre des visiteurs" defaultChecked={defaultValues?.registreVisiteurs} disabled={isPending} />
+          </div>
+          <div className="grid gap-4 pt-1 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="nombreCameras">Nombre de caméras</Label>
+              <Input id="nombreCameras" name="nombreCameras" type="number" min={0} defaultValue={defaultValues?.nombreCameras ?? ""} disabled={isPending} />
+            </div>
+          </div>
+        </div>
       </div>
 
       <DialogFooter>

@@ -127,6 +127,16 @@ personneContact, mobile
 > `code_barres` renseigné (même convention "carton = dossier avec code-barres" que le
 > tableau de bord, §48). Stocker une valeur "occupée" figée se serait désynchronisée du
 > réel dès le premier dossier archivé ou déplacé.
+>
+> **Ajout (Phase 17+)** : conditions de conservation et sécurité de l'entrepôt —
+> température/humidité (moyenne/min/max + présence et fonctionnement des systèmes de
+> climatisation/déshumidification/contrôle), protection du bâtiment (eau, infiltrations,
+> étanchéité, poussière, nuisibles), sécurité incendie (extincteurs, détecteurs, alarme,
+> extinction automatique, dates de contrôle) et sécurité physique (gardiennage,
+> vidéosurveillance, alarme anti-intrusion, contrôle d'accès, badge, serrure, registre des
+> visiteurs). Tous nullable/déclaratifs, saisis/mis à jour au fil des relevés — les cases
+> à cocher résolvent toujours en `true`/`false` depuis le formulaire (jamais tri-state),
+> `NULL` en base signifiant simplement "jamais renseigné".
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le
