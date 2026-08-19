@@ -251,19 +251,44 @@ model Site {
 // Collecte juste après le site (cascade), une fois qu'un site a été
 // sélectionné.
 model Entrepot {
-  id                Int       @id @default(autoincrement())
-  siteId            Int       @map("site_id")
-  code              String    @unique
-  nom               String
-  typeEntrepot      String?   @map("type_entrepot")
-  description       String?   @db.Text
-  isActive          Boolean   @default(true) @map("is_active")
+  id                 Int      @id @default(autoincrement())
+  siteId             Int      @map("site_id")
+  code               String   @unique
+  nom                String
+  typeEntrepot       String?  @map("type_entrepot")
+  description        String?  @db.Text
+  isActive           Boolean  @default(true) @map("is_active")
   anneeMiseEnService Int?     @map("annee_mise_en_service")
-  responsable       String?
-  telephone         String?
-  email             String?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  responsable        String?
+  telephone          String?
+  email              String?
+
+  // --- Dimensions (Phase 17+) --- déclaratif, saisi une fois en
+  // administration (ne varie pas d'une collecte à l'autre).
+  surfaceM2            Float? @map("surface_m2")
+  longueur             Float?
+  largeur              Float?
+  hauteurSousPlafond   Float? @map("hauteur_sous_plafond")
+  nombreNiveaux        Int?   @map("nombre_niveaux")
+  nombreSalles         Int?   @map("nombre_salles")
+  nombreZonesArchivage Int?   @map("nombre_zones_archivage")
+
+  // --- Capacité (Phase 17+) --- champs déclaratifs uniquement ; "capacité
+  // occupée", "capacité disponible" et le taux d'occupation ne sont PAS
+  // stockés : ils sont recalculés à la volée à partir du nombre réel de
+  // cartons (dossiers.codeBarres renseigné) rattachés à cet entrepôt — voir
+  // getEntrepotOccupancy() dans referentiels-admin-service.ts. Stocker une
+  // valeur "occupée" figée se serait désynchronisé du réel dès le premier
+  // dossier archivé/déplacé.
+  nombreRayonnages  Int? @map("nombre_rayonnages")
+  nombreTravees     Int? @map("nombre_travees")
+  nombreEtageres    Int? @map("nombre_etageres")
+  capaciteCartonsMax Int? @map("capacite_cartons_max")
+  capaciteBoitesMax  Int? @map("capacite_boites_max")
+  capaciteTheorique  Int? @map("capacite_theorique")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   site     Site      @relation(fields: [siteId], references: [id])
   dossiers Dossier[]

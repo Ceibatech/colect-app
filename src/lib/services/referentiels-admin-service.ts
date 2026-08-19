@@ -312,11 +312,37 @@ export async function updateNature(id: number, _prevState: ActionResult, formDat
 
 // -------------------------------------------------------------- Entrepôts
 
+/**
+ * `cartonsOccupes`/`capaciteDisponible`/`tauxOccupation` ne sont jamais
+ * stockés (cf. schema.prisma) : recalculés ici à partir du nombre réel de
+ * cartons (dossiers.codeBarres renseigné) actuellement rattachés à chaque
+ * entrepôt, comme demandé par le métier ("Taux d'occupation = Cartons
+ * occupés / Capacité cartons").
+ */
 export async function listAllEntrepots() {
   await requirePermission("REFERENTIEL_MANAGE");
-  return prisma.entrepot.findMany({
-    orderBy: [{ site: { nom: "asc" } }, { nom: "asc" }],
-    include: { site: { select: { id: true, nom: true } }, _count: { select: { dossiers: true } } },
+  const [entrepots, cartonCounts] = await Promise.all([
+    prisma.entrepot.findMany({
+      orderBy: [{ site: { nom: "asc" } }, { nom: "asc" }],
+      include: { site: { select: { id: true, nom: true } }, _count: { select: { dossiers: true } } },
+    }),
+    prisma.dossier.groupBy({
+      by: ["entrepotId"],
+      where: { entrepotId: { not: null }, codeBarres: { not: null } },
+      _count: { _all: true },
+    }),
+  ]);
+  const cartonMap = new Map(cartonCounts.map((c) => [c.entrepotId as number, c._count._all]));
+
+  return entrepots.map((e) => {
+    const cartonsOccupes = cartonMap.get(e.id) ?? 0;
+    const capaciteMax = e.capaciteCartonsMax;
+    return {
+      ...e,
+      cartonsOccupes,
+      capaciteDisponible: capaciteMax != null ? Math.max(0, capaciteMax - cartonsOccupes) : null,
+      tauxOccupation: capaciteMax != null && capaciteMax > 0 ? Math.round((cartonsOccupes / capaciteMax) * 1000) / 10 : null,
+    };
   });
 }
 
@@ -332,10 +358,24 @@ function parseEntrepotFormData(formData: FormData) {
     responsable: formData.get("responsable"),
     telephone: formData.get("telephone"),
     email: formData.get("email"),
+    surfaceM2: formData.get("surfaceM2") || undefined,
+    longueur: formData.get("longueur") || undefined,
+    largeur: formData.get("largeur") || undefined,
+    hauteurSousPlafond: formData.get("hauteurSousPlafond") || undefined,
+    nombreNiveaux: formData.get("nombreNiveaux") || undefined,
+    nombreSalles: formData.get("nombreSalles") || undefined,
+    nombreZonesArchivage: formData.get("nombreZonesArchivage") || undefined,
+    nombreRayonnages: formData.get("nombreRayonnages") || undefined,
+    nombreTravees: formData.get("nombreTravees") || undefined,
+    nombreEtageres: formData.get("nombreEtageres") || undefined,
+    capaciteCartonsMax: formData.get("capaciteCartonsMax") || undefined,
+    capaciteBoitesMax: formData.get("capaciteBoitesMax") || undefined,
+    capaciteTheorique: formData.get("capaciteTheorique") || undefined,
   });
 }
 
 function entrepotDataFromInput(input: z.infer<typeof entrepotSchema>) {
+  const num = (v: number | "" | undefined): number | null => (v === "" || v === undefined ? null : Number(v));
   return {
     siteId: input.siteId,
     code: input.code,
@@ -343,10 +383,23 @@ function entrepotDataFromInput(input: z.infer<typeof entrepotSchema>) {
     typeEntrepot: input.typeEntrepot || null,
     description: input.description || null,
     isActive: input.isActive,
-    anneeMiseEnService: input.anneeMiseEnService === "" || input.anneeMiseEnService === undefined ? null : Number(input.anneeMiseEnService),
+    anneeMiseEnService: num(input.anneeMiseEnService),
     responsable: input.responsable || null,
     telephone: input.telephone || null,
     email: input.email || null,
+    surfaceM2: num(input.surfaceM2),
+    longueur: num(input.longueur),
+    largeur: num(input.largeur),
+    hauteurSousPlafond: num(input.hauteurSousPlafond),
+    nombreNiveaux: num(input.nombreNiveaux),
+    nombreSalles: num(input.nombreSalles),
+    nombreZonesArchivage: num(input.nombreZonesArchivage),
+    nombreRayonnages: num(input.nombreRayonnages),
+    nombreTravees: num(input.nombreTravees),
+    nombreEtageres: num(input.nombreEtageres),
+    capaciteCartonsMax: num(input.capaciteCartonsMax),
+    capaciteBoitesMax: num(input.capaciteBoitesMax),
+    capaciteTheorique: num(input.capaciteTheorique),
   };
 }
 

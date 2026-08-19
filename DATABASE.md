@@ -116,6 +116,17 @@ personneContact, mobile
 > obligatoire. `dossiers.entrepot_id` (FK nullable vers `entrepots.id`) : précision en
 > cascade sous le site choisi en Collecte, également optionnelle pour la même raison que
 > `site_id` ci-dessus.
+>
+> **Ajout (Phase 17+)** : caractéristiques physiques de l'entrepôt — dimensions
+> déclaratives (`surface_m2`, `longueur`, `largeur`, `hauteur_sous_plafond`,
+> `nombre_niveaux`, `nombre_salles`, `nombre_zones_archivage`) et capacité déclarative
+> (`nombre_rayonnages`, `nombre_travees`, `nombre_etageres`, `capacite_cartons_max`,
+> `capacite_boites_max`, `capacite_theorique`). **Non stockés** en revanche : cartons
+> occupés, capacité disponible et taux d'occupation — recalculés à la volée par
+> `listAllEntrepots()` à partir du nombre réel de dossiers rattachés à l'entrepôt avec un
+> `code_barres` renseigné (même convention "carton = dossier avec code-barres" que le
+> tableau de bord, §48). Stocker une valeur "occupée" figée se serait désynchronisée du
+> réel dès le premier dossier archivé ou déplacé.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le

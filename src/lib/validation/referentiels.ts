@@ -76,5 +76,22 @@ export const entrepotSchema = z.object({
   responsable: z.string().max(150).optional().or(z.literal("")),
   telephone: z.string().max(30).optional().or(z.literal("")),
   email: z.string().email("E-mail invalide").max(150).optional().or(z.literal("")),
+  // Dimensions (Phase 17+, "Caractéristiques physiques de l'entrepôt") —
+  // déclaratives, saisies une fois en administration.
+  surfaceM2: z.coerce.number().min(0).optional().or(z.literal("")),
+  longueur: z.coerce.number().min(0).optional().or(z.literal("")),
+  largeur: z.coerce.number().min(0).optional().or(z.literal("")),
+  hauteurSousPlafond: z.coerce.number().min(0).optional().or(z.literal("")),
+  nombreNiveaux: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  nombreSalles: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  nombreZonesArchivage: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  // Capacité — uniquement les champs déclaratifs ; "occupée"/"disponible"/
+  // taux sont calculés à la volée, jamais saisis (cf. schema.prisma).
+  nombreRayonnages: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  nombreTravees: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  nombreEtageres: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  capaciteCartonsMax: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  capaciteBoitesMax: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  capaciteTheorique: z.coerce.number().int().min(0).optional().or(z.literal("")),
 });
 export type EntrepotInput = z.infer<typeof entrepotSchema>;

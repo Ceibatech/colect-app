@@ -28,6 +28,23 @@ export interface EntrepotRow {
   responsable: string | null;
   telephone: string | null;
   email: string | null;
+  surfaceM2: number | null;
+  longueur: number | null;
+  largeur: number | null;
+  hauteurSousPlafond: number | null;
+  nombreNiveaux: number | null;
+  nombreSalles: number | null;
+  nombreZonesArchivage: number | null;
+  nombreRayonnages: number | null;
+  nombreTravees: number | null;
+  nombreEtageres: number | null;
+  capaciteCartonsMax: number | null;
+  capaciteBoitesMax: number | null;
+  capaciteTheorique: number | null;
+  // Calculés côté serveur (jamais saisis) — voir listAllEntrepots().
+  cartonsOccupes: number;
+  capaciteDisponible: number | null;
+  tauxOccupation: number | null;
   site: { id: number; nom: string };
   _count: { dossiers: number };
 }
@@ -157,6 +174,82 @@ function EntrepotForm({
         </div>
       </div>
 
+      {/* Caractéristiques physiques (Phase 17+) — "on cherche à connaître la
+          capacité réelle du lieu". Champs déclaratifs uniquement : l'espace
+          occupé/disponible et le taux d'occupation ne se saisissent pas ici,
+          ils sont recalculés en direct à partir des cartons réellement
+          rattachés à cet entrepôt (voir le tableau ci-dessous). */}
+      <div className="space-y-3 rounded-md border p-3">
+        <Label className="text-sm font-medium">Dimensions</Label>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="surfaceM2">Surface totale (m²)</Label>
+            <Input id="surfaceM2" name="surfaceM2" type="number" step="any" min={0} placeholder="1200" defaultValue={defaultValues?.surfaceM2 ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="longueur">Longueur (m)</Label>
+            <Input id="longueur" name="longueur" type="number" step="any" min={0} defaultValue={defaultValues?.longueur ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="largeur">Largeur (m)</Label>
+            <Input id="largeur" name="largeur" type="number" step="any" min={0} defaultValue={defaultValues?.largeur ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hauteurSousPlafond">Hauteur sous plafond (m)</Label>
+            <Input id="hauteurSousPlafond" name="hauteurSousPlafond" type="number" step="any" min={0} defaultValue={defaultValues?.hauteurSousPlafond ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nombreNiveaux">Nombre de niveaux</Label>
+            <Input id="nombreNiveaux" name="nombreNiveaux" type="number" min={0} defaultValue={defaultValues?.nombreNiveaux ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nombreSalles">Nombre de salles</Label>
+            <Input id="nombreSalles" name="nombreSalles" type="number" min={0} defaultValue={defaultValues?.nombreSalles ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nombreZonesArchivage">Nombre de zones d&apos;archivage</Label>
+            <Input id="nombreZonesArchivage" name="nombreZonesArchivage" type="number" min={0} defaultValue={defaultValues?.nombreZonesArchivage ?? ""} disabled={isPending} />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3 rounded-md border p-3">
+        <Label className="text-sm font-medium">Capacité</Label>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="nombreRayonnages">Nombre de rayonnages</Label>
+            <Input id="nombreRayonnages" name="nombreRayonnages" type="number" min={0} placeholder="85" defaultValue={defaultValues?.nombreRayonnages ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nombreTravees">Nombre de travées</Label>
+            <Input id="nombreTravees" name="nombreTravees" type="number" min={0} placeholder="420" defaultValue={defaultValues?.nombreTravees ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nombreEtageres">Nombre d&apos;étagères</Label>
+            <Input id="nombreEtageres" name="nombreEtageres" type="number" min={0} defaultValue={defaultValues?.nombreEtageres ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="capaciteCartonsMax">Nombre de cartons maximum</Label>
+            <Input id="capaciteCartonsMax" name="capaciteCartonsMax" type="number" min={0} placeholder="12000" defaultValue={defaultValues?.capaciteCartonsMax ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="capaciteBoitesMax">Nombre de boîtes maximum</Label>
+            <Input id="capaciteBoitesMax" name="capaciteBoitesMax" type="number" min={0} defaultValue={defaultValues?.capaciteBoitesMax ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="capaciteTheorique">Capacité théorique</Label>
+            <Input id="capaciteTheorique" name="capaciteTheorique" type="number" min={0} defaultValue={defaultValues?.capaciteTheorique ?? ""} disabled={isPending} />
+          </div>
+        </div>
+        {defaultValues?.id ? (
+          <p className="text-xs text-muted-foreground">
+            Cartons occupés : <span className="font-medium text-foreground">{defaultValues.cartonsOccupes ?? 0}</span>
+            {defaultValues.tauxOccupation != null ? ` (${defaultValues.tauxOccupation}% de la capacité déclarée)` : ""} — calculé
+            automatiquement à partir des dossiers rattachés, non modifiable ici.
+          </p>
+        ) : null}
+      </div>
+
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
@@ -214,6 +307,7 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
               <TableHead>Type</TableHead>
               <TableHead>Site</TableHead>
               <TableHead>Dossiers</TableHead>
+              <TableHead>Occupation</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -221,7 +315,7 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
           <TableBody>
             {entrepots.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                   Aucun entrepôt.
                 </TableCell>
               </TableRow>
@@ -233,6 +327,16 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
                   <TableCell className="text-sm text-muted-foreground">{e.typeEntrepot ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{e.site.nom}</TableCell>
                   <TableCell>{e._count.dossiers}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {e.capaciteCartonsMax != null ? (
+                      <>
+                        {e.cartonsOccupes} / {e.capaciteCartonsMax}
+                        {e.tauxOccupation != null ? ` (${e.tauxOccupation}%)` : ""}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={e.isActive ? "default" : "secondary"}>{e.isActive ? "Actif" : "Inactif"}</Badge>
                   </TableCell>
