@@ -56,6 +56,7 @@ function cleanForDb(values: DossierFormValues) {
   };
   return {
     siteId: toNullableNumber(values.siteId),
+    entrepotId: toNullableNumber(values.entrepotId),
     libelleCarton: clean(values.libelleCarton) ?? null,
     codeBarres: clean(values.codeBarres) ?? null,
     numeroGuichet: clean(values.numeroGuichet) ?? null,

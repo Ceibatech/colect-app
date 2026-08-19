@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
-import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema } from "@/lib/validation/referentiels";
+import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema, entrepotSchema } from "@/lib/validation/referentiels";
 
 /**
  * CRUD administration des référentiels géographiques (Phase 15+) — jamais de
@@ -203,6 +203,12 @@ function siteDataFromInput(input: z.infer<typeof siteSchema>) {
     quartier: input.quartier || null,
     ville: input.ville || null,
     region: input.region || null,
+    latitude: input.latitude === "" || input.latitude === undefined ? null : Number(input.latitude),
+    longitude: input.longitude === "" || input.longitude === undefined ? null : Number(input.longitude),
+    altitude: input.altitude === "" || input.altitude === undefined ? null : Number(input.altitude),
+    precisionGps: input.precisionGps === "" || input.precisionGps === undefined ? null : Number(input.precisionGps),
+    adresseGps: input.adresseGps || null,
+    pointGps: input.pointGps || null,
   };
 }
 
@@ -222,6 +228,12 @@ function parseSiteFormData(formData: FormData) {
     quartier: formData.get("quartier"),
     ville: formData.get("ville"),
     region: formData.get("region"),
+    latitude: formData.get("latitude") || undefined,
+    longitude: formData.get("longitude") || undefined,
+    altitude: formData.get("altitude") || undefined,
+    precisionGps: formData.get("precisionGps") || undefined,
+    adresseGps: formData.get("adresseGps"),
+    pointGps: formData.get("pointGps"),
   });
 }
 
@@ -296,4 +308,123 @@ export async function updateNature(id: number, _prevState: ActionResult, formDat
     },
   });
   return { success: true };
+}
+
+// -------------------------------------------------------------- Entrepôts
+
+export async function listAllEntrepots() {
+  await requirePermission("REFERENTIEL_MANAGE");
+  return prisma.entrepot.findMany({
+    orderBy: [{ site: { nom: "asc" } }, { nom: "asc" }],
+    include: { site: { select: { id: true, nom: true } }, _count: { select: { dossiers: true } } },
+  });
+}
+
+function parseEntrepotFormData(formData: FormData) {
+  return entrepotSchema.safeParse({
+    siteId: formData.get("siteId"),
+    code: formData.get("code"),
+    nom: formData.get("nom"),
+    typeEntrepot: formData.get("typeEntrepot"),
+    description: formData.get("description"),
+    isActive: formData.get("isActive") === "on",
+    anneeMiseEnService: formData.get("anneeMiseEnService") || undefined,
+    responsable: formData.get("responsable"),
+    telephone: formData.get("telephone"),
+    email: formData.get("email"),
+  });
+}
+
+function entrepotDataFromInput(input: z.infer<typeof entrepotSchema>) {
+  return {
+    siteId: input.siteId,
+    code: input.code,
+    nom: input.nom,
+    typeEntrepot: input.typeEntrepot || null,
+    description: input.description || null,
+    isActive: input.isActive,
+    anneeMiseEnService: input.anneeMiseEnService === "" || input.anneeMiseEnService === undefined ? null : Number(input.anneeMiseEnService),
+    responsable: input.responsable || null,
+    telephone: input.telephone || null,
+    email: input.email || null,
+  };
+}
+
+export async function createEntrepot(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = parseEntrepotFormData(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const existing = await prisma.entrepot.findUnique({ where: { code: parsed.data.code } });
+  if (existing) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
+
+  const site = await prisma.site.findUnique({ where: { id: parsed.data.siteId } });
+  if (!site) return { error: "Site introuvable." };
+
+  const data = entrepotDataFromInput(parsed.data);
+  const entrepot = await prisma.entrepot.create({ data });
+  await prisma.auditLog.create({
+    data: { userId: session.userId, action: "ENTREPOT_CREATE", entity: "ENTREPOT", entityId: entrepot.id, newValue: data, ipAddress: await getClientIp() },
+  });
+  return { success: true };
+}
+
+export async function updateEntrepot(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = parseEntrepotFormData(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const existing = await prisma.entrepot.findUnique({ where: { code: parsed.data.code } });
+  if (existing && existing.id !== id) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
+
+  const site = await prisma.site.findUnique({ where: { id: parsed.data.siteId } });
+  if (!site) return { error: "Site introuvable." };
+
+  const before = await prisma.entrepot.findUnique({ where: { id } });
+  const data = entrepotDataFromInput(parsed.data);
+  const entrepot = await prisma.entrepot.update({ where: { id }, data });
+  await prisma.auditLog.create({
+    data: {
+      userId: session.userId,
+      action: "ENTREPOT_UPDATE",
+      entity: "ENTREPOT",
+      entityId: entrepot.id,
+      oldValue: before ? { code: before.code, nom: before.nom, isActive: before.isActive } : undefined,
+      newValue: data,
+      ipAddress: await getClientIp(),
+    },
+  });
+  return { success: true };
+}
+
+// --------------------------------------------------------- Géolocalisation
+
+export interface ReverseGeocodeResult {
+  address?: string;
+  error?: string;
+}
+
+/**
+ * Géocodage inverse (Phase 17+, "Adresse GPS") via OpenStreetMap/Nominatim,
+ * appelé côté serveur (jamais depuis le navigateur) : Nominatim demande un
+ * User-Agent identifiant l'application dans sa politique d'usage
+ * (https://operations.osmfoundation.org/policies/nominatim/), ce qu'un
+ * `fetch()` navigateur ne permet pas de définir (en-tête interdit). Best
+ * effort : en cas d'échec (réseau, quota, service indisponible), l'appelant
+ * garde la possibilité de saisir l'adresse à la main — jamais bloquant.
+ */
+export async function reverseGeocodeSite(latitude: number, longitude: number): Promise<ReverseGeocodeResult> {
+  await requirePermission("REFERENTIEL_MANAGE");
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=0`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "GeoArchives-MULCV/1.0 (contact: administration MULCV)", Accept: "application/json" },
+    });
+    if (!res.ok) return { error: "Service de géocodage indisponible." };
+    const json = (await res.json()) as { display_name?: string };
+    if (!json.display_name) return { error: "Adresse introuvable pour ces coordonnées." };
+    return { address: json.display_name };
+  } catch {
+    return { error: "Impossible de contacter le service de géocodage." };
+  }
 }

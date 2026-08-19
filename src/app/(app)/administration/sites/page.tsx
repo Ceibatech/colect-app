@@ -24,6 +24,12 @@ export default async function AdminSitesPage() {
     quartier: s.quartier,
     ville: s.ville,
     region: s.region,
+    latitude: s.latitude,
+    longitude: s.longitude,
+    altitude: s.altitude,
+    precisionGps: s.precisionGps,
+    adresseGps: s.adresseGps,
+    pointGps: s.pointGps,
     commune: s.commune ? { id: s.commune.id, nom: s.commune.nom } : null,
     _count: s._count,
   }));

@@ -30,11 +30,18 @@ export async function getActiveOperateurs(scopeIds?: number[]) {
   });
 }
 
-/** Sites actifs (Phase 16+) proposés en première étape de la Collecte. */
+/**
+ * Sites actifs (Phase 16+) proposés en première étape de la Collecte, avec
+ * leurs entrepôts actifs (Phase 17+, cascade — un site peut avoir plusieurs
+ * entrepôts, même principe que Commune -> Lotissement en étape 3).
+ */
 export async function getActiveSites() {
   return prisma.site.findMany({
     where: { isActive: true },
     orderBy: { nom: "asc" },
-    include: { commune: { select: { id: true, nom: true } } },
+    include: {
+      commune: { select: { id: true, nom: true } },
+      entrepots: { where: { isActive: true }, orderBy: { nom: "asc" } },
+    },
   });
 }

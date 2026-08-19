@@ -4,9 +4,11 @@ import { testPrisma, DEMO_USERS } from "../helpers/auth";
 /**
  * E2E dédié à la nouvelle étape 1 "Site" de la Collecte (Phase 16+) :
  * sélection d'un site d'archivage existant (référentiel géré depuis
- * /administration/sites, cf. SitesManager.tsx). Optionnel à la soumission
- * (voir dossierFormSchema) — ce test vérifie qu'un site choisi est bien
- * persisté (`dossier.siteId`), pas que le champ est obligatoire.
+ * /administration/sites, cf. SitesManager.tsx), et de son entrepôt en
+ * cascade (Phase 17+, cf. EntrepotsManager.tsx — "un site peut avoir un ou
+ * plusieurs entrepôts"). Les deux champs sont optionnels à la soumission
+ * (voir dossierFormSchema) — ce test vérifie qu'un choix est bien persisté
+ * (`dossier.siteId`/`entrepotId`), pas que les champs sont obligatoires.
  */
 
 const UNIQUE = Date.now();
@@ -22,9 +24,10 @@ async function selectCombobox(page: Page, fieldLabel: string, optionLabel: strin
   await page.getByRole("option", { name: optionLabel, exact: true }).click();
 }
 
-test("Site : sélectionné en étape 1, persisté sur le dossier et affiché au récapitulatif", async ({ page }) => {
+test("Site + Entrepôt : sélectionnés en cascade à l'étape 1, persistés sur le dossier et affichés au récapitulatif", async ({ page }) => {
   const codeBarres = `TEST-SITE-${UNIQUE}`;
-  const site = await testPrisma.site.findFirstOrThrow({ where: { isActive: true } });
+  const entrepot = await testPrisma.entrepot.findFirstOrThrow({ where: { isActive: true }, include: { site: true } });
+  const site = entrepot.site;
   let dossierId: number | undefined;
 
   try {
@@ -42,6 +45,10 @@ test("Site : sélectionné en étape 1, persisté sur le dossier et affiché au 
     await selectCombobox(page, "Site d'archivage", `${site.nom} (${site.code})`);
     // Le résumé en lecture seule confirme la sélection.
     await expect(page.getByText(site.nom, { exact: false })).toBeVisible();
+
+    // L'entrepôt n'est sélectionnable qu'une fois le site choisi (cascade).
+    await selectCombobox(page, "Entrepôt", `${entrepot.nom} (${entrepot.code})`);
+
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
 
     await fillField(page, "Code-barres", codeBarres);
@@ -52,6 +59,7 @@ test("Site : sélectionné en étape 1, persisté sur le dossier et affiché au 
     const dossier = await testPrisma.dossier.findFirstOrThrow({ where: { codeBarres } });
     dossierId = dossier.id;
     expect(dossier.siteId).toBe(site.id);
+    expect(dossier.entrepotId).toBe(entrepot.id);
   } finally {
     if (dossierId) await testPrisma.dossier.delete({ where: { id: dossierId } }).catch(() => {});
   }

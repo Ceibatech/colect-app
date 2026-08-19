@@ -3,7 +3,7 @@
 import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, Loader2 } from "lucide-react";
+import { Plus, Pencil, Loader2, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { createSite, updateSite, type ActionResult } from "@/lib/services/referentiels-admin-service";
+import { createSite, updateSite, reverseGeocodeSite, type ActionResult } from "@/lib/services/referentiels-admin-service";
 
 export interface SiteRow {
   id: number;
@@ -32,6 +32,12 @@ export interface SiteRow {
   quartier: string | null;
   ville: string | null;
   region: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  altitude: number | null;
+  precisionGps: number | null;
+  adresseGps: string | null;
+  pointGps: string | null;
   commune: { id: number; nom: string } | null;
   _count: { dossiers: number };
 }
@@ -42,6 +48,113 @@ const initialState: ActionResult = {};
 // reste en saisie libre, "etc." dans la fiche fournie indique une liste non
 // exhaustive qu'on ne doit pas figer en liste fermée.
 const TYPE_SITE_SUGGESTIONS = ["Siège", "Dépôt", "Antenne"];
+
+/**
+ * Géolocalisation du site (Phase 17+) : capture via l'API Geolocation du
+ * navigateur (aucun service tiers pour lat/lon/altitude/précision), puis
+ * géocodage inverse best-effort côté serveur pour l'adresse (§ jamais
+ * bloquant — reverseGeocodeSite() peut échouer sans empêcher la saisie
+ * manuelle). Champs contrôlés (state local) car remplis par le bouton, à
+ * la différence du reste du formulaire (defaultValue non contrôlé).
+ */
+function GpsCaptureSection({ defaultValues, isPending }: { defaultValues?: Partial<SiteRow>; isPending: boolean }) {
+  const [gps, setGps] = useState({
+    latitude: defaultValues?.latitude != null ? String(defaultValues.latitude) : "",
+    longitude: defaultValues?.longitude != null ? String(defaultValues.longitude) : "",
+    altitude: defaultValues?.altitude != null ? String(defaultValues.altitude) : "",
+    precisionGps: defaultValues?.precisionGps != null ? String(defaultValues.precisionGps) : "",
+    adresseGps: defaultValues?.adresseGps ?? "",
+    pointGps: defaultValues?.pointGps ?? "",
+  });
+  const [capturing, setCapturing] = useState(false);
+  const [geocoding, setGeocoding] = useState(false);
+
+  const field = (name: keyof typeof gps) => ({
+    value: gps[name],
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => setGps((g) => ({ ...g, [name]: e.target.value })),
+  });
+
+  function handleCapture() {
+    if (typeof navigator === "undefined" || !("geolocation" in navigator)) {
+      toast.error("La géolocalisation n'est pas disponible sur ce navigateur.");
+      return;
+    }
+    setCapturing(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude, altitude, accuracy } = pos.coords;
+        setGps((g) => ({
+          ...g,
+          latitude: latitude.toFixed(6),
+          longitude: longitude.toFixed(6),
+          altitude: altitude != null ? altitude.toFixed(1) : g.altitude,
+          precisionGps: accuracy != null ? accuracy.toFixed(1) : g.precisionGps,
+          pointGps: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+        }));
+        setCapturing(false);
+        toast.success("Position capturée.");
+
+        setGeocoding(true);
+        reverseGeocodeSite(latitude, longitude)
+          .then((result) => {
+            if (result.address) setGps((g) => ({ ...g, adresseGps: result.address! }));
+            else if (result.error) toast.error(result.error);
+          })
+          .catch(() => toast.error("Impossible de contacter le service de géocodage."))
+          .finally(() => setGeocoding(false));
+      },
+      (err) => {
+        setCapturing(false);
+        toast.error(`Impossible d'obtenir la position : ${err.message}`);
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    );
+  }
+
+  return (
+    <div className="space-y-3 rounded-md border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Label className="text-sm font-medium">Géolocalisation</Label>
+        <Button type="button" variant="outline" size="sm" onClick={handleCapture} disabled={isPending || capturing}>
+          {capturing ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <MapPin className="mr-1 h-3.5 w-3.5" />}
+          Capturer ma position GPS
+        </Button>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="latitude">Latitude</Label>
+          <Input id="latitude" name="latitude" type="number" step="any" {...field("latitude")} disabled={isPending} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="longitude">Longitude</Label>
+          <Input id="longitude" name="longitude" type="number" step="any" {...field("longitude")} disabled={isPending} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="altitude">Altitude (m, facultatif)</Label>
+          <Input id="altitude" name="altitude" type="number" step="any" {...field("altitude")} disabled={isPending} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="precisionGps">Précision (m)</Label>
+          <Input id="precisionGps" name="precisionGps" type="number" step="any" {...field("precisionGps")} disabled={isPending} />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="adresseGps">Adresse GPS {geocoding ? "— recherche en cours..." : ""}</Label>
+          <Input
+            id="adresseGps"
+            name="adresseGps"
+            placeholder="Renseignée automatiquement après capture (modifiable)"
+            {...field("adresseGps")}
+            disabled={isPending}
+          />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="pointGps">Point GPS</Label>
+          <Input id="pointGps" name="pointGps" placeholder="lat, lon" {...field("pointGps")} disabled={isPending} />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SiteForm({
   action,
@@ -182,6 +295,8 @@ function SiteForm({
           <Input id="region" name="region" placeholder="Abidjan" defaultValue={defaultValues?.region ?? ""} maxLength={100} disabled={isPending} />
         </div>
       </div>
+
+      <GpsCaptureSection defaultValues={defaultValues} isPending={isPending} />
 
       <DialogFooter>
         <Button type="submit" disabled={isPending}>

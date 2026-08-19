@@ -35,6 +35,7 @@ export default async function CollectePage({
     if (dossier) {
       const initialValues: Partial<DossierFormValues> = {
         siteId: dossier.siteId ?? undefined,
+        entrepotId: dossier.entrepotId ?? undefined,
         operateurId: dossier.operateurId,
         libelleCarton: dossier.libelleCarton ?? undefined,
         codeBarres: dossier.codeBarres ?? undefined,

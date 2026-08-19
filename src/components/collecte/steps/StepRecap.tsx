@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Pencil } from "lucide-react";
 
 interface Lookups {
-  sites: { id: number; nom: string; code: string }[];
+  sites: { id: number; nom: string; code: string; entrepots: { id: number; nom: string; code: string }[] }[];
   communes: { id: number; nom: string; lotissements: { id: number; nom: string }[] }[];
   natures: { id: number; libelle: string }[];
   operateurs: { id: number; nom: string; prenoms: string | null }[];
@@ -52,6 +52,7 @@ export function StepRecap({
 }) {
   const v = form.getValues();
   const site = lookups.sites.find((s) => s.id === v.siteId);
+  const entrepot = site?.entrepots.find((e) => e.id === v.entrepotId);
   const commune = lookups.communes.find((c) => c.id === v.communeId);
   const nature = lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
   const etatLabel = (value?: string) => ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label;
@@ -70,6 +71,7 @@ export function StepRecap({
 
       <Section title="Site" onEdit={() => onEditStep(1)}>
         <Row label="Site d'archivage" value={site ? `${site.nom} (${site.code})` : undefined} />
+        <Row label="Entrepôt" value={entrepot ? `${entrepot.nom} (${entrepot.code})` : undefined} />
       </Section>
 
       <Section title="Identification" onEdit={() => onEditStep(2)}>

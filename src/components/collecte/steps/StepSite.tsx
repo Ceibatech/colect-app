@@ -8,6 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Info } from "lucide-react";
 
+export interface EntrepotOption {
+  id: number;
+  code: string;
+  nom: string;
+  typeEntrepot: string | null;
+}
+
 export interface SiteOption {
   id: number;
   code: string;
@@ -20,6 +27,7 @@ export interface SiteOption {
   responsable: string | null;
   telephone: string | null;
   commune: { id: number; nom: string } | null;
+  entrepots: EntrepotOption[];
 }
 
 /**
@@ -30,8 +38,10 @@ export interface SiteOption {
  * administrateur peuple le référentiel.
  */
 export function StepSite({ form, sites }: { form: UseFormReturn<DossierFormValues>; sites: SiteOption[] }) {
-  const { control, formState } = form;
+  const { control, formState, watch, setValue } = form;
   const errors = formState.errors;
+  const siteId = watch("siteId");
+  const selectedSite = sites.find((s) => s.id === siteId);
 
   return (
     <div className="space-y-4">
@@ -45,35 +55,80 @@ export function StepSite({ form, sites }: { form: UseFormReturn<DossierFormValue
         </Alert>
       ) : null}
 
-      <Field>
-        <FieldLabel>Site d&apos;archivage</FieldLabel>
-        <FieldContent>
-          <Controller
-            control={control}
-            name="siteId"
-            render={({ field }) => (
-              <Select
-                items={sites.map((s) => ({ label: `${s.nom} (${s.code})`, value: s.id }))}
-                value={field.value ?? null}
-                onValueChange={field.onChange}
-                disabled={sites.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Sélectionner un site" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sites.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.nom} ({s.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          />
-          <FieldError errors={[errors.siteId]} />
-        </FieldContent>
-      </Field>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldLabel>Site d&apos;archivage</FieldLabel>
+          <FieldContent>
+            <Controller
+              control={control}
+              name="siteId"
+              render={({ field }) => (
+                <Select
+                  items={sites.map((s) => ({ label: `${s.nom} (${s.code})`, value: s.id }))}
+                  value={field.value ?? null}
+                  onValueChange={(value) => {
+                    field.onChange(value);
+                    // Un entrepôt appartient à un seul site : la sélection
+                    // précédente n'a plus de sens si on change de site.
+                    setValue("entrepotId", undefined);
+                  }}
+                  disabled={sites.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Sélectionner un site" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sites.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.nom} ({s.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError errors={[errors.siteId]} />
+          </FieldContent>
+        </Field>
+
+        <Field>
+          <FieldLabel>Entrepôt</FieldLabel>
+          <FieldContent>
+            <Controller
+              control={control}
+              name="entrepotId"
+              render={({ field }) => (
+                <Select
+                  items={(selectedSite?.entrepots ?? []).map((e) => ({ label: `${e.nom} (${e.code})`, value: e.id }))}
+                  value={field.value ?? null}
+                  onValueChange={field.onChange}
+                  disabled={!selectedSite || selectedSite.entrepots.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        !selectedSite
+                          ? "Choisir d'abord un site"
+                          : selectedSite.entrepots.length === 0
+                            ? "Aucun entrepôt pour ce site"
+                            : "Sélectionner un entrepôt"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(selectedSite?.entrepots ?? []).map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.nom} ({e.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <FieldError errors={[errors.entrepotId]} />
+          </FieldContent>
+        </Field>
+      </div>
 
       <SiteSummary form={form} sites={sites} />
     </div>

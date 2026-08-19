@@ -48,5 +48,33 @@ export const siteSchema = z.object({
   quartier: z.string().max(150).optional().or(z.literal("")),
   ville: z.string().max(100).optional().or(z.literal("")),
   region: z.string().max(100).optional().or(z.literal("")),
+  // Géolocalisation (Phase 17+) — capturée via le bouton "Capturer ma
+  // position GPS" (Geolocation API du navigateur), jamais saisie à la main
+  // pour lat/lon (mais le champ reste modifiable si besoin de correction).
+  latitude: z.coerce.number().min(-90).max(90).optional().or(z.literal("")),
+  longitude: z.coerce.number().min(-180).max(180).optional().or(z.literal("")),
+  altitude: z.coerce.number().optional().or(z.literal("")),
+  precisionGps: z.coerce.number().min(0).optional().or(z.literal("")),
+  adresseGps: z.string().max(500).optional().or(z.literal("")),
+  pointGps: z.string().max(100).optional().or(z.literal("")),
 });
 export type SiteInput = z.infer<typeof siteSchema>;
+
+/**
+ * Entrepôt (Phase 17+) : subdivision d'un site — "un site peut avoir un ou
+ * plusieurs entrepôts". Rattachement obligatoire à un site (contrairement
+ * au site lui-même qui n'est pas obligatoirement rattaché à une commune).
+ */
+export const entrepotSchema = z.object({
+  siteId: z.coerce.number({ message: "Le site est requis" }).int().positive("Le site est requis"),
+  code: z.string().min(1, "Le code est requis").max(20),
+  nom: z.string().min(1, "Le nom est requis").max(150),
+  typeEntrepot: z.string().max(100).optional().or(z.literal("")),
+  description: z.string().max(1000).optional().or(z.literal("")),
+  isActive: z.coerce.boolean().default(true),
+  anneeMiseEnService: z.coerce.number().int().min(1900).max(2100).optional().or(z.literal("")),
+  responsable: z.string().max(150).optional().or(z.literal("")),
+  telephone: z.string().max(30).optional().or(z.literal("")),
+  email: z.string().email("E-mail invalide").max(150).optional().or(z.literal("")),
+});
+export type EntrepotInput = z.infer<typeof entrepotSchema>;

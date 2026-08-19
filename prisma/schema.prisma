@@ -217,14 +217,59 @@ model Site {
   quartier          String?
   ville             String?
   region            String?
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  commune  Commune?  @relation(fields: [communeId], references: [id])
-  dossiers Dossier[]
+  // --- Géolocalisation (Phase 17+) --- capturée via le bouton "Capturer ma
+  // position GPS" (Geolocation API du navigateur) dans le formulaire
+  // d'administration du site. `adresseGps` est renseignée automatiquement
+  // par géocodage inverse (OpenStreetMap/Nominatim, appelé côté serveur —
+  // voir reverseGeocodeSite() dans referentiels-admin-service.ts), jamais
+  // depuis le navigateur directement. `pointGps` est une représentation
+  // texte pratique ("lat, lon") dérivée de latitude/longitude, pour copier-
+  // coller vers un outil cartographique externe en attendant une carte
+  // intégrée (§ hors périmètre V1, cf. DashboardGéographiquePage).
+  latitude     Float?  @db.Double
+  longitude    Float?  @db.Double
+  altitude     Float?
+  precisionGps Float?  @map("precision_gps")
+  adresseGps   String? @map("adresse_gps") @db.Text
+  pointGps     String? @map("point_gps")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  commune   Commune?   @relation(fields: [communeId], references: [id])
+  dossiers  Dossier[]
+  entrepots Entrepot[]
 
   @@index([communeId])
   @@map("sites")
+}
+
+// Entrepôt (Phase 17+) : un site d'archivage peut comprendre plusieurs
+// entrepôts (bâtiments/salles de stockage distincts) — hiérarchie à deux
+// niveaux, même principe que Commune -> Lotissement. Choisi dans la
+// Collecte juste après le site (cascade), une fois qu'un site a été
+// sélectionné.
+model Entrepot {
+  id                Int       @id @default(autoincrement())
+  siteId            Int       @map("site_id")
+  code              String    @unique
+  nom               String
+  typeEntrepot      String?   @map("type_entrepot")
+  description       String?   @db.Text
+  isActive          Boolean   @default(true) @map("is_active")
+  anneeMiseEnService Int?     @map("annee_mise_en_service")
+  responsable       String?
+  telephone         String?
+  email             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  site     Site      @relation(fields: [siteId], references: [id])
+  dossiers Dossier[]
+
+  @@index([siteId])
+  @@map("entrepots")
 }
 
 // ================================================================
@@ -340,6 +385,10 @@ model Dossier {
   // requis à la soumission une fois qu'au moins un site aura été créé par
   // un administrateur (cf. dossierSubmitSchema, src/lib/validation/dossier.ts).
   siteId Int? @map("site_id")
+  // Entrepôt (Phase 17+) : précision optionnelle du site, en cascade — un
+  // site peut comprendre plusieurs entrepôts. Même raisonnement que siteId
+  // ci-dessus : nullable, le référentiel `entrepots` étant vide au départ.
+  entrepotId Int? @map("entrepot_id")
 
   // --- IDENTIFICATION (fiche CG1020) ---
   libelleCarton       String? @map("libelle_carton")
@@ -406,6 +455,7 @@ model Dossier {
 
   operateur     Operateur      @relation(fields: [operateurId], references: [id])
   site          Site?          @relation(fields: [siteId], references: [id])
+  entrepot      Entrepot?      @relation(fields: [entrepotId], references: [id])
   commune       Commune?       @relation(fields: [communeId], references: [id])
   lotissement   Lotissement?   @relation(fields: [lotissementId], references: [id])
   natureDossier NatureDossier? @relation(fields: [natureDossierId], references: [id])
@@ -420,6 +470,7 @@ model Dossier {
   history             DossierHistory[]
 
   @@index([siteId])
+  @@index([entrepotId])
   @@index([numeroDdu])
   @@index([numeroDirectionService])
   @@index([numeroGuichet])

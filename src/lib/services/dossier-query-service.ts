@@ -115,6 +115,7 @@ export async function getDossierDetail(id: number) {
     where: { id },
     include: {
       site: true,
+      entrepot: true,
       commune: true,
       lotissement: true,
       natureDossier: true,

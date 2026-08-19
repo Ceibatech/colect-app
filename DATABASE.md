@@ -24,7 +24,7 @@ npm run db:verify
 |---|---|---|
 | RBAC | `roles`, `permissions`, `role_permissions` | Contrôle d'accès basé sur les rôles |
 | Identité | `users`, `operateurs` | Comptes applicatifs et fiches opérateur terrain |
-| Référentiels | `sites`, `communes`, `lotissements`, `natures_dossier` | Listes de valeurs pour la collecte |
+| Référentiels | `sites`, `entrepots`, `communes`, `lotissements`, `natures_dossier` | Listes de valeurs pour la collecte |
 | Workflow | `workflow_statuses`, `workflow_transitions`, `dossier_history` | Configuration et traçabilité du cycle métier |
 | Métier | `dossiers` | Table centrale — fiche CG1020 + suivi applicatif |
 | Documents | `documents` | Métadonnées des fichiers numérisés (pas de blob en base) |
@@ -103,6 +103,19 @@ personneContact, mobile
 > le référentiel est vide à l'introduction de ce champ, le rendre obligatoire aurait
 > bloqué toute la Collecte tant qu'aucun site n'existe — à réévaluer une fois le
 > référentiel peuplé.
+>
+> **Ajout (Phase 17+)** : géolocalisation du site — `sites.latitude`/`longitude`/`altitude`/
+> `precision_gps` (capturées via l'API Geolocation du navigateur, bouton "Capturer ma
+> position GPS" dans `/administration/sites`), `sites.adresse_gps` (géocodage inverse
+> best-effort côté serveur via OpenStreetMap/Nominatim — jamais depuis le navigateur, qui
+> ne permet pas de fixer l'en-tête `User-Agent` requis par leur politique d'usage ; voir
+> `reverseGeocodeSite()` dans `referentiels-admin-service.ts`), `sites.point_gps` (texte
+> "lat, lon" dérivé, pratique à copier vers un outil cartographique externe). Et table
+> `entrepots` : subdivision d'un site ("un site peut avoir un ou plusieurs entrepôts"),
+> même conventions CRUD que `sites` (jamais de suppression physique), FK `site_id`
+> obligatoire. `dossiers.entrepot_id` (FK nullable vers `entrepots.id`) : précision en
+> cascade sous le site choisi en Collecte, également optionnelle pour la même raison que
+> `site_id` ci-dessus.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le

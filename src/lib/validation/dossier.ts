@@ -58,6 +58,9 @@ export const dossierFormSchema = z.object({
   // rendre obligatoire à la soumission bloquerait toute la Collecte tant
   // qu'un administrateur n'a pas créé au moins un site.
   siteId: z.coerce.number().int().positive().optional(),
+  // Entrepôt (Phase 17+) : précision en cascade sous le site choisi, même
+  // raisonnement d'optionalité que siteId ci-dessus.
+  entrepotId: z.coerce.number().int().positive().optional(),
 
   // ÉTAPE 2 — Identification
   operateurId: z.coerce.number().int().positive().optional(),
@@ -144,7 +147,7 @@ export const dossierSubmitSchema = dossierFormSchema
   });
 
 export const DOSSIER_STEPS = [
-  { id: 1, title: "Site", fields: ["siteId"] },
+  { id: 1, title: "Site", fields: ["siteId", "entrepotId"] },
   { id: 2, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
   { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
   { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },

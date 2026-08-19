@@ -216,6 +216,26 @@ async function main() {
   }
   console.log(`✔ ${sites.length} sites d'archivage`);
 
+  // 6ter. Entrepôts (Phase 17+) — 1 à 2 par site.
+  const entrepots = [];
+  for (const site of sites) {
+    for (let i = 1; i <= (site.id % 2 === 0 ? 2 : 1); i++) {
+      const entrepot = await prisma.entrepot.upsert({
+        where: { code: `${site.code}-ENT-${i}` },
+        update: {},
+        create: {
+          siteId: site.id,
+          code: `${site.code}-ENT-${i}`,
+          nom: `Entrepôt ${i === 1 ? "Principal" : "Secondaire"} — ${site.nom}`,
+          typeEntrepot: i === 1 ? "Principal" : "Secondaire",
+          anneeMiseEnService: 2020 + i,
+        },
+      });
+      entrepots.push(entrepot);
+    }
+  }
+  console.log(`✔ ${entrepots.length} entrepôts`);
+
   // 7. Natures de dossier
   const natures = [];
   for (const n of NATURES_DOSSIER) {
@@ -253,6 +273,8 @@ async function main() {
     const createdAt = faker.date.between({ from: startDate, to: endDate });
     const operateur = faker.helpers.arrayElement(operateurs);
     const site = faker.helpers.arrayElement(sites);
+    const siteEntrepots = entrepots.filter((e) => e.siteId === site.id);
+    const entrepot = siteEntrepots.length > 0 ? faker.helpers.arrayElement(siteEntrepots) : null;
     const commune = faker.helpers.arrayElement(communes);
     const communeLots = lotissements.filter((l) => l.communeId === commune.id);
     const lotissement = faker.helpers.arrayElement(communeLots);
@@ -295,6 +317,7 @@ async function main() {
         reference,
         operateurId: operateur.id,
         siteId: site.id,
+        entrepotId: entrepot?.id,
         libelleCarton: `Carton ${faker.string.alphanumeric(6).toUpperCase()}`,
         codeBarres: faker.string.numeric(13),
         numeroGuichet: faker.string.numeric(6),
