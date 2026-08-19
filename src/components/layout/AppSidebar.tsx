@@ -34,17 +34,27 @@ export function AppSidebar({ permissions }: { permissions: PermissionCode[] }) {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          {/* Version "simplifiée" (fusion des petites feuilles par
-              fermeture morphologique) plutôt que ceiba-icon.png (détaillé,
-              utilisé pour apple-icon.png à 180px) : à 28px le tracé fin des
-              feuilles individuelles se réduisait à un bruit de pixels
-              verts illisible — voir public/brand/ceiba-icon-simple.png. */}
+          {/* Logo CEIBA Analytics réel, non modifié (public/brand/ceiba-analytics-logo.png)
+              — affiché sidebar déployée uniquement : au format rail replié
+              (~48px carré), le logo complet (large, non carré) ne peut pas
+              se lire, on retombe alors sur l'icône seule (fusion des
+              petites feuilles par fermeture morphologique, plus lisible
+              qu'une réduction du logo complet à cette taille — voir
+              public/brand/ceiba-icon-simple.png). */}
+          <Image
+            src="/brand/ceiba-analytics-logo.png"
+            alt="CEIBA Analytics"
+            width={960}
+            height={531}
+            className="h-8 w-auto shrink-0 group-data-[collapsible=icon]:hidden"
+            priority
+          />
           <Image
             src="/brand/ceiba-icon-simple.png"
-            alt=""
+            alt="CEIBA Analytics"
             width={28}
             height={28}
-            className="h-7 w-7 shrink-0"
+            className="hidden h-7 w-7 shrink-0 group-data-[collapsible=icon]:block"
             priority
           />
           <div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
