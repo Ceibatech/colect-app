@@ -4,7 +4,7 @@ import type { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
-import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema, entrepotSchema } from "@/lib/validation/referentiels";
+import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema, entrepotSchema, equipementSchema } from "@/lib/validation/referentiels";
 
 /**
  * CRUD administration des référentiels géographiques (Phase 15+) — jamais de
@@ -401,6 +401,17 @@ function parseEntrepotFormData(formData: FormData) {
     badge: formData.get("badge") === "on",
     serrureSecurisee: formData.get("serrureSecurisee") === "on",
     registreVisiteurs: formData.get("registreVisiteurs") === "on",
+    typeAcces: formData.get("typeAcces"),
+    accesLibre: formData.get("accesLibre") === "on",
+    autorisationNecessaire: formData.get("autorisationNecessaire") === "on",
+    badgeNecessaire: formData.get("badgeNecessaire") === "on",
+    controleIdentite: formData.get("controleIdentite") === "on",
+    horaireOuverture: formData.get("horaireOuverture"),
+    horaireFermeture: formData.get("horaireFermeture"),
+    joursAcces: formData.get("joursAcces"),
+    accesWeekend: formData.get("accesWeekend"),
+    responsableAcces: formData.get("responsableAcces"),
+    contactUrgence: formData.get("contactUrgence"),
   });
 }
 
@@ -460,6 +471,17 @@ function entrepotDataFromInput(input: z.infer<typeof entrepotSchema>) {
     badge: input.badge,
     serrureSecurisee: input.serrureSecurisee,
     registreVisiteurs: input.registreVisiteurs,
+    typeAcces: input.typeAcces || null,
+    accesLibre: input.accesLibre,
+    autorisationNecessaire: input.autorisationNecessaire,
+    badgeNecessaire: input.badgeNecessaire,
+    controleIdentite: input.controleIdentite,
+    horaireOuverture: input.horaireOuverture || null,
+    horaireFermeture: input.horaireFermeture || null,
+    joursAcces: input.joursAcces || null,
+    accesWeekend: input.accesWeekend || null,
+    responsableAcces: input.responsableAcces || null,
+    contactUrgence: input.contactUrgence || null,
   };
 }
 
@@ -540,4 +562,112 @@ export async function reverseGeocodeSite(latitude: number, longitude: number): P
   } catch {
     return { error: "Impossible de contacter le service de géocodage." };
   }
+}
+
+// ------------------------------------------------------------ Équipements
+
+/**
+ * Inventaire des équipements d'entrepôt (Phase 17+). Seul référentiel de ce
+ * module à autoriser la suppression physique (`deleteEquipement`) : un
+ * équipement n'est référencé par aucun dossier, contrairement à
+ * sites/entrepôts/communes/lotissements/natures — le retirer de
+ * l'inventaire (matériel remplacé/mis au rebut) ne casse aucun historique
+ * métier.
+ */
+export async function listAllEquipements() {
+  await requirePermission("REFERENTIEL_MANAGE");
+  return prisma.equipement.findMany({
+    orderBy: [{ entrepot: { nom: "asc" } }, { type: "asc" }],
+    include: { entrepot: { select: { id: true, nom: true, site: { select: { id: true, nom: true } } } } },
+  });
+}
+
+function parseEquipementFormData(formData: FormData) {
+  return equipementSchema.safeParse({
+    entrepotId: formData.get("entrepotId"),
+    type: formData.get("type"),
+    reference: formData.get("reference"),
+    marque: formData.get("marque"),
+    quantite: formData.get("quantite") || undefined,
+    etat: formData.get("etat") || undefined,
+    dateAcquisition: formData.get("dateAcquisition"),
+    dateDernierControle: formData.get("dateDernierControle"),
+    dateProchaineMaintenance: formData.get("dateProchaineMaintenance"),
+    observation: formData.get("observation"),
+  });
+}
+
+function equipementDataFromInput(input: z.infer<typeof equipementSchema>) {
+  return {
+    entrepotId: input.entrepotId,
+    type: input.type,
+    reference: input.reference || null,
+    marque: input.marque || null,
+    quantite: input.quantite === "" || input.quantite === undefined ? null : Number(input.quantite),
+    etat: input.etat || null,
+    dateAcquisition: input.dateAcquisition ? new Date(input.dateAcquisition) : null,
+    dateDernierControle: input.dateDernierControle ? new Date(input.dateDernierControle) : null,
+    dateProchaineMaintenance: input.dateProchaineMaintenance ? new Date(input.dateProchaineMaintenance) : null,
+    observation: input.observation || null,
+  };
+}
+
+export async function createEquipement(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = parseEquipementFormData(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const entrepot = await prisma.entrepot.findUnique({ where: { id: parsed.data.entrepotId } });
+  if (!entrepot) return { error: "Entrepôt introuvable." };
+
+  const data = equipementDataFromInput(parsed.data);
+  const equipement = await prisma.equipement.create({ data });
+  await prisma.auditLog.create({
+    data: { userId: session.userId, action: "EQUIPEMENT_CREATE", entity: "EQUIPEMENT", entityId: equipement.id, newValue: data, ipAddress: await getClientIp() },
+  });
+  return { success: true };
+}
+
+export async function updateEquipement(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const parsed = parseEquipementFormData(formData);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+
+  const entrepot = await prisma.entrepot.findUnique({ where: { id: parsed.data.entrepotId } });
+  if (!entrepot) return { error: "Entrepôt introuvable." };
+
+  const before = await prisma.equipement.findUnique({ where: { id } });
+  const data = equipementDataFromInput(parsed.data);
+  const equipement = await prisma.equipement.update({ where: { id }, data });
+  await prisma.auditLog.create({
+    data: {
+      userId: session.userId,
+      action: "EQUIPEMENT_UPDATE",
+      entity: "EQUIPEMENT",
+      entityId: equipement.id,
+      oldValue: before ? { type: before.type, reference: before.reference } : undefined,
+      newValue: data,
+      ipAddress: await getClientIp(),
+    },
+  });
+  return { success: true };
+}
+
+export async function deleteEquipement(id: number): Promise<ActionResult> {
+  const session = await requirePermission("REFERENTIEL_MANAGE");
+  const equipement = await prisma.equipement.findUnique({ where: { id } });
+  if (!equipement) return { error: "Équipement introuvable." };
+
+  await prisma.equipement.delete({ where: { id } });
+  await prisma.auditLog.create({
+    data: {
+      userId: session.userId,
+      action: "EQUIPEMENT_DELETE",
+      entity: "EQUIPEMENT",
+      entityId: id,
+      oldValue: { type: equipement.type, reference: equipement.reference, entrepotId: equipement.entrepotId },
+      ipAddress: await getClientIp(),
+    },
+  });
+  return { success: true };
 }

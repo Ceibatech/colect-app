@@ -130,5 +130,42 @@ export const entrepotSchema = z.object({
   badge: z.boolean().default(false),
   serrureSecurisee: z.boolean().default(false),
   registreVisiteurs: z.boolean().default(false),
+
+  // Conditions d'accès (Phase 17+) — "très important pour l'application".
+  // gardiennage/vidéosurveillance/registre des visiteurs sont déjà couverts
+  // ci-dessus (pas de doublon). Horaires/jours en texte libre (aucun format
+  // imposé par le métier), "Accès week-end" aussi (l'exemple "Sur
+  // autorisation" n'est pas un simple oui/non).
+  typeAcces: z.string().max(100).optional().or(z.literal("")),
+  accesLibre: z.boolean().default(false),
+  autorisationNecessaire: z.boolean().default(false),
+  badgeNecessaire: z.boolean().default(false),
+  controleIdentite: z.boolean().default(false),
+  horaireOuverture: z.string().max(20).optional().or(z.literal("")),
+  horaireFermeture: z.string().max(20).optional().or(z.literal("")),
+  joursAcces: z.string().max(100).optional().or(z.literal("")),
+  accesWeekend: z.string().max(150).optional().or(z.literal("")),
+  responsableAcces: z.string().max(150).optional().or(z.literal("")),
+  contactUrgence: z.string().max(30).optional().or(z.literal("")),
 });
 export type EntrepotInput = z.infer<typeof entrepotSchema>;
+
+/**
+ * Équipement d'entrepôt (Phase 17+, inventaire) — seul référentiel de ce
+ * module supprimable physiquement (aucun dossier n'y fait référence, cf.
+ * schema.prisma). `etat` réutilise l'enum EtatConservation déjà en place
+ * pour carton/dossier (même concept : état physique constaté).
+ */
+export const equipementSchema = z.object({
+  entrepotId: z.coerce.number({ message: "L'entrepôt est requis" }).int().positive("L'entrepôt est requis"),
+  type: z.string().min(1, "Le type est requis").max(100),
+  reference: z.string().max(100).optional().or(z.literal("")),
+  marque: z.string().max(100).optional().or(z.literal("")),
+  quantite: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  etat: z.enum(["BON_ETAT", "DEGRADE"]).optional().or(z.literal("")),
+  dateAcquisition: z.string().max(20).optional().or(z.literal("")),
+  dateDernierControle: z.string().max(20).optional().or(z.literal("")),
+  dateProchaineMaintenance: z.string().max(20).optional().or(z.literal("")),
+  observation: z.string().max(1000).optional().or(z.literal("")),
+});
+export type EquipementInput = z.infer<typeof equipementSchema>;

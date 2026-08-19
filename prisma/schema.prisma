@@ -322,14 +322,62 @@ model Entrepot {
   serrureSecurisee   Boolean? @map("serrure_securisee")
   registreVisiteurs  Boolean? @map("registre_visiteurs")
 
+  // --- Conditions d'accès (Phase 17+) --- "très important pour
+  // l'application". `gardiennage`/`videosurveillance`/`registreVisiteurs`
+  // ci-dessus couvrent déjà les items identiques de cette section (pas de
+  // colonne dupliquée) ; `badgeNecessaire` et `controleIdentite` restent
+  // distincts de `badge`/`controleAcces` (présence d'un équipement/système
+  // vs. politique d'accès effective). Horaires et jours en texte libre
+  // (pas de format imposé par le métier, ex. "Lundi-Vendredi").
+  typeAcces              String?  @map("type_acces")
+  accesLibre             Boolean? @map("acces_libre")
+  autorisationNecessaire Boolean? @map("autorisation_necessaire")
+  badgeNecessaire        Boolean? @map("badge_necessaire")
+  controleIdentite       Boolean? @map("controle_identite")
+  horaireOuverture       String?  @map("horaire_ouverture")
+  horaireFermeture       String?  @map("horaire_fermeture")
+  joursAcces             String?  @map("jours_acces")
+  accesWeekend           String?  @map("acces_weekend")
+  responsableAcces       String?  @map("responsable_acces")
+  contactUrgence         String?  @map("contact_urgence")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  site     Site      @relation(fields: [siteId], references: [id])
-  dossiers Dossier[]
+  site        Site         @relation(fields: [siteId], references: [id])
+  dossiers    Dossier[]
+  equipements Equipement[]
 
   @@index([siteId])
   @@map("entrepots")
+}
+
+// Équipement d'entrepôt (Phase 17+, "Équipements de l'entrepôt" — inventaire
+// des équipements). Contrairement à Site/Commune/Lotissement/NatureDossier,
+// un équipement n'est référencé par aucun dossier : c'est un inventaire de
+// facilities propre à l'entrepôt, sans impact sur l'intégrité historique
+// des dossiers. Suppression physique donc autorisée ici (seul référentiel
+// de ce module à le permettre), contrairement aux autres qui se
+// désactivent uniquement (§60).
+model Equipement {
+  id                       Int               @id @default(autoincrement())
+  entrepotId               Int               @map("entrepot_id")
+  type                     String
+  reference                String?
+  marque                   String?
+  quantite                 Int?              @default(1)
+  etat                     EtatConservation?
+  dateAcquisition          DateTime?         @map("date_acquisition")
+  dateDernierControle      DateTime?         @map("date_dernier_controle")
+  dateProchaineMaintenance DateTime?         @map("date_prochaine_maintenance")
+  observation              String?           @db.Text
+  createdAt                DateTime          @default(now()) @map("created_at")
+  updatedAt                DateTime          @updatedAt @map("updated_at")
+
+  entrepot Entrepot @relation(fields: [entrepotId], references: [id], onDelete: Cascade)
+
+  @@index([entrepotId])
+  @@map("equipements")
 }
 
 // ================================================================

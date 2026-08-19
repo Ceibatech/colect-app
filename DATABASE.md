@@ -24,7 +24,7 @@ npm run db:verify
 |---|---|---|
 | RBAC | `roles`, `permissions`, `role_permissions` | Contrôle d'accès basé sur les rôles |
 | Identité | `users`, `operateurs` | Comptes applicatifs et fiches opérateur terrain |
-| Référentiels | `sites`, `entrepots`, `communes`, `lotissements`, `natures_dossier` | Listes de valeurs pour la collecte |
+| Référentiels | `sites`, `entrepots`, `equipements`, `communes`, `lotissements`, `natures_dossier` | Listes de valeurs pour la collecte |
 | Workflow | `workflow_statuses`, `workflow_transitions`, `dossier_history` | Configuration et traçabilité du cycle métier |
 | Métier | `dossiers` | Table centrale — fiche CG1020 + suivi applicatif |
 | Documents | `documents` | Métadonnées des fichiers numérisés (pas de blob en base) |
@@ -137,6 +137,19 @@ personneContact, mobile
 > visiteurs). Tous nullable/déclaratifs, saisis/mis à jour au fil des relevés — les cases
 > à cocher résolvent toujours en `true`/`false` depuis le formulaire (jamais tri-state),
 > `NULL` en base signifiant simplement "jamais renseigné".
+>
+> **Ajout (Phase 17+)** : conditions d'accès de l'entrepôt (type d'accès, accès libre,
+> autorisation/badge/contrôle d'identité nécessaires, horaires d'ouverture/fermeture,
+> jours d'accès, accès week-end, responsable accès, contact urgence) — les items déjà
+> couverts par la sécurité physique ci-dessus (gardiennage, vidéosurveillance, registre
+> des visiteurs) ne sont pas dupliqués. Et nouvelle table `equipements` (inventaire :
+> type, référence, marque, quantité, état — réutilise l'enum `EtatConservation` déjà en
+> place pour carton/dossier —, dates d'acquisition/dernier contrôle/prochaine
+> maintenance, observation), FK `entrepot_id` obligatoire (`ON DELETE CASCADE`). **Seul
+> référentiel de ce module supprimable physiquement** : un équipement n'est référencé par
+> aucun dossier (contrairement à sites/entrepôts/communes/lotissements/natures), le
+> retirer de l'inventaire ne casse donc aucun historique métier — voir
+> `deleteEquipement()` dans `referentiels-admin-service.ts`.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le

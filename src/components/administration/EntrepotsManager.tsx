@@ -73,6 +73,18 @@ export interface EntrepotRow {
   badge: boolean | null;
   serrureSecurisee: boolean | null;
   registreVisiteurs: boolean | null;
+  // Conditions d'accès
+  typeAcces: string | null;
+  accesLibre: boolean | null;
+  autorisationNecessaire: boolean | null;
+  badgeNecessaire: boolean | null;
+  controleIdentite: boolean | null;
+  horaireOuverture: string | null;
+  horaireFermeture: string | null;
+  joursAcces: string | null;
+  accesWeekend: string | null;
+  responsableAcces: string | null;
+  contactUrgence: string | null;
   // Calculés côté serveur (jamais saisis) — voir listAllEntrepots().
   cartonsOccupes: number;
   capaciteDisponible: number | null;
@@ -408,6 +420,51 @@ function EntrepotForm({
               <Label htmlFor="nombreCameras">Nombre de caméras</Label>
               <Input id="nombreCameras" name="nombreCameras" type="number" min={0} defaultValue={defaultValues?.nombreCameras ?? ""} disabled={isPending} />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Conditions d'accès (Phase 17+) — "très important pour l'application".
+          Gardiennage / vidéosurveillance / registre des visiteurs sont déjà
+          couverts dans la section Sécurité ci-dessus, pas répétés ici. */}
+      <div className="space-y-3 rounded-md border p-3">
+        <Label className="text-sm font-medium">Conditions d&apos;accès</Label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="typeAcces">Type d&apos;accès</Label>
+            <Input id="typeAcces" name="typeAcces" placeholder="Contrôlé" defaultValue={defaultValues?.typeAcces ?? ""} maxLength={100} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="responsableAcces">Responsable accès</Label>
+            <Input id="responsableAcces" name="responsableAcces" placeholder="Nom" defaultValue={defaultValues?.responsableAcces ?? ""} maxLength={150} disabled={isPending} />
+          </div>
+        </div>
+        <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+          <CheckField name="accesLibre" label="Accès libre" defaultChecked={defaultValues?.accesLibre} disabled={isPending} />
+          <CheckField name="autorisationNecessaire" label="Autorisation nécessaire" defaultChecked={defaultValues?.autorisationNecessaire} disabled={isPending} />
+          <CheckField name="badgeNecessaire" label="Badge nécessaire" defaultChecked={defaultValues?.badgeNecessaire} disabled={isPending} />
+          <CheckField name="controleIdentite" label="Contrôle d'identité" defaultChecked={defaultValues?.controleIdentite} disabled={isPending} />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="horaireOuverture">Horaires d&apos;ouverture</Label>
+            <Input id="horaireOuverture" name="horaireOuverture" type="time" defaultValue={defaultValues?.horaireOuverture ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="horaireFermeture">Horaires de fermeture</Label>
+            <Input id="horaireFermeture" name="horaireFermeture" type="time" defaultValue={defaultValues?.horaireFermeture ?? ""} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="joursAcces">Jours d&apos;accès</Label>
+            <Input id="joursAcces" name="joursAcces" placeholder="Lundi-Vendredi" defaultValue={defaultValues?.joursAcces ?? ""} maxLength={100} disabled={isPending} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="accesWeekend">Accès week-end</Label>
+            <Input id="accesWeekend" name="accesWeekend" placeholder="Sur autorisation" defaultValue={defaultValues?.accesWeekend ?? ""} maxLength={150} disabled={isPending} />
+          </div>
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="contactUrgence">Contact urgence</Label>
+            <Input id="contactUrgence" name="contactUrgence" placeholder="07 XX XX XX XX" defaultValue={defaultValues?.contactUrgence ?? ""} maxLength={30} disabled={isPending} />
           </div>
         </div>
       </div>
