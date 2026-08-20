@@ -17,18 +17,35 @@ SOUMIS
    ↓
 EN CONTRÔLE
    ↓
-VALIDÉ ──────→ REJETÉ
+VALIDÉ (superviseur) ──────→ REJETÉ
    ↓
+[opérateur numérise] → À VALIDER (numérisation) ──────→ REJETÉ → [opérateur relance]
+   ↓ (superviseur valide)
 NUMÉRISÉ
    ↓
+[opérateur indexe] → À VALIDER (indexation) ──────→ REJETÉ → [opérateur relance]
+   ↓ (superviseur valide)
 INDEXÉ
    ↓
+[opérateur archive] → À VALIDER (archivage) ──────→ REJETÉ → [opérateur relance]
+   ↓ (superviseur valide)
 ARCHIVÉ
 ```
 
 Un dossier ne peut pas être ARCHIVÉ s'il n'est pas INDEXÉ, ni INDEXÉ s'il n'est pas
 NUMÉRISÉ, ni NUMÉRISÉ s'il n'est pas VALIDÉ. Ces règles sont appliquées en couche
 service (pas uniquement côté client) — voir §5 « aucune confiance au frontend seul ».
+
+**Validation superviseur à chaque étape (Phase 19+)** : comme pour la Collecte
+(EN CONTRÔLE → VALIDÉ/REJETÉ), chacune des 3 étapes opérationnelles suivantes passe
+désormais par une validation superviseur avant d'être considérée terminée — l'action de
+l'opérateur (numériser/indexer/archiver) ne termine plus directement l'étape, elle la
+soumet ("À valider"). Le superviseur (scopé à ses opérateurs affectés, même règle de
+cloisonnement que pour la Collecte — voir `src/lib/services/access-scope.ts`) valide
+(→ Terminé, débloque l'étape suivante) ou rejette
+avec un motif obligatoire (→ Rejeté, renvoyé à l'opérateur qui peut relancer l'action).
+Détail : [DATABASE.md](DATABASE.md#3-origine-des-champs--fiche-cg1020-vs-suivi-applicatif),
+`src/lib/services/workflow-service.ts`.
 
 ### Source fonctionnelle
 

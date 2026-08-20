@@ -88,17 +88,25 @@ const WORKFLOW_STATUSES: Array<{ workflowType: WorkflowType; code: string; libel
   { workflowType: "VALIDATION", code: "VALIDE", libelle: "Validé", ordre: 3, isFinal: true },
   { workflowType: "VALIDATION", code: "REJETE", libelle: "Rejeté", ordre: 3, isFinal: true },
 
+  // Phase 19+ : A_VALIDER (l'opérateur a agi, en attente du superviseur) et
+  // REJETE (renvoyé à l'opérateur pour reprise) s'intercalent avant TERMINE.
   { workflowType: "NUMERISATION", code: "EN_ATTENTE", libelle: "En attente", ordre: 1, isFinal: false },
   { workflowType: "NUMERISATION", code: "EN_COURS", libelle: "En cours", ordre: 2, isFinal: false },
-  { workflowType: "NUMERISATION", code: "TERMINE", libelle: "Terminé", ordre: 3, isFinal: true },
+  { workflowType: "NUMERISATION", code: "A_VALIDER", libelle: "À valider", ordre: 3, isFinal: false },
+  { workflowType: "NUMERISATION", code: "TERMINE", libelle: "Terminé", ordre: 4, isFinal: true },
+  { workflowType: "NUMERISATION", code: "REJETE", libelle: "Rejeté", ordre: 4, isFinal: false },
 
   { workflowType: "INDEXATION", code: "EN_ATTENTE", libelle: "En attente", ordre: 1, isFinal: false },
   { workflowType: "INDEXATION", code: "EN_COURS", libelle: "En cours", ordre: 2, isFinal: false },
-  { workflowType: "INDEXATION", code: "TERMINE", libelle: "Terminé", ordre: 3, isFinal: true },
+  { workflowType: "INDEXATION", code: "A_VALIDER", libelle: "À valider", ordre: 3, isFinal: false },
+  { workflowType: "INDEXATION", code: "TERMINE", libelle: "Terminé", ordre: 4, isFinal: true },
+  { workflowType: "INDEXATION", code: "REJETE", libelle: "Rejeté", ordre: 4, isFinal: false },
 
   { workflowType: "ARCHIVAGE", code: "EN_ATTENTE", libelle: "En attente", ordre: 1, isFinal: false },
   { workflowType: "ARCHIVAGE", code: "EN_COURS", libelle: "En cours", ordre: 2, isFinal: false },
-  { workflowType: "ARCHIVAGE", code: "TERMINE", libelle: "Terminé", ordre: 3, isFinal: true },
+  { workflowType: "ARCHIVAGE", code: "A_VALIDER", libelle: "À valider", ordre: 3, isFinal: false },
+  { workflowType: "ARCHIVAGE", code: "TERMINE", libelle: "Terminé", ordre: 4, isFinal: true },
+  { workflowType: "ARCHIVAGE", code: "REJETE", libelle: "Rejeté", ordre: 4, isFinal: false },
 ];
 
 async function main() {

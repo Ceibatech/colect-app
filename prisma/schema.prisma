@@ -481,22 +481,36 @@ enum StatutValidation {
   REJETE
 }
 
+// Phase 19+ : validation superviseur à chaque étape (pas seulement à la
+// Collecte). Flux par étape : EN_ATTENTE/EN_COURS -> (opérateur agit) ->
+// A_VALIDER -> (superviseur valide) -> TERMINE, ou -> (superviseur rejette)
+// -> REJETE -> (opérateur relance l'action) -> A_VALIDER à nouveau. TERMINE
+// garde exactement sa sémantique actuelle ("étape effectivement terminée,
+// donc l'étape suivante est débloquée") — il n'est simplement plus atteint
+// directement par l'opérateur, ce qui ne casse aucune des vérifications déjà
+// en place ailleurs (dashboard, export, gate de l'étape suivante...).
 enum StatutNumerisation {
   EN_ATTENTE
   EN_COURS
+  A_VALIDER
   TERMINE
+  REJETE
 }
 
 enum StatutIndexation {
   EN_ATTENTE
   EN_COURS
+  A_VALIDER
   TERMINE
+  REJETE
 }
 
 enum StatutArchivage {
   EN_ATTENTE
   EN_COURS
+  A_VALIDER
   TERMINE
+  REJETE
 }
 
 model Dossier {

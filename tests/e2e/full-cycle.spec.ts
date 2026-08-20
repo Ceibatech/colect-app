@@ -124,24 +124,44 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
     expect(validateRes.status()).toBe(200);
 
     // --- 4. NUMÉRISATION, 5. INDEXATION, 6. ARCHIVAGE (OPERATEUR) ---
+    // Phase 19+ : chaque étape est soumise par l'opérateur ("À valider") puis
+    // validée par le superviseur ("Terminé") avant de débloquer la suivante
+    // — même principe que la validation de Collecte ci-dessus, désormais
+    // répété à chaque étape (détail des transitions déjà testé par
+    // workflow.spec.ts, on vérifie ici seulement l'enchaînement bout en bout).
     const operateurCookie = await sessionCookieHeader(DEMO_USERS.operateur1);
     const numerizeRes = await request.post(`/api/dossiers/${dossier.id}/numerize`, {
       headers: { Cookie: operateurCookie },
       data: { nombrePages: 8 },
     });
     expect(numerizeRes.status()).toBe(200);
+    expect((await numerizeRes.json()).dossier.statutNumerisation).toBe("A_VALIDER");
+    const numerizeValidateRes = await request.post(`/api/dossiers/${dossier.id}/numerize/validate`, {
+      headers: { Cookie: superviseurCookie },
+    });
+    expect(numerizeValidateRes.status()).toBe(200);
 
     const indexRes = await request.post(`/api/dossiers/${dossier.id}/index`, {
       headers: { Cookie: operateurCookie },
       data: { scoreQualite: 95 },
     });
     expect(indexRes.status()).toBe(200);
+    expect((await indexRes.json()).dossier.statutIndexation).toBe("A_VALIDER");
+    const indexValidateRes = await request.post(`/api/dossiers/${dossier.id}/index/validate`, {
+      headers: { Cookie: superviseurCookie },
+    });
+    expect(indexValidateRes.status()).toBe(200);
 
     const archiveRes = await request.post(`/api/dossiers/${dossier.id}/archive`, {
       headers: { Cookie: operateurCookie },
       data: { emplacement: "Rayon E2E, étagère 1" },
     });
     expect(archiveRes.status()).toBe(200);
+    expect((await archiveRes.json()).dossier.statutArchivage).toBe("A_VALIDER");
+    const archiveValidateRes = await request.post(`/api/dossiers/${dossier.id}/archive/validate`, {
+      headers: { Cookie: superviseurCookie },
+    });
+    expect(archiveValidateRes.status()).toBe(200);
 
     // --- 7. VÉRIFICATION VISUELLE FINALE — retour dans le navigateur ---
     await page.goto(`/dossiers/${dossier.id}`);

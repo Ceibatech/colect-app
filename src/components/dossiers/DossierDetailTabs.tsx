@@ -10,7 +10,15 @@ import {
   STATUT_INDEXATION_LABELS,
   STATUT_ARCHIVAGE_LABELS,
 } from "@/lib/utils/dossier-status";
-import { ControleActions, NumerisationActions, IndexationActions, ArchivageActions } from "@/components/dossiers/WorkflowActions";
+import {
+  ControleActions,
+  NumerisationActions,
+  IndexationActions,
+  ArchivageActions,
+  NumerisationValidationActions,
+  IndexationValidationActions,
+  ArchivageValidationActions,
+} from "@/components/dossiers/WorkflowActions";
 import { DocumentsPanel } from "@/components/dossiers/DocumentsPanel";
 import type { PermissionCode } from "@/lib/permissions/constants";
 import { ETAT_CONSERVATION_OPTIONS } from "@/lib/validation/dossier";
@@ -246,6 +254,14 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                   Statut : {n.statut} {n.qualite ? `— Qualité : ${n.qualite}` : ""}
                 </div>
               ))}
+              <NumerisationValidationActions
+                dossierId={dossier.id}
+                permissions={permissions}
+                statutValidation={dossier.statutValidation}
+                statutNumerisation={dossier.statutNumerisation}
+                statutIndexation={dossier.statutIndexation}
+                statutArchivage={dossier.statutArchivage}
+              />
               <NumerisationActions
                 dossierId={dossier.id}
                 permissions={permissions}
@@ -268,6 +284,14 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                   Statut : {n.statut} {n.scoreQualite !== null ? `— Score : ${n.scoreQualite}` : ""}
                 </div>
               ))}
+              <IndexationValidationActions
+                dossierId={dossier.id}
+                permissions={permissions}
+                statutValidation={dossier.statutValidation}
+                statutNumerisation={dossier.statutNumerisation}
+                statutIndexation={dossier.statutIndexation}
+                statutArchivage={dossier.statutArchivage}
+              />
               <IndexationActions
                 dossierId={dossier.id}
                 permissions={permissions}
@@ -289,6 +313,14 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                   {a.emplacement ?? "Emplacement non renseigné"} {a.referenceArchivage ? `— ${a.referenceArchivage}` : ""}
                 </div>
               ))}
+              <ArchivageValidationActions
+                dossierId={dossier.id}
+                permissions={permissions}
+                statutValidation={dossier.statutValidation}
+                statutNumerisation={dossier.statutNumerisation}
+                statutIndexation={dossier.statutIndexation}
+                statutArchivage={dossier.statutArchivage}
+              />
               <ArchivageActions
                 dossierId={dossier.id}
                 permissions={permissions}

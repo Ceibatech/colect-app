@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const statutCollecteEnum = z.enum(["BROUILLON", "SOUMIS"]);
 const statutValidationEnum = z.enum(["EN_ATTENTE", "EN_CONTROLE", "VALIDE", "REJETE"]);
-const statutTermineEnum = z.enum(["EN_ATTENTE", "EN_COURS", "TERMINE"]);
+const statutTermineEnum = z.enum(["EN_ATTENTE", "EN_COURS", "A_VALIDER", "TERMINE", "REJETE"]);
 const sortEnum = z.enum(["createdAt", "reference", "nom", "commune"]);
 const dirEnum = z.enum(["asc", "desc"]);
 

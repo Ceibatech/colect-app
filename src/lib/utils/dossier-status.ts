@@ -21,19 +21,25 @@ export const STATUT_VALIDATION_LABELS: Record<StatutValidation, string> = {
 export const STATUT_NUMERISATION_LABELS: Record<StatutNumerisation, string> = {
   EN_ATTENTE: "En attente",
   EN_COURS: "En cours",
+  A_VALIDER: "À valider",
   TERMINE: "Terminé",
+  REJETE: "Rejeté",
 };
 
 export const STATUT_INDEXATION_LABELS: Record<StatutIndexation, string> = {
   EN_ATTENTE: "En attente",
   EN_COURS: "En cours",
+  A_VALIDER: "À valider",
   TERMINE: "Terminé",
+  REJETE: "Rejeté",
 };
 
 export const STATUT_ARCHIVAGE_LABELS: Record<StatutArchivage, string> = {
   EN_ATTENTE: "En attente",
   EN_COURS: "En cours",
+  A_VALIDER: "À valider",
   TERMINE: "Terminé",
+  REJETE: "Rejeté",
 };
 
 /** Variante de badge shadcn/ui selon la sémantique du statut. */
@@ -51,6 +57,7 @@ export function statutBadgeVariant(
       return "destructive";
     case "EN_CONTROLE":
     case "EN_COURS":
+    case "A_VALIDER":
       return "secondary";
     default:
       return "outline";

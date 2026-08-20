@@ -170,6 +170,21 @@ Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePage
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le
 processus métier — ils ne figurent pas sur la fiche CG1020.
 
+> **Ajout (Phase 19+)** : validation superviseur systématique à chaque étape
+> opérationnelle, pas seulement à la Collecte. `StatutNumerisation`/`StatutIndexation`/
+> `StatutArchivage` gagnent chacun deux valeurs : `A_VALIDER` (l'opérateur a agi, en
+> attente du superviseur) et `REJETE` (renvoyé à l'opérateur, qui peut relancer l'action
+> — repasse alors à `A_VALIDER`). `TERMINE` garde exactement sa sémantique actuelle
+> ("étape effectivement terminée, débloque la suivante") — il n'est simplement plus
+> atteint directement par l'opérateur, ce qui ne change aucune des vérifications déjà en
+> place ailleurs (dashboard, export, gate de l'étape suivante...). Aucune colonne
+> ajoutée : uniquement une extension des 3 enums MySQL existants. Nouvelles permissions
+> `NUMERISATION_VALIDATE`/`REJECT`, `INDEXATION_VALIDATE`/`REJECT`,
+> `ARCHIVAGE_VALIDATE`/`REJECT` (SUPERVISEUR + ADMIN), scopées aux opérateurs affectés au
+> superviseur — même règle que `DOSSIER_VALIDATE`/`REJECT` pour la Collecte (cf.
+> `assertSupervisorScope()` dans `workflow-service.ts`). Dossiers déjà `TERMINE` avant ce
+> changement : considérés définitivement validés, aucun retraitement rétroactif.
+
 ## 4. Décisions de conception documentées
 
 - **`operateurs` séparée de `users`** : conservée car explicitement référencée comme clé
