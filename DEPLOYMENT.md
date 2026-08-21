@@ -161,9 +161,11 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
    `prisma`, indispensables pour *construire* l'app. Bug réel rencontré au
    premier déploiement — voir « État actuel » en tête de ce document.)
 4. Start command : `npm run start`
-5. Health check path : **`/api/health`** (route publique ajoutée en Phase 15 — vérifie
-   une vraie connexion base, pas seulement que le process répond, voir
-   [API.md](API.md#get-apihealth)).
+5. Health check path : **`/api/health`** (route publique ajoutée en Phase 15, voir
+   [API.md](API.md#get-apihealth)). ⚠️ Depuis l'incident du 21/08/2026 (§9), cette
+   route répond **200 même si la base est injoignable**, en signalant l'état dans le
+   corps (`status: "degraded"`). La supervision doit donc porter sur le **corps** de la
+   réponse (`status !== "ok"`), **pas** sur le code HTTP.
 6. Renseigner les variables d'environnement de la section 2.
 
 ## 4. Stockage des documents — disque persistant obligatoire
@@ -255,7 +257,43 @@ Repris et complétés depuis [SECURITY.md](SECURITY.md) :
 - **HTTPS** : automatique sur Render (certificat géré) — aucune action requise, mais
   vérifier que l'URL finale utilisée par les utilisateurs est bien en `https://`.
 
-## 9. Rollback
+## 9. Incident du 21/08/2026 — blocage MySQL cPanel (à connaître)
+
+**Symptôme** : `502` sur *toutes* les URL, y compris les ressources statiques
+(`/icon.png`). Logs Render : `Can't reach database server at
+p3plzcpnl504395...:3306`, en boucle, alors que l'app démarrait bien
+(`✓ Ready in 486ms`) et que la base répondait normalement depuis l'extérieur
+(~1,5 s depuis un poste de développement).
+
+**Enchaînement** : Render ne joignait plus la base → `/api/health` (qui exécutait un
+`SELECT 1` à chaque appel) renvoyait 503 → Render marquait l'instance non saine et la
+retirait du routage → 502 sur tout, derrière une page d'erreur opaque de l'hébergeur.
+
+**Cause racine** : blocage réseau **côté cPanel/GoDaddy**, pas côté application. Deux
+facteurs aggravants, corrigés depuis :
+
+- Le health check ouvrait une connexion MySQL toutes les ~5 s, soit **~17 000
+  connexions/jour depuis une seule IP** vers un hébergement mutualisé — de quoi
+  déclencher le pare-feu de l'hébergeur (CSF/LFD bannit une IP sur ce motif). Le
+  résultat de la sonde est désormais mémorisé 30 s (`PROBE_TTL_MS`).
+- Le pool Prisma n'était pas borné (défaut : `nb_CPU * 2 + 1`), au-dessus de ce que
+  tolère un `max_user_connections` de cPanel mutualisé (souvent 10-25). Fixé à
+  `connection_limit=5` / `pool_timeout=20` dans `src/lib/prisma/client.ts`.
+
+**Résolution côté hébergeur** (seule action qui rétablit réellement la connectivité) :
+
+1. **cPanel → Remote MySQL®** : vérifier que l'hôte d'accès est toujours présent
+   (`%`, ou les IP sortantes Render). Le ré-ajouter s'il a disparu.
+2. **Render → Settings → Outbound IPs** : récupérer les IP exactes à autoriser
+   (préférable à `%`).
+3. Si l'entrée est bien présente, il s'agit d'un **bannissement pare-feu** :
+   demander au support de l'hébergeur de lever le blocage sur ces IP.
+
+**À retenir** : un `502` global ne signifie pas forcément que l'application est
+cassée — vérifier d'abord la connectivité base depuis l'extérieur, ce qui distingue
+immédiatement « app en panne » de « base injoignable depuis l'hébergeur ».
+
+## 10. Rollback
 
 Render conserve l'historique des déploiements (**Render → service → Deploys**) —
 revenir à un déploiement précédent est un clic. Ceci ne rejoue **aucune** migration en

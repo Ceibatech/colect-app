@@ -12,16 +12,34 @@ import { prisma } from "@/lib/prisma/client";
  * redirection d'authentification ; cette route ne fait par ailleurs elle-
  * même aucun appel à `requireApiUser`/`requireApiPermission`.
  *
- * Vérifie une connexion base réelle (`SELECT 1`, pas juste "le process
- * tourne") : un process Node up mais une base MySQL injoignable doit être
- * détecté comme non sain par la plateforme.
+ * ---
  *
- * Le résultat de cette sonde est MÉMORISÉ (Phase 19+, suite à l'incident du
- * 21/08/2026). La plateforme interroge cette route toutes les quelques
- * secondes ; sans mémorisation cela représentait ~17 000 connexions MySQL par
- * jour depuis une seule IP vers un hébergement mutualisé, ce qui déclenche le
- * pare-feu de l'hébergeur (blocage de l'IP -> base injoignable -> service
- * entièrement indisponible, la cause exacte de cet incident). On ne sonde donc
+ * SÉMANTIQUE (revue Phase 19+, suite à l'incident du 21/08/2026) : cette
+ * route répond désormais **200 même lorsque la base est injoignable**, en
+ * signalant l'état dégradé dans le corps de la réponse (`status: "degraded"`,
+ * `database: "down"`).
+ *
+ * Auparavant elle renvoyait 503 dans ce cas — la plateforme retirait alors
+ * l'instance du routage, et *toutes* les URL du site (y compris les
+ * ressources statiques) tombaient en 502 derrière une page d'erreur opaque
+ * de l'hébergeur. Une simple coupure de connectivité base provoquait donc un
+ * blackout total, sans message compréhensible pour l'utilisateur ni page de
+ * connexion accessible.
+ *
+ * Compromis assumé, décidé avec le métier : le process Node reste considéré
+ * comme sain tant qu'il répond, et l'application demeure joignable (page de
+ * connexion, message d'erreur explicite) pendant une panne base.
+ * **Contrepartie : la plateforme ne détecte plus automatiquement une base
+ * injoignable** — la supervision doit se faire sur le corps de la réponse
+ * (`status !== "ok"`), pas sur le code HTTP.
+ */
+
+/**
+ * Résultat de la dernière sonde base réellement exécutée. La plateforme
+ * interroge cette route toutes les quelques secondes ; sans mémorisation cela
+ * représentait ~17 000 connexions MySQL par jour depuis une seule IP vers un
+ * hébergement mutualisé, ce qui déclenche le pare-feu de l'hébergeur (blocage
+ * de l'IP -> base injoignable -> incident du 21/08/2026). On ne sonde donc
  * réellement la base qu'au plus une fois par `PROBE_TTL_MS`, en réutilisant le
  * dernier résultat entre-temps.
  *
@@ -48,19 +66,13 @@ async function probeDatabase(): Promise<{ ok: boolean; latencyMs: number; cached
 export async function GET() {
   const probe = await probeDatabase();
 
-  if (!probe.ok) {
-    // Jamais de détail technique exposé publiquement (§67, même principe
-    // que apiErrorResponse()) — juste de quoi distinguer "process up, DB
-    // injoignable" pour le diagnostic opérationnel.
-    return NextResponse.json(
-      { status: "error", database: "down", timestamp: new Date().toISOString() },
-      { status: 503 }
-    );
-  }
-
+  // Toujours 200 (cf. SÉMANTIQUE ci-dessus) : c'est le corps qui porte l'état
+  // réel. Jamais de détail technique exposé publiquement (§67, même principe
+  // que apiErrorResponse()) — juste de quoi distinguer "process up, base
+  // injoignable" pour le diagnostic opérationnel.
   return NextResponse.json({
-    status: "ok",
-    database: "up",
+    status: probe.ok ? "ok" : "degraded",
+    database: probe.ok ? "up" : "down",
     timestamp: new Date().toISOString(),
     latencyMs: probe.latencyMs,
     cached: probe.cached,
