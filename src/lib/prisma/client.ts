@@ -23,7 +23,12 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
  * l'authentification.
  */
 function databaseUrlWithPoolLimit(): string | undefined {
-  const raw = process.env.DATABASE_URL;
+  // .trim() : une espace ou un retour à la ligne collé par erreur dans la
+  // variable DATABASE_URL suffit sinon à casser la validation Prisma
+  // ("the URL must start with the protocol mysql://") et met TOUT le
+  // service à terre — constaté le 21/08/2026 lors d'une edition de la
+  // variable côté plateforme.
+  const raw = process.env.DATABASE_URL?.trim();
   if (!raw) return undefined;
   if (raw.includes("connection_limit=")) return raw; // déjà fixé côté variable d'env
   return `${raw}${raw.includes("?") ? "&" : "?"}connection_limit=5&pool_timeout=20`;
