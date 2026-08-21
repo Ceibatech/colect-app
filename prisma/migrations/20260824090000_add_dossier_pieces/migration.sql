@@ -17,10 +17,18 @@ CREATE TABLE `types_piece` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+-- `PRIMARY KEY (A, B)` ajoute manuellement : Prisma genere les tables de
+-- liaison many-to-many implicites avec un simple index unique, sans cle
+-- primaire. Or les MySQL manages (Aiven, PlanetScale...) imposent
+-- `sql_require_primary_key=ON`, non desactivable sans privilege SUPER, ce
+-- qui faisait echouer cette migration (erreur 3750). La cle primaire (A,B)
+-- est fonctionnellement equivalente a l'index unique ; ce dernier est
+-- conserve pour rester conforme a ce qu'attend l'introspection Prisma.
 CREATE TABLE `_DossierTypesPieces` (
     `A` INTEGER NOT NULL,
     `B` INTEGER NOT NULL,
 
+    PRIMARY KEY (`A`, `B`),
     UNIQUE INDEX `_DossierTypesPieces_AB_unique`(`A`, `B`),
     INDEX `_DossierTypesPieces_B_index`(`B`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
