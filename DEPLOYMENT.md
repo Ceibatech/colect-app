@@ -1,9 +1,9 @@
 # Déploiement — GeoArchives-MULCV (Phase 15, §95/§96)
 
-Cible : **GitHub → Render (application Next.js) → MySQL/MariaDB hébergé sur cPanel →
-phpMyAdmin** (schéma complet dans [ARCHITECTURE.md](ARCHITECTURE.md#2-architecture-technique)).
-Render héberge uniquement l'application ; la base de données reste sur l'hébergement
-cPanel existant — jamais de MySQL local en production.
+Cible : **GitHub → Render (application Next.js) → MySQL managé chez Aiven**
+(schéma complet dans [ARCHITECTURE.md](ARCHITECTURE.md#2-architecture-technique)).
+Render héberge uniquement l'application ; la base est un service managé distinct —
+jamais de MySQL local en production.
 
 ## État actuel (déployé)
 
@@ -11,7 +11,8 @@ cPanel existant — jamais de MySQL local en production.
 |---|---|
 | URL publique | **https://geoarchives.ceiba-analytics.com** (CNAME GoDaddy → `colect-app.onrender.com`, certificat HTTPS Render automatique) |
 | Service Render | `colect-app`, plan **Starter** (disque persistant `documents` monté sur `/var/data/documents`) |
-| Base de données | cPanel (GoDaddy, `p3plzcpnl504395.prod.phx3.secureserver.net`), base **`col_invent`** |
+| Base de données | **Aiven MySQL 8.4** — palier Developer, région North America, base **`col_invent`**. Migrée depuis cPanel/GoDaddy le 21/08/2026 (§9) |
+| Accès base | Filtrage IP entrant actif : plages sortantes Render + poste d'administration (§1.4) |
 | Structure | Migrations appliquées (`prisma migrate deploy`), référentiel RBAC + statuts de workflow chargés via `prisma/seed-production-core.ts` (aucune donnée fictive) |
 | Compte admin | 1 compte réel créé via `scripts/create-user.ts` |
 | Restant | Communes/lotissements/natures de dossier réels non encore chargés (0) — à fournir avant utilisation réelle de la Collecte |
@@ -46,92 +47,106 @@ cPanel existant — jamais de MySQL local en production.
 
 - [ ] Code poussé sur un dépôt GitHub (`main` protégée, déploiements depuis une branche
       ou des tags, au choix)
-- [ ] Accès cPanel avec l'outil **MySQL® Databases** et **phpMyAdmin**
+- [ ] Un compte [Aiven](https://console.aiven.io) pour la base MySQL managée (§1)
 - [ ] Un compte Render
 - [ ] `openssl rand -base64 32` disponible (ou tout générateur équivalent) pour
       `AUTH_SECRET`
 
-## 1. Base de données MySQL/MariaDB sur cPanel
+## 1. Base de données MySQL managée (Aiven)
 
-Ces étapes se font **dans l'interface cPanel de l'hébergeur** (identifiants cPanel —
-jamais à saisir ailleurs qu'à cet endroit). Le thème cPanel le plus courant
-("Jupiter") est décrit ci-dessous ; les libellés peuvent varier légèrement selon
-l'hébergeur mais les 4 outils utilisés (MySQL® Databases, Remote MySQL, phpMyAdmin)
-existent sur la quasi-totalité des cPanel.
+> **Historique** : la base était initialement hébergée sur le cPanel GoDaddy du client
+> (MariaDB 10.11, `p3plzcpnl504395.prod.phx3.secureserver.net`). Elle a été migrée vers
+> Aiven le 21/08/2026 à la suite d'un incident de connectivité **non contournable
+> applicativement** — GoDaddy bloque les plages d'IP de datacenter au niveau de son
+> pare-feu réseau, en amont de MySQL, et ce filtrage n'est pas pilotable depuis cPanel.
+> Récit complet et méthode de diagnostic en **§9**.
 
-### 1.1 Créer la base
+### 1.1 Créer le service
 
-cPanel → section **Databases** → **MySQL® Databases**.
+Console [Aiven](https://console.aiven.io) → **Create service** → **MySQL**.
 
-1. Champ **"New Database"** : saisir un nom court, ex. `geoarchives`. cPanel préfixe
-   automatiquement avec le nom du compte d'hébergement — le nom final ressemblera à
-   `moncompte_geoarchives` (c'est normal, il apparaîtra tel quel dans `DATABASE_URL`).
-2. Cliquer **"Create Database"**.
+1. **Service tier** : `Developer` (5 $/mois) et **non** `Free`. Le palier gratuit
+   **éteint le service en cas d'inactivité**, ce qui produirait des pannes
+   intermittentes en exploitation — bien plus coûteuses à diagnostiquer qu'à prévenir.
+2. **Cloud / Region** : `North America`. Le service Render tourne en **Virginia
+   (US East)** ; une base en Europe ajouterait ~90 ms de latence à *chaque* requête,
+   soit près d'une seconde sur une page qui en enchaîne huit.
+3. **Service name** : ex. `geoarchives-db`.
+4. Attendre le statut **`Running`** (3 à 5 minutes).
 
-### 1.2 Créer un utilisateur dédié
+### 1.2 Récupérer la chaîne de connexion
 
-Sur la même page, section **"MySQL Users" → "Add New User"** :
+Page du service → **Connection information** → révéler le mot de passe (icône œil),
+puis noter `Host`, `Port`, `User`, `Password`.
 
-1. **Username** : ex. `geoarchives_app` (deviendra `moncompte_geoarchives_app`).
-2. **Password** : générer un mot de passe fort (cPanel propose un générateur — l'utiliser
-   plutôt qu'en inventer un). **Noter ce mot de passe immédiatement**, il ne sera plus
-   affiché en clair ensuite.
-3. Cliquer **"Create User"**.
+⚠️ Le paramètre `ssl-mode=REQUIRED` fourni par Aiven est une option du **client MySQL
+en ligne de commande**, que Prisma ne comprend pas. L'équivalent Prisma est
+`sslaccept` (cf. §2).
 
-⚠️ Ne jamais utiliser l'utilisateur MySQL "root"/principal du compte cPanel pour
-l'application — toujours un utilisateur dédié à privilèges limités à cette seule base.
+### 1.3 Créer la base applicative
 
-### 1.3 Associer l'utilisateur à la base
+Aiven fournit une base `defaultdb`. On lui préfère une base portant le nom métier :
 
-Toujours sur la même page, section **"Add User To Database"** :
-
-1. **User** : sélectionner `moncompte_geoarchives_app`.
-2. **Database** : sélectionner `moncompte_geoarchives`.
-3. Cliquer **"Add"**.
-4. Sur l'écran de permissions qui s'affiche : cocher **"ALL PRIVILEGES"** (en haut de la
-   liste, coche toutes les cases d'un coup), puis **"Make Changes"**.
-
-### 1.4 Autoriser l'accès distant (Render → cPanel)
-
-cPanel → **Remote MySQL®** (parfois sous "Databases" aussi).
-
-1. Champ **"Host"** : dépend de ce que propose l'hébergeur pour Render (pas d'IP
-   sortante fixe sur les plans Render standards) :
-   - Si l'hébergeur permet de restreindre par nom d'hôte plutôt que par IP, l'utiliser.
-   - Sinon, `%` (tout hôte) est l'option la plus courante en pratique chez les
-     hébergeurs mutualisés — à n'utiliser qu'en connaissance de cause (l'accès reste
-     protégé par utilisateur/mot de passe MySQL, mais c'est moins restrictif qu'une IP
-     précise).
-   - Un plan Render avec IP sortante statique (offre payante) permet de restreindre
-     précisément — préférable si disponible.
-   **Ce choix dépend de la politique de l'hébergeur cPanel — à valider avec lui,
-   impossible à généraliser ici.**
-2. **"Add Host"**.
-
-### 1.5 Récupérer les informations de connexion
-
-cPanel affiche généralement le nom d'hôte MySQL distant dans **MySQL® Databases** ou
-dans les infos générales du compte (souvent **pas** `localhost` en accès distant — ex.
-`serveurXX.hebergeur.com` ou une IP dédiée). Port MySQL standard : `3306`.
-
-Avec compte `moncompte`, base `geoarchives`, utilisateur `geoarchives_app` :
-
-```
-DATABASE_URL="mysql://moncompte_geoarchives_app:MOT_DE_PASSE@serveurXX.hebergeur.com:3306/moncompte_geoarchives"
+```sql
+CREATE DATABASE col_invent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Remplacer `MOT_DE_PASSE` par le mot de passe généré en 1.2, et l'hôte/port par les
-valeurs réelles de l'hébergeur. **Cette chaîne complète est ta variable Render
-`DATABASE_URL`** (section 2 ci-dessous) — ne jamais la commiter dans le dépôt.
+Puis appliquer le schéma (§5) — `prisma migrate deploy` recrée les 29 tables **et les
+9 vues de reporting**, celles-ci étant définies dans les migrations
+(`20260813103408_reporting_views`, `20260813150947_evolution_validation_view`).
 
-### 1.6 phpMyAdmin
+### 1.4 Restreindre les IP entrantes
 
-cPanel → **phpMyAdmin** — accessible avec les identifiants cPanel eux-mêmes (pas ceux
-de l'utilisateur MySQL applicatif). Sert à consulter/vérifier directement le contenu de
-la base indépendamment de l'application — utile en section 6 (vérification
-post-déploiement).
-5. phpMyAdmin (accessible depuis cPanel) sert de client d'administration/consultation
-   directe — utile pour vérifier l'état de la base indépendamment de l'application.
+**Service settings → Allowed IP addresses.** À la création, Aiven ouvre le service à
+tout l'internet (`0.0.0.0/0` et `::/0`) — à restreindre dès que le fonctionnement est
+confirmé :
+
+| Plage | Rôle |
+|---|---|
+| `74.220.49.0/24` | IP sortantes Render — région Virginia |
+| `74.220.57.0/24` | IP sortantes Render — région Virginia |
+| `<ip-poste-admin>/32` | Poste d'administration (sauvegardes, scripts de vérification) |
+
+Les plages Render se relèvent dans **Render → service → `Connect` (en haut à droite) →
+onglet `Outbound`**. Elles sont **partagées** avec les autres services Render de la
+région : elles ne constituent donc pas une identification, seulement une réduction de
+surface. La protection réelle reste le mot de passe et TLS.
+
+**Procéder dans cet ordre** : ajouter les trois plages, vérifier que l'application et
+le poste d'administration accèdent toujours à la base, **puis seulement** supprimer
+`0.0.0.0/0` **et** `::/0`. En laisser une seule annule tout le bénéfice. En cas de
+blocage, remettre `0.0.0.0/0` rétablit l'accès en quelques secondes — contrairement au
+pare-feu GoDaddy, ce réglage est entièrement sous votre contrôle.
+
+### 1.5 Contraintes propres aux MySQL managés
+
+- **`sql_require_primary_key=ON`**, non désactivable (privilège `SUPER` non accordé).
+  Prisma génère les tables de liaison many-to-many implicites **sans clé primaire** :
+  toute migration en créant une échouera avec l'erreur `3750`. Corrigé en ajoutant
+  `PRIMARY KEY (A, B)` dans la migration concernée — cf.
+  `20260824090000_add_dossier_pieces`.
+- **Pas de privilège `SUPER`** : un dump contenant `DEFINER=...` sur des vues échouera
+  (`ERROR 1449`). Recréer les vues via les migrations Prisma plutôt que de les
+  restaurer depuis un dump.
+- **Type `JSON` natif** (MySQL 8.4) là où MariaDB stockait du texte : les clés d'objet
+  sont normalisées et réordonnées. Différence sans conséquence — le contenu reste
+  sémantiquement identique — mais elle fausse toute comparaison de dumps octet à octet.
+
+### 1.6 Sauvegarde et restauration
+
+Le palier Developer inclut les sauvegardes automatiques. Pour un export manuel :
+
+```bash
+mysqldump -h <host> -P <port> -u avnadmin -p<password> \
+  --single-transaction --no-tablespaces --default-character-set=utf8mb4 \
+  --ssl-mode=REQUIRED col_invent > backup.sql
+```
+
+⚠️ **Toujours préciser `--default-character-set=utf8mb4`**, à l'export **comme à
+l'import**. Sans cela les caractères accentués sont tronqués silencieusement
+(`Carte résident` → `Carte r`) — l'erreur ne se voit qu'en relisant les données.
+Pour un volume modeste, une copie table à table via Prisma est plus sûre : les deux
+connexions négocient l'`utf8mb4` nativement, ce qui élimine le problème à la racine.
 
 ## 2. Variables d'environnement (Render → Environment)
 
@@ -139,7 +154,7 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 
 | Variable | Valeur |
 |---|---|
-| `DATABASE_URL` | `mysql://...` vers le serveur cPanel (jamais `localhost`) |
+| `DATABASE_URL` | `mysql://avnadmin:<mdp>@<hote>.aivencloud.com:<port>/col_invent?sslaccept=accept_invalid_certs` — jamais `localhost` |
 | `AUTH_SECRET` | valeur générée avec `openssl rand -base64 32` — **différente** de celle utilisée en dev, jamais commitée |
 | `NODE_ENV` | `production` |
 | `DOCUMENTS_STORAGE_PATH` | point de montage du disque persistant Render (§4) |
@@ -147,6 +162,22 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 `AUTH_SECRET` en production conditionne aussi le cookie de session `secure: true`
 (`src/lib/auth/session.ts` / `auth-service.ts`, cf. [SECURITY.md](SECURITY.md)) — un
 `NODE_ENV` mal positionné dégraderait silencieusement la sécurité des cookies.
+
+**TLS vers la base** : Aiven impose le chiffrement. Le `?ssl-mode=REQUIRED` affiché
+dans sa console est une option du client MySQL en ligne de commande — Prisma ne la
+comprend pas et attend `sslaccept`. Deux valeurs possibles :
+
+| Valeur | Effet |
+|---|---|
+| `sslaccept=accept_invalid_certs` | Chiffre la liaison **sans vérifier** le certificat du serveur |
+| `sslaccept=strict` + `sslcert=<chemin-ca.pem>` | Chiffre **et** vérifie l'identité du serveur |
+
+La configuration actuelle utilise `accept_invalid_certs` : la liaison est chiffrée,
+mais un intercepteur pourrait théoriquement se faire passer pour la base. **Durcissement
+à prévoir** : télécharger le certificat CA depuis la console Aiven (*CA certificate →
+Show*), l'embarquer dans le dépôt (il n'est pas secret) et passer en `strict`. Le
+filtrage IP (§1.4) réduit déjà fortement l'exposition, mais ne remplace pas la
+vérification du certificat.
 
 ## 3. Création du service Render
 
@@ -191,7 +222,7 @@ Avant la mise en production réelle, deux options :
 **Ne jamais** utiliser `prisma migrate dev` ni `db push --force-reset` en production
 (règle absolue du cahier des charges — destructif). Séquence correcte :
 
-1. Premier déploiement (base cPanel vide) : exécuter une fois
+1. Premier déploiement (base vide) : exécuter une fois
    ```bash
    npm run db:migrate:deploy
    ```
@@ -234,6 +265,8 @@ Render au lieu d'utiliser l'URL `*.onrender.com` :
 
 - [ ] `GET https://<votre-domaine>/api/health` → `{ "status": "ok", "database": "up", ... }`
 - [ ] `/login` accessible, connexion avec un compte réel fonctionne
+- [ ] Filtrage IP Aiven actif (§1.4) : l'application **et** le poste d'administration
+      joignent la base, `0.0.0.0/0` et `::/0` supprimés des *Allowed IP addresses*
 - [ ] Cookie de session envoyé avec `Secure` (vérifier dans les DevTools réseau —
       nécessite HTTPS, automatique sur Render)
 - [ ] Upload d'un document puis redémarrage du service → le document est toujours
@@ -257,7 +290,7 @@ Repris et complétés depuis [SECURITY.md](SECURITY.md) :
 - **HTTPS** : automatique sur Render (certificat géré) — aucune action requise, mais
   vérifier que l'URL finale utilisée par les utilisateurs est bien en `https://`.
 
-## 9. Incident du 21/08/2026 — blocage MySQL cPanel (à connaître)
+## 9. Incident du 21/08/2026 — blocage réseau GoDaddy et migration vers Aiven
 
 **Symptôme** : `502` sur *toutes* les URL, y compris les ressources statiques
 (`/icon.png`). Logs Render : `Can't reach database server at
@@ -280,18 +313,34 @@ facteurs aggravants, corrigés depuis :
   tolère un `max_user_connections` de cPanel mutualisé (souvent 10-25). Fixé à
   `connection_limit=5` / `pool_timeout=20` dans `src/lib/prisma/client.ts`.
 
-**Résolution côté hébergeur** (seule action qui rétablit réellement la connectivité) :
+**Résolution retenue : migration de la base vers Aiven** (§1). Les pistes côté
+hébergeur ont toutes été écartées par le diagnostic ci-dessous ; sur du mutualisé
+GoDaddy, seul leur support peut lever un filtrage réseau, avec un délai et une
+issue incertains — inacceptable pour un service en exploitation.
 
-1. **cPanel → Remote MySQL®** : vérifier que l'hôte d'accès est toujours présent
-   (`%`, ou les IP sortantes Render). Le ré-ajouter s'il a disparu.
-2. **Render → Settings → Outbound IPs** : récupérer les IP exactes à autoriser
-   (préférable à `%`).
-3. Si l'entrée est bien présente, il s'agit d'un **bannissement pare-feu** :
-   demander au support de l'hébergeur de lever le blocage sur ces IP.
+**Méthode de diagnostic** (réutilisable pour toute panne « base injoignable ») —
+les hypothèses ont été éliminées dans cet ordre :
+
+| Hypothèse | Comment l'écarter |
+|---|---|
+| Base éteinte | S'y connecter depuis un poste tiers |
+| Droits MySQL / whitelist | Vérifier les hôtes autorisés (`%` couvrait déjà tout) |
+| Identifiants | Tester la chaîne exacte hors application |
+| Résolution DNS / IPv6 | Remplacer le nom d'hôte par l'IPv4 dans `DATABASE_URL` |
+| Format de l'URL | Lire le message d'erreur : un défaut de protocole est explicite |
+| Plafond de connexions | Un dépassement donne un **rejet immédiat**, pas un timeout |
+| **Filtrage réseau** | **Timeout franc (~5 s) alors qu'un autre poste passe** |
+
+Le signal décisif est la **nature de l'échec** : un `timeout` signifie des paquets
+silencieusement jetés (règle `DROP` d'un pare-feu), là où un `connection refused` ou
+un message MySQL explicite oriente vers la configuration. Comparer depuis deux
+origines réseau différentes, à la même minute, tranche en une seule mesure.
 
 **À retenir** : un `502` global ne signifie pas forcément que l'application est
 cassée — vérifier d'abord la connectivité base depuis l'extérieur, ce qui distingue
-immédiatement « app en panne » de « base injoignable depuis l'hébergeur ».
+immédiatement « app en panne » de « base injoignable depuis l'hébergeur ». Depuis le
+découplage de la sonde (§3), ce cas n'entraîne plus de blackout : le site reste
+debout et `/api/health` renvoie `status: "degraded"`.
 
 ## 10. Rollback
 
