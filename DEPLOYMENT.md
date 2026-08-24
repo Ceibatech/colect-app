@@ -1,6 +1,7 @@
 # Déploiement — GeoArchives-MULCV (Phase 15, §95/§96)
 
-Cible : **GitHub → Render (application Next.js) → MySQL managé chez Aiven**
+Cible : **GitHub → Render (application Next.js) → MySQL/MariaDB sur cPanel**,
+avec un service **Aiven** maintenu en repli déjà éprouvé (§1)
 (schéma complet dans [ARCHITECTURE.md](ARCHITECTURE.md#2-architecture-technique)).
 Render héberge uniquement l'application ; la base est un service managé distinct —
 jamais de MySQL local en production.
@@ -11,8 +12,8 @@ jamais de MySQL local en production.
 |---|---|
 | URL publique | **https://geoarchives.ceiba-analytics.com** (CNAME GoDaddy → `colect-app.onrender.com`, certificat HTTPS Render automatique) |
 | Service Render | `colect-app`, plan **Starter** (disque persistant `documents` monté sur `/var/data/documents`) |
-| Base de données | **Aiven MySQL 8.4** — palier Developer, région North America, base **`col_invent`**. Migrée depuis cPanel/GoDaddy le 21/08/2026 (§9) |
-| Accès base | Filtrage IP entrant actif : plages sortantes Render + poste d'administration (§1.4) |
+| Base de données | **cPanel / GoDaddy** (MariaDB 10.11, `p3plzcpnl504395.prod.phx3.secureserver.net`), base **`col_invent`** |
+| Repli | Service **Aiven MySQL 8.4** (palier Developer) maintenu et validé — bascule en changeant la seule `DATABASE_URL` (§1). Attention : ses données se figent dès que la production écrit ailleurs (§9.1) |
 | Structure | Migrations appliquées (`prisma migrate deploy`), référentiel RBAC + statuts de workflow chargés via `prisma/seed-production-core.ts` (aucune donnée fictive) |
 | Compte admin | 1 compte réel créé via `scripts/create-user.ts` |
 | Restant | Communes/lotissements/natures de dossier réels non encore chargés (0) — à fournir avant utilisation réelle de la Collecte |
@@ -47,19 +48,21 @@ jamais de MySQL local en production.
 
 - [ ] Code poussé sur un dépôt GitHub (`main` protégée, déploiements depuis une branche
       ou des tags, au choix)
-- [ ] Un compte [Aiven](https://console.aiven.io) pour la base MySQL managée (§1)
+- [ ] Accès à la base MySQL/MariaDB de production (cPanel) — ou un compte
+      [Aiven](https://console.aiven.io) pour la solution de repli (§1)
 - [ ] Un compte Render
 - [ ] `openssl rand -base64 32` disponible (ou tout générateur équivalent) pour
       `AUTH_SECRET`
 
-## 1. Base de données MySQL managée (Aiven)
+## 1. Base de données MySQL managée (Aiven) — solution de repli
 
-> **Historique** : la base était initialement hébergée sur le cPanel GoDaddy du client
-> (MariaDB 10.11, `p3plzcpnl504395.prod.phx3.secureserver.net`). Elle a été migrée vers
-> Aiven le 21/08/2026 à la suite d'un incident de connectivité **non contournable
-> applicativement** — GoDaddy bloque les plages d'IP de datacenter au niveau de son
-> pare-feu réseau, en amont de MySQL, et ce filtrage n'est pas pilotable depuis cPanel.
-> Récit complet et méthode de diagnostic en **§9**.
+> **Statut** : la production tourne actuellement sur **cPanel/GoDaddy** (MariaDB 10.11).
+> Cette section décrit la bascule vers Aiven, **réalisée et validée le 21/08/2026** lors
+> d'un incident de connectivité, puis annulée le 24/08 une fois le blocage expiré
+> (§9.1). La procédure est conservée en l'état : le blocage peut réapparaître, GoDaddy
+> filtrant les plages d'IP de datacenter en amont de MySQL — un filtrage que cPanel ne
+> permet pas de piloter. Le service Aiven reste provisionné, la bascule ne demande que
+> de changer `DATABASE_URL`.
 
 ### 1.1 Créer le service
 
@@ -154,7 +157,7 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 
 | Variable | Valeur |
 |---|---|
-| `DATABASE_URL` | `mysql://avnadmin:<mdp>@<hote>.aivencloud.com:<port>/col_invent?sslaccept=accept_invalid_certs` — jamais `localhost` |
+| `DATABASE_URL` | **Production (cPanel)** : `mysql://<user>:<mdp>@<hote-cpanel>:3306/col_invent`. **Repli (Aiven)** : `mysql://avnadmin:<mdp>@<hote>.aivencloud.com:<port>/col_invent?sslaccept=accept_invalid_certs`. Jamais `localhost` — mot de passe percent-encodé si caractères spéciaux |
 | `AUTH_SECRET` | valeur générée avec `openssl rand -base64 32` — **différente** de celle utilisée en dev, jamais commitée |
 | `NODE_ENV` | `production` |
 | `DOCUMENTS_STORAGE_PATH` | point de montage du disque persistant Render (§4) |
@@ -341,6 +344,39 @@ cassée — vérifier d'abord la connectivité base depuis l'extérieur, ce qui 
 immédiatement « app en panne » de « base injoignable depuis l'hébergeur ». Depuis le
 découplage de la sonde (§3), ce cas n'entraîne plus de blackout : le site reste
 debout et `/api/health` renvoie `status: "degraded"`.
+
+### 9.1 Épilogue — retour sur cPanel le 24/08/2026
+
+Le blocage GoDaddy a **expiré de lui-même** au bout de quelques jours. Notez la
+nuance : il a expiré, il n'a pas été *levé* — le filtrage reste hors de contrôle et
+**rien n'exclut sa réapparition**. Les deux correctifs applicatifs (sonde mémorisée
+30 s, pool borné à 5) réduisent nettement le risque de re-déclencher l'anti-abus, mais
+ne le suppriment pas.
+
+La base de production a donc été **ramenée sur cPanel**. Le service Aiven reste en
+place : il constitue une solution de repli déjà éprouvée, réactivable en changeant une
+seule variable d'environnement.
+
+**Réconciliation des données** — entre le 21/08 et le 24/08, l'application écrivait sur
+Aiven. Le retour sur cPanel laissait donc de côté tout ce qui avait été produit dans
+l'intervalle : 1 dossier, 1 compte utilisateur, 45 entrées d'audit, 5 liaisons
+types de pièces, plus l'historique associé — **61 lignes sur 9 tables**, reportées
+d'Aiven vers cPanel en préservant les identifiants d'origine (indispensable : les clés
+étrangères en dépendent).
+
+**À retenir si la situation se reproduit** : faire vivre deux bases en parallèle est le
+vrai danger. Chaque jour d'écriture sur l'une creuse l'écart avec l'autre. Trancher
+rapidement laquelle fait foi, et reporter dans la foulée. La procédure de contrôle
+utilisée ici — comparaison table par table sur les clés primaires, vérification des
+compteurs auto-incrémentés, contrôle des orphelins de clés étrangères — est
+reproductible avec Prisma sur les deux bases simultanément.
+
+> **Piège de migration** : le fichier `20260824090000_add_dossier_pieces` a été modifié
+> après application (ajout de `PRIMARY KEY (A, B)` pour Aiven), ce qui a désynchronisé
+> sa somme de contrôle dans `_prisma_migrations` côté cPanel. Corrigé en alignant le
+> schéma (ajout de la clé primaire, que MariaDB n'exigeait pas) **puis** la somme de
+> contrôle. Toute modification d'une migration déjà appliquée impose de vérifier
+> ce point sur **chaque** base où elle est passée.
 
 ## 10. Rollback
 
