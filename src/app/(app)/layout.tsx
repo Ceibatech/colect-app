@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth/current-user";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { Header } from "@/components/layout/Header";
+import { CollecteFab } from "@/components/layout/CollecteFab";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 // Coquille protégée partagée par tous les modules applicatifs (dashboard,
@@ -17,6 +18,7 @@ export default async function AppShellLayout({ children }: { children: React.Rea
         <Header name={session.name} email={session.email} roleCode={session.roleCode} />
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </SidebarInset>
+      {session.permissions.includes("DOSSIER_CREATE") && <CollecteFab />}
     </SidebarProvider>
   );
 }
