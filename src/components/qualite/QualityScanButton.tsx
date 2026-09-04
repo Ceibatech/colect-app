@@ -26,7 +26,7 @@ export function QualityScanButton() {
   }
 
   return (
-    <Button onClick={run} disabled={isPending}>
+    <Button onClick={run} disabled={isPending} size="lg" className="h-9 shadow-sm">
       {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-1 h-4 w-4" />}
       Lancer un contrôle qualité
     </Button>

@@ -1,7 +1,9 @@
+import { Download } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getCommunesWithLotissements, getActiveOperateurs } from "@/lib/services/referentiels-service";
 import { getOperateurScopeFilter } from "@/lib/services/access-scope";
 import { ExportFilterForm } from "@/components/export/ExportFilterForm";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = { title: "Export — GeoArchives-MULCV" };
@@ -23,11 +25,18 @@ export default async function ExportPage() {
   ]);
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Export</h1>
-        <p className="text-sm text-muted-foreground">Export CSV ou Excel respectant les filtres actifs (§55).</p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Extraction"
+        icon={Download}
+        title="Export"
+        description="Préparez un export CSV ou Excel respectant les filtres actifs et le périmètre de votre rôle."
+        stats={[
+          { label: "Formats", value: "CSV / Excel" },
+          { label: "Communes", value: communes.length },
+          { label: "Opérateurs", value: isOperateurRole ? "Moi" : operateurs.length },
+        ]}
+      />
 
       <Card>
         <CardHeader>

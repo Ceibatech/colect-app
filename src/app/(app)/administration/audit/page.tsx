@@ -1,9 +1,11 @@
+import { ScrollText } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { parseAuditSearchParams } from "@/lib/validation/audit-search";
 import { searchAuditLogs, getAuditFacets, AUDIT_PAGE_SIZE } from "@/lib/services/audit-service";
 import { AuditFilterBar } from "@/components/administration/AuditFilterBar";
 import { AuditTable, type AuditLogRowView } from "@/components/administration/AuditTable";
 import { DataPagination } from "@/components/shared/DataPagination";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export const metadata = { title: "Audit — Administration" };
 
@@ -49,13 +51,18 @@ export default async function AdminAuditPage({
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Journal d&apos;audit</h1>
-        <p className="text-sm text-muted-foreground">
-          {results.total} événement{results.total > 1 ? "s" : ""} — page {results.page} / {results.totalPages}
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Traçabilité"
+        icon={ScrollText}
+        title="Journal d'audit"
+        description={`${results.total} événement${results.total > 1 ? "s" : ""} — page ${results.page} / ${results.totalPages}.`}
+        stats={[
+          { label: "Événements", value: results.total },
+          { label: "Actions", value: facets.actions.length },
+          { label: "Entités", value: facets.entities.length },
+        ]}
+      />
 
       <AuditFilterBar current={params} users={facets.users} actions={facets.actions} entities={facets.entities} />
 

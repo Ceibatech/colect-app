@@ -1,6 +1,8 @@
+import { PackageOpen } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { listAllEntrepots, listAllSites } from "@/lib/services/referentiels-admin-service";
 import { EntrepotsManager } from "@/components/administration/EntrepotsManager";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export const metadata = { title: "Entrepôts — Administration" };
 
@@ -82,14 +84,18 @@ export default async function AdminEntrepotsPage() {
   }));
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Entrepôts</h1>
-        <p className="text-sm text-muted-foreground">
-          {entrepots.length} entrepôt{entrepots.length > 1 ? "s" : ""}, rattachés à un site — un site peut avoir
-          plusieurs entrepôts.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Infrastructure"
+        icon={PackageOpen}
+        title="Entrepôts"
+        description={`${entrepots.length} entrepôt${entrepots.length > 1 ? "s" : ""}, rattaché${entrepots.length > 1 ? "s" : ""} aux sites d'archivage.`}
+        stats={[
+          { label: "Total", value: entrepots.length },
+          { label: "Actifs", value: entrepots.filter((e) => e.isActive).length, tone: "success" },
+          { label: "Sites actifs", value: sites.filter((s) => s.isActive).length },
+        ]}
+      />
       <EntrepotsManager entrepots={serialized} sites={sites.filter((s) => s.isActive).map((s) => ({ id: s.id, nom: s.nom }))} />
     </div>
   );

@@ -14,6 +14,37 @@ export interface LoginFormState {
   error?: string;
 }
 
+function getAuthenticationSetupError(error: unknown): string | null {
+  if (!(error instanceof Error)) return null;
+
+  if (error.name === "PrismaClientInitializationError") {
+    if (error.message.includes("Environment variable not found: DATABASE_URL")) {
+      return process.env.NODE_ENV === "production"
+        ? "Service d'authentification temporairement indisponible."
+        : "Configuration locale manquante : renseignez DATABASE_URL dans .env.local, puis relancez le serveur.";
+    }
+
+    return process.env.NODE_ENV === "production"
+      ? "Service d'authentification temporairement indisponible."
+      : "Base de données inaccessible : vérifiez DATABASE_URL, démarrez MySQL/MariaDB, puis relancez le serveur.";
+  }
+
+  if (error.message.includes("AUTH_SECRET")) {
+    return process.env.NODE_ENV === "production"
+      ? "Service d'authentification temporairement indisponible."
+      : "Configuration locale manquante : renseignez AUTH_SECRET dans .env.local, puis relancez le serveur.";
+  }
+
+  return null;
+}
+
+function findLoginUser(email: string) {
+  return prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+  });
+}
+
 async function getClientIp(): Promise<string> {
   const h = await headers();
   return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? h.get("x-real-ip") ?? "unknown";
@@ -37,10 +68,14 @@ export async function loginAction(_prevState: LoginFormState, formData: FormData
     return { error: "Trop de tentatives échouées. Réessayez dans quelques minutes." };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-    include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
-  });
+  let user: Awaited<ReturnType<typeof findLoginUser>>;
+  try {
+    user = await findLoginUser(email);
+  } catch (error) {
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
 
   // Message volontairement générique (ne pas révéler si l'e-mail existe ou non).
   const genericError = "Identifiants incorrects.";
@@ -63,13 +98,20 @@ export async function loginAction(_prevState: LoginFormState, formData: FormData
 
   const permissions = user.role.rolePermissions.map((rp) => rp.permission.code) as PermissionCode[];
 
-  const token = await signSession({
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-    roleCode: user.role.code as RoleCode,
-    permissions,
-  });
+  let token: string;
+  try {
+    token = await signSession({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      roleCode: user.role.code as RoleCode,
+      permissions,
+    });
+  } catch (error) {
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
 
   const store = await cookies();
   store.set(COOKIE_NAME, token, {

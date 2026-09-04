@@ -4,7 +4,7 @@ import { useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, ClipboardCheck, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,14 @@ export function AnomaliesTable({ anomalies, canResolve }: { anomalies: OpenAnoma
 
   if (anomalies.length === 0) {
     return (
-      <div className="rounded-lg border py-10 text-center text-sm text-muted-foreground">
-        Aucune anomalie ouverte. Lancez un contrôle qualité pour analyser les dossiers.
+      <div className="flex min-h-52 flex-col items-center justify-center rounded-lg border border-dashed border-border/80 bg-background/70 px-6 py-10 text-center">
+        <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-brand-green/10 text-brand-green">
+          <ClipboardCheck className="h-6 w-6" />
+        </span>
+        <h2 className="mt-4 text-base font-semibold">Aucune anomalie ouverte</h2>
+        <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">
+          Lancez un contrôle qualité pour analyser les dossiers et faire remonter les points à corriger.
+        </p>
       </div>
     );
   }
@@ -53,10 +59,10 @@ export function AnomaliesTable({ anomalies, canResolve }: { anomalies: OpenAnoma
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <Table>
+    <div className="overflow-hidden rounded-lg border border-border/70 bg-background/70">
+      <Table className="min-w-[860px]">
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-muted/60 hover:bg-muted/60">
             <TableHead>Dossier</TableHead>
             <TableHead>Type</TableHead>
             <TableHead>Champ</TableHead>
@@ -67,16 +73,18 @@ export function AnomaliesTable({ anomalies, canResolve }: { anomalies: OpenAnoma
         </TableHeader>
         <TableBody>
           {anomalies.map((a) => (
-            <TableRow key={a.id}>
+            <TableRow key={a.id} className="hover:bg-accent/30">
               <TableCell className="whitespace-nowrap">
-                <Link href={`/dossiers/${a.dossier.id}`} className="font-mono text-xs underline underline-offset-2">
+                <Link href={`/dossiers/${a.dossier.id}`} className="font-mono text-xs font-semibold text-primary underline-offset-2 hover:underline">
                   {a.dossier.reference}
                 </Link>
               </TableCell>
-              <TableCell className="whitespace-nowrap">{TYPE_LABELS[a.type] ?? a.type}</TableCell>
+              <TableCell className="whitespace-nowrap font-medium">{TYPE_LABELS[a.type] ?? a.type}</TableCell>
               <TableCell className="whitespace-nowrap text-muted-foreground">{a.champ ?? "—"}</TableCell>
               <TableCell>
-                <Badge variant={GRAVITE_VARIANT[a.gravite] ?? "outline"}>{a.gravite}</Badge>
+                <Badge variant={GRAVITE_VARIANT[a.gravite] ?? "outline"} className="rounded-md">
+                  {a.gravite}
+                </Badge>
               </TableCell>
               <TableCell className="max-w-xs truncate text-muted-foreground" title={a.description ?? undefined}>
                 {a.description ?? "—"}
