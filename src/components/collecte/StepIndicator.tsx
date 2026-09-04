@@ -9,32 +9,43 @@ export function StepIndicator({ currentStep }: { currentStep: number }) {
   const percent = (currentStep / DOSSIER_STEPS.length) * 100;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between text-sm text-muted-foreground">
-        <span>
-          Étape {currentStep} / {DOSSIER_STEPS.length} — {DOSSIER_STEPS[currentStep - 1].title}
-        </span>
-        <span>{Math.round(percent)}%</span>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="font-medium text-foreground">Progression</span>
+          <span className="font-semibold tabular-nums text-primary">{Math.round(percent)}%</span>
+        </div>
+        <Progress value={percent} />
       </div>
-      <Progress value={percent} />
-      <ol className="hidden flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground md:flex">
-        {DOSSIER_STEPS.map((step) => (
-          <li
-            key={step.id}
-            className={cn(
-              "flex items-center gap-1",
-              step.id === currentStep && "font-medium text-foreground",
-              step.id < currentStep && "text-foreground"
-            )}
-          >
-            {step.id < currentStep ? (
-              <Check className="h-3 w-3 text-primary" />
-            ) : (
-              <span className="tabular-nums">{step.id}.</span>
-            )}
-            {step.title}
-          </li>
-        ))}
+
+      <ol className="grid gap-1.5 text-sm">
+        {DOSSIER_STEPS.map((step) => {
+          const complete = step.id < currentStep;
+          const active = step.id === currentStep;
+
+          return (
+            <li
+              key={step.id}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-2 py-2 text-muted-foreground transition-colors",
+                active && "bg-primary/10 font-medium text-foreground",
+                complete && "text-foreground"
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums",
+                  complete && "border-primary bg-primary text-primary-foreground",
+                  active && "border-primary bg-background text-primary",
+                  !complete && !active && "border-border bg-muted text-muted-foreground"
+                )}
+              >
+                {complete ? <Check className="h-3.5 w-3.5" /> : step.id}
+              </span>
+              <span className="min-w-0 truncate">{step.title}</span>
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

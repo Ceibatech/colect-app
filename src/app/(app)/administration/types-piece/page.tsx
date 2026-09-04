@@ -1,6 +1,8 @@
+import { FileStack } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { listAllTypesPiece } from "@/lib/services/referentiels-admin-service";
 import { TypesPieceManager } from "@/components/administration/TypesPieceManager";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export const metadata = { title: "Types de pièces — Administration" };
 
@@ -9,14 +11,17 @@ export default async function AdminTypesPiecePage() {
   const typesPiece = await listAllTypesPiece();
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Types de pièces</h1>
-        <p className="text-sm text-muted-foreground">
-          {typesPiece.length} type{typesPiece.length > 1 ? "s" : ""} de pièce (CNI, Carte résident, Extrait topo...) proposé(s) en étape
-          « Dossier » de la Collecte.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Référentiel"
+        icon={FileStack}
+        title="Types de pièces"
+        description={`${typesPiece.length} type${typesPiece.length > 1 ? "s" : ""} de pièce proposé${typesPiece.length > 1 ? "s" : ""} en étape Dossier de la Collecte.`}
+        stats={[
+          { label: "Total", value: typesPiece.length },
+          { label: "Actifs", value: typesPiece.filter((t) => t.isActive).length, tone: "success" },
+        ]}
+      />
       <TypesPieceManager typesPiece={typesPiece} />
     </div>
   );

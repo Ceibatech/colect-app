@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { FilePlus2 } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { parseDossierSearchParams } from "@/lib/validation/dossier-search";
 import { searchDossiers, DOSSIERS_PAGE_SIZE } from "@/lib/services/dossier-query-service";
@@ -6,6 +8,9 @@ import { getOperateurScopeFilter } from "@/lib/services/access-scope";
 import { DossiersFilterBar } from "@/components/dossiers/DossiersFilterBar";
 import { DossiersTable } from "@/components/dossiers/DossiersTable";
 import { DataPagination } from "@/components/shared/DataPagination";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Dossiers — GeoArchives-MULCV" };
 
@@ -58,13 +63,27 @@ export default async function DossiersPage({
   }
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Dossiers</h1>
-        <p className="text-sm text-muted-foreground">
-          {results.total} dossier{results.total > 1 ? "s" : ""} — page {results.page} / {results.totalPages}
-        </p>
-      </div>
+    <div className="space-y-5">
+      <section className="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/95 p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-3">
+          <Badge variant="secondary" className="w-fit rounded-md border border-border/60 bg-muted/70 uppercase tracking-[0.16em]">
+            Référentiel dossiers
+          </Badge>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Dossiers</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {results.total} dossier{results.total > 1 ? "s" : ""} — page {results.page} / {results.totalPages}
+            </p>
+          </div>
+        </div>
+
+        {session.permissions.includes("DOSSIER_CREATE") && (
+          <Link href="/collecte/nouveau" className={cn(buttonVariants({ size: "lg" }), "h-9 shadow-sm")}>
+            <FilePlus2 className="mr-1 h-4 w-4" />
+            Nouveau dossier
+          </Link>
+        )}
+      </section>
 
       <DossiersFilterBar
         current={params}

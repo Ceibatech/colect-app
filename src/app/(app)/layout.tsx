@@ -14,9 +14,11 @@ export default async function AppShellLayout({ children }: { children: React.Rea
   return (
     <SidebarProvider>
       <AppSidebar permissions={session.permissions} />
-      <SidebarInset>
+      <SidebarInset className="bg-transparent">
         <Header name={session.name} email={session.email} roleCode={session.roleCode} />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+        <main className="min-h-[calc(100svh-3.5rem)] flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-6">
+          <div className="mx-auto w-full max-w-[1600px]">{children}</div>
+        </main>
       </SidebarInset>
       {session.permissions.includes("DOSSIER_CREATE") && <CollecteFab />}
     </SidebarProvider>

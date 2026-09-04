@@ -1,6 +1,7 @@
 import { requirePermission } from "@/lib/auth/current-user";
 import { getRepartitionByCommune, getRepartitionByLotissement } from "@/lib/services/dashboard-service";
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MapPinned } from "lucide-react";
@@ -13,17 +14,23 @@ export default async function DashboardGeographiePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Dashboard Géographique</h1>
-        <p className="text-sm text-muted-foreground">Analyse par commune et lotissement.</p>
-      </div>
+      <PageHeader
+        eyebrow="Territoire"
+        icon={MapPinned}
+        title="Dashboard Géographique"
+        description="Lecture des volumes documentaires par commune et lotissement pour prioriser les zones à suivre."
+        stats={[
+          { label: "Communes", value: byCommune.length },
+          { label: "Lotissements", value: byLotissement.length },
+          { label: "Top commune", value: byCommune[0]?.label ?? "—" },
+        ]}
+      />
 
-      <Alert>
-        <MapPinned className="h-4 w-4" />
-        <AlertTitle>Cartographie (SIG)</AlertTitle>
+      <Alert className="border-primary/20 bg-primary/5">
+        <MapPinned className="h-4 w-4 text-primary" />
+        <AlertTitle>Cartographie SIG prête à intégrer</AlertTitle>
         <AlertDescription>
-          Hors périmètre V1 (cahier des charges §51) — l&apos;architecture (référentiels commune/lotissement/îlot/lot déjà
-          normalisés) permet une future intégration cartographique sans migration de schéma.
+          L&apos;architecture des référentiels commune, lotissement, îlot et lot permet une future intégration cartographique sans migration de schéma.
         </AlertDescription>
       </Alert>
 

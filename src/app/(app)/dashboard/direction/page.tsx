@@ -3,8 +3,9 @@ import { getDirectionOverview, getAnomaliesEvolution } from "@/lib/services/dash
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
 import { AnomaliesEvolutionChart } from "@/components/dashboard/AnomaliesEvolutionChart";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Gauge, ShieldX, Clock, ShieldAlert, FolderKanban } from "lucide-react";
+import { Gauge, ShieldX, Clock, ShieldAlert, FolderKanban, TrendingUp } from "lucide-react";
 
 export const metadata = { title: "Dashboard Direction — GeoArchives-MULCV" };
 
@@ -23,12 +24,20 @@ export default async function DashboardDirectionPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Dashboard Direction</h1>
-        <p className="text-sm text-muted-foreground">Vue synthétique de l&apos;avancement du chantier d&apos;archivage.</p>
-      </div>
+      <PageHeader
+        eyebrow="Pilotage"
+        icon={TrendingUp}
+        title="Dashboard Direction"
+        description="Vue synthétique de l'avancement du chantier d'archivage, avec les signaux de risque à surveiller."
+        stats={[
+          { label: "Total dossiers", value: overview.total },
+          { label: "Avancement", value: `${overview.tauxGlobal}%`, tone: "success" },
+          { label: "En retard", value: overview.dossiersEnRetard, tone: overview.dossiersEnRetard > 0 ? "warning" : "success" },
+          { label: "Critiques", value: overview.anomaliesCritiques, tone: overview.anomaliesCritiques > 0 ? "destructive" : "success" },
+        ]}
+      />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <KpiCard icon={FolderKanban} label="Total dossiers" value={overview.total} />
         <KpiCard icon={Gauge} label="Taux global d'avancement" value={`${overview.tauxGlobal}%`} hint="archivés / total" tone="success" />
         <KpiCard icon={ShieldX} label="Dossiers rejetés" value={overview.rejetes} tone="destructive" />
@@ -40,7 +49,7 @@ export default async function DashboardDirectionPage() {
         <Card>
           <CardHeader>
             <CardTitle>Taux par étape</CardTitle>
-            <CardDescription>Formules détaillées dans DATABASE.md / ARCHITECTURE.md (§47).</CardDescription>
+            <CardDescription>Progression comparée des cinq étapes du pipeline.</CardDescription>
           </CardHeader>
           <CardContent>
             <RepartitionBarChart data={tauxParEtape} colorByCategory limit={5} />

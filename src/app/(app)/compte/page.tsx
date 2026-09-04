@@ -1,5 +1,7 @@
+import { User } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = { title: "Mon compte — GeoArchives-MULCV" };
@@ -14,11 +16,17 @@ export default async function ComptePage() {
   const session = await requireUser();
 
   return (
-    <div className="max-w-lg space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Mon compte</h1>
-        <p className="text-sm text-muted-foreground">{session.name} — {session.email}</p>
-      </div>
+    <div className="mx-auto w-full max-w-3xl space-y-5">
+      <PageHeader
+        eyebrow="Profil"
+        icon={User}
+        title="Mon compte"
+        description={`${session.name} — ${session.email}`}
+        stats={[
+          { label: "Rôle", value: session.roleCode },
+          { label: "Sécurité", value: "Mot de passe" },
+        ]}
+      />
 
       <Card>
         <CardHeader>

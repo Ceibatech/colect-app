@@ -32,7 +32,7 @@ export function CollecteFab() {
             aria-label="Nouvelle collecte"
             className={cn(
               buttonVariants({ size: "icon-lg" }),
-              "fixed right-6 bottom-6 z-40 size-14 rounded-full shadow-lg transition-transform hover:scale-105"
+              "fixed right-5 bottom-5 z-40 size-14 rounded-full border border-white/25 bg-primary shadow-[0_16px_38px_rgba(40,81,159,0.28)] transition-all hover:-translate-y-0.5 hover:bg-primary/90 sm:right-6 sm:bottom-6"
             )}
           >
             <FilePlus2 className="size-6" />
