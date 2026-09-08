@@ -16,7 +16,7 @@ export function QualityScanButton() {
       try {
         const result = await runQualityScan();
         toast.success(
-          `Contrôle terminé — ${result.dossiersScanned} dossier(s) analysé(s), ${result.anomaliesCreated} nouvelle(s) anomalie(s).`
+          `Analyse actualisée : ${result.dossiersScanned} dossier(s) contrôlé(s), ${result.anomaliesCreated} nouvelle(s) alerte(s).`
         );
         router.refresh();
       } catch (e) {
@@ -26,9 +26,9 @@ export function QualityScanButton() {
   }
 
   return (
-    <Button onClick={run} disabled={isPending} size="lg" className="h-9 shadow-sm">
+    <Button onClick={run} disabled={isPending} size="lg" className="h-10 shadow-sm">
       {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-1 h-4 w-4" />}
-      Lancer un contrôle qualité
+      Actualiser l&apos;analyse
     </Button>
   );
 }

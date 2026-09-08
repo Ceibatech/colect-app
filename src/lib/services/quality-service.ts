@@ -42,10 +42,10 @@ const getScoredDossiers = cache(async (session: SessionPayload) => {
 export interface QualityOverview {
   totalDossiers: number;
   scoreGlobal: number;
-  totalIncomplets: number; // score < 100
+  totalConformes: number;
+  totalIncomplets: number;
   totalRejetes: number;
-  totalDoublonsCodeBarres: number;
-  totalDoublonsNumeroDirectionService: number;
+  totalReferencesDupliquees: number;
   totalAnomaliesOuvertes: number;
 }
 
@@ -54,20 +54,9 @@ export async function getQualityOverview(): Promise<QualityOverview> {
   const scope = await getSupervisorScope(session);
   const operateurWhere = scope ? { operateurId: scope.length ? { in: scope } : -1 } : {};
 
-  const [scored, totalRejetes, doublonsCodeBarres, doublonsNumeroDirectionService, totalAnomaliesOuvertes] = await Promise.all([
+  const [scored, totalRejetes, referencesDupliquees, totalAnomaliesOuvertes] = await Promise.all([
     getScoredDossiers(session),
     prisma.dossier.count({ where: { statutValidation: "REJETE", ...operateurWhere } }),
-    prisma.dossier.groupBy({
-      by: ["codeBarres"],
-      where: { codeBarres: { not: null }, ...operateurWhere },
-      _count: { _all: true },
-      having: { codeBarres: { _count: { gt: 1 } } },
-    }),
-    // "numeroDdu" est désormais une direction/service (liste fermée) —
-    // partagée légitimement par de nombreux dossiers, ce n'est plus un
-    // identifiant à détecter en doublon. Le doublon pertinent est
-    // "numeroDirectionService" (référence propre à ce dossier au sein de
-    // cette direction/service).
     prisma.dossier.groupBy({
       by: ["numeroDirectionService"],
       where: { numeroDirectionService: { not: null }, ...operateurWhere },
@@ -79,15 +68,16 @@ export async function getQualityOverview(): Promise<QualityOverview> {
 
   const totalValid = scored.reduce((sum, d) => sum + d.scoreResult.validFields, 0);
   const totalControlled = scored.reduce((sum, d) => sum + d.scoreResult.totalFields, 0);
+  const totalConformes = scored.filter((d) => d.scoreResult.score === 100).length;
   const totalIncomplets = scored.filter((d) => d.scoreResult.score < 100).length;
 
   return {
     totalDossiers: scored.length,
     scoreGlobal: totalControlled > 0 ? Math.round((totalValid / totalControlled) * 100) : 0,
+    totalConformes,
     totalIncomplets,
     totalRejetes,
-    totalDoublonsCodeBarres: doublonsCodeBarres.length,
-    totalDoublonsNumeroDirectionService: doublonsNumeroDirectionService.length,
+    totalReferencesDupliquees: referencesDupliquees.length,
     totalAnomaliesOuvertes,
   };
 }

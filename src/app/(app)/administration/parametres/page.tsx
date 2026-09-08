@@ -3,30 +3,32 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import { CheckCircle2, Database, Eye, KeyRound, LockKeyhole, ShieldCheck, SlidersHorizontal, type LucideIcon } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock3,
+  Database,
+  Eye,
+  KeyRound,
+  LockKeyhole,
+  ShieldCheck,
+  SlidersHorizontal,
+} from "lucide-react";
 
-export const metadata = { title: "Parametres - Administration" };
+export const metadata = { title: "Configuration applicative - GeoArchives-MULCV" };
 
-type ControlTone = "default" | "success" | "warning";
+interface SettingView {
+  id: number;
+  key: string;
+  value: string | null;
+  description: string | null;
+  isPublic: boolean;
+  updatedAt: Date;
+}
 
-const controlTones: Record<ControlTone, { icon: string; value: string; surface: string }> = {
-  default: {
-    icon: "bg-primary/10 text-primary ring-primary/20",
-    value: "text-primary",
-    surface: "border-primary/20 bg-primary/[0.035]",
-  },
-  success: {
-    icon: "bg-brand-green/10 text-brand-green ring-brand-green/20",
-    value: "text-brand-green",
-    surface: "border-brand-green/25 bg-brand-green/[0.04]",
-  },
-  warning: {
-    icon: "bg-brand-gold/15 text-brand-gold ring-brand-gold/25",
-    value: "text-brand-gold",
-    surface: "border-brand-gold/30 bg-brand-gold/[0.045]",
-  },
+const SETTING_LABELS: Record<string, string> = {
+  APP_NAME: "Nom de l'application",
 };
 
 export default async function AdminParametresPage() {
@@ -36,169 +38,213 @@ export default async function AdminParametresPage() {
   const configuredSettings = settings.filter((setting) => Boolean(setting.value?.trim())).length;
   const publicSettings = settings.filter((setting) => setting.isPublic).length;
   const privateSettings = settings.length - publicSettings;
+  const completionRate = settings.length > 0 ? Math.round((configuredSettings / settings.length) * 100) : 0;
   const lastUpdated = settings.reduce<Date | null>((latest, setting) => {
     if (!latest || setting.updatedAt > latest) return setting.updatedAt;
     return latest;
   }, null);
 
-  const controls: Array<{ label: string; value: number | string; description: string; icon: LucideIcon; tone: ControlTone }> = [
-    {
-      label: "Cl\u00e9s actives",
-      value: settings.length,
-      description: "Param\u00e8tres enregistr\u00e9s dans la base.",
-      icon: Database,
-      tone: "default",
-    },
-    {
-      label: "Configur\u00e9s",
-      value: configuredSettings,
-      description: "Valeurs pr\u00eates pour l'application.",
-      icon: CheckCircle2,
-      tone: "success",
-    },
-    {
-      label: "Publics",
-      value: publicSettings,
-      description: "Autoris\u00e9s c\u00f4t\u00e9 interface.",
-      icon: Eye,
-      tone: "default",
-    },
-    {
-      label: "Priv\u00e9s",
-      value: privateSettings,
-      description: "R\u00e9serv\u00e9s au serveur et \u00e0 l'administration.",
-      icon: LockKeyhole,
-      tone: privateSettings > 0 ? "warning" : "success",
-    },
-  ];
-
   return (
     <div className="space-y-5 lg:space-y-6">
       <PageHeader
-        eyebrow="Configuration"
+        eyebrow="Administration système"
         icon={SlidersHorizontal}
-        title="Param\u00e8tres"
-        description="Centre de contr\u00f4le des r\u00e9glages applicatifs, des cl\u00e9s publiques et des param\u00e8tres r\u00e9serv\u00e9s au serveur."
-        stats={[
-          { label: "Cl\u00e9s", value: settings.length },
-          { label: "Configur\u00e9s", value: configuredSettings, tone: "success" },
-          { label: "Priv\u00e9s", value: privateSettings, tone: privateSettings > 0 ? "warning" : "success" },
-          { label: "Derni\u00e8re mise \u00e0 jour", value: lastUpdated ? lastUpdated.toLocaleDateString("fr-FR") : "\u2014" },
-        ]}
+        title="Configuration applicative"
+        description="Consultez les paramètres qui gouvernent l'application et contrôlez leur niveau d'exposition."
+        actions={
+          <Badge variant={completionRate === 100 ? "outline" : "secondary"} className={completionRate === 100 ? "rounded-md border-brand-green/25 bg-brand-green/8 text-brand-green" : "rounded-md"}>
+            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+            {completionRate === 100 ? "Configuration complète" : `${configuredSettings}/${settings.length} configurés`}
+          </Badge>
+        }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {controls.map((control) => {
-          const Icon = control.icon;
-          const style = controlTones[control.tone];
-
-          return (
-            <Card key={control.label} className={cn("bg-card/95", style.surface)}>
-              <CardContent className="flex min-h-[126px] items-start justify-between gap-3 p-4">
-                <div className="min-w-0 space-y-2">
-                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{control.label}</p>
-                  <p className={cn("text-3xl font-semibold tracking-tight tabular-nums", style.value)}>{control.value}</p>
-                  <p className="text-xs leading-5 text-muted-foreground">{control.description}</p>
-                </div>
-                <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ring-1", style.icon)}>
-                  <Icon className="h-5 w-5" />
-                </span>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_21rem]">
         <Card className="min-w-0 bg-card/95">
           <CardHeader className="border-b border-border/60 pb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <CardTitle>Registre des param&egrave;tres</CardTitle>
-                <CardDescription>Inventaire centralis&eacute; des cl&eacute;s, valeurs et niveaux d&apos;exposition.</CardDescription>
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+                  <Database className="h-4.5 w-4.5" />
+                </span>
+                <div className="min-w-0">
+                  <CardTitle>Registre de configuration</CardTitle>
+                  <CardDescription>Référentiel des valeurs actives et de leur visibilité.</CardDescription>
+                </div>
               </div>
               <Badge variant="outline" className="w-fit rounded-md bg-background/70">
-                {settings.length} {settings.length > 1 ? "entr\u00e9es" : "entr\u00e9e"}
+                {settings.length} {settings.length === 1 ? "paramètre" : "paramètres"}
               </Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {settings.length === 0 ? (
-              <div className="flex min-h-[260px] flex-col items-center justify-center px-4 py-10 text-center">
-                <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+              <div className="flex min-h-72 flex-col items-center justify-center px-5 py-12 text-center">
+                <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
                   <KeyRound className="h-5 w-5" />
                 </span>
-                <h2 className="mt-4 text-base font-medium text-foreground">Aucun param&egrave;tre enregistr&eacute;</h2>
-                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-                  Le registre est pr&ecirc;t &agrave; recevoir les r&eacute;glages applicatifs d&egrave;s que la table settings sera aliment&eacute;e.
-                </p>
+                <h2 className="mt-4 text-base font-semibold">Aucun paramètre enregistré</h2>
+                <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">Le registre est actuellement vide.</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="min-w-[14rem] px-4 py-3">Cl&eacute;</TableHead>
-                    <TableHead className="min-w-[16rem] px-4 py-3">Valeur</TableHead>
-                    <TableHead className="min-w-[18rem] px-4 py-3">Description</TableHead>
-                    <TableHead className="px-4 py-3">Exposition</TableHead>
-                    <TableHead className="px-4 py-3 text-right">Mise &agrave; jour</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {settings.map((setting) => (
-                    <TableRow key={setting.id}>
-                      <TableCell className="px-4 py-3 font-medium text-foreground">{setting.key}</TableCell>
-                      <TableCell className="max-w-[28rem] whitespace-normal break-words px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {formatSettingValue(setting.value)}
-                      </TableCell>
-                      <TableCell className="max-w-[32rem] whitespace-normal break-words px-4 py-3 text-muted-foreground">
-                        {setting.description ?? "\u2014"}
-                      </TableCell>
-                      <TableCell className="px-4 py-3">
-                        <Badge variant={setting.isPublic ? "outline" : "secondary"} className="rounded-md bg-background/70">
-                          {setting.isPublic ? "Public" : "Priv\u00e9"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-right text-muted-foreground">{setting.updatedAt.toLocaleDateString("fr-FR")}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <>
+                <div className="hidden overflow-x-auto lg:block">
+                  <Table className="min-w-[920px]">
+                    <TableHeader>
+                      <TableRow className="bg-muted/45 hover:bg-muted/45">
+                        <TableHead className="min-w-56 pl-5">Paramètre</TableHead>
+                        <TableHead className="min-w-64">Valeur active</TableHead>
+                        <TableHead className="min-w-64">Description</TableHead>
+                        <TableHead>Visibilité</TableHead>
+                        <TableHead>État</TableHead>
+                        <TableHead className="pr-5 text-right">Mise à jour</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {settings.map((setting) => <SettingTableRow key={setting.id} setting={setting} />)}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="divide-y divide-border/60 lg:hidden">
+                  {settings.map((setting) => <SettingMobileRow key={setting.id} setting={setting} />)}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
-          <Card className="bg-card/95">
-            <CardHeader>
-              <div className="flex items-start gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
-                  <ShieldCheck className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <CardTitle>S&eacute;curit&eacute;</CardTitle>
-                  <CardDescription>Les param&egrave;tres priv&eacute;s restent confin&eacute;s aux rendus serveur.</CardDescription>
-                </div>
+        <Card className="h-fit bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-green/10 text-brand-green ring-1 ring-brand-green/20">
+                <ShieldCheck className="h-4.5 w-4.5" />
+              </span>
+              <div>
+                <CardTitle>Gouvernance</CardTitle>
+                <CardDescription>État et exposition du registre.</CardDescription>
               </div>
-            </CardHeader>
-          </Card>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5 pt-1">
+            <div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase text-muted-foreground">Configuration renseignée</p>
+                  <p className="mt-2 text-3xl font-semibold tabular-nums text-brand-green">{completionRate}%</p>
+                </div>
+                <span className="text-xs text-muted-foreground">{configuredSettings}/{settings.length}</span>
+              </div>
+              <Progress value={completionRate} className="mt-3 [&_[data-slot=progress-indicator]]:bg-brand-green" />
+            </div>
 
-          <Card className="bg-card/95">
-            <CardHeader>
-              <CardTitle>Optimisation</CardTitle>
-              <CardDescription>Le registre est lu en une seule requ&ecirc;te, tri&eacute; c&ocirc;t&eacute; base et pr&ecirc;t pour les futures actions d&apos;&eacute;dition.</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+            <div className="space-y-3 border-y border-border/60 py-4">
+              <ExposureRow icon={Eye} label="Visible dans l'interface" value={publicSettings} tone="primary" />
+              <ExposureRow icon={LockKeyhole} label="Réservé au serveur" value={privateSettings} tone="success" />
+            </div>
+
+            <div className="rounded-lg bg-muted/45 p-3.5">
+              <p className="flex items-center gap-2 text-sm font-semibold"><LockKeyhole className="h-4 w-4 text-brand-green" />Valeurs protégées</p>
+              <p className="mt-2 text-xs leading-5 text-muted-foreground">Les valeurs réservées au serveur sont masquées dans le registre.</p>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5"><Clock3 className="h-3.5 w-3.5" />Dernière mise à jour</span>
+              <span className="font-medium text-foreground">{lastUpdated ? lastUpdated.toLocaleDateString("fr-FR") : "Aucune"}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
 
-function formatSettingValue(value: string | null) {
-  const trimmed = value?.trim();
-  if (!trimmed) return "Non d\u00e9fini";
+function SettingTableRow({ setting }: { setting: SettingView }) {
+  const configured = Boolean(setting.value?.trim());
 
-  if (trimmed.length > 96) return `${trimmed.slice(0, 93)}...`;
+  return (
+    <TableRow className="hover:bg-accent/25">
+      <TableCell className="pl-5">
+        <p className="font-semibold">{settingLabel(setting.key)}</p>
+        <p className="mt-1 font-mono text-[11px] text-muted-foreground">{setting.key}</p>
+      </TableCell>
+      <TableCell className="max-w-80 whitespace-normal break-words text-sm">{formatSettingValue(setting.value, setting.isPublic)}</TableCell>
+      <TableCell className="max-w-80 whitespace-normal break-words text-sm leading-5 text-muted-foreground">{setting.description ?? "Description non renseignée"}</TableCell>
+      <TableCell><ExposureBadge isPublic={setting.isPublic} /></TableCell>
+      <TableCell><StatusBadge configured={configured} /></TableCell>
+      <TableCell className="pr-5 text-right text-muted-foreground">{setting.updatedAt.toLocaleDateString("fr-FR")}</TableCell>
+    </TableRow>
+  );
+}
+
+function SettingMobileRow({ setting }: { setting: SettingView }) {
+  const configured = Boolean(setting.value?.trim());
+
+  return (
+    <article className="space-y-4 p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold">{settingLabel(setting.key)}</p>
+          <p className="mt-1 font-mono text-[11px] text-muted-foreground">{setting.key}</p>
+        </div>
+        <StatusBadge configured={configured} />
+      </div>
+      <div>
+        <p className="text-xs font-medium uppercase text-muted-foreground">Valeur active</p>
+        <p className="mt-1 break-words text-sm">{formatSettingValue(setting.value, setting.isPublic)}</p>
+      </div>
+      <p className="text-sm leading-6 text-muted-foreground">{setting.description ?? "Description non renseignée"}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-3">
+        <ExposureBadge isPublic={setting.isPublic} />
+        <span className="text-xs text-muted-foreground">Mis à jour le {setting.updatedAt.toLocaleDateString("fr-FR")}</span>
+      </div>
+    </article>
+  );
+}
+
+function ExposureBadge({ isPublic }: { isPublic: boolean }) {
+  return (
+    <Badge variant="outline" className={isPublic ? "rounded-md border-primary/20 bg-primary/5 text-primary" : "rounded-md border-brand-green/20 bg-brand-green/5 text-brand-green"}>
+      {isPublic ? <Eye className="mr-1 h-3 w-3" /> : <LockKeyhole className="mr-1 h-3 w-3" />}
+      {isPublic ? "Interface" : "Serveur"}
+    </Badge>
+  );
+}
+
+function StatusBadge({ configured }: { configured: boolean }) {
+  return (
+    <Badge variant={configured ? "outline" : "secondary"} className={configured ? "rounded-md border-brand-green/20 bg-brand-green/5 text-brand-green" : "rounded-md"}>
+      {configured ? <CheckCircle2 className="mr-1 h-3 w-3" /> : null}
+      {configured ? "Configuré" : "À compléter"}
+    </Badge>
+  );
+}
+
+function ExposureRow({ icon: Icon, label, value, tone }: { icon: typeof Eye; label: string; value: number; tone: "primary" | "success" }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="inline-flex min-w-0 items-center gap-2 text-sm text-muted-foreground">
+        <Icon className={tone === "primary" ? "h-4 w-4 shrink-0 text-primary" : "h-4 w-4 shrink-0 text-brand-green"} />
+        <span className="truncate">{label}</span>
+      </span>
+      <span className="font-semibold tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+function settingLabel(key: string) {
+  if (SETTING_LABELS[key]) return SETTING_LABELS[key];
+  return key
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatSettingValue(value: string | null, isPublic: boolean) {
+  const trimmed = value?.trim();
+  if (!trimmed) return "Non renseignée";
+  if (!isPublic) return "Valeur protégée";
+  if (trimmed.length > 120) return `${trimmed.slice(0, 117)}...`;
   return trimmed;
 }
