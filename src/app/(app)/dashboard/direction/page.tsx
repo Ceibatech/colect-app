@@ -6,6 +6,7 @@ import { AnomaliesEvolutionChart } from "@/components/dashboard/AnomaliesEvoluti
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { computeRate } from "@/lib/utils/rate";
+import { computePipelineScore } from "@/lib/utils/pipeline-score";
 import { cn } from "@/lib/utils";
 import {
   Activity,
@@ -59,7 +60,14 @@ export default async function DashboardDirectionPage() {
 
   const [overview, anomaliesEvolution] = await Promise.all([getDirectionOverview(), getAnomaliesEvolution()]);
 
-  const globalProgress = clampPercent(overview.tauxGlobal);
+  const globalProgress = computePipelineScore({
+    total: overview.total,
+    submitted: overview.soumis,
+    validated: overview.valides,
+    digitized: overview.numerises,
+    indexed: overview.indexes,
+    archived: overview.archives,
+  });
   const rejectionRate = computeRate(overview.rejetes, overview.total);
   const lateRate = computeRate(overview.dossiersEnRetard, overview.total);
   const backlog = Math.max(overview.total - overview.archives, 0);
@@ -122,21 +130,26 @@ export default async function DashboardDirectionPage() {
             <div className="grid gap-3 sm:grid-cols-3">
               <CompactStat label="Total dossiers" value={overview.total} />
               <CompactStat label="Avancement" value={`${globalProgress}%`} tone="success" />
-              <CompactStat label="Reste \u00e0 archiver" value={backlog} tone={backlog > 0 ? "warning" : "success"} />
+              <CompactStat label={"Reste \u00e0 archiver"} value={backlog} tone={backlog > 0 ? "warning" : "success"} />
             </div>
           </div>
 
           <div className={cn("min-w-0 rounded-lg border p-4 shadow-sm", metricTones[healthTone].surface)}>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Sant&eacute; op&eacute;rationnelle</p>
-                <div className={cn("mt-2 text-4xl font-semibold tracking-tight tabular-nums", metricTones[healthTone].value)}>{globalProgress}%</div>
+                <p className="text-xs font-medium uppercase text-muted-foreground">Situation opérationnelle</p>
+                <div className={cn("mt-2 text-xl font-semibold leading-7", metricTones[healthTone].value)}>{healthLabel}</div>
+                <p className="mt-1 text-xs text-muted-foreground">Indice pipeline · moyenne des 5 jalons</p>
               </div>
               <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ring-1", metricTones[healthTone].icon)}>
                 <Activity className="h-5 w-5" />
               </span>
             </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+            <div className="mt-4 flex items-center justify-between gap-3 text-xs">
+              <span className="font-medium text-muted-foreground">Avancement consolidé</span>
+              <span className={cn("font-semibold tabular-nums", metricTones[healthTone].value)}>{globalProgress}%</span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
               <div className={cn("h-full rounded-full", metricTones[healthTone].bar)} style={{ width: `${globalProgress}%` }} />
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-xs">
@@ -150,10 +163,10 @@ export default async function DashboardDirectionPage() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <DirectionMetric icon={FolderKanban} label="Total dossiers" value={overview.total} hint="Base active du programme" />
-        <DirectionMetric icon={Gauge} label="Taux global" value={`${globalProgress}%`} hint={`${overview.archives} ${plural(overview.archives, "archiv\u00e9", "archiv\u00e9s")}`} tone="success" />
-        <DirectionMetric icon={ShieldX} label="Dossiers rejet\u00e9s" value={overview.rejetes} hint={`${rejectionRate}% du total`} tone={overview.rejetes > 0 ? "destructive" : "success"} />
-        <DirectionMetric icon={Clock} label="Dossiers en retard" value={overview.dossiersEnRetard} hint={`${lateRate}% sans mise \u00e0 jour +30 j`} tone={overview.dossiersEnRetard > 0 ? "destructive" : "success"} />
-        <DirectionMetric icon={ShieldAlert} label="Anomalies critiques" value={overview.anomaliesCritiques} hint="Ouvertes \u00e0 traiter" tone={overview.anomaliesCritiques > 0 ? "destructive" : "success"} />
+        <DirectionMetric icon={Gauge} label="Indice pipeline" value={`${globalProgress}%`} hint={`${overview.archives} ${plural(overview.archives, "archiv\u00e9", "archiv\u00e9s")}`} tone="success" />
+        <DirectionMetric icon={ShieldX} label={"Dossiers rejet\u00e9s"} value={overview.rejetes} hint={`${rejectionRate}% du total`} tone={overview.rejetes > 0 ? "destructive" : "success"} />
+        <DirectionMetric icon={Clock} label="Dossiers en retard" value={overview.dossiersEnRetard} hint={`${lateRate}% sans mise à jour +30 j`} tone={overview.dossiersEnRetard > 0 ? "destructive" : "success"} />
+        <DirectionMetric icon={ShieldAlert} label="Anomalies critiques" value={overview.anomaliesCritiques} hint={"Ouvertes \u00e0 traiter"} tone={overview.anomaliesCritiques > 0 ? "destructive" : "success"} />
       </div>
 
       <Card className="bg-card/95">
@@ -161,7 +174,7 @@ export default async function DashboardDirectionPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <CardTitle>Progression par &eacute;tape</CardTitle>
-              <CardDescription>Lecture rapide des cinq jalons cl&eacute;s du pipeline.</CardDescription>
+              <CardDescription>Chaque jalon contribue à parts égales à l&apos;indice consolidé.</CardDescription>
             </div>
             <Badge variant="outline" className="w-fit rounded-md bg-background/70">
               {overview.archives}/{overview.total} archiv&eacute;s

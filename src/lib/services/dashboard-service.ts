@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { computeRate as rate } from "@/lib/utils/rate";
+import { computePipelineScore, computeQualityScore } from "@/lib/utils/pipeline-score";
 import { getSupervisorScope } from "@/lib/services/access-scope";
 
 /**
@@ -340,8 +341,9 @@ export async function getRepartitionByStatut(): Promise<RepartitionRow[]> {
 
 export interface OperateurPerformanceRow {
   id: number;
-  operateur: string;
-  collectes: number;
+  nom: string;
+  matricule: string;
+  total: number;
   soumis: number;
   valides: number;
   rejetes: number;
@@ -349,10 +351,12 @@ export interface OperateurPerformanceRow {
   indexes: number;
   archives: number;
   anomalies: number;
-  performance: number; // % de dossiers archivés parmi les dossiers de l'opérateur
+  dossiersARisque: number;
+  avancement: number;
+  qualite: number;
 }
 
-/** Performance des opérateurs (§48 item 10 / §50) — via la vue Phase 2 + anomalies. */
+/** Pilotage des operateurs : progression du pipeline et qualite du portefeuille. */
 export async function getOperateurPerformance(): Promise<OperateurPerformanceRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
   const scope = await getSupervisorScope(session);
@@ -379,33 +383,68 @@ export async function getOperateurPerformance(): Promise<OperateurPerformanceRow
     WHERE a.statut = 'OUVERTE'
     GROUP BY d.operateur_id
   `;
-  const anomalyMap = new Map(anomalyCounts.map((a) => [a.operateur_id, Number(a.total)]));
+  const anomalyMap = new Map(anomalyCounts.map((row) => [row.operateur_id, Number(row.total)]));
 
-  // SUPERVISEUR (Phase 16+) : ne garder que ses opérateurs affectés — la
-  // requête ci-dessus reste globale (petit volume, LEFT JOIN déjà filtré
-  // par `total_dossiers > 0` côté vue), filtrage en mémoire plus simple
-  // qu'une requête dédiée.
-  const scoped = scope ? rows.filter((r) => scope.includes(r.operateur_id)) : rows;
+  const riskCounts = await prisma.$queryRaw<Array<{ operateur_id: number; total: bigint }>>`
+    SELECT risks.operateur_id, COUNT(DISTINCT risks.dossier_id) AS total
+    FROM (
+      SELECT d.operateur_id, d.id AS dossier_id
+      FROM dossiers d
+      WHERE d.statut_validation = 'REJETE'
+      UNION
+      SELECT d.operateur_id, d.id AS dossier_id
+      FROM anomalies a
+      JOIN dossiers d ON d.id = a.dossier_id
+      WHERE a.statut = 'OUVERTE'
+    ) AS risks
+    GROUP BY risks.operateur_id
+  `;
+  const riskMap = new Map(riskCounts.map((row) => [row.operateur_id, Number(row.total)]));
+
+  const scoped = scope ? rows.filter((row) => scope.includes(row.operateur_id)) : rows;
 
   return scoped
-    .map((r) => {
-      const total = Number(r.total_dossiers);
-      const archives = Number(r.total_archives);
+    .map((row) => {
+      const total = Number(row.total_dossiers);
+      const soumis = Number(row.total_soumis);
+      const valides = Number(row.total_valides);
+      const numerises = Number(row.total_numerises);
+      const indexes = Number(row.total_indexes);
+      const archives = Number(row.total_archives);
+      const dossiersARisque = riskMap.get(row.operateur_id) ?? 0;
+
       return {
-        id: r.operateur_id,
-        operateur: `${r.operateur_nom} (${r.operateur_matricule})`,
-        collectes: Number(r.total_soumis),
-        soumis: Number(r.total_soumis),
-        valides: Number(r.total_valides),
-        rejetes: Number(r.total_rejetes),
-        numerises: Number(r.total_numerises),
-        indexes: Number(r.total_indexes),
+        id: row.operateur_id,
+        nom: row.operateur_nom,
+        matricule: row.operateur_matricule,
+        total,
+        soumis,
+        valides,
+        rejetes: Number(row.total_rejetes),
+        numerises,
+        indexes,
         archives,
-        anomalies: anomalyMap.get(r.operateur_id) ?? 0,
-        performance: rate(archives, total),
+        anomalies: anomalyMap.get(row.operateur_id) ?? 0,
+        dossiersARisque,
+        avancement: computePipelineScore({
+          total,
+          submitted: soumis,
+          validated: valides,
+          digitized: numerises,
+          indexed: indexes,
+          archived: archives,
+        }),
+        qualite: computeQualityScore(total, dossiersARisque),
       };
     })
-    .sort((a, b) => b.performance - a.performance);
+    .sort(
+      (a, b) =>
+        b.avancement - a.avancement ||
+        b.qualite - a.qualite ||
+        b.archives - a.archives ||
+        b.total - a.total ||
+        a.nom.localeCompare(b.nom),
+    );
 }
 
 export interface AnomalyEvolutionPoint {
