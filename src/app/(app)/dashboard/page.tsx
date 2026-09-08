@@ -13,10 +13,9 @@ import { PipelineFunnelChart } from "@/components/dashboard/PipelineFunnelChart"
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   FolderKanban, FilePlus2, Send, ShieldQuestion, ShieldCheck, ShieldX,
-  ScanLine, Tags, Archive, Gauge, Activity, AlertTriangle,
+  ScanLine, Tags, Archive, Gauge, Activity, AlertTriangle, Boxes, Files,
 } from "lucide-react";
 
 export const metadata = { title: "Tableau de bord — GeoArchives-MULCV" };
@@ -134,70 +133,105 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition par nature de dossier</CardTitle>
-            <CardDescription>Lecture des typologies les plus représentées.</CardDescription>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card className="min-w-0 bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Répartition par nature de dossier</CardTitle>
+                <CardDescription>Classement des typologies les plus représentées.</CardDescription>
+              </div>
+              <Badge variant="outline" className="w-fit rounded-md bg-background/70">
+                Top catégories
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent>
-            <RepartitionBarChart data={byNature} colorByCategory />
+          <CardContent className="pt-4">
+            <RepartitionBarChart data={byNature} colorByCategory leftAxisWidth={168} barSize={14} />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition par statut de validation</CardTitle>
-            <CardDescription>Contrôle rapide des dossiers en anomalie ou validés.</CardDescription>
+        <Card className="min-w-0 bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Répartition par statut de validation</CardTitle>
+                <CardDescription>Lecture immédiate des volumes à contrôler ou validés.</CardDescription>
+              </div>
+              <Badge variant={kpis.rejetes > 0 ? "destructive" : "outline"} className="w-fit rounded-md bg-background/70">
+                {kpis.rejetes > 0 ? "Rejets à traiter" : "Flux maîtrisé"}
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent>
-            <RepartitionBarChart data={byStatut} colorByCategory />
+          <CardContent className="pt-4">
+            <RepartitionBarChart data={byStatut} colorByCategory leftAxisWidth={132} barSize={14} />
           </CardContent>
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>État de conservation des cartons et dossiers</CardTitle>
-          <CardDescription>
-            Renseigné à la collecte — un carton/dossier « Dégradé » porte une description de son état.
-          </CardDescription>
+      <Card className="min-w-0 bg-card/95">
+        <CardHeader className="border-b border-border/60 pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <CardTitle>État de conservation</CardTitle>
+              <CardDescription>Lecture consolidée des cartons et dossiers déclarés à la collecte.</CardDescription>
+            </div>
+            <Badge variant={degradedTotal > 0 ? "destructive" : "outline"} className="w-fit rounded-md bg-background/70">
+              {degradedTotal > 0 ? "Éléments dégradés détectés" : "Aucune dégradation"}
+            </Badge>
+          </div>
         </CardHeader>
-        <CardContent>
-          <div className="overflow-hidden rounded-lg border border-border/70 bg-background/70">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/60 hover:bg-muted/60">
-                  <TableHead>Nbre de cartons</TableHead>
-                  <TableHead>Nbre de dossiers</TableHead>
-                  <TableHead>Nbre de cartons dégradés</TableHead>
-                  <TableHead>Nbre de dossiers dégradés</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow className="hover:bg-transparent">
-                  <TableCell className="text-base font-semibold tabular-nums">{etatOverview.nombreCartons}</TableCell>
-                  <TableCell className="text-base font-semibold tabular-nums">{etatOverview.nombreDossiers}</TableCell>
-                  <TableCell className="text-base font-semibold tabular-nums">
-                    {etatOverview.nombreCartonsDegrades > 0 ? (
-                      <span className="text-destructive">{etatOverview.nombreCartonsDegrades}</span>
-                    ) : (
-                      etatOverview.nombreCartonsDegrades
-                    )}
-                  </TableCell>
-                  <TableCell className="text-base font-semibold tabular-nums">
-                    {etatOverview.nombreDossiersDegrades > 0 ? (
-                      <span className="text-destructive">{etatOverview.nombreDossiersDegrades}</span>
-                    ) : (
-                      etatOverview.nombreDossiersDegrades
-                    )}
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+        <CardContent className="pt-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <ConservationMetric icon={Boxes} label="Cartons inventoriés" value={etatOverview.nombreCartons} />
+            <ConservationMetric icon={Files} label="Dossiers inventoriés" value={etatOverview.nombreDossiers} />
+            <ConservationMetric
+              icon={AlertTriangle}
+              label="Cartons dégradés"
+              value={etatOverview.nombreCartonsDegrades}
+              alert={etatOverview.nombreCartonsDegrades > 0}
+            />
+            <ConservationMetric
+              icon={AlertTriangle}
+              label="Dossiers dégradés"
+              value={etatOverview.nombreDossiersDegrades}
+              alert={etatOverview.nombreDossiersDegrades > 0}
+            />
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+function ConservationMetric({
+  icon: Icon,
+  label,
+  value,
+  alert = false,
+}: {
+  icon: typeof Boxes;
+  label: string;
+  value: number;
+  alert?: boolean;
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-background/60 p-4">
+      <span
+        className={
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ring-1 " +
+          (alert
+            ? "bg-destructive/10 text-destructive ring-destructive/20"
+            : "bg-primary/10 text-primary ring-primary/20")
+        }
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+      <div className="min-w-0">
+        <p className={"text-2xl font-semibold leading-none tabular-nums " + (alert ? "text-destructive" : "text-foreground")}>
+          {value}
+        </p>
+        <p className="mt-1.5 text-xs font-medium leading-4 text-muted-foreground">{label}</p>
+      </div>
     </div>
   );
 }

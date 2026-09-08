@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,11 @@ const toneStyles = {
     bar: "bg-brand-green",
     icon: "bg-brand-green/10 text-brand-green ring-brand-green/20",
     value: "text-brand-green",
+  },
+  warning: {
+    bar: "bg-brand-gold",
+    icon: "bg-brand-gold/15 text-brand-gold ring-brand-gold/25",
+    value: "text-brand-gold",
   },
   destructive: {
     bar: "bg-destructive",
@@ -29,21 +35,21 @@ export function KpiCard({
 }: {
   icon: LucideIcon;
   label: string;
-  value: React.ReactNode;
+  value: ReactNode;
   hint?: string;
-  tone?: "default" | "destructive" | "success";
+  tone?: keyof typeof toneStyles;
 }) {
   const style = toneStyles[tone];
 
   return (
-    <Card className="relative min-h-[118px] bg-card/95 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(16,24,40,0.10)]">
+    <Card className="relative min-h-[118px] min-w-0 bg-card/95 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_42px_rgba(16,24,40,0.10)]">
       <div className={cn("absolute inset-x-0 top-0 h-1", style.bar)} aria-hidden="true" />
       <CardContent className="flex h-full items-start justify-between gap-3 p-4">
         <div className="min-w-0 space-y-3">
           <div className={cn("text-3xl font-semibold leading-none tracking-tight tabular-nums", style.value)}>{value}</div>
           <div className="space-y-1">
-            <div className="truncate text-sm font-medium text-foreground">{label}</div>
-            {hint && <div className="text-xs font-medium text-muted-foreground">{hint}</div>}
+            <div className="text-sm font-medium leading-5 text-foreground">{label}</div>
+            {hint && <div className="text-xs leading-5 text-muted-foreground">{hint}</div>}
           </div>
         </div>
         <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ring-1", style.icon)}>

@@ -16,7 +16,7 @@ export default async function AppShellLayout({ children }: { children: React.Rea
       <AppSidebar permissions={session.permissions} />
       <SidebarInset className="bg-transparent">
         <Header name={session.name} email={session.email} roleCode={session.roleCode} />
-        <main className="min-h-[calc(100svh-3.5rem)] flex-1 px-3 py-4 sm:px-5 lg:px-6 lg:py-6">
+        <main className="min-h-[calc(100svh-3.5rem)] flex-1 px-3 py-4 pb-24 sm:px-5 sm:pb-6 lg:px-6 lg:py-6">
           <div className="mx-auto w-full max-w-[1600px]">{children}</div>
         </main>
       </SidebarInset>
