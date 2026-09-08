@@ -26,6 +26,7 @@ export default async function CollecteNouveauPage() {
       typesPiece={typesPiece}
       operateurs={operateurs}
       isOperateurRole={isOperateurRole}
+      currentUserId={session.userId}
       currentUserName={session.name}
     />
   );

@@ -535,7 +535,7 @@ model Dossier {
 
   // --- IDENTIFICATION (fiche CG1020) ---
   libelleCarton       String? @map("libelle_carton")
-  codeBarres          String? @unique @map("code_barres")
+  codeBarres          String? @map("code_barres")
   numeroGuichet       String? @map("numero_guichet")
   // Anciennement "N° DDU" — repurposé en "Direction/Service concerné(e)"
   // (liste fermée + "Autres" en saisie libre, cf. src/lib/validation/dossier.ts
@@ -623,6 +623,7 @@ model Dossier {
 
   @@index([siteId])
   @@index([entrepotId])
+  @@index([codeBarres])
   @@index([numeroDdu])
   @@index([numeroDirectionService])
   @@index([numeroGuichet])

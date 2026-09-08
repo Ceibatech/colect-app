@@ -1,14 +1,35 @@
-import { redirect } from "next/navigation";
 import Image from "next/image";
-import { Archive, FileSearch, ShieldCheck } from "lucide-react";
+import { redirect } from "next/navigation";
+import { Archive, CheckCircle2, FileSearch, LockKeyhole, ShieldCheck } from "lucide-react";
+
 import { getSession } from "@/lib/auth/current-user";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = {
-  title: "Connexion — GeoArchives-MULCV",
+  title: "Connexion - GeoArchives-MULCV",
 };
+
+const capabilities = [
+  {
+    icon: Archive,
+    title: "Chaîne d'archivage maîtrisée",
+    description: "Un suivi continu, de la collecte au classement final.",
+    tone: "text-[#79a8ff]",
+  },
+  {
+    icon: FileSearch,
+    title: "Dossiers immédiatement retrouvables",
+    description: "Des référentiels structurés et une recherche unifiée.",
+    tone: "text-[#4fd1b5]",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Contrôle et traçabilité intégrés",
+    description: "Des rôles précis, un audit complet et des validations suivies.",
+    tone: "text-[#efc86f]",
+  },
+] as const;
 
 export default async function LoginPage() {
   const session = await getSession();
@@ -17,70 +38,95 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="grid w-full max-w-6xl items-center gap-6 lg:grid-cols-[1.08fr_0.92fr]">
-      <section className="relative overflow-hidden rounded-lg border border-border/70 bg-card/90 p-6 shadow-[0_24px_80px_rgba(16,24,40,0.10)] sm:p-8 lg:min-h-[620px]">
-        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-brand-green to-brand-gold" />
-        <div className="flex h-full flex-col justify-between gap-12">
-          <div className="space-y-8">
+    <main className="grid w-full max-w-6xl overflow-hidden rounded-lg border border-border/70 bg-card shadow-[0_28px_90px_rgba(16,24,40,0.16)] lg:grid-cols-[1.08fr_0.92fr]">
+      <section className="relative flex flex-col justify-between gap-10 bg-[#142943] p-6 text-white sm:p-8 lg:min-h-[660px] lg:p-10">
+        <div className="absolute inset-y-0 right-0 hidden w-1 bg-brand-green lg:block" aria-hidden="true" />
+
+        <div className="space-y-10">
+          <div className="flex items-center justify-between gap-4">
             <Image
               src="/brand/ceiba-analytics-logo.png"
               alt="CEIBA Analytics"
               width={960}
               height={531}
-              className="h-16 w-auto rounded-md bg-white px-3 py-2 shadow-sm"
+              className="h-14 w-auto rounded-md bg-white px-3 py-2 shadow-sm"
               priority
             />
+            <Badge className="rounded-md border border-white/15 bg-white/10 text-white shadow-none">
+              Portail sécurisé
+            </Badge>
+          </div>
 
-            <div className="max-w-2xl space-y-4">
-              <Badge variant="secondary" className="rounded-md border border-border/60 bg-muted/70 uppercase tracking-[0.18em]">
-                MULCV &amp; CEIBA
-              </Badge>
-              <div className="space-y-3">
-                <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
-                  GeoArchives-MULCV
-                </h1>
-                <p className="max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-                  Préserver aujourd&apos;hui, valoriser demain : une plateforme claire pour suivre la collecte,
-                  la numérisation, l&apos;indexation et l&apos;archivage des dossiers fonciers.
-                </p>
+          <div className="max-w-xl space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4fd1b5]">MULCV &amp; CEIBA Analytics</p>
+            <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
+              GeoArchives-MULCV
+            </h1>
+            <p className="max-w-lg text-sm leading-6 text-white/70 sm:text-base sm:leading-7">
+              Le poste de travail unifié pour inventorier, contrôler, numériser et archiver les dossiers fonciers.
+            </p>
+          </div>
+
+          <div className="hidden divide-y divide-white/10 border-y border-white/10 lg:block">
+            {capabilities.map(({ icon: Icon, title, description, tone }) => (
+              <div key={title} className="grid grid-cols-[2.75rem_minmax(0,1fr)] gap-3 py-5">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/[0.07] ring-1 ring-white/10">
+                  <Icon className={"h-4 w-4 " + tone} />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-white">{title}</p>
+                  <p className="mt-1 text-xs leading-5 text-white/60">{description}</p>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
+        </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg border border-border/70 bg-background/70 p-4">
-              <Archive className="mb-3 h-5 w-5 text-primary" />
-              <div className="text-sm font-semibold">Archivage maîtrisé</div>
-              <div className="mt-1 text-xs leading-5 text-muted-foreground">Pipeline complet et traçable.</div>
-            </div>
-            <div className="rounded-lg border border-border/70 bg-background/70 p-4">
-              <FileSearch className="mb-3 h-5 w-5 text-brand-green" />
-              <div className="text-sm font-semibold">Dossiers retrouvables</div>
-              <div className="mt-1 text-xs leading-5 text-muted-foreground">Recherche et référentiels unifiés.</div>
-            </div>
-            <div className="rounded-lg border border-border/70 bg-background/70 p-4">
-              <ShieldCheck className="mb-3 h-5 w-5 text-brand-gold" />
-              <div className="text-sm font-semibold">Accès contrôlé</div>
-              <div className="mt-1 text-xs leading-5 text-muted-foreground">Rôles, audit et qualité intégrés.</div>
-            </div>
-          </div>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-white/60">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#4fd1b5]" />
+            Accès par rôle
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#4fd1b5]" />
+            Journal d&apos;audit
+          </span>
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-[#4fd1b5]" />
+            Données protégées
+          </span>
         </div>
       </section>
 
-      <section className="flex justify-center lg:justify-end">
-        <Card className="w-full max-w-md border-border/80 bg-card/95 shadow-[0_24px_80px_rgba(16,24,40,0.14)]">
-          <CardHeader className="space-y-2 pb-2 text-center">
-            <CardTitle className="text-2xl font-semibold tracking-tight">Connexion</CardTitle>
-            <CardDescription>Accédez à votre espace de travail sécurisé.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <LoginForm />
-            <p className="text-center text-xs leading-5 text-muted-foreground">
-              GeoArchives-MULCV — Inventaire · Numérisation · Indexation · Archivage
+      <section className="flex items-center bg-card p-6 sm:p-10 lg:p-12">
+        <div className="mx-auto w-full max-w-md">
+          <div className="mb-8 flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+              <LockKeyhole className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Espace professionnel</p>
+              <p className="mt-0.5 text-sm font-medium text-foreground">Session personnelle et sécurisée</p>
+            </div>
+          </div>
+
+          <div className="mb-8 space-y-2">
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground">Connexion</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              Identifiez-vous pour accéder à votre espace de travail.
             </p>
-          </CardContent>
-        </Card>
+          </div>
+
+          <LoginForm />
+
+          <div className="mt-8 border-t border-border/70 pt-5">
+            <p className="flex items-center justify-center gap-2 text-center text-xs leading-5 text-muted-foreground">
+              <ShieldCheck className="h-3.5 w-3.5 text-brand-green" />
+              GeoArchives-MULCV protège chaque opération par contrôle d&apos;accès.
+            </p>
+          </div>
+        </div>
       </section>
-    </div>
+    </main>
   );
 }

@@ -45,6 +45,8 @@ export default async function CollectePage({
         numeroDdu: dossier.numeroDdu ?? undefined,
         numeroDirectionService: dossier.numeroDirectionService ?? undefined,
         referenceClassement: dossier.referenceClassement ?? undefined,
+        etatCarton: dossier.etatCarton ?? undefined,
+        etatCartonDescription: dossier.etatCartonDescription ?? undefined,
         numeroIlot: dossier.numeroIlot ?? undefined,
         numeroLot: dossier.numeroLot ?? undefined,
         superficie: dossier.superficie ? Number(dossier.superficie) : undefined,
@@ -55,6 +57,8 @@ export default async function CollectePage({
         nombrePieces: dossier.nombrePieces ?? undefined,
         typesPieces: dossier.typesPieces.map((t) => String(t.id)),
         autresPieces: dossier.autresPieces ?? undefined,
+        etatDossier: dossier.etatDossier ?? undefined,
+        etatDossierDescription: dossier.etatDossierDescription ?? undefined,
         nom: dossier.nom ?? undefined,
         prenoms: dossier.prenoms ?? undefined,
         adresse: dossier.adresse ?? undefined,
@@ -75,6 +79,7 @@ export default async function CollectePage({
           typesPiece={typesPiece}
           operateurs={operateurs}
           isOperateurRole={isOperateurRole}
+          currentUserId={session.userId}
           currentUserName={session.name}
         />
       );
@@ -141,6 +146,7 @@ export default async function CollectePage({
       typesPiece={typesPiece}
       operateurs={operateurs}
       isOperateurRole={isOperateurRole}
+      currentUserId={session.userId}
       currentUserName={session.name}
     />
   );

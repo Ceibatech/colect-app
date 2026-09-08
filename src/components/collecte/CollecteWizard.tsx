@@ -1,14 +1,20 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useEffect, useState, useTransition } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, CheckCircle2, FilePlus2, Loader2, Save, Send, XCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Box, CheckCircle2, CopyPlus, Loader2, PackagePlus, Save, Send, XCircle } from "lucide-react";
 
 import { dossierFormSchema, dossierSubmitSchema, DOSSIER_STEPS, type DossierFormValues } from "@/lib/validation/dossier";
 import { saveDraft, submitDossier } from "@/lib/services/dossier-service";
+import {
+  extractActiveCartonValues,
+  getActiveCartonLabel,
+  hasActiveCartonIdentity,
+  type ActiveCartonValues,
+} from "@/lib/utils/carton-prefill";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -61,6 +67,7 @@ export interface CollecteWizardProps {
   typesPiece: TypePieceOption[];
   operateurs: Operateur[];
   isOperateurRole: boolean;
+  currentUserId: number;
   currentUserName: string;
 }
 
@@ -75,13 +82,15 @@ export function CollecteWizard({
   typesPiece,
   operateurs,
   isOperateurRole,
+  currentUserId,
   currentUserName,
 }: CollecteWizardProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [draftId, setDraftId] = useState<number | undefined>(initialDraftId);
   const [isPending, startTransition] = useTransition();
-  const [done, setDone] = useState<{ reference: string } | null>(null);
+  const [done, setDone] = useState<{ reference: string; carton: ActiveCartonValues } | null>(null);
+  const [isContinuingCarton, setIsContinuingCarton] = useState(false);
 
   const form = useForm<DossierFormValues>({
     resolver: zodResolver(dossierFormSchema),
@@ -92,6 +101,40 @@ export function CollecteWizard({
   const activeStep = DOSSIER_STEPS[currentStep - 1];
   const stepFields = activeStep.fields;
   const percent = Math.round((currentStep / DOSSIER_STEPS.length) * 100);
+  const activeCartonStorageKey = "geoarchives:active-carton:" + currentUserId;
+  const [cartonLabelValue, cartonBarcodeValue] = useWatch({
+    control: form.control,
+    name: ["libelleCarton", "codeBarres"],
+  });
+  const cartonLabel = cartonLabelValue?.trim();
+  const cartonBarcode = cartonBarcodeValue?.trim();
+  const canRestoreActiveCarton = !initialDraftId && !initialValues;
+
+  useEffect(() => {
+    if (!canRestoreActiveCarton) return;
+
+    try {
+      const stored = window.sessionStorage.getItem(activeCartonStorageKey);
+      if (!stored) return;
+      const carton = JSON.parse(stored) as ActiveCartonValues;
+      if (!hasActiveCartonIdentity(carton)) {
+        window.sessionStorage.removeItem(activeCartonStorageKey);
+        return;
+      }
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        form.reset({ ...EMPTY_VALUES, ...carton });
+        setIsContinuingCarton(true);
+        setCurrentStep(3);
+      });
+      return () => {
+        cancelled = true;
+      };
+    } catch {
+      window.sessionStorage.removeItem(activeCartonStorageKey);
+    }
+  }, [activeCartonStorageKey, canRestoreActiveCarton, form]);
 
   async function goNext() {
     if (stepFields.length > 0) {
@@ -106,24 +149,65 @@ export function CollecteWizard({
     setCurrentStep((s) => Math.max(s - 1, 1));
   }
 
-  function handleSaveDraft(andNew: boolean) {
+  function persistActiveCarton(carton: ActiveCartonValues) {
+    window.sessionStorage.setItem(activeCartonStorageKey, JSON.stringify(carton));
+  }
+
+  function clearActiveCarton() {
+    window.sessionStorage.removeItem(activeCartonStorageKey);
+  }
+
+  function startNextDossier(mode: "same-carton" | "new-carton", carton: ActiveCartonValues) {
+    setDraftId(undefined);
+    setDone(null);
+
+    if (mode === "same-carton") {
+      persistActiveCarton(carton);
+      let cancelled = false;
+      queueMicrotask(() => {
+        if (cancelled) return;
+        form.reset({ ...EMPTY_VALUES, ...carton });
+        setIsContinuingCarton(true);
+        setCurrentStep(3);
+      });
+      return () => {
+        cancelled = true;
+      };
+      toast.success(getActiveCartonLabel(carton) + " reste actif. Les informations du nouveau dossier sont vides.");
+      return;
+    }
+
+    clearActiveCarton();
+    form.reset(EMPTY_VALUES);
+    setIsContinuingCarton(false);
+    setCurrentStep(1);
+    toast.success("Nouveau carton prêt à être renseigné.");
+  }
+
+  function handleSaveDraft(mode: "stay" | "same-carton" | "new-carton") {
+    const values = form.getValues();
+    const carton = extractActiveCartonValues(values);
+
+    if (mode === "same-carton" && !hasActiveCartonIdentity(carton)) {
+      toast.error("Renseignez le libellé ou le code-barres du carton avant de le continuer.");
+      setCurrentStep(2);
+      return;
+    }
+
     startTransition(async () => {
       try {
-        const values = form.getValues();
         const result = await saveDraft(values, draftId);
-        setDraftId(result.id);
-        toast.success(`Brouillon enregistré — ${result.reference}`);
-        if (andNew) {
-          form.reset(EMPTY_VALUES);
-          setDraftId(undefined);
-          setCurrentStep(1);
+        if (mode === "stay") {
+          setDraftId(result.id);
+          toast.success("Brouillon enregistré - " + result.reference);
+        } else {
+          startNextDossier(mode, carton);
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de l'enregistrement du brouillon.");
       }
     });
   }
-
   function handleSubmitFinal() {
     const values = form.getValues();
     const parsed = dossierSubmitSchema.safeParse(values);
@@ -147,7 +231,7 @@ export function CollecteWizard({
     startTransition(async () => {
       try {
         const result = await submitDossier(values, draftId);
-        setDone({ reference: result.reference });
+        setDone({ reference: result.reference, carton: extractActiveCartonValues(values) });
         toast.success(`Dossier ${result.reference} soumis avec succès.`);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de la soumission du dossier.");
@@ -155,11 +239,9 @@ export function CollecteWizard({
     });
   }
 
-  function handleStartNew() {
-    form.reset(EMPTY_VALUES);
-    setDraftId(undefined);
-    setDone(null);
-    setCurrentStep(1);
+  function handleStartNew(mode: "same-carton" | "new-carton") {
+    if (!done) return;
+    startNextDossier(mode, done.carton);
   }
 
   if (done) {
@@ -180,9 +262,15 @@ export function CollecteWizard({
             <Button variant="outline" onClick={() => router.push("/dashboard")}>
               Retour au tableau de bord
             </Button>
-            <Button onClick={handleStartNew}>
-              <FilePlus2 className="mr-1 h-4 w-4" />
-              Nouveau dossier
+            {hasActiveCartonIdentity(done.carton) ? (
+              <Button onClick={() => handleStartNew("same-carton")}>
+                <CopyPlus className="mr-1 h-4 w-4" />
+                Ajouter au même carton
+              </Button>
+            ) : null}
+            <Button variant="outline" onClick={() => handleStartNew("new-carton")}>
+              <PackagePlus className="mr-1 h-4 w-4" />
+              Nouveau carton
             </Button>
           </div>
         </CardContent>
@@ -192,7 +280,8 @@ export function CollecteWizard({
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/95 p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+      <div className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-border/70 bg-card/95 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_16px_44px_rgba(16,24,40,0.06)] sm:flex-row sm:items-end sm:justify-between">
+        <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-brand-green to-brand-gold" aria-hidden="true" />
         <div className="space-y-3">
           <Badge variant="secondary" className="w-fit rounded-md border border-border/60 bg-muted/70 uppercase tracking-[0.16em]">
             Collecte CG1020
@@ -210,9 +299,28 @@ export function CollecteWizard({
         </div>
       </div>
 
+      {isContinuingCarton ? (
+        <div className="flex flex-col gap-3 rounded-lg border border-brand-green/25 bg-brand-green/[0.055] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-green/10 text-brand-green ring-1 ring-brand-green/20">
+              <Box className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-[0.14em] text-brand-green">Carton actif repris automatiquement</p>
+              <p className="mt-1 truncate text-sm font-semibold text-foreground">
+                {[cartonLabel || "Carton sans libellé", cartonBarcode].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+          </div>
+          <Button type="button" size="sm" variant="outline" className="w-full bg-background/70 sm:w-auto" onClick={() => setCurrentStep(2)}>
+            Vérifier le carton
+          </Button>
+        </div>
+      ) : null}
+
       <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="rounded-lg border border-border/70 bg-card/95 p-4 shadow-sm xl:sticky xl:top-20 xl:self-start">
-          <StepIndicator currentStep={currentStep} />
+          <StepIndicator currentStep={currentStep} onStepChange={setCurrentStep} />
         </aside>
 
         <Card className="min-w-0">
@@ -233,7 +341,13 @@ export function CollecteWizard({
             <form onSubmit={(e) => e.preventDefault()}>
               {currentStep === 1 && <StepSite form={form} sites={sites} />}
               {currentStep === 2 && (
-                <StepIdentification form={form} operateurs={operateurs} isOperateurRole={isOperateurRole} currentUserName={currentUserName} />
+                <StepIdentification
+                  form={form}
+                  operateurs={operateurs}
+                  isOperateurRole={isOperateurRole}
+                  currentUserName={currentUserName}
+                  isCartonCarryOver={isContinuingCarton}
+                />
               )}
               {currentStep === 3 && <StepFoncier form={form} communes={communes} />}
               {currentStep === 4 && <StepDossier form={form} natures={natures} typesPiece={typesPiece} />}
@@ -275,13 +389,17 @@ export function CollecteWizard({
               </AlertDialog>
 
               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <Button type="button" variant="outline" disabled={isPending} onClick={() => handleSaveDraft(false)}>
+                <Button type="button" variant="outline" disabled={isPending} onClick={() => handleSaveDraft("stay")}>
                   {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
                   Enregistrer brouillon
                 </Button>
-                <Button type="button" variant="outline" disabled={isPending} onClick={() => handleSaveDraft(true)}>
-                  <FilePlus2 className="mr-1 h-4 w-4" />
-                  Enregistrer et nouveau
+                <Button type="button" variant="outline" disabled={isPending} onClick={() => handleSaveDraft("same-carton")}>
+                  <CopyPlus className="mr-1 h-4 w-4" />
+                  <span className="hidden sm:inline">Enregistrer + </span>même carton
+                </Button>
+                <Button type="button" variant="ghost" disabled={isPending} onClick={() => handleSaveDraft("new-carton")}>
+                  <PackagePlus className="mr-1 h-4 w-4" />
+                  <span className="hidden sm:inline">Enregistrer + </span>nouveau carton
                 </Button>
                 {currentStep > 1 && (
                   <Button type="button" variant="outline" disabled={isPending} onClick={goPrev}>

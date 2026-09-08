@@ -490,23 +490,34 @@ export interface CartonsDossiersEtatOverview {
 }
 
 /**
- * Indicateurs état de conservation des cartons/dossiers (Phase 15+),
- * renseignés à la collecte (`etatCarton`/`etatDossier`, cf. schema.prisma).
- * `codeBarres` est unique par dossier — dans ce modèle un code-barres
- * identifie un carton unique, donc "nombre de cartons" = nombre de dossiers
- * avec un code-barres renseigné (pas besoin d'un groupBy distinct).
+ * Indicateurs état de conservation des cartons/dossiers (Phase 15+).
+ * Plusieurs dossiers peuvent partager un carton : les cartons sont donc
+ * comptés par code-barres distinct, jamais par nombre de lignes dossier.
  */
 export async function getCartonsDossiersEtatOverview(): Promise<CartonsDossiersEtatOverview> {
   const session = await requirePermission("DASHBOARD_VIEW");
   const scope = await getSupervisorScope(session);
   const base = scope ? scopeWhere(scope) : {};
 
-  const [nombreCartons, nombreDossiers, nombreCartonsDegrades, nombreDossiersDegrades] = await Promise.all([
-    prisma.dossier.count({ where: { ...base, codeBarres: { not: null } } }),
+  const [cartons, nombreDossiers, cartonsDegrades, nombreDossiersDegrades] = await Promise.all([
+    prisma.dossier.findMany({
+      where: { ...base, codeBarres: { not: null } },
+      distinct: ["codeBarres"],
+      select: { codeBarres: true },
+    }),
     prisma.dossier.count({ where: base }),
-    prisma.dossier.count({ where: { ...base, codeBarres: { not: null }, etatCarton: "DEGRADE" } }),
+    prisma.dossier.findMany({
+      where: { ...base, codeBarres: { not: null }, etatCarton: "DEGRADE" },
+      distinct: ["codeBarres"],
+      select: { codeBarres: true },
+    }),
     prisma.dossier.count({ where: { ...base, etatDossier: "DEGRADE" } }),
   ]);
 
-  return { nombreCartons, nombreDossiers, nombreCartonsDegrades, nombreDossiersDegrades };
+  return {
+    nombreCartons: cartons.length,
+    nombreDossiers,
+    nombreCartonsDegrades: cartonsDegrades.length,
+    nombreDossiersDegrades,
+  };
 }
