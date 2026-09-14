@@ -94,7 +94,7 @@ Aiven fournit une base `defaultdb`. On lui préfère une base portant le nom mé
 CREATE DATABASE col_invent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Puis appliquer le schéma (§5) — `prisma migrate deploy` recrée les 29 tables **et les
+Puis appliquer le schéma (§5) — `prisma migrate deploy` recrée les 30 tables **et les
 9 vues de reporting**, celles-ci étant définies dans les migrations
 (`20260813103408_reporting_views`, `20260813150947_evolution_validation_view`).
 
@@ -161,7 +161,11 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 | `AUTH_SECRET` | valeur générée avec `openssl rand -base64 32` — **différente** de celle utilisée en dev, jamais commitée |
 | `NODE_ENV` | `production` |
 | `DOCUMENTS_STORAGE_PATH` | point de montage du disque persistant Render (§4) |
+| `RESEND_API_KEY` | clé serveur Resend active, jamais commitée ni préfixée par `NEXT_PUBLIC_` |
+| `EMAIL_FROM` | `GeoArchives-MULCV <no-reply@ceiba-analytics.com>` après vérification du domaine dans Resend |
+| `APP_URL` | `https://geoarchives.ceiba-analytics.com` — origine utilisée dans les liens de réinitialisation |
 
+**E-mails transactionnels** : vérifier `ceiba-analytics.com` (SPF + DKIM) dans Resend avant d'utiliser l'adresse `no-reply@ceiba-analytics.com`. La clé saisie dans Render doit être une clé serveur renouvelée ; ne jamais reprendre une clé publiée dans un ticket, une conversation ou l'historique Git.
 `AUTH_SECRET` en production conditionne aussi le cookie de session `secure: true`
 (`src/lib/auth/session.ts` / `auth-service.ts`, cf. [SECURITY.md](SECURITY.md)) — un
 `NODE_ENV` mal positionné dégraderait silencieusement la sécurité des cookies.

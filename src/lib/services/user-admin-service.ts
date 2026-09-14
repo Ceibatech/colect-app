@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
 import { hashPassword } from "@/lib/auth/password";
 import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/validation/user-admin";
+import { issuePasswordAccessEmail } from "@/lib/services/password-reset-service";
 
 /**
  * CRUD administration des utilisateurs (Phase 15+, §11) — jamais de
@@ -24,6 +25,8 @@ import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/v
 export interface ActionResult {
   error?: string;
   success?: boolean;
+  message?: string;
+  warning?: string;
 }
 
 export async function listUsersWithRoles() {
@@ -87,6 +90,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
     roleId: formData.get("roleId"),
     telephone: formData.get("telephone"),
   });
+  const sendInvitation = formData.get("sendInvitation") === "on";
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
 
   const email = parsed.data.email.toLowerCase();
@@ -121,7 +125,23 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
     data: { userId: session.userId, action: "USER_CREATE", entity: "USER", entityId: user.id, newValue: { name: user.name, email, role: role.code }, ipAddress: ip },
   });
 
-  return { success: true };
+  if (sendInvitation) {
+    try {
+      await issuePasswordAccessEmail({ user, purpose: "ACTIVATE" });
+      await prisma.auditLog.create({
+        data: { userId: session.userId, action: "USER_INVITATION_EMAIL", entity: "USER", entityId: user.id, ipAddress: ip },
+      });
+      return { success: true, message: "Compte créé et invitation envoyée." };
+    } catch (error) {
+      console.error("User invitation email delivery failed.", error);
+      return {
+        success: true,
+        warning: "Le compte a été créé, mais l'invitation n'a pas pu être envoyée. Vérifiez la configuration Resend puis renvoyez l'accès depuis la liste.",
+      };
+    }
+  }
+
+  return { success: true, message: "Compte créé." };
 }
 
 export async function updateUser(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -243,10 +263,99 @@ export async function resetUserPassword(id: number, _prevState: ActionResult, fo
 
   await prisma.$transaction([
     prisma.user.update({ where: { id }, data: { passwordHash } }),
+    prisma.passwordResetToken.deleteMany({ where: { userId: id } }),
     prisma.auditLog.create({
       data: { userId: session.userId, action: "PASSWORD_RESET_ADMIN", entity: "USER", entityId: id, ipAddress: ip },
     }),
   ]);
 
   return { success: true };
+}
+
+export async function sendUserAccessEmail(
+  id: number,
+  _prevState: ActionResult,
+  _formData: FormData
+): Promise<ActionResult> {
+  void _prevState;
+  void _formData;
+  const session = await requirePermission("USER_MANAGE");
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, name: true, email: true, isActive: true, lastLoginAt: true },
+  });
+  if (!user) return { error: "Utilisateur introuvable." };
+  if (!user.isActive) return { error: "Activez ce compte avant d'envoyer un accès." };
+
+  const ip = await getClientIp();
+  const purpose = user.lastLoginAt ? "RESET" : "ACTIVATE";
+
+  try {
+    await issuePasswordAccessEmail({ user, purpose });
+    await prisma.auditLog.create({
+      data: {
+        userId: session.userId,
+        action: purpose === "ACTIVATE" ? "USER_INVITATION_EMAIL" : "PASSWORD_RESET_EMAIL_ADMIN",
+        entity: "USER",
+        entityId: user.id,
+        ipAddress: ip,
+      },
+    });
+    return { success: true, message: `Lien sécurisé envoyé à ${user.email}.` };
+  } catch (error) {
+    console.error("User access email delivery failed.", error);
+    return { error: "Envoi impossible. Vérifiez la clé Resend, le domaine expéditeur et l'adresse du destinataire." };
+  }
+}
+
+export async function sendPendingUsersAccessEmails(
+  _prevState: ActionResult,
+  _formData: FormData
+): Promise<ActionResult> {
+  void _prevState;
+  void _formData;
+  const session = await requirePermission("USER_MANAGE");
+  const users = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      lastLoginAt: null,
+      passwordResetTokens: {
+        none: { purpose: "ACTIVATE", usedAt: null, expiresAt: { gt: new Date() } },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 10,
+    select: { id: true, name: true, email: true },
+  });
+
+  if (users.length === 0) {
+    return { success: true, message: "Aucune nouvelle invitation à envoyer pour le moment." };
+  }
+
+  const ip = await getClientIp();
+  let sent = 0;
+  let failed = 0;
+
+  for (const user of users) {
+    try {
+      await issuePasswordAccessEmail({ user, purpose: "ACTIVATE" });
+      await prisma.auditLog.create({
+        data: { userId: session.userId, action: "USER_INVITATION_EMAIL", entity: "USER", entityId: user.id, ipAddress: ip },
+      });
+      sent++;
+    } catch (error) {
+      console.error("Bulk user invitation email delivery failed.", error);
+      failed++;
+    }
+  }
+
+  if (sent === 0) {
+    return { error: "Aucune invitation n'a pu être envoyée. Vérifiez la configuration Resend." };
+  }
+
+  return {
+    success: true,
+    message: `${sent} invitation${sent > 1 ? "s" : ""} envoyée${sent > 1 ? "s" : ""}.`,
+    warning: failed > 0 ? `${failed} envoi${failed > 1 ? "s" : ""} en échec.` : undefined,
+  };
 }

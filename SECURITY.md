@@ -8,6 +8,8 @@
 - Session : JWT signé (HS256, bibliothèque `jose`) stocké dans un cookie **httpOnly**,
   `sameSite=lax`, `secure` en production, durée de vie 8h. Voir
   [`src/lib/auth/session.ts`](src/lib/auth/session.ts).
+- Récupération de mot de passe : lien aléatoire de 256 bits envoyé par Resend, seule son empreinte SHA-256 est stockée dans `password_reset_tokens`. Le lien expire après 60 minutes, est invalidé par tout nouvel envoi et ne peut être consommé qu'une seule fois.
+- Les réponses de `/mot-de-passe-oublie` restent identiques qu'un compte existe ou non, afin d'éviter l'énumération des utilisateurs. Les invitations administratives utilisent le même mécanisme et n'envoient jamais de mot de passe en clair.
 - Le secret de signature vient de `AUTH_SECRET` (variable d'environnement obligatoire —
   l'application refuse de démarrer une vérification de session si la valeur par défaut du
   `.env.example` est encore présente).
@@ -51,7 +53,7 @@ implémentation (Phase 12 — Audit).
 
 ## 4. Secrets & configuration
 
-- Aucun secret en dur dans le code : `DATABASE_URL`, `AUTH_SECRET` uniquement via variables
+- Aucun secret en dur dans le code : `DATABASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` et `APP_URL` uniquement via variables
   d'environnement (`.env`, jamais commité — voir `.gitignore`).
 - `.env.example` documente les variables requises sans valeurs réelles.
 - Utilisateur MySQL applicatif dédié (`mulcv_app`), pas de `root` en production (cahier des

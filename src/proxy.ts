@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
 import { ROLE_ONLY_ROUTE_PREFIXES } from "@/lib/permissions/constants";
 
-const PUBLIC_PATHS = ["/login", "/mot-de-passe-oublie"];
+const PUBLIC_PATHS = ["/login", "/mot-de-passe-oublie", "/reinitialiser-mot-de-passe"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

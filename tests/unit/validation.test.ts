@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { loginSchema, changePasswordSchema } from "@/lib/validation/auth";
+import {
+  loginSchema,
+  changePasswordSchema,
+  requestPasswordResetSchema,
+  resetPasswordWithTokenSchema,
+} from "@/lib/validation/auth";
 import { dossierFormSchema, dossierSubmitSchema } from "@/lib/validation/dossier";
 
 describe("loginSchema", () => {
@@ -18,6 +23,44 @@ describe("loginSchema", () => {
   });
 });
 
+describe("password reset validation", () => {
+  it("accepte une demande avec une adresse e-mail valide", () => {
+    expect(requestPasswordResetSchema.safeParse({ email: "user@ceiba-analytics.com" }).success).toBe(true);
+  });
+
+  it("rejette une demande avec une adresse invalide", () => {
+    expect(requestPasswordResetSchema.safeParse({ email: "adresse-invalide" }).success).toBe(false);
+  });
+
+  it("accepte un jeton et deux mots de passe identiques", () => {
+    const result = resetPasswordWithTokenSchema.safeParse({
+      token: "a".repeat(43),
+      newPassword: "NouveauMdp1",
+      confirmPassword: "NouveauMdp1",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejette un jeton trop court ou une confirmation différente", () => {
+    expect(resetPasswordWithTokenSchema.safeParse({
+      token: "court",
+      newPassword: "NouveauMdp1",
+      confirmPassword: "NouveauMdp1",
+    }).success).toBe(false);
+    expect(resetPasswordWithTokenSchema.safeParse({
+      token: "a".repeat(43),
+      newPassword: "NouveauMdp1",
+      confirmPassword: "Different1",
+    }).success).toBe(false);
+  });
+  it("rejette un jeton qui n'est pas encodé en base64url", () => {
+    expect(resetPasswordWithTokenSchema.safeParse({
+      token: "!".repeat(43),
+      newPassword: "NouveauMdp1",
+      confirmPassword: "NouveauMdp1",
+    }).success).toBe(false);
+  });
+});
 describe("changePasswordSchema (self-service, Phase 15)", () => {
   const valid = { currentPassword: "AncienMdp1", newPassword: "NouveauMdp1", confirmPassword: "NouveauMdp1" };
 

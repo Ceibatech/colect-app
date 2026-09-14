@@ -6,7 +6,18 @@ import { prisma } from "@/lib/prisma/client";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
 import { signSession, COOKIE_NAME, SESSION_DURATION_SECONDS } from "@/lib/auth/session";
 import { isRateLimited, registerFailedAttempt, clearAttempts } from "@/lib/auth/rate-limit";
-import { loginSchema, changePasswordSchema } from "@/lib/validation/auth";
+import {
+  loginSchema,
+  changePasswordSchema,
+  requestPasswordResetSchema,
+  resetPasswordWithTokenSchema,
+} from "@/lib/validation/auth";
+import { assertEmailConfigured, EmailConfigurationError } from "@/lib/email/resend";
+import {
+  InvalidPasswordResetTokenError,
+  issuePasswordAccessEmail,
+  resetPasswordWithToken,
+} from "@/lib/services/password-reset-service";
 import { getSession, requireUser } from "@/lib/auth/current-user";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
@@ -190,10 +201,114 @@ export async function changePasswordAction(
 
   await prisma.$transaction([
     prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
     prisma.auditLog.create({
       data: { userId: user.id, action: "PASSWORD_CHANGE", entity: "USER", entityId: user.id, ipAddress: ip },
     }),
   ]);
 
   return { success: true };
+}
+
+export interface RequestPasswordResetFormState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function requestPasswordResetAction(
+  _prevState: RequestPasswordResetFormState,
+  formData: FormData
+): Promise<RequestPasswordResetFormState> {
+  const parsed = requestPasswordResetSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Adresse e-mail invalide." };
+  }
+
+  const ip = await getClientIp();
+  const email = parsed.data.email.toLowerCase();
+  const emailRateLimitKey = `password-reset:${email}:${ip}`;
+  const ipRateLimitKey = `password-reset-ip:${ip}`;
+  const genericSuccess = { success: true } as const;
+
+  if (isRateLimited(emailRateLimitKey) || isRateLimited(ipRateLimitKey)) return genericSuccess;
+  registerFailedAttempt(emailRateLimitKey);
+  registerFailedAttempt(ipRateLimitKey);
+
+  try {
+    assertEmailConfigured();
+  } catch (error) {
+    const detail = error instanceof EmailConfigurationError ? error.message : "Configuration e-mail invalide.";
+    return {
+      error: process.env.NODE_ENV === "production"
+        ? "Le service e-mail est temporairement indisponible."
+        : `Service e-mail non configuré : ${detail}`,
+    };
+  }
+
+  let user: { id: number; name: string; email: string; isActive: boolean } | null;
+  try {
+    user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, name: true, email: true, isActive: true },
+    });
+  } catch (error) {
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
+
+  if (!user?.isActive) return genericSuccess;
+
+  try {
+    await issuePasswordAccessEmail({ user, purpose: "RESET" });
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "PASSWORD_RESET_REQUEST",
+        entity: "USER",
+        entityId: user.id,
+        ipAddress: ip,
+      },
+    });
+  } catch (error) {
+    console.error("Password reset email delivery failed.", error);
+    if (process.env.NODE_ENV !== "production") {
+      return { error: "L'e-mail n'a pas pu être envoyé. Vérifiez la clé Resend et l'adresse d'expédition." };
+    }
+  }
+
+  return genericSuccess;
+}
+
+export interface ResetPasswordFromLinkFormState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function resetPasswordFromLinkAction(
+  _prevState: ResetPasswordFromLinkFormState,
+  formData: FormData
+): Promise<ResetPasswordFromLinkFormState> {
+  const parsed = resetPasswordWithTokenSchema.safeParse({
+    token: formData.get("token"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+  }
+
+  try {
+    await resetPasswordWithToken({
+      token: parsed.data.token,
+      newPassword: parsed.data.newPassword,
+      ipAddress: await getClientIp(),
+    });
+    return { success: true };
+  } catch (error) {
+    if (error instanceof InvalidPasswordResetTokenError) return { error: error.message };
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
 }

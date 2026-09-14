@@ -311,14 +311,18 @@ utilisateur connecté peut changer son propre mot de passe (revérification du m
 de passe actuel côté serveur, jamais de confiance dans le seul formulaire).
 Protégé uniquement par `requireUser()` (pas de permission dédiée : ce n'est pas
 une action administrative sur un tiers, à la différence de `USER_MANAGE`).
-Accessible depuis le menu utilisateur (`UserMenu.tsx`).
+Accessible depuis le menu utilisateur (`UserMenu.tsx`). Les routes publiques
+`/mot-de-passe-oublie` et `/reinitialiser-mot-de-passe` complètent ce parcours via
+Resend : jeton aléatoire de 256 bits, empreinte SHA-256 seule en base, expiration à
+60 minutes et consommation atomique unique. Le même mécanisme sert aux invitations
+de compte depuis l'administration, sans jamais transmettre de mot de passe en clair.
 
 **Écrans d'administration CRUD (Phase 15+, hors périmètre initial des 15 phases)** :
 `/administration/communes`, `/lotissements`, `/natures` (référentiels géographiques —
 création/édition, jamais de suppression physique : un référentiel déjà utilisé par un
 dossier reste intègre, seule la désactivation `isActive` le retire des listes proposées
 à la Collecte) et `/administration/utilisateurs` (comptes — création avec mot de passe
-initial, modification, réinitialisation de mot de passe par un administrateur,
+initial, invitation par e-mail individuelle ou groupée, modification et réinitialisation manuelle de secours,
 désactivation). Un utilisateur créé/modifié avec le rôle OPERATEUR obtient/perd
 automatiquement une fiche `operateurs` liée (`user-admin-service.ts::nextOperateurMatricule`)
 — sans ce lien, il ne pourrait pas apparaître dans les listes d'opérateurs actifs ni se

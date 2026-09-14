@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createUser, updateUser, resetUserPassword, type ActionResult } from "@/lib/services/user-admin-service";
 import { cn } from "@/lib/utils";
+import { SendPendingUsersAccessDialog, SendUserAccessButton } from "@/components/administration/UserAccessEmailControls";
 
 export interface UserRow {
   id: number;
@@ -154,14 +155,14 @@ function OperateurAssignmentField({
   );
 }
 
-function CreateUserForm({ roles, onSuccess }: { roles: RoleOption[]; onSuccess: () => void }) {
+function CreateUserForm({ roles, onSuccess }: { roles: RoleOption[]; onSuccess: (message?: string, warning?: string) => void }) {
   const [state, formAction, isPending] = useActionState(createUser, initialState);
 
   // `onSuccess` doit être mémoïsé (useCallback) côté appelant — voir
   // CommunesManager.tsx pour le détail.
   useEffect(() => {
-    if (state.success) onSuccess();
-  }, [state.success, onSuccess]);
+    if (state.success) onSuccess(state.message, state.warning);
+  }, [state.success, state.message, state.warning, onSuccess]);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -181,7 +182,14 @@ function CreateUserForm({ roles, onSuccess }: { roles: RoleOption[]; onSuccess: 
       <div className="space-y-2">
         <Label htmlFor="password">Mot de passe initial</Label>
         <Input id="password" name="password" type="password" minLength={8} required disabled={isPending} autoComplete="new-password" />
-        <p className="text-xs text-muted-foreground">Au moins 8 caractères — transmettez-le à l&apos;intéressé(e) par un canal sûr.</p>
+        <p className="text-xs text-muted-foreground">Au moins 8 caractères. L&apos;invitation permettra à la personne de le remplacer avant sa première connexion.</p>
+      </div>
+      <div className="flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+        <Checkbox id="sendInvitation" name="sendInvitation" defaultChecked disabled={isPending} />
+        <div className="space-y-1">
+          <Label htmlFor="sendInvitation" className="cursor-pointer font-medium">Envoyer l&apos;invitation par e-mail</Label>
+          <p className="text-xs leading-5 text-muted-foreground">Un lien personnel valable 60 minutes permettra de définir un nouveau mot de passe.</p>
+        </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="roleId">Rôle</Label>
@@ -330,9 +338,10 @@ export function UsersManager({
   const [editId, setEditId] = useState<number | null>(null);
   const [resetId, setResetId] = useState<number | null>(null);
 
-  const onSuccessCreate = useCallback(() => {
+  const onSuccessCreate = useCallback((message?: string, warning?: string) => {
     setCreateOpen(false);
-    toast.success("Compte créé.");
+    if (warning) toast.warning(warning);
+    else toast.success(message ?? "Compte créé.");
     router.refresh();
   }, [router]);
   const onSuccessEdit = useCallback(() => {
@@ -347,19 +356,21 @@ export function UsersManager({
   }, [router]);
 
   const editing = users.find((u) => u.id === editId);
+  const pendingAccessCount = users.filter((user) => user.isActive && !user.lastLoginAt).length;
 
   const dateFmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-col justify-end gap-2 sm:flex-row">
+        <SendPendingUsersAccessDialog pendingCount={pendingAccessCount} />
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger render={<Button><Plus className="mr-1 h-4 w-4" />Nouvel utilisateur</Button>} />
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Nouvel utilisateur</DialogTitle>
               <DialogDescription>
-                Une fiche opérateur est créée automatiquement si le rôle choisi est Opérateur.
+                Une fiche opérateur est créée automatiquement pour ce rôle. L&apos;invitation sécurisée peut être envoyée immédiatement.
               </DialogDescription>
             </DialogHeader>
             <CreateUserForm roles={roles} onSuccess={onSuccessCreate} />
@@ -408,7 +419,8 @@ export function UsersManager({
                     <Button size="icon-sm" variant="ghost" aria-label="Modifier" onClick={() => setEditId(u.id)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="icon-sm" variant="ghost" aria-label="Réinitialiser le mot de passe" onClick={() => setResetId(u.id)}>
+                    <SendUserAccessButton userId={u.id} email={u.email} disabled={!u.isActive} />
+                    <Button size="icon-sm" variant="ghost" aria-label="Réinitialiser le mot de passe manuellement" onClick={() => setResetId(u.id)}>
                       <KeyRound className="h-4 w-4" />
                     </Button>
                   </div>
@@ -441,7 +453,7 @@ export function UsersManager({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Réinitialiser le mot de passe</DialogTitle>
-            <DialogDescription>Transmettez le nouveau mot de passe à l&apos;intéressé(e) par un canal sûr.</DialogDescription>
+            <DialogDescription>Utilisez cette option uniquement si l&apos;envoi sécurisé par e-mail n&apos;est pas disponible.</DialogDescription>
           </DialogHeader>
           {resetId !== null ? <ResetPasswordForm userId={resetId} onSuccess={onSuccessReset} /> : null}
         </DialogContent>
