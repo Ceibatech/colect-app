@@ -22,14 +22,19 @@ import {
   Wrench,
   FileStack,
 } from "lucide-react";
-import type { PermissionCode } from "@/lib/permissions/constants";
+import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
 export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
   permission: PermissionCode;
+  roles?: readonly RoleCode[];
   children?: NavItem[];
+}
+
+export function isNavItemVisible(item: NavItem, permissions: readonly PermissionCode[], roleCode: RoleCode) {
+  return permissions.includes(item.permission) && (!item.roles || item.roles.includes(roleCode));
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -40,9 +45,9 @@ export const NAV_ITEMS: NavItem[] = [
     permission: "DASHBOARD_VIEW",
     children: [
       { title: "Vue d'ensemble", href: "/dashboard", icon: LayoutDashboard, permission: "DASHBOARD_VIEW" },
-      { title: "Direction", href: "/dashboard/direction", icon: TrendingUp, permission: "DASHBOARD_VIEW" },
-      { title: "Opérateurs", href: "/dashboard/operateurs", icon: UsersRound, permission: "DASHBOARD_VIEW" },
-      { title: "Géographie", href: "/dashboard/geographie", icon: Map, permission: "DASHBOARD_VIEW" },
+      { title: "Direction", href: "/dashboard/direction", icon: TrendingUp, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "CONSULTATION"] },
+      { title: "Opérateurs", href: "/dashboard/operateurs", icon: UsersRound, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "SUPERVISEUR"] },
+      { title: "Géographie", href: "/dashboard/geographie", icon: Map, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "SUPERVISEUR", "CONSULTATION"] },
     ],
   },
   { title: "Collecte", href: "/collecte", icon: FilePlus2, permission: "DOSSIER_CREATE" },

@@ -5,18 +5,13 @@ import { Prisma } from "@prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { computeRate as rate } from "@/lib/utils/rate";
 import { computePipelineScore, computeQualityScore } from "@/lib/utils/pipeline-score";
-import { getSupervisorScope } from "@/lib/services/access-scope";
+import { getDashboardOperateurScope } from "@/lib/services/access-scope";
 
 /**
- * Phase 16+ (affectation opérateur -> superviseur) : un SUPERVISEUR ne doit
- * voir, sur TOUT le dashboard, que les agrégats concernant les opérateurs
- * qui lui sont affectés — jamais les vues SQL globales ci-dessous
- * (`vw_*`), qui ne sont pas paramétrables (vues MySQL). Pour ce rôle, les
- * fonctions ci-dessous recalculent donc les mêmes agrégats directement via
- * l'API Prisma (`where operateurId IN (...)`) au lieu d'interroger la vue.
- * Comportement inchangé pour ADMIN/CONSULTATION (et OPERATEUR, qui voyait
- * déjà un dashboard global avant cette phase — non modifié, hors périmètre
- * de cette demande). `getSupervisorScope()` est partagée (access-scope.ts).
+ * Les vues SQL de reporting ne sont pas paramétrables. Les agrégats sont
+ * donc recalculés avec Prisma pour le portefeuille personnel d'un opérateur
+ * et pour l'équipe affectée à un superviseur. ADMIN et CONSULTATION
+ * conservent la vue globale.
  */
 
 /** `where` Prisma correspondant à un scope opérateur (tableau vide -> aucun résultat). */
@@ -110,7 +105,7 @@ async function getDashboardKpisScoped(operateurIds: number[]): Promise<Dashboard
 export const getDashboardKpis = cache(async (): Promise<DashboardKpis> => {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) return getDashboardKpisScoped(scope);
 
   const rows = await prisma.$queryRaw<GlobalRow[]>`SELECT * FROM vw_dashboard_global`;
@@ -206,7 +201,7 @@ async function getPipelineEvolutionScoped(
 export async function getPipelineEvolution(): Promise<Array<{ mois: string } & Record<EvolutionType, number>>> {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) return getPipelineEvolutionScoped(scope);
 
   const [collecte, validation, numerisation, indexation, archivage] = await Promise.all([
@@ -262,7 +257,7 @@ export interface RepartitionRow {
 export async function getRepartitionByCommune(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) {
     const grouped = await prisma.dossier.groupBy({
       by: ["communeId"],
@@ -285,7 +280,7 @@ export async function getRepartitionByCommune(): Promise<RepartitionRow[]> {
 /** Répartition par lotissement (§48 item 8) — pas de vue dédiée (non prévue §63), agrégation directe. */
 export async function getRepartitionByLotissement(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
 
   const grouped = await prisma.dossier.groupBy({
     by: ["lotissementId"],
@@ -302,7 +297,7 @@ export async function getRepartitionByLotissement(): Promise<RepartitionRow[]> {
 /** Répartition par nature de dossier (§48 item 9). */
 export async function getRepartitionByNature(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
 
   const grouped = await prisma.dossier.groupBy({
     by: ["natureDossierId"],
@@ -321,7 +316,7 @@ export async function getRepartitionByStatut(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
   const LABELS: Record<string, string> = { EN_ATTENTE: "En attente", EN_CONTROLE: "En contrôle", VALIDE: "Validé", REJETE: "Rejeté" };
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) {
     const grouped = await prisma.dossier.groupBy({
       by: ["statutValidation"],
@@ -359,7 +354,7 @@ export interface OperateurPerformanceRow {
 /** Pilotage des operateurs : progression du pipeline et qualite du portefeuille. */
 export async function getOperateurPerformance(): Promise<OperateurPerformanceRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
 
   const rows = await prisma.$queryRaw<
     Array<{
@@ -456,7 +451,7 @@ export interface AnomalyEvolutionPoint {
 export async function getAnomaliesEvolution(): Promise<AnomalyEvolutionPoint[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) {
     const anomalies = await prisma.anomalie.findMany({
       where: { dossier: { operateurId: scope.length ? { in: scope } : -1 } },
@@ -497,7 +492,7 @@ export async function getDirectionOverview(): Promise<DirectionOverview> {
   const seuil = new Date();
   seuil.setDate(seuil.getDate() - RETARD_SEUIL_JOURS);
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   const operateurFilter = scope ? scopeWhere(scope) : {};
 
   const [dossiersEnRetard, anomaliesCritiques] = await Promise.all([
@@ -535,7 +530,7 @@ export interface CartonsDossiersEtatOverview {
  */
 export async function getCartonsDossiersEtatOverview(): Promise<CartonsDossiersEtatOverview> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   const base = scope ? scopeWhere(scope) : {};
 
   const [cartons, nombreDossiers, cartonsDegrades, nombreDossiersDegrades] = await Promise.all([

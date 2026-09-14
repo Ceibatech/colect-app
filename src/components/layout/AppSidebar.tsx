@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -19,17 +18,17 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { NAV_ITEMS, type NavItem } from "@/config/navigation";
-import type { PermissionCode } from "@/lib/permissions/constants";
+import { NAV_ITEMS, isNavItemVisible, type NavItem } from "@/config/navigation";
+import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 import { cn } from "@/lib/utils";
 
 function isActive(pathname: string, href: string) {
   return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar({ permissions }: { permissions: PermissionCode[] }) {
+export function AppSidebar({ permissions, roleCode }: { permissions: PermissionCode[]; roleCode: RoleCode }) {
   const pathname = usePathname();
-  const visibleItems = NAV_ITEMS.filter((item) => permissions.includes(item.permission));
+  const visibleItems = NAV_ITEMS.filter((item) => isNavItemVisible(item, permissions, roleCode));
 
   return (
     <Sidebar collapsible="icon" variant="floating" className="border-sidebar-border/70">
@@ -64,31 +63,20 @@ export function AppSidebar({ permissions }: { permissions: PermissionCode[] }) {
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
               {visibleItems.map((item) => (
-                <NavEntry key={item.href} item={item} pathname={pathname} permissions={permissions} />
+                <NavEntry key={item.href} item={item} pathname={pathname} permissions={permissions} roleCode={roleCode} />
               ))}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
-        <div className="rounded-lg border border-sidebar-border/70 bg-white/10 p-3 text-xs text-sidebar-foreground/70 shadow-sm group-data-[collapsible=icon]:hidden">
-          <div className="flex items-center justify-between gap-2">
-            <span className="font-medium text-sidebar-foreground">Pipeline actif</span>
-            <span className="rounded-md bg-sidebar-accent px-1.5 py-0.5 text-[0.7rem] text-sidebar-foreground/80">2026</span>
-          </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-sidebar-accent">
-            <div className="h-full w-2/3 rounded-full bg-brand-green" aria-hidden="true" />
-          </div>
-        </div>
-      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
 }
 
-function NavEntry({ item, pathname, permissions }: { item: NavItem; pathname: string; permissions: PermissionCode[] }) {
-  const children = item.children?.filter((c) => permissions.includes(c.permission));
+function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pathname: string; permissions: PermissionCode[]; roleCode: RoleCode }) {
+  const children = item.children?.filter((child) => isNavItemVisible(child, permissions, roleCode));
   const active = isActive(pathname, item.href);
 
   const trigger = (

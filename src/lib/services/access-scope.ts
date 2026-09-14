@@ -40,6 +40,27 @@ export async function getSupervisorScope(session: SessionPayload): Promise<numbe
 }
 
 /**
+ * Périmètre utilisé par les tableaux de bord : portefeuille personnel pour
+ * un OPERATEUR, équipe affectée pour un SUPERVISEUR, vue globale pour les
+ * rôles de pilotage. Un tableau vide signifie volontairement aucun résultat.
+ */
+export async function getDashboardOperateurScope(session: SessionPayload): Promise<number[] | null> {
+  if (session.roleCode === "OPERATEUR") {
+    const operateur = await prisma.operateur.findUnique({
+      where: { userId: session.userId },
+      select: { id: true },
+    });
+    return operateur ? [operateur.id] : [];
+  }
+
+  if (session.roleCode === "SUPERVISEUR") {
+    return getSupervisedOperateurIds(session.userId);
+  }
+
+  return null;
+}
+
+/**
  * Filtre à assigner à `where.operateurId` d'une requête `dossiers` (ou
  * table liée par `operateurId`) selon le rôle de la session :
  * - `undefined` : pas de restriction à appliquer (ne pas définir la clé).

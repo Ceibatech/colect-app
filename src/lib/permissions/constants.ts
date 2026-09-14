@@ -92,6 +92,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
  * requis (défense en profondeur suffisante, cf. §60).
  */
 export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly RoleCode[] }> = [
+  { prefix: "/dashboard/direction", roles: ["ADMIN", "CONSULTATION"] },
+  { prefix: "/dashboard/operateurs", roles: ["ADMIN", "SUPERVISEUR"] },
+  { prefix: "/dashboard/geographie", roles: ["ADMIN", "SUPERVISEUR", "CONSULTATION"] },
   { prefix: "/qualite", roles: ["ADMIN", "SUPERVISEUR"] },
   { prefix: "/import", roles: ["ADMIN", "OPERATEUR"] },
 ];

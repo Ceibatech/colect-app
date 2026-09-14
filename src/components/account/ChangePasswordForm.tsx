@@ -1,13 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { changePasswordAction, type ChangePasswordFormState } from "@/lib/services/auth-service";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
 
 const initialState: ChangePasswordFormState = {};
 
@@ -32,10 +32,10 @@ export function ChangePasswordForm() {
       ) : null}
 
       <PasswordField id="currentPassword" name="currentPassword" label="Mot de passe actuel" autoComplete="current-password" disabled={isPending} />
-      <PasswordField id="newPassword" name="newPassword" label="Nouveau mot de passe" autoComplete="new-password" disabled={isPending} minLength={8} hint="Au moins 8 caractères." />
+      <PasswordField id="newPassword" name="newPassword" label="Nouveau mot de passe" autoComplete="new-password" disabled={isPending} minLength={8} hint="Utilisez au moins 8 caractères, difficiles à deviner." />
       <PasswordField id="confirmPassword" name="confirmPassword" label="Confirmer le nouveau mot de passe" autoComplete="new-password" disabled={isPending} minLength={8} />
 
-      <Button type="submit" size="lg" className="h-10 shadow-sm" disabled={isPending}>
+      <Button type="submit" size="lg" className="h-11 w-full shadow-sm sm:w-auto" disabled={isPending}>
         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
         Mettre à jour le mot de passe
       </Button>
@@ -60,25 +60,37 @@ function PasswordField({
   minLength?: number;
   hint?: string;
 }) {
+  const [visible, setVisible] = useState(false);
+
   return (
     <div className="space-y-2">
-      <Label htmlFor={id} className="text-sm font-medium">
-        {label}
-      </Label>
+      <Label htmlFor={id} className="text-sm font-medium">{label}</Label>
       <div className="relative">
         <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           id={id}
           name={name}
-          type="password"
+          type={visible ? "text" : "password"}
           autoComplete={autoComplete}
           minLength={minLength}
-          className="h-10 pl-9"
+          className="h-11 px-10"
           required
           disabled={disabled}
         />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="absolute right-1 top-1/2 h-9 w-9 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          onClick={() => setVisible((value) => !value)}
+          aria-label={visible ? `Masquer ${label.toLowerCase()}` : `Afficher ${label.toLowerCase()}`}
+          aria-pressed={visible}
+          disabled={disabled}
+        >
+          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </Button>
       </div>
-      {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }

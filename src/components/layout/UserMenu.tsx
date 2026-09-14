@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, LogOut, User as UserIcon } from "lucide-react";
+import { ChevronDown, KeyRound, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -56,8 +56,8 @@ export function UserMenu({ name, email, roleCode }: { name: string; email: strin
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/compte" />}>
-          <UserIcon className="mr-2 h-4 w-4" />
-          Mon compte
+          <KeyRound className="mr-2 h-4 w-4" />
+          Sécurité et mot de passe
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onClick={() => logoutAction()}>

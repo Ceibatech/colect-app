@@ -1,57 +1,68 @@
-import { requirePermission } from "@/lib/auth/current-user";
+import { requirePermission, requireRole } from "@/lib/auth/current-user";
 import { getRepartitionByCommune, getRepartitionByLotissement } from "@/lib/services/dashboard-service";
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { MapPinned } from "lucide-react";
 
-export const metadata = { title: "Dashboard Géographique — GeoArchives-MULCV" };
+export const metadata = { title: "Répartition territoriale - GeoArchives-MULCV" };
 
 export default async function DashboardGeographiePage() {
+  const session = await requireRole("ADMIN", "SUPERVISEUR", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
+
   const [byCommune, byLotissement] = await Promise.all([getRepartitionByCommune(), getRepartitionByLotissement()]);
+  const total = byCommune.reduce((sum, item) => sum + item.total, 0);
+  const topShare = total > 0 ? Math.round(((byCommune[0]?.total ?? 0) / total) * 100) : 0;
+  const scopeLabel = session.roleCode === "SUPERVISEUR" ? "Périmètre équipe" : "Périmètre global";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 lg:space-y-6">
       <PageHeader
-        eyebrow="Territoire"
+        eyebrow="Pilotage territorial"
         icon={MapPinned}
-        title="Dashboard Géographique"
-        description="Lecture des volumes documentaires par commune et lotissement pour prioriser les zones à suivre."
+        title="Répartition territoriale"
+        description="Comparez les volumes documentaires par commune et lotissement."
+        actions={<Badge variant="outline" className="rounded-md bg-background/80">{scopeLabel}</Badge>}
         stats={[
-          { label: "Communes", value: byCommune.length },
-          { label: "Lotissements", value: byLotissement.length },
-          { label: "Top commune", value: byCommune[0]?.label ?? "—" },
+          { label: "Dossiers localisés", value: total },
+          { label: "Communes actives", value: byCommune.length },
+          { label: "Lotissements actifs", value: byLotissement.length },
+          { label: "Zone principale", value: byCommune[0]?.label ?? "Aucune" },
         ]}
       />
 
-      <Alert className="border-primary/20 bg-primary/5">
-        <MapPinned className="h-4 w-4 text-primary" />
-        <AlertTitle>Cartographie SIG prête à intégrer</AlertTitle>
-        <AlertDescription>
-          L&apos;architecture des référentiels commune, lotissement, îlot et lot permet une future intégration cartographique sans migration de schéma.
-        </AlertDescription>
-      </Alert>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition par commune</CardTitle>
-            <CardDescription>{byCommune.length} commune(s) avec au moins un dossier.</CardDescription>
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card className="min-w-0 bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Volumes par commune</CardTitle>
+                <CardDescription>{byCommune.length} commune{byCommune.length > 1 ? "s" : ""} avec au moins un dossier.</CardDescription>
+              </div>
+              {byCommune[0] ? (
+                <Badge variant="secondary" className="w-fit rounded-md">{byCommune[0].label} · {topShare}%</Badge>
+              ) : null}
+            </div>
           </CardHeader>
-          <CardContent>
-            <RepartitionBarChart data={byCommune} colorByCategory limit={byCommune.length} />
+          <CardContent className="pt-4">
+            <RepartitionBarChart data={byCommune} colorByCategory limit={byCommune.length} leftAxisWidth={120} barSize={18} />
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Répartition par lotissement</CardTitle>
-            <CardDescription>{byLotissement.length} lotissement(s) avec au moins un dossier — 10 premiers affichés.</CardDescription>
+        <Card className="min-w-0 bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Volumes par lotissement</CardTitle>
+                <CardDescription>Les 10 secteurs les plus représentés dans le portefeuille.</CardDescription>
+              </div>
+              <Badge variant="outline" className="w-fit rounded-md bg-background/70">Top 10</Badge>
+            </div>
           </CardHeader>
-          <CardContent>
-            <RepartitionBarChart data={byLotissement} />
+          <CardContent className="pt-4">
+            <RepartitionBarChart data={byLotissement} leftAxisWidth={140} barSize={18} />
           </CardContent>
         </Card>
       </div>

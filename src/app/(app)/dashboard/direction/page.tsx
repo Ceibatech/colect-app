@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { requirePermission } from "@/lib/auth/current-user";
+import { requirePermission, requireRole } from "@/lib/auth/current-user";
 import { getDirectionOverview, getAnomaliesEvolution } from "@/lib/services/dashboard-service";
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
 import { AnomaliesEvolutionChart } from "@/components/dashboard/AnomaliesEvolutionChart";
@@ -56,6 +56,7 @@ const metricTones: Record<MetricTone, { bar: string; icon: string; value: string
 };
 
 export default async function DashboardDirectionPage() {
+  await requireRole("ADMIN", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
 
   const [overview, anomaliesEvolution] = await Promise.all([getDirectionOverview(), getAnomaliesEvolution()]);
