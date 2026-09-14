@@ -10,8 +10,8 @@ import { getDashboardOperateurScope } from "@/lib/services/access-scope";
 /**
  * Les vues SQL de reporting ne sont pas paramétrables. Les agrégats sont
  * donc recalculés avec Prisma pour le portefeuille personnel d'un opérateur
- * et pour l'équipe affectée à un superviseur. ADMIN, EXECUTIF et CONSULTATION
- * conservent la vue globale.
+ * pour l'équipe d'un superviseur et pour le portefeuille d'un PMO. ADMIN,
+ * FINANCE, EXECUTIF et CONSULTATION conservent la vue globale.
  */
 
 /** `where` Prisma correspondant à un scope opérateur (tableau vide -> aucun résultat). */

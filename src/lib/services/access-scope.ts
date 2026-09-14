@@ -15,7 +15,9 @@ import type { SessionPayload } from "@/lib/auth/session";
  *   jamais un accès global par défaut — un superviseur non configuré ne
  *   doit rien voir plutôt que tout voir.
  *
- * ADMIN / EXECUTIF / CONSULTATION : pas de restriction.
+ * - PMO : union des opérateurs rattachés aux superviseurs de son périmètre.
+ *
+ * ADMIN / FINANCE / EXECUTIF / CONSULTATION : pas de restriction.
  */
 
 /** Fiches opérateur affectées à ce superviseur (`userId` = User.id, rôle SUPERVISEUR). */
@@ -57,7 +59,26 @@ export async function getDashboardOperateurScope(session: SessionPayload): Promi
     return getSupervisedOperateurIds(session.userId);
   }
 
+  if (session.roleCode === "PMO") {
+    return getPmoSupervisedOperateurIds(session.userId);
+  }
+
   return null;
+}
+
+/** Opérateurs couverts par les superviseurs explicitement affectés à ce PMO. */
+export async function getPmoSupervisedOperateurIds(pmoUserId: number): Promise<number[]> {
+  const scopes = await prisma.pmoSupervisorScope.findMany({
+    where: { pmoUserId, supervisor: { isActive: true, role: { code: "SUPERVISEUR" } } },
+    select: { supervisorUserId: true },
+  });
+  if (scopes.length === 0) return [];
+
+  const rows = await prisma.operateur.findMany({
+    where: { supervisorId: { in: scopes.map((scope) => scope.supervisorUserId) } },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
 }
 
 /**

@@ -26,14 +26,15 @@
 
 ## 2. Autorisation (RBAC)
 
-- 5 rôles (`ADMIN`, `SUPERVISEUR`, `OPERATEUR`, `EXECUTIF`, `CONSULTATION`) et 28 permissions
+- 7 rôles (`ADMIN`, `SUPERVISEUR`, `OPERATEUR`, `FINANCE`, `PMO`, `EXECUTIF`, `CONSULTATION`) et 31 permissions
   granulaires, stockés en base (`roles`, `permissions`, `role_permissions`) — voir
   [`src/lib/permissions/constants.ts`](src/lib/permissions/constants.ts) (source unique,
   utilisée par le seed **et** l'application).
 - Les permissions de l'utilisateur sont embarquées dans le JWT de session au moment du
-  login. Le rôle `EXECUTIF` ne reçoit que `DASHBOARD_VIEW` : il consulte les quatre vues
-  globales de pilotage sans accès aux dossiers, formulaires, imports, exports ou modules
-  d'administration.
+  login. `EXECUTIF` consulte les vues globales sans accès opérationnel. `PMO` consulte
+  uniquement les tableaux de bord des superviseurs qui lui sont affectés. `FINANCE`
+  accède aux points, barèmes et projections budgétaires, sans accès aux dossiers ni aux
+  formulaires. Les données de rémunération ne sont jamais exposées à PMO ou Exécutif.
   **Conséquence documentée** : un changement de permissions d'un rôle ne prend effet
   qu'à la prochaine connexion de l'utilisateur concerné (acceptable en V1 ; une invalidation
   active pourra être ajoutée plus tard si nécessaire).
@@ -45,6 +46,12 @@
      `requireUser()` / `requireRole()` / `requirePermission()`
      ([`src/lib/auth/current-user.ts`](src/lib/auth/current-user.ts)) — **jamais de
      confiance uniquement au frontend** (cahier des charges §60).
+- Le périmètre PMO est matérialisé par `pmo_supervisor_scopes`; l'absence d'affectation
+  produit volontairement un tableau de bord vide, jamais une vue globale par défaut.
+- Les points financiers sont dérivés de `workflow_transitions`. Seules les étapes
+  acceptées créditent l'opérateur; chaque validation ou rejet tracé crédite le
+  superviseur qui l'a prononcé. Les barèmes sont datés dans `finance_rates`, sans édition
+  ni suppression depuis l'interface, et chaque création/export est journalisé.
 
 ## 3. Traçabilité
 

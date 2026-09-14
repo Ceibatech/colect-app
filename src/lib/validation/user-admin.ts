@@ -8,6 +8,7 @@ export const createUserSchema = z.object({
   password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
   roleId: z.coerce.number({ message: "Le rôle est requis" }).int().positive("Le rôle est requis"),
   telephone: z.string().max(30).optional().or(z.literal("")),
+  supervisorIds: z.array(z.coerce.number().int().positive()).default([]),
 });
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 
@@ -18,6 +19,8 @@ export const updateUserSchema = z.object({
   // Phase 16+ : opérateurs affectés à ce compte, uniquement pertinent si le
   // rôle choisi est SUPERVISEUR (ignoré sinon, cf. updateUser()).
   operateurIds: z.array(z.coerce.number().int().positive()).default([]),
+  // Superviseurs inclus dans le périmètre d'un compte PMO.
+  supervisorIds: z.array(z.coerce.number().int().positive()).default([]),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 

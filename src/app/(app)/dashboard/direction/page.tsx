@@ -56,7 +56,7 @@ const metricTones: Record<MetricTone, { bar: string; icon: string; value: string
 };
 
 export default async function DashboardDirectionPage() {
-  await requireRole("ADMIN", "EXECUTIF", "CONSULTATION");
+  const session = await requireRole("ADMIN", "EXECUTIF", "PMO", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
 
   const [overview, anomaliesEvolution] = await Promise.all([getDirectionOverview(), getAnomaliesEvolution()]);
@@ -114,6 +114,9 @@ export default async function DashboardDirectionPage() {
               <Badge variant="secondary" className="rounded-md border border-border/60 bg-background/80 uppercase tracking-[0.16em]">
                 Pilotage ex&eacute;cutif
               </Badge>
+              {session.roleCode === "PMO" ? (
+                <Badge variant="outline" className="rounded-md bg-background/70 text-primary">Périmètre PMO</Badge>
+              ) : null}
               <Badge variant={healthTone === "destructive" ? "destructive" : "outline"} className="rounded-md bg-background/70">
                 {healthLabel}
               </Badge>

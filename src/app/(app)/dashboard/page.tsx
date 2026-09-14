@@ -44,6 +44,18 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     description: "Retrouvez vos dossiers en cours, les retours à traiter et votre progression.",
     progress: "Mon avancement",
   },
+  FINANCE: {
+    eyebrow: "Pilotage financier",
+    title: "Activité et budget",
+    description: "Suivez les volumes acceptés, les points acquis et la projection budgétaire du programme.",
+    progress: "Avancement du programme",
+  },
+  PMO: {
+    eyebrow: "Pilotage PMO",
+    title: "Portefeuille PMO",
+    description: "Suivez la progression, la qualité et les risques du périmètre qui vous est confié.",
+    progress: "Avancement du périmètre",
+  },
   EXECUTIF: {
     eyebrow: "Vue exécutive",
     title: "Pilotage exécutif",
@@ -62,6 +74,7 @@ export default async function DashboardPage() {
   const session = await requirePermission("DASHBOARD_VIEW");
   const isOperator = session.roleCode === "OPERATEUR";
   const isExecutive = session.roleCode === "EXECUTIF";
+  const dashboardScopeLabel = session.roleCode === "PMO" ? "Lecture seule · Périmètre PMO" : session.roleCode === "FINANCE" ? "Lecture globale · Données financières protégées" : null;
   const copy = DASHBOARD_COPY[session.roleCode];
 
   const distributionsPromise = isOperator
@@ -100,9 +113,9 @@ export default async function DashboardPage() {
               <Badge variant="secondary" className="rounded-md border border-border/60 bg-muted/70 uppercase tracking-[0.16em]">
                 {copy.eyebrow}
               </Badge>
-              {isExecutive ? (
+              {isExecutive || dashboardScopeLabel ? (
                 <Badge variant="outline" className="rounded-md bg-background/70 text-xs font-medium text-muted-foreground">
-                  Lecture seule · Périmètre global
+                  {isExecutive ? "Lecture seule · Périmètre global" : dashboardScopeLabel}
                 </Badge>
               ) : (
                 <span className="text-xs font-medium text-muted-foreground">

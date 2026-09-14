@@ -21,6 +21,8 @@ import {
   PackageOpen,
   Wrench,
   FileStack,
+  WalletCards,
+  BriefcaseBusiness,
 } from "lucide-react";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
@@ -45,9 +47,11 @@ export const NAV_ITEMS: NavItem[] = [
     permission: "DASHBOARD_VIEW",
     children: [
       { title: "Vue d'ensemble", href: "/dashboard", icon: LayoutDashboard, permission: "DASHBOARD_VIEW" },
-      { title: "Direction", href: "/dashboard/direction", icon: TrendingUp, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "CONSULTATION"] },
-      { title: "Opérateurs", href: "/dashboard/operateurs", icon: UsersRound, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "SUPERVISEUR"] },
-      { title: "Géographie", href: "/dashboard/geographie", icon: Map, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "SUPERVISEUR", "CONSULTATION"] },
+      { title: "Direction", href: "/dashboard/direction", icon: TrendingUp, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "PMO", "CONSULTATION"] },
+      { title: "Opérateurs", href: "/dashboard/operateurs", icon: UsersRound, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR"] },
+      { title: "Géographie", href: "/dashboard/geographie", icon: Map, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR", "CONSULTATION"] },
+      { title: "Finance", href: "/dashboard/finance", icon: WalletCards, permission: "FINANCE_VIEW", roles: ["ADMIN", "FINANCE"] },
+      { title: "PMO", href: "/dashboard/pmo", icon: BriefcaseBusiness, permission: "PMO_VIEW", roles: ["ADMIN", "PMO"] },
     ],
   },
   { title: "Collecte", href: "/collecte", icon: FilePlus2, permission: "DOSSIER_CREATE" },

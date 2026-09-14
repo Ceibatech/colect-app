@@ -12,6 +12,8 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   ADMIN: "Administrateur",
   SUPERVISEUR: "Superviseur",
   OPERATEUR: "Opérateur",
+  FINANCE: "Finance",
+  PMO: "PMO",
   EXECUTIF: "Exécutif",
   CONSULTATION: "Consultation",
 };

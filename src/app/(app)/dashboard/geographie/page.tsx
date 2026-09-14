@@ -9,13 +9,13 @@ import { MapPinned } from "lucide-react";
 export const metadata = { title: "Répartition territoriale - GeoArchives-MULCV" };
 
 export default async function DashboardGeographiePage() {
-  const session = await requireRole("ADMIN", "EXECUTIF", "SUPERVISEUR", "CONSULTATION");
+  const session = await requireRole("ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
 
   const [byCommune, byLotissement] = await Promise.all([getRepartitionByCommune(), getRepartitionByLotissement()]);
   const total = byCommune.reduce((sum, item) => sum + item.total, 0);
   const topShare = total > 0 ? Math.round(((byCommune[0]?.total ?? 0) / total) * 100) : 0;
-  const scopeLabel = session.roleCode === "SUPERVISEUR" ? "Périmètre équipe" : "Périmètre global";
+  const scopeLabel = session.roleCode === "SUPERVISEUR" ? "Périmètre équipe" : session.roleCode === "PMO" ? "Périmètre PMO" : "Périmètre global";
 
   return (
     <div className="space-y-5 lg:space-y-6">
