@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NAV_ITEMS, isNavItemVisible } from "@/config/navigation";
-import { ROLE_ONLY_ROUTE_PREFIXES, type RoleCode } from "@/lib/permissions/constants";
+import { ROLE_ONLY_ROUTE_PREFIXES, ROLE_PERMISSIONS, type RoleCode } from "@/lib/permissions/constants";
 
 const dashboard = NAV_ITEMS.find((item) => item.href === "/dashboard")!;
 const child = (href: string) => dashboard.children!.find((item) => item.href === href)!;
@@ -11,6 +11,7 @@ describe("role-aware dashboard navigation", () => {
     ["ADMIN", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie"]],
     ["SUPERVISEUR", ["/dashboard", "/dashboard/operateurs", "/dashboard/geographie"]],
     ["OPERATEUR", ["/dashboard"]],
+    ["EXECUTIF", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie"]],
     ["CONSULTATION", ["/dashboard", "/dashboard/direction", "/dashboard/geographie"]],
   ];
 
@@ -20,6 +21,14 @@ describe("role-aware dashboard navigation", () => {
       .map((item) => item.href);
 
     expect(visible).toEqual(expected);
+  });
+
+  it("limits the executive sidebar to the dashboard module", () => {
+    const visible = NAV_ITEMS
+      .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.EXECUTIF, "EXECUTIF"))
+      .map((item) => item.href);
+
+    expect(visible).toEqual(["/dashboard"]);
   });
 
   it("keeps route restrictions aligned with navigation roles", () => {

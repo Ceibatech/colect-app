@@ -59,7 +59,7 @@ function RoleSelect({
   value?: string;
   onValueChange?: (value: string) => void;
 }) {
-  const items = roles.map((r) => ({ label: r.name, value: String(r.id) }));
+  const items = roles.map((r) => ({ label: r.name, value: String(r.id), code: r.code }));
   return (
     <Select
       name="roleId"
@@ -75,7 +75,14 @@ function RoleSelect({
       <SelectContent>
         {items.map((o) => (
           <SelectItem key={o.value} value={o.value}>
-            {o.label}
+            <span className="flex w-full items-center justify-between gap-3">
+              <span>{o.label}</span>
+              {o.code === "EXECUTIF" ? (
+                <span className="rounded-sm border border-primary/20 bg-primary/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-primary">
+                  Lecture seule
+                </span>
+              ) : null}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -370,7 +377,7 @@ export function UsersManager({
             <DialogHeader>
               <DialogTitle>Nouvel utilisateur</DialogTitle>
               <DialogDescription>
-                Une fiche opérateur est créée automatiquement pour ce rôle. L&apos;invitation sécurisée peut être envoyée immédiatement.
+                Choisissez le niveau d&apos;accès adapté. Le profil Exécutif donne une lecture globale des tableaux de bord, sans accès opérationnel ni administratif.
               </DialogDescription>
             </DialogHeader>
             <CreateUserForm roles={roles} onSuccess={onSuccessCreate} />
@@ -398,7 +405,7 @@ export function UsersManager({
                 </TableCell>
                 <TableCell className="whitespace-nowrap">{u.email}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{u.role.code}</Badge>
+                  <Badge variant="secondary">{u.role.name}</Badge>
                   {u.operateur ? (
                     <span className="ml-1 text-xs text-muted-foreground">{u.operateur.matricule}</span>
                   ) : null}

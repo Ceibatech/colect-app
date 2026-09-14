@@ -56,7 +56,7 @@ const metricTones: Record<MetricTone, { bar: string; icon: string; value: string
 };
 
 export default async function DashboardDirectionPage() {
-  await requireRole("ADMIN", "CONSULTATION");
+  await requireRole("ADMIN", "EXECUTIF", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
 
   const [overview, anomaliesEvolution] = await Promise.all([getDirectionOverview(), getAnomaliesEvolution()]);

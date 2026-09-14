@@ -20,7 +20,7 @@ export const metadata = { title: "Performance opérateurs - GeoArchives-MULCV" }
 const PIPELINE_LABELS = ["Soumission", "Validation", "Numérisation", "Indexation", "Archivage"];
 
 export default async function DashboardOperateursPage() {
-  const session = await requireRole("ADMIN", "SUPERVISEUR");
+  const session = await requireRole("ADMIN", "EXECUTIF", "SUPERVISEUR");
   await requirePermission("DASHBOARD_VIEW");
 
   const rows = await getOperateurPerformance();

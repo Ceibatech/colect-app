@@ -26,12 +26,15 @@
 
 ## 2. Autorisation (RBAC)
 
-- 4 rôles (`ADMIN`, `SUPERVISEUR`, `OPERATEUR`, `CONSULTATION`) et ~22 permissions
+- 5 rôles (`ADMIN`, `SUPERVISEUR`, `OPERATEUR`, `EXECUTIF`, `CONSULTATION`) et 28 permissions
   granulaires, stockés en base (`roles`, `permissions`, `role_permissions`) — voir
   [`src/lib/permissions/constants.ts`](src/lib/permissions/constants.ts) (source unique,
   utilisée par le seed **et** l'application).
 - Les permissions de l'utilisateur sont embarquées dans le JWT de session au moment du
-  login. **Conséquence documentée** : un changement de permissions d'un rôle ne prend effet
+  login. Le rôle `EXECUTIF` ne reçoit que `DASHBOARD_VIEW` : il consulte les quatre vues
+  globales de pilotage sans accès aux dossiers, formulaires, imports, exports ou modules
+  d'administration.
+  **Conséquence documentée** : un changement de permissions d'un rôle ne prend effet
   qu'à la prochaine connexion de l'utilisateur concerné (acceptable en V1 ; une invalidation
   active pourra être ajoutée plus tard si nécessaire).
 - Contrôle en 2 niveaux :

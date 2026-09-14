@@ -10,7 +10,7 @@ import { PERMISSIONS, ROLE_CODES, ROLE_PERMISSIONS, ROLE_ONLY_ROUTE_PREFIXES } f
  * les tests API/E2E (Playwright) qui frappent de vraies routes protégées.
  */
 describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
-  it("définit une entrée pour chacun des 4 rôles", () => {
+  it("définit une entrée pour chacun des 5 rôles", () => {
     for (const role of ROLE_CODES) {
       expect(ROLE_PERMISSIONS[role]).toBeDefined();
     }
@@ -40,6 +40,10 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     const writeVerbs = /_(CREATE|UPDATE|DELETE|VALIDATE|REJECT|MANAGE|DATA)$/;
     const writePerms = ROLE_PERMISSIONS.CONSULTATION.filter((p) => writeVerbs.test(p));
     expect(writePerms).toEqual([]);
+  });
+
+  it("EXECUTIF est strictement limité aux tableaux de bord", () => {
+    expect(ROLE_PERMISSIONS.EXECUTIF).toEqual(["DASHBOARD_VIEW"]);
   });
 
   it("seuls ADMIN et SUPERVISEUR ont AUDIT_VIEW", () => {

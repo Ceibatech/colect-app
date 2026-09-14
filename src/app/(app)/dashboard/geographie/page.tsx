@@ -9,7 +9,7 @@ import { MapPinned } from "lucide-react";
 export const metadata = { title: "Répartition territoriale - GeoArchives-MULCV" };
 
 export default async function DashboardGeographiePage() {
-  const session = await requireRole("ADMIN", "SUPERVISEUR", "CONSULTATION");
+  const session = await requireRole("ADMIN", "EXECUTIF", "SUPERVISEUR", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
 
   const [byCommune, byLotissement] = await Promise.all([getRepartitionByCommune(), getRepartitionByLotissement()]);

@@ -44,6 +44,12 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     description: "Retrouvez vos dossiers en cours, les retours à traiter et votre progression.",
     progress: "Mon avancement",
   },
+  EXECUTIF: {
+    eyebrow: "Vue exécutive",
+    title: "Pilotage exécutif",
+    description: "Lecture globale de la performance, des risques et de la progression du programme documentaire.",
+    progress: "Avancement du programme",
+  },
   CONSULTATION: {
     eyebrow: "Vue de consultation",
     title: "Synthèse documentaire",
@@ -55,6 +61,7 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
 export default async function DashboardPage() {
   const session = await requirePermission("DASHBOARD_VIEW");
   const isOperator = session.roleCode === "OPERATEUR";
+  const isExecutive = session.roleCode === "EXECUTIF";
   const copy = DASHBOARD_COPY[session.roleCode];
 
   const distributionsPromise = isOperator
@@ -93,9 +100,15 @@ export default async function DashboardPage() {
               <Badge variant="secondary" className="rounded-md border border-border/60 bg-muted/70 uppercase tracking-[0.16em]">
                 {copy.eyebrow}
               </Badge>
-              <span className="text-xs font-medium text-muted-foreground">
-                {isOperator ? session.name : "Collecte · Validation · Numérisation · Indexation · Archivage"}
-              </span>
+              {isExecutive ? (
+                <Badge variant="outline" className="rounded-md bg-background/70 text-xs font-medium text-muted-foreground">
+                  Lecture seule · Périmètre global
+                </Badge>
+              ) : (
+                <span className="text-xs font-medium text-muted-foreground">
+                  {isOperator ? session.name : "Collecte · Validation · Numérisation · Indexation · Archivage"}
+                </span>
+              )}
             </div>
 
             <div className="mt-5 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

@@ -15,7 +15,7 @@ import type { SessionPayload } from "@/lib/auth/session";
  *   jamais un accès global par défaut — un superviseur non configuré ne
  *   doit rien voir plutôt que tout voir.
  *
- * ADMIN / CONSULTATION : pas de restriction.
+ * ADMIN / EXECUTIF / CONSULTATION : pas de restriction.
  */
 
 /** Fiches opérateur affectées à ce superviseur (`userId` = User.id, rôle SUPERVISEUR). */

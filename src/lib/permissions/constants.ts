@@ -4,7 +4,7 @@
  * par l'application (contrôles serveur, middleware, UI conditionnelle).
  */
 
-export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "CONSULTATION"] as const;
+export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const PERMISSIONS = [
@@ -74,6 +74,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "ARCHIVAGE_UPDATE",
     "IMPORT_DATA",
   ],
+  EXECUTIF: ["DASHBOARD_VIEW"],
   CONSULTATION: ["DASHBOARD_VIEW", "DOSSIER_READ", "NUMERISATION_VIEW", "INDEXATION_VIEW", "ARCHIVAGE_VIEW"],
 };
 
@@ -92,9 +93,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
  * requis (défense en profondeur suffisante, cf. §60).
  */
 export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly RoleCode[] }> = [
-  { prefix: "/dashboard/direction", roles: ["ADMIN", "CONSULTATION"] },
-  { prefix: "/dashboard/operateurs", roles: ["ADMIN", "SUPERVISEUR"] },
-  { prefix: "/dashboard/geographie", roles: ["ADMIN", "SUPERVISEUR", "CONSULTATION"] },
+  { prefix: "/dashboard/direction", roles: ["ADMIN", "EXECUTIF", "CONSULTATION"] },
+  { prefix: "/dashboard/operateurs", roles: ["ADMIN", "EXECUTIF", "SUPERVISEUR"] },
+  { prefix: "/dashboard/geographie", roles: ["ADMIN", "EXECUTIF", "SUPERVISEUR", "CONSULTATION"] },
   { prefix: "/qualite", roles: ["ADMIN", "SUPERVISEUR"] },
   { prefix: "/import", roles: ["ADMIN", "OPERATEUR"] },
 ];
