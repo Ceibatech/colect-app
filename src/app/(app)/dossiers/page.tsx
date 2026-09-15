@@ -42,6 +42,7 @@ export default async function DossiersPage({
         operateurId: isScopedRole ? scope : params.operateur,
         statutCollecte: params.statutCollecte,
         statutValidation: params.statutValidation,
+        statutPreparation: params.statutPreparation,
         statutNumerisation: params.statutNumerisation,
         statutIndexation: params.statutIndexation,
         statutArchivage: params.statutArchivage,

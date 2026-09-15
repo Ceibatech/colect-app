@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, XCircle, ScanLine, Tags, Archive, Loader2 } from "lucide-react";
+import { CheckCircle2, XCircle, ClipboardList, ScanLine, Tags, Archive, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { PermissionCode } from "@/lib/permissions/constants";
+import { TypesPiecesField, type TypePieceOption } from "./TypesPiecesField";
 
 async function callWorkflowApi(id: number, action: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/dossiers/${id}/${action}`, {
@@ -45,6 +46,7 @@ interface Props {
   dossierId: number;
   permissions: PermissionCode[];
   statutValidation: string;
+  statutPreparation: string;
   statutNumerisation: string;
   statutIndexation: string;
   statutArchivage: string;
@@ -141,11 +143,107 @@ export function ControleActions({ dossierId, permissions, statutValidation }: Pr
  * l'action après un rejet (Phase 19+). */
 const STAGE_BLOCKED_FOR_OPERATOR = new Set(["A_VALIDER", "TERMINE"]);
 
-export function NumerisationActions({ dossierId, permissions, statutValidation, statutNumerisation }: Props) {
+/**
+ * Étape "Préparation" (Phase 20+), intercalée entre Validation et
+ * Numérisation : contrairement aux autres étapes opérationnelles,
+ * l'opérateur y saisit des données (nombre de pièces, types de pièces,
+ * nombre de pages — retirés de la Collecte, cf. StepDossier.tsx/
+ * StepSuivi.tsx) plutôt que de se contenter de déclencher une action.
+ * D'où la boîte de dialogue, sur le modèle d'ArchivageActions.
+ */
+export function PreparationActions({
+  dossierId,
+  permissions,
+  statutValidation,
+  statutPreparation,
+  typesPiece,
+}: Props & { typesPiece: TypePieceOption[] }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [nombrePieces, setNombrePieces] = useState("");
+  const [typesPieces, setTypesPieces] = useState<string[]>([]);
+  const [nombrePages, setNombrePages] = useState("");
+
+  if (statutValidation !== "VALIDE" || STAGE_BLOCKED_FOR_OPERATOR.has(statutPreparation)) return null;
+  if (!permissions.includes("PREPARATION_UPDATE")) return null;
+
+  function run() {
+    startTransition(async () => {
+      try {
+        await callWorkflowApi(dossierId, "prepare", {
+          nombrePieces: nombrePieces ? Number(nombrePieces) : undefined,
+          typesPieces,
+          nombrePages: nombrePages ? Number(nombrePages) : undefined,
+        });
+        toast.success("Préparation soumise, en attente de validation du superviseur.");
+        router.refresh();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Erreur lors de la préparation.");
+      }
+    });
+  }
+
+  return (
+    <Dialog>
+      <DialogTrigger
+        render={
+          <Button disabled={isPending}>
+            <ClipboardList className="mr-1 h-4 w-4" />
+            {statutPreparation === "REJETE" ? "Relancer la préparation" : "Préparer"}
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Préparer ce dossier</DialogTitle>
+          <DialogDescription>Nombre de pièces, types de pièces et nombre de pages du dossier physique.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="prep-nombre-pieces">Nombre de pièces dans le dossier</Label>
+            <Input
+              id="prep-nombre-pieces"
+              type="number"
+              min={0}
+              step={1}
+              value={nombrePieces}
+              onChange={(e) => setNombrePieces(e.target.value)}
+              placeholder="Ex. 5"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Types de pièces dans le dossier</Label>
+            <TypesPiecesField value={typesPieces} onChange={setTypesPieces} typesPiece={typesPiece} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="prep-nombre-pages">Nombre de pages</Label>
+            <Input
+              id="prep-nombre-pages"
+              type="number"
+              min={1}
+              step={1}
+              value={nombrePages}
+              onChange={(e) => setNombrePages(e.target.value)}
+              placeholder="Estimation du nombre de pages du dossier physique"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button disabled={isPending} onClick={run}>
+            {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+            Confirmer la préparation
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function NumerisationActions({ dossierId, permissions, statutPreparation, statutNumerisation }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  if (statutValidation !== "VALIDE" || STAGE_BLOCKED_FOR_OPERATOR.has(statutNumerisation)) return null;
+  if (statutPreparation !== "TERMINE" || STAGE_BLOCKED_FOR_OPERATOR.has(statutNumerisation)) return null;
   if (!permissions.includes("NUMERISATION_UPDATE")) return null;
 
   function run() {
@@ -362,6 +460,21 @@ function StageValidationActions({
         </Dialog>
       )}
     </div>
+  );
+}
+
+export function PreparationValidationActions({ dossierId, permissions, statutPreparation }: Props) {
+  return (
+    <StageValidationActions
+      dossierId={dossierId}
+      permissions={permissions}
+      statut={statutPreparation}
+      apiSegment="prepare"
+      validatePermission="PREPARATION_VALIDATE"
+      rejectPermission="PREPARATION_REJECT"
+      stageLabel="Préparation"
+      nextStepHint="Le dossier passera au statut « Terminé » et pourra ensuite être numérisé."
+    />
   );
 }
 

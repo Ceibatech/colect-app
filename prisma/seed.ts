@@ -88,6 +88,14 @@ const WORKFLOW_STATUSES: Array<{ workflowType: WorkflowType; code: string; libel
   { workflowType: "VALIDATION", code: "VALIDE", libelle: "Validé", ordre: 3, isFinal: true },
   { workflowType: "VALIDATION", code: "REJETE", libelle: "Rejeté", ordre: 3, isFinal: true },
 
+  // Phase 20+ : nouvelle étape "Préparation", intercalée entre Validation et
+  // Numérisation. Même forme que les étapes ci-dessous.
+  { workflowType: "PREPARATION", code: "EN_ATTENTE", libelle: "En attente", ordre: 1, isFinal: false },
+  { workflowType: "PREPARATION", code: "EN_COURS", libelle: "En cours", ordre: 2, isFinal: false },
+  { workflowType: "PREPARATION", code: "A_VALIDER", libelle: "À valider", ordre: 3, isFinal: false },
+  { workflowType: "PREPARATION", code: "TERMINE", libelle: "Terminé", ordre: 4, isFinal: true },
+  { workflowType: "PREPARATION", code: "REJETE", libelle: "Rejeté", ordre: 4, isFinal: false },
+
   // Phase 19+ : A_VALIDER (l'opérateur a agi, en attente du superviseur) et
   // REJETE (renvoyé à l'opérateur pour reprise) s'intercalent avant TERMINE.
   { workflowType: "NUMERISATION", code: "EN_ATTENTE", libelle: "En attente", ordre: 1, isFinal: false },
@@ -325,9 +333,15 @@ async function main() {
       stage === "REJETE" || stage === "VALIDE" || stage === "NUMERISE" || stage === "INDEXE" || stage === "ARCHIVE"
         ? faker.date.soon({ days: 3, refDate: dateSoumission ?? createdAt })
         : null;
+    // Phase 20+ : étape "Préparation", intercalée entre Validation et
+    // Numérisation.
+    const datePreparation =
+      stage === "NUMERISE" || stage === "INDEXE" || stage === "ARCHIVE"
+        ? faker.date.soon({ days: 2, refDate: dateValidation ?? createdAt })
+        : null;
     const dateNumerisation =
       stage === "NUMERISE" || stage === "INDEXE" || stage === "ARCHIVE"
-        ? faker.date.soon({ days: 5, refDate: dateValidation ?? createdAt })
+        ? faker.date.soon({ days: 5, refDate: datePreparation ?? dateValidation ?? createdAt })
         : null;
     const dateIndexation =
       stage === "INDEXE" || stage === "ARCHIVE" ? faker.date.soon({ days: 4, refDate: dateNumerisation ?? createdAt }) : null;
@@ -379,6 +393,12 @@ async function main() {
             : stage === "REJETE"
               ? "REJETE"
               : "VALIDE",
+        // Phase 20+ : un dossier déjà NUMERISE/INDEXE/ARCHIVE a nécessairement
+        // été préparé au préalable (nouvelle étape gate) ; un dossier
+        // simplement VALIDE reste volontairement EN_ATTENTE de préparation —
+        // fournit des données de démonstration pour le nouvel onglet.
+        statutPreparation:
+          stage === "NUMERISE" || stage === "INDEXE" || stage === "ARCHIVE" ? "TERMINE" : "EN_ATTENTE",
         statutNumerisation:
           stage === "NUMERISE" || stage === "INDEXE" || stage === "ARCHIVE" ? "TERMINE" : "EN_ATTENTE",
         statutIndexation: stage === "INDEXE" || stage === "ARCHIVE" ? "TERMINE" : "EN_ATTENTE",
@@ -386,6 +406,7 @@ async function main() {
 
         dateSoumission,
         dateValidation,
+        datePreparation,
         dateNumerisation,
         dateIndexation,
         dateArchivage,

@@ -7,6 +7,7 @@ import type { DossierListItem } from "@/lib/services/dossier-query-service";
 import {
   STATUT_COLLECTE_LABELS,
   STATUT_VALIDATION_LABELS,
+  STATUT_PREPARATION_LABELS,
   STATUT_NUMERISATION_LABELS,
   STATUT_INDEXATION_LABELS,
   STATUT_ARCHIVAGE_LABELS,
@@ -37,6 +38,7 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
             <TableHead>Opérateur</TableHead>
             <TableHead>Collecte</TableHead>
             <TableHead>Validation</TableHead>
+            <TableHead>Préparation</TableHead>
             <TableHead>Numérisation</TableHead>
             <TableHead>Indexation</TableHead>
             <TableHead>Archivage</TableHead>
@@ -61,6 +63,9 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
               </TableCell>
               <TableCell>
                 <Badge variant={statutBadgeVariant(d.statutValidation)}>{STATUT_VALIDATION_LABELS[d.statutValidation]}</Badge>
+              </TableCell>
+              <TableCell>
+                <Badge variant={statutBadgeVariant(d.statutPreparation)}>{STATUT_PREPARATION_LABELS[d.statutPreparation]}</Badge>
               </TableCell>
               <TableCell>
                 <Badge variant={statutBadgeVariant(d.statutNumerisation)}>

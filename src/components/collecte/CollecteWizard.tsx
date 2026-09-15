@@ -29,7 +29,6 @@ import { StepSite, type SiteOption } from "./steps/StepSite";
 import { StepIdentification } from "./steps/StepIdentification";
 import { StepFoncier } from "./steps/StepFoncier";
 import { StepDossier } from "./steps/StepDossier";
-import type { TypePieceOption } from "./steps/TypesPiecesField";
 import { StepTitulaire } from "./steps/StepTitulaire";
 import { StepContact } from "./steps/StepContact";
 import { StepSuivi } from "./steps/StepSuivi";
@@ -57,7 +56,6 @@ export interface CollecteWizardProps {
   sites: SiteOption[];
   communes: CommuneWithLotissements[];
   natures: NatureDossier[];
-  typesPiece: TypePieceOption[];
   operateurs: Operateur[];
   isOperateurRole: boolean;
   currentUserName: string;
@@ -71,7 +69,6 @@ export function CollecteWizard({
   sites,
   communes,
   natures,
-  typesPiece,
   operateurs,
   isOperateurRole,
   currentUserName,
@@ -200,7 +197,7 @@ export function CollecteWizard({
             <StepIdentification form={form} operateurs={operateurs} isOperateurRole={isOperateurRole} currentUserName={currentUserName} />
           )}
           {currentStep === 3 && <StepFoncier form={form} communes={communes} />}
-          {currentStep === 4 && <StepDossier form={form} natures={natures} typesPiece={typesPiece} />}
+          {currentStep === 4 && <StepDossier form={form} natures={natures} />}
           {currentStep === 5 && <StepTitulaire form={form} />}
           {currentStep === 6 && <StepContact form={form} />}
           {currentStep === 7 && <StepSuivi form={form} />}
@@ -208,7 +205,7 @@ export function CollecteWizard({
             <StepRecap
               form={form}
               onEditStep={setCurrentStep}
-              lookups={{ sites, communes, natures, typesPiece, operateurs, isOperateurRole, currentUserName }}
+              lookups={{ sites, communes, natures, operateurs, isOperateurRole, currentUserName }}
             />
           )}
         </form>

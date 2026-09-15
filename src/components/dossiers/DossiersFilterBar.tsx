@@ -9,6 +9,7 @@ import type { DossierSearchParams } from "@/lib/validation/dossier-search";
 import {
   STATUT_COLLECTE_LABELS,
   STATUT_VALIDATION_LABELS,
+  STATUT_PREPARATION_LABELS,
   STATUT_NUMERISATION_LABELS,
   STATUT_INDEXATION_LABELS,
   STATUT_ARCHIVAGE_LABELS,
@@ -72,6 +73,12 @@ export function DossiersFilterBar({
           label="Validation"
           defaultValue={current.statutValidation}
           options={Object.entries(STATUT_VALIDATION_LABELS).map(([value, label]) => ({ value, label }))}
+        />
+        <NamedSelect
+          name="statutPreparation"
+          label="Préparation"
+          defaultValue={current.statutPreparation}
+          options={Object.entries(STATUT_PREPARATION_LABELS).map(([value, label]) => ({ value, label }))}
         />
         <NamedSelect
           name="statutNumerisation"

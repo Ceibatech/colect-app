@@ -6,12 +6,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   STATUT_VALIDATION_LABELS,
+  STATUT_PREPARATION_LABELS,
   STATUT_NUMERISATION_LABELS,
   STATUT_INDEXATION_LABELS,
   STATUT_ARCHIVAGE_LABELS,
 } from "@/lib/utils/dossier-status";
 import {
   ControleActions,
+  PreparationActions,
+  PreparationValidationActions,
   NumerisationActions,
   IndexationActions,
   ArchivageActions,
@@ -19,6 +22,7 @@ import {
   IndexationValidationActions,
   ArchivageValidationActions,
 } from "@/components/dossiers/WorkflowActions";
+import type { TypePieceOption } from "@/components/dossiers/TypesPiecesField";
 import { DocumentsPanel } from "@/components/dossiers/DocumentsPanel";
 import type { PermissionCode } from "@/lib/permissions/constants";
 import { ETAT_CONSERVATION_OPTIONS } from "@/lib/validation/dossier";
@@ -63,11 +67,13 @@ interface DossierDetail {
   nombrePages: number | null;
   observations: string | null;
   statutValidation: keyof typeof STATUT_VALIDATION_LABELS;
+  statutPreparation: keyof typeof STATUT_PREPARATION_LABELS;
   statutNumerisation: keyof typeof STATUT_NUMERISATION_LABELS;
   statutIndexation: keyof typeof STATUT_INDEXATION_LABELS;
   statutArchivage: keyof typeof STATUT_ARCHIVAGE_LABELS;
   dateSoumission: string | null;
   dateValidation: string | null;
+  datePreparation: string | null;
   dateNumerisation: string | null;
   dateIndexation: string | null;
   dateArchivage: string | null;
@@ -107,7 +113,15 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 
-export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDetail; permissions: PermissionCode[] }) {
+export function DossierDetailTabs({
+  dossier,
+  permissions,
+  typesPiece,
+}: {
+  dossier: DossierDetail;
+  permissions: PermissionCode[];
+  typesPiece: TypePieceOption[];
+}) {
   // Rendu conditionnel manuel du panneau actif, au lieu du composant
   // <TabsContent> (masquage interne défaillant constaté avec ce composant
   // Base UI — les panneaux inactifs restaient visibles simultanément ;
@@ -123,6 +137,7 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
         <TabsTrigger value="titulaire">Titulaire</TabsTrigger>
         <TabsTrigger value="collecte">Collecte</TabsTrigger>
         <TabsTrigger value="controle">Contrôle</TabsTrigger>
+        <TabsTrigger value="preparation">Préparation</TabsTrigger>
         <TabsTrigger value="numerisation">Numérisation</TabsTrigger>
         <TabsTrigger value="indexation">Indexation</TabsTrigger>
         <TabsTrigger value="archivage">Archivage</TabsTrigger>
@@ -179,8 +194,6 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
               {dossier.etatDossier === "DEGRADE" ? (
                 <Field label="Description de l'état (dossier)" value={dossier.etatDossierDescription} />
               ) : null}
-              <Field label="Nombre de pièces" value={dossier.nombrePieces} />
-              <Field label="Types de pièces" value={dossier.typesPieces.map((t) => t.libelle).join(", ") || null} />
               <Field label="Autres pièces" value={dossier.autresPieces} />
               <Field label="Personne à contacter" value={dossier.personneContact} />
               <Field label="Mobile" value={dossier.mobile} />
@@ -191,7 +204,6 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
         {tab === "collecte" && (
           <Card>
             <CardContent className="grid gap-4 pt-6 sm:grid-cols-3">
-              <Field label="Nombre de pages" value={dossier.nombrePages} />
               <Field
                 label="Date de soumission"
                 value={dossier.dateSoumission ? dateFmt.format(new Date(dossier.dateSoumission)) : null}
@@ -237,9 +249,46 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                 dossierId={dossier.id}
                 permissions={permissions}
                 statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
                 statutNumerisation={dossier.statutNumerisation}
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {tab === "preparation" && (
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Statut" value={STATUT_PREPARATION_LABELS[dossier.statutPreparation]} />
+                <Field label="Nombre de pièces" value={dossier.nombrePieces} />
+                <Field label="Nombre de pages" value={dossier.nombrePages} />
+                <Field label="Types de pièces" value={dossier.typesPieces.map((t) => t.libelle).join(", ") || null} />
+                <Field
+                  label="Date de préparation"
+                  value={dossier.datePreparation ? dateFmt.format(new Date(dossier.datePreparation)) : null}
+                />
+              </div>
+              <PreparationValidationActions
+                dossierId={dossier.id}
+                permissions={permissions}
+                statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
+                statutNumerisation={dossier.statutNumerisation}
+                statutIndexation={dossier.statutIndexation}
+                statutArchivage={dossier.statutArchivage}
+              />
+              <PreparationActions
+                dossierId={dossier.id}
+                permissions={permissions}
+                statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
+                statutNumerisation={dossier.statutNumerisation}
+                statutIndexation={dossier.statutIndexation}
+                statutArchivage={dossier.statutArchivage}
+                typesPiece={typesPiece}
               />
             </CardContent>
           </Card>
@@ -258,6 +307,7 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                 dossierId={dossier.id}
                 permissions={permissions}
                 statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
                 statutNumerisation={dossier.statutNumerisation}
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
@@ -266,6 +316,7 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                 dossierId={dossier.id}
                 permissions={permissions}
                 statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
                 statutNumerisation={dossier.statutNumerisation}
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
@@ -288,6 +339,7 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                 dossierId={dossier.id}
                 permissions={permissions}
                 statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
                 statutNumerisation={dossier.statutNumerisation}
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
@@ -296,6 +348,7 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                 dossierId={dossier.id}
                 permissions={permissions}
                 statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
                 statutNumerisation={dossier.statutNumerisation}
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
@@ -317,6 +370,7 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                 dossierId={dossier.id}
                 permissions={permissions}
                 statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
                 statutNumerisation={dossier.statutNumerisation}
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
@@ -325,6 +379,7 @@ export function DossierDetailTabs({ dossier, permissions }: { dossier: DossierDe
                 dossierId={dossier.id}
                 permissions={permissions}
                 statutValidation={dossier.statutValidation}
+                statutPreparation={dossier.statutPreparation}
                 statutNumerisation={dossier.statutNumerisation}
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}

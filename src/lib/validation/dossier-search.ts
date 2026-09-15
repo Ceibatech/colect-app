@@ -15,6 +15,7 @@ export const dossierSearchParamsSchema = z.object({
   operateur: z.coerce.number().int().positive().optional(),
   statutCollecte: statutCollecteEnum.optional(),
   statutValidation: statutValidationEnum.optional(),
+  statutPreparation: statutTermineEnum.optional(),
   statutNumerisation: statutTermineEnum.optional(),
   statutIndexation: statutTermineEnum.optional(),
   statutArchivage: statutTermineEnum.optional(),

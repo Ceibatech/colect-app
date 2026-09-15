@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma/client";
 import { getDossierDetail } from "@/lib/services/dossier-query-service";
 import { isOperateurInScope } from "@/lib/services/access-scope";
+import { getActiveTypesPiece } from "@/lib/services/referentiels-service";
 import { DossierDetailTabs } from "@/components/dossiers/DossierDetailTabs";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 import {
   STATUT_COLLECTE_LABELS,
   STATUT_VALIDATION_LABELS,
+  STATUT_PREPARATION_LABELS,
   STATUT_NUMERISATION_LABELS,
   STATUT_INDEXATION_LABELS,
   STATUT_ARCHIVAGE_LABELS,
@@ -30,7 +32,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const dossier = await getDossierDetail(id);
+  const [dossier, typesPiece] = await Promise.all([getDossierDetail(id), getActiveTypesPiece()]);
   if (!dossier) notFound();
 
   if (session.roleCode === "OPERATEUR") {
@@ -51,6 +53,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
     updatedAt: dossier.updatedAt.toISOString(),
     dateSoumission: dossier.dateSoumission?.toISOString() ?? null,
     dateValidation: dossier.dateValidation?.toISOString() ?? null,
+    datePreparation: dossier.datePreparation?.toISOString() ?? null,
     dateNumerisation: dossier.dateNumerisation?.toISOString() ?? null,
     dateIndexation: dossier.dateIndexation?.toISOString() ?? null,
     dateArchivage: dossier.dateArchivage?.toISOString() ?? null,
@@ -96,6 +99,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-wrap items-center gap-1.5">
           <Badge variant={statutBadgeVariant(dossier.statutCollecte)}>{STATUT_COLLECTE_LABELS[dossier.statutCollecte]}</Badge>
           <Badge variant={statutBadgeVariant(dossier.statutValidation)}>{STATUT_VALIDATION_LABELS[dossier.statutValidation]}</Badge>
+          <Badge variant={statutBadgeVariant(dossier.statutPreparation)}>{STATUT_PREPARATION_LABELS[dossier.statutPreparation]}</Badge>
           <Badge variant={statutBadgeVariant(dossier.statutNumerisation)}>
             {STATUT_NUMERISATION_LABELS[dossier.statutNumerisation]}
           </Badge>
@@ -110,7 +114,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      <DossierDetailTabs dossier={serialized} permissions={session.permissions} />
+      <DossierDetailTabs dossier={serialized} permissions={session.permissions} typesPiece={typesPiece} />
     </div>
   );
 }

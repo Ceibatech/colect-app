@@ -1,5 +1,5 @@
 import { testPrisma } from "./auth";
-import type { StatutValidation, StatutNumerisation, StatutIndexation, StatutArchivage } from "@prisma/client";
+import type { StatutValidation, StatutPreparation, StatutNumerisation, StatutIndexation, StatutArchivage } from "@prisma/client";
 
 /**
  * Crée un dossier de test directement en base (contourne la Collecte/le
@@ -13,6 +13,7 @@ import type { StatutValidation, StatutNumerisation, StatutIndexation, StatutArch
  */
 export async function createTestDossier(overrides: {
   statutValidation?: StatutValidation;
+  statutPreparation?: StatutPreparation;
   statutNumerisation?: StatutNumerisation;
   statutIndexation?: StatutIndexation;
   statutArchivage?: StatutArchivage;
@@ -28,6 +29,7 @@ export async function createTestDossier(overrides: {
       operateurId,
       statutCollecte: "SOUMIS",
       statutValidation: overrides.statutValidation ?? "EN_CONTROLE",
+      statutPreparation: overrides.statutPreparation ?? "EN_ATTENTE",
       statutNumerisation: overrides.statutNumerisation ?? "EN_ATTENTE",
       statutIndexation: overrides.statutIndexation ?? "EN_ATTENTE",
       statutArchivage: overrides.statutArchivage ?? "EN_ATTENTE",

@@ -110,17 +110,13 @@ export const dossierFormSchema = z.object({
   // l'état du carton ci-dessus.
   etatDossier: z.enum(["BON_ETAT", "DEGRADE"]).optional(),
   etatDossierDescription: z.string().max(1000).optional().or(z.literal("")),
-  // Nombre de pièces contenues dans le dossier (Phase 18+).
-  nombrePieces: z.coerce.number().int().positive().max(10_000).optional().or(z.literal("")),
-  // Types de pièces présentes — sélection multiple dans une liste fermée
-  // extensible (cf. TypesPiecesField.tsx). Chaque entrée est soit l'id
-  // (chaîne numérique) d'un type existant, soit un type ajouté à la volée
-  // préfixé "new:" (jamais stocké tel quel — résolu côté serveur en
-  // find-or-create dans dossier-service.ts, comme Lotissement/Nature
-  // "Autres" ci-dessus).
-  typesPieces: z.array(z.string()).optional(),
-  // Autres pièces (Phase 18+) — champ libre distinct de "Types de pièces",
-  // pour toute pièce ne relevant pas d'un type catégorisable.
+  // Autres pièces (Phase 18+) — champ libre pour toute pièce ne relevant pas
+  // d'un type catégorisable. Reste dans la Collecte : `nombrePieces` et
+  // `typesPieces`, en revanche, ont été retirés d'ici en Phase 20+ pour
+  // constituer la nouvelle étape "Préparation" (entre Validation et
+  // Numérisation) — voir TypesPiecesField.tsx (déplacé vers
+  // PreparationActions dans WorkflowActions.tsx) et
+  // resolveTypesPieceIds() dans workflow-service.ts.
   autresPieces: z.string().max(1000).optional().or(z.literal("")),
 
   // ÉTAPE 5 — Titulaire
@@ -135,7 +131,8 @@ export const dossierFormSchema = z.object({
   mobile: z.string().max(30).optional().or(z.literal("")),
 
   // ÉTAPE 7 — Suivi
-  nombrePages: z.coerce.number().int().positive().max(100_000).optional().or(z.literal("")),
+  // `nombrePages` retiré d'ici en Phase 20+ — déplacé vers l'étape
+  // "Préparation" (cf. note sur `autresPieces` ci-dessus).
   observations: z.string().max(2000).optional().or(z.literal("")),
 });
 
@@ -162,9 +159,9 @@ export const DOSSIER_STEPS = [
   { id: 1, title: "Site", fields: ["siteId", "entrepotId"] },
   { id: 2, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
   { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
-  { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription", "nombrePieces", "typesPieces", "autresPieces"] },
+  { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription", "autresPieces"] },
   { id: 5, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
   { id: 6, title: "Contact", fields: ["personneContact", "mobile"] },
-  { id: 7, title: "Suivi", fields: ["nombrePages", "observations"] },
+  { id: 7, title: "Suivi", fields: ["observations"] },
   { id: 8, title: "Récapitulatif", fields: [] },
 ] as const satisfies ReadonlyArray<{ id: number; title: string; fields: readonly (keyof DossierFormValues)[] }>;

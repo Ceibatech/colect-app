@@ -97,8 +97,8 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
   await fillField(page, "Mobile", "0708091011");
   await clickNext(page);
 
-  // Étape 7 — Suivi
-  await fillField(page, "Nombre de pages", "8");
+  // Étape 7 — Suivi (Observations, facultatif — "Nombre de pages" a été
+  // retiré de la Collecte en Phase 20+, déplacé vers l'étape Préparation)
   await clickNext(page);
 
   // Étape 8 — Récapitulatif -> SOUMISSION (§41)
@@ -123,16 +123,28 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
     });
     expect(validateRes.status()).toBe(200);
 
-    // --- 4. NUMÉRISATION, 5. INDEXATION, 6. ARCHIVAGE (OPERATEUR) ---
-    // Phase 19+ : chaque étape est soumise par l'opérateur ("À valider") puis
-    // validée par le superviseur ("Terminé") avant de débloquer la suivante
-    // — même principe que la validation de Collecte ci-dessus, désormais
-    // répété à chaque étape (détail des transitions déjà testé par
-    // workflow.spec.ts, on vérifie ici seulement l'enchaînement bout en bout).
+    // --- 4. PRÉPARATION, 5. NUMÉRISATION, 6. INDEXATION, 7. ARCHIVAGE (OPERATEUR) ---
+    // Phase 19+/20+ : chaque étape est soumise par l'opérateur ("À valider")
+    // puis validée par le superviseur ("Terminé") avant de débloquer la
+    // suivante — même principe que la validation de Collecte ci-dessus,
+    // désormais répété à chaque étape, Préparation comprise (nombre de
+    // pièces/types de pièces/nombre de pages, retirés de la Collecte en
+    // Phase 20+ ; détail des transitions déjà testé par workflow.spec.ts, on
+    // vérifie ici seulement l'enchaînement bout en bout).
     const operateurCookie = await sessionCookieHeader(DEMO_USERS.operateur1);
+    const prepareRes = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
+      headers: { Cookie: operateurCookie },
+      data: { nombrePieces: 3, typesPieces: [], nombrePages: 8 },
+    });
+    expect(prepareRes.status()).toBe(200);
+    expect((await prepareRes.json()).dossier.statutPreparation).toBe("A_VALIDER");
+    const prepareValidateRes = await request.post(`/api/dossiers/${dossier.id}/prepare/validate`, {
+      headers: { Cookie: superviseurCookie },
+    });
+    expect(prepareValidateRes.status()).toBe(200);
+
     const numerizeRes = await request.post(`/api/dossiers/${dossier.id}/numerize`, {
       headers: { Cookie: operateurCookie },
-      data: { nombrePages: 8 },
     });
     expect(numerizeRes.status()).toBe(200);
     expect((await numerizeRes.json()).dossier.statutNumerisation).toBe("A_VALIDER");
@@ -170,6 +182,9 @@ test("cycle complet CG1020 : connexion → collecte → soumission → contrôle
 
     const final = await testPrisma.dossier.findUniqueOrThrow({ where: { id: dossier.id } });
     expect(final.statutValidation).toBe("VALIDE");
+    expect(final.statutPreparation).toBe("TERMINE");
+    expect(final.nombrePieces).toBe(3);
+    expect(final.nombrePages).toBe(8);
     expect(final.statutNumerisation).toBe("TERMINE");
     expect(final.statutIndexation).toBe("TERMINE");
     expect(final.statutArchivage).toBe("TERMINE");

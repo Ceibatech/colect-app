@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EtatConservationField } from "./EtatConservationField";
-import { TypesPiecesField, type TypePieceOption } from "./TypesPiecesField";
 
 interface NatureDossier {
   id: number;
@@ -19,14 +18,20 @@ interface NatureDossier {
 /** Sentinelle d'interface uniquement — jamais stockée (résolue côté serveur). */
 const AUTRES = "__AUTRES__";
 
+/**
+ * "Nombre de pièces" et "Types de pièces" (Phase 18+) ont été retirés d'ici
+ * en Phase 20+ : ils constituent désormais la nouvelle étape "Préparation"
+ * (entre Validation et Numérisation, cf. PreparationActions dans
+ * WorkflowActions.tsx), plutôt que d'être saisis dès la Collecte —
+ * l'opérateur ne connaît pas toujours ces informations sur le terrain, avant
+ * même que le dossier soit validé.
+ */
 export function StepDossier({
   form,
   natures,
-  typesPiece,
 }: {
   form: UseFormReturn<DossierFormValues>;
   natures: NatureDossier[];
-  typesPiece: TypePieceOption[];
 }) {
   const { register, control, formState, setValue } = form;
   const errors = formState.errors;
@@ -81,16 +86,6 @@ export function StepDossier({
       </Field>
 
       <EtatConservationField form={form} label="État du dossier" etatField="etatDossier" descriptionField="etatDossierDescription" />
-
-      <Field>
-        <FieldLabel>Nombre de pièces dans le dossier</FieldLabel>
-        <FieldContent>
-          <Input type="number" min={0} step={1} {...register("nombrePieces")} placeholder="Ex. 5" />
-          <FieldError errors={[errors.nombrePieces]} />
-        </FieldContent>
-      </Field>
-
-      <TypesPiecesField form={form} typesPiece={typesPiece} />
 
       <Field className="sm:col-span-2">
         <FieldLabel>Autres pièces</FieldLabel>

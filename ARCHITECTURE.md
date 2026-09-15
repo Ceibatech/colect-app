@@ -5,7 +5,7 @@
 ### Cycle métier
 
 ```
-COLLECTE → CONTRÔLE → VALIDATION → NUMÉRISATION → INDEXATION → ARCHIVAGE
+COLLECTE → CONTRÔLE → VALIDATION → PRÉPARATION → NUMÉRISATION → INDEXATION → ARCHIVAGE
 ```
 
 ### Workflow détaillé (état d'un dossier)
@@ -18,6 +18,10 @@ SOUMIS
 EN CONTRÔLE
    ↓
 VALIDÉ (superviseur) ──────→ REJETÉ
+   ↓
+[opérateur prépare] → À VALIDER (préparation) ──────→ REJETÉ → [opérateur relance]
+   ↓ (superviseur valide)
+PRÉPARÉ
    ↓
 [opérateur numérise] → À VALIDER (numérisation) ──────→ REJETÉ → [opérateur relance]
    ↓ (superviseur valide)
@@ -33,19 +37,31 @@ ARCHIVÉ
 ```
 
 Un dossier ne peut pas être ARCHIVÉ s'il n'est pas INDEXÉ, ni INDEXÉ s'il n'est pas
-NUMÉRISÉ, ni NUMÉRISÉ s'il n'est pas VALIDÉ. Ces règles sont appliquées en couche
-service (pas uniquement côté client) — voir §5 « aucune confiance au frontend seul ».
+NUMÉRISÉ, ni NUMÉRISÉ s'il n'est pas PRÉPARÉ, ni PRÉPARÉ s'il n'est pas VALIDÉ. Ces
+règles sont appliquées en couche service (pas uniquement côté client) — voir §5
+« aucune confiance au frontend seul ».
 
 **Validation superviseur à chaque étape (Phase 19+)** : comme pour la Collecte
-(EN CONTRÔLE → VALIDÉ/REJETÉ), chacune des 3 étapes opérationnelles suivantes passe
+(EN CONTRÔLE → VALIDÉ/REJETÉ), chacune des étapes opérationnelles suivantes passe
 désormais par une validation superviseur avant d'être considérée terminée — l'action de
-l'opérateur (numériser/indexer/archiver) ne termine plus directement l'étape, elle la
-soumet ("À valider"). Le superviseur (scopé à ses opérateurs affectés, même règle de
-cloisonnement que pour la Collecte — voir `src/lib/services/access-scope.ts`) valide
-(→ Terminé, débloque l'étape suivante) ou rejette
-avec un motif obligatoire (→ Rejeté, renvoyé à l'opérateur qui peut relancer l'action).
-Détail : [DATABASE.md](DATABASE.md#3-origine-des-champs--fiche-cg1020-vs-suivi-applicatif),
+l'opérateur (préparer/numériser/indexer/archiver) ne termine plus directement l'étape,
+elle la soumet ("À valider"). Le superviseur (scopé à ses opérateurs affectés, même
+règle de cloisonnement que pour la Collecte — voir `src/lib/services/access-scope.ts`)
+valide (→ Terminé, débloque l'étape suivante) ou rejette avec un motif obligatoire
+(→ Rejeté, renvoyé à l'opérateur qui peut relancer l'action). Détail :
+[DATABASE.md](DATABASE.md#3-origine-des-champs--fiche-cg1020-vs-suivi-applicatif),
 `src/lib/services/workflow-service.ts`.
+
+**Étape "Préparation" (Phase 20+)** : intercalée entre Validation et Numérisation,
+c'est la plus récente des étapes opérationnelles et la seule où l'opérateur saisit des
+données plutôt que de simplement déclencher une action — nombre de pièces, types de
+pièces (liste fermée extensible) et nombre de pages, **retirés de la Collecte**
+(cf. `StepDossier.tsx`/`StepSuivi.tsx`) pour constituer cette fiche à part : ces
+informations ne sont pas toujours connues sur le terrain avant même que le dossier soit
+validé. Contrairement aux 3 autres étapes opérationnelles, elle n'a pas de table
+dédiée (pas de `preparations`, comme `numerisations`/`indexations`/`archivages`) —
+même principe que Validation, qui n'en a jamais eu non plus : ce n'est qu'une porte de
+contrôle sur des champs déjà présents sur `Dossier`.
 
 ### Source fonctionnelle
 

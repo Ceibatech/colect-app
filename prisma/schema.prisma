@@ -408,6 +408,7 @@ model Equipement {
 enum WorkflowType {
   COLLECTE
   VALIDATION
+  PREPARATION
   NUMERISATION
   INDEXATION
   ARCHIVAGE
@@ -489,6 +490,25 @@ enum StatutValidation {
 // donc l'étape suivante est débloquée") — il n'est simplement plus atteint
 // directement par l'opérateur, ce qui ne casse aucune des vérifications déjà
 // en place ailleurs (dashboard, export, gate de l'étape suivante...).
+//
+// Phase 20+ : nouvelle étape "Préparation", intercalée entre Validation et
+// Numérisation (cycle complet désormais Collecte -> Validation ->
+// Préparation -> Numérisation -> Indexation -> Archivage). Même forme que
+// StatutNumerisation/StatutIndexation/StatutArchivage ci-dessous — l'
+// opérateur y renseigne nombrePieces/typesPieces/nombrePages (retirés de la
+// Collecte, cf. StepDossier.tsx/StepSuivi.tsx), le superviseur valide ou
+// rejette. Pas de table dédiée (contrairement à numerisations/indexations/
+// archivages) : comme Validation, qui n'a elle-même jamais eu de table
+// propre, ce n'est qu'une porte de contrôle sur des champs déjà présents sur
+// `Dossier` — une table ne s'imposait pas.
+enum StatutPreparation {
+  EN_ATTENTE
+  EN_COURS
+  A_VALIDER
+  TERMINE
+  REJETE
+}
+
 enum StatutNumerisation {
   EN_ATTENTE
   EN_COURS
@@ -588,12 +608,16 @@ model Dossier {
   // --- SUIVI APPLICATIF (ajouté pour la gestion du processus métier) ---
   statutCollecte     StatutCollecte     @default(BROUILLON) @map("statut_collecte")
   statutValidation   StatutValidation   @default(EN_ATTENTE) @map("statut_validation")
+  // Phase 20+ : étape "Préparation", intercalée entre Validation et
+  // Numérisation — voir le commentaire sur l'enum StatutPreparation.
+  statutPreparation  StatutPreparation  @default(EN_ATTENTE) @map("statut_preparation")
   statutNumerisation StatutNumerisation @default(EN_ATTENTE) @map("statut_numerisation")
   statutIndexation   StatutIndexation   @default(EN_ATTENTE) @map("statut_indexation")
   statutArchivage    StatutArchivage    @default(EN_ATTENTE) @map("statut_archivage")
 
   dateSoumission   DateTime? @map("date_soumission")
   dateValidation   DateTime? @map("date_validation")
+  datePreparation  DateTime? @map("date_preparation")
   dateNumerisation DateTime? @map("date_numerisation")
   dateIndexation   DateTime? @map("date_indexation")
   dateArchivage    DateTime? @map("date_archivage")
@@ -636,6 +660,7 @@ model Dossier {
   @@index([operateurId])
   @@index([statutCollecte])
   @@index([statutValidation])
+  @@index([statutPreparation])
   @@index([statutNumerisation])
   @@index([statutIndexation])
   @@index([statutArchivage])

@@ -165,6 +165,11 @@ personneContact, mobile
 > `types_piece` administrable depuis `/administration/types-piece` (mêmes conventions —
 > jamais de suppression physique). Champ distinct de `autres_pieces` ci-dessus : l'un
 > catégorise (types connus/extensibles), l'autre est un fourre-tout en saisie libre.
+>
+> **Modifié (Phase 20+)** : `nombre_pieces` et la relation `types_piece` sont retirés de
+> la Collecte (colonnes et référentiel inchangés, seul le point de saisie change) pour
+> constituer, avec `nombre_pages`, la nouvelle étape "Préparation" — voir la note
+> ci-dessous.
 
 Tous les autres champs (`reference`, les 5 `statut*`, les 5 `date*`, `nombrePages`,
 `observations`, `createdAt`/`updatedAt`) sont des **ajouts applicatifs** pour piloter le
@@ -184,6 +189,37 @@ processus métier — ils ne figurent pas sur la fiche CG1020.
 > superviseur — même règle que `DOSSIER_VALIDATE`/`REJECT` pour la Collecte (cf.
 > `assertSupervisorScope()` dans `workflow-service.ts`). Dossiers déjà `TERMINE` avant ce
 > changement : considérés définitivement validés, aucun retraitement rétroactif.
+>
+> **Ajout (Phase 20+)** : nouvelle étape "Préparation", intercalée entre Validation et
+> Numérisation — le cycle complet devient Collecte → Validation → Préparation →
+> Numérisation → Indexation → Archivage. Nouvel enum `StatutPreparation` (même forme que
+> `StatutNumerisation` ci-dessus : `EN_ATTENTE`/`EN_COURS`/`A_VALIDER`/`TERMINE`/`REJETE`),
+> nouvelles colonnes `dossiers.statut_preparation` (défaut `EN_ATTENTE`) et
+> `dossiers.date_preparation`, nouvelle valeur `PREPARATION` sur l'enum `WorkflowType`.
+> **Aucune table dédiée** (pas de `preparations`, contrairement à
+> `numerisations`/`indexations`/`archivages`) : comme `VALIDATION`, qui n'en a jamais eu
+> non plus, ce n'est qu'une porte de contrôle sur des champs déjà présents sur `dossiers`
+> — une table ne s'imposait pas.
+>
+> Les champs saisis à cette étape — `nombre_pieces`, la relation `types_piece` et
+> `nombre_pages` — existaient déjà (Phase 18+/15+) mais étaient saisis directement dans
+> la Collecte ; ils en sont retirés (`StepDossier.tsx`/`StepSuivi.tsx`) et déplacés vers
+> cette nouvelle fiche (`PreparationActions` dans `WorkflowActions.tsx`), l'opérateur ne
+> connaissant pas toujours ces informations sur le terrain avant même la validation du
+> dossier. `resolveTypesPieceIds()`/`generateTypePieceCode()` sont déplacées de
+> `dossier-service.ts` vers `workflow-service.ts` en conséquence.
+>
+> Nouvelles permissions `PREPARATION_VIEW`/`UPDATE`/`VALIDATE`/`REJECT` (mêmes
+> attributions que `NUMERISATION_*` : `UPDATE` pour OPERATEUR, `VALIDATE`/`REJECT` pour
+> SUPERVISEUR, tout pour ADMIN).
+>
+> **Dossiers déjà avancés avant ce changement** : un dossier déjà `NUMERISE`/`INDEXE`/
+> `ARCHIVE` (donc dont `statut_numerisation` a dépassé `EN_ATTENTE`) a nécessairement été
+> numérisé sans être jamais passé par une Préparation, qui n'existait pas encore — sa
+> `statut_preparation` est rétroactivement mise à `TERMINE` lors du déploiement (même
+> principe que pour la Phase 19+ ci-dessus : aucun retraitement rétroactif). Un dossier
+> simplement `VALIDE` (jamais numérisé) reste, lui, `EN_ATTENTE` de préparation — c'est
+> la première fois que l'étape s'applique réellement à lui.
 
 ## 4. Décisions de conception documentées
 

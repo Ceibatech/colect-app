@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import type {
   StatutCollecte,
   StatutValidation,
+  StatutPreparation,
   StatutNumerisation,
   StatutIndexation,
   StatutArchivage,
@@ -17,6 +18,7 @@ export interface DossierSearchFilters {
   operateurId?: number | { in: number[] };
   statutCollecte?: StatutCollecte;
   statutValidation?: StatutValidation;
+  statutPreparation?: StatutPreparation;
   statutNumerisation?: StatutNumerisation;
   statutIndexation?: StatutIndexation;
   statutArchivage?: StatutArchivage;
@@ -69,6 +71,7 @@ export async function searchDossiers(filters: DossierSearchFilters, options: Dos
   if (filters.operateurId) where.operateurId = filters.operateurId;
   if (filters.statutCollecte) where.statutCollecte = filters.statutCollecte;
   if (filters.statutValidation) where.statutValidation = filters.statutValidation;
+  if (filters.statutPreparation) where.statutPreparation = filters.statutPreparation;
   if (filters.statutNumerisation) where.statutNumerisation = filters.statutNumerisation;
   if (filters.statutIndexation) where.statutIndexation = filters.statutIndexation;
   if (filters.statutArchivage) where.statutArchivage = filters.statutArchivage;

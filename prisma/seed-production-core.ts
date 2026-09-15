@@ -39,6 +39,15 @@ const WORKFLOW_STATUSES: Array<{ workflowType: WorkflowType; code: string; libel
   { workflowType: "VALIDATION", code: "VALIDE", libelle: "Validé", ordre: 3, isFinal: true },
   { workflowType: "VALIDATION", code: "REJETE", libelle: "Rejeté", ordre: 3, isFinal: true },
 
+  // Phase 20+ : nouvelle étape "Préparation", intercalée entre Validation et
+  // Numérisation. Même forme que NUMERISATION/INDEXATION/ARCHIVAGE
+  // ci-dessous (A_VALIDER/REJETE s'intercalent avant TERMINE).
+  { workflowType: "PREPARATION", code: "EN_ATTENTE", libelle: "En attente", ordre: 1, isFinal: false },
+  { workflowType: "PREPARATION", code: "EN_COURS", libelle: "En cours", ordre: 2, isFinal: false },
+  { workflowType: "PREPARATION", code: "A_VALIDER", libelle: "À valider", ordre: 3, isFinal: false },
+  { workflowType: "PREPARATION", code: "TERMINE", libelle: "Terminé", ordre: 4, isFinal: true },
+  { workflowType: "PREPARATION", code: "REJETE", libelle: "Rejeté", ordre: 4, isFinal: false },
+
   // Phase 19+ : A_VALIDER (l'opérateur a agi, en attente du superviseur) et
   // REJETE (renvoyé à l'opérateur pour reprise) s'intercalent avant TERMINE,
   // sur les 3 étapes opérationnelles — même principe que VALIDATION ci-dessus.
