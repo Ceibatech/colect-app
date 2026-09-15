@@ -1,7 +1,7 @@
 export const FINANCE_ACTIVITY_TYPES = ["COLLECTE", "NUMERISATION", "INDEXATION", "ARCHIVAGE"] as const;
 
 export type FinanceActivityType = (typeof FINANCE_ACTIVITY_TYPES)[number];
-export type FinanceWorkflowType = "COLLECTE" | "VALIDATION" | "NUMERISATION" | "INDEXATION" | "ARCHIVAGE";
+export type FinanceWorkflowType = "COLLECTE" | "VALIDATION" | "PREPARATION" | "NUMERISATION" | "INDEXATION" | "ARCHIVAGE";
 export type SupervisorDecisionKind = "VALIDATION" | "REJET";
 
 export interface WorkflowPointEvent {
