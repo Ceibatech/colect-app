@@ -4,7 +4,7 @@
  * par l'application (contrôles serveur, middleware, UI conditionnelle).
  */
 
-export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "CONSULTATION"] as const;
+export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const PERMISSIONS = [
@@ -35,6 +35,9 @@ export const PERMISSIONS = [
   "QUALITY_UPDATE",
   "IMPORT_DATA",
   "EXPORT_DATA",
+  "FINANCE_VIEW",
+  "FINANCE_CONFIGURE",
+  "PMO_VIEW",
   "USER_MANAGE",
   "ROLE_MANAGE",
   "REFERENTIEL_MANAGE",
@@ -83,7 +86,17 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "ARCHIVAGE_UPDATE",
     "IMPORT_DATA",
   ],
-  CONSULTATION: ["DASHBOARD_VIEW", "DOSSIER_READ", "PREPARATION_VIEW", "NUMERISATION_VIEW", "INDEXATION_VIEW", "ARCHIVAGE_VIEW"],
+  FINANCE: ["DASHBOARD_VIEW", "FINANCE_VIEW", "FINANCE_CONFIGURE"],
+  PMO: ["DASHBOARD_VIEW", "PMO_VIEW"],
+  EXECUTIF: ["DASHBOARD_VIEW"],
+  CONSULTATION: [
+    "DASHBOARD_VIEW",
+    "DOSSIER_READ",
+    "PREPARATION_VIEW",
+    "NUMERISATION_VIEW",
+    "INDEXATION_VIEW",
+    "ARCHIVAGE_VIEW",
+  ],
 };
 
 /**
@@ -101,6 +114,11 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
  * requis (défense en profondeur suffisante, cf. §60).
  */
 export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly RoleCode[] }> = [
+  { prefix: "/dashboard/direction", roles: ["ADMIN", "EXECUTIF", "PMO", "CONSULTATION"] },
+  { prefix: "/dashboard/operateurs", roles: ["ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR"] },
+  { prefix: "/dashboard/geographie", roles: ["ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR", "CONSULTATION"] },
+  { prefix: "/dashboard/finance", roles: ["ADMIN", "FINANCE"] },
+  { prefix: "/dashboard/pmo", roles: ["ADMIN", "PMO"] },
   { prefix: "/qualite", roles: ["ADMIN", "SUPERVISEUR"] },
   { prefix: "/import", roles: ["ADMIN", "OPERATEUR"] },
 ];

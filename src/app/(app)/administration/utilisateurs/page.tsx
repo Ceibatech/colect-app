@@ -1,15 +1,18 @@
+import { Users } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
-import { listUsersWithRoles, listRoles, listActiveOperateursForAssignment } from "@/lib/services/user-admin-service";
+import { listUsersWithRoles, listRoles, listActiveOperateursForAssignment, listActiveSupervisorsForPmoAssignment } from "@/lib/services/user-admin-service";
 import { UsersManager } from "@/components/administration/UsersManager";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export const metadata = { title: "Utilisateurs — Administration" };
 
 export default async function AdminUtilisateursPage() {
   const session = await requirePermission("USER_MANAGE");
-  const [users, roles, operateurs] = await Promise.all([
+  const [users, roles, operateurs, supervisors] = await Promise.all([
     listUsersWithRoles(),
     listRoles(),
     listActiveOperateursForAssignment(),
+    listActiveSupervisorsForPmoAssignment(),
   ]);
 
   const serialized = users.map((u) => ({
@@ -21,6 +24,7 @@ export default async function AdminUtilisateursPage() {
     role: { id: u.role.id, code: u.role.code, name: u.role.name },
     operateur: u.operateur ? { id: u.operateur.id, matricule: u.operateur.matricule, isActive: u.operateur.isActive } : null,
     supervisedCount: u._count.supervisedOperateurs,
+    pmoSupervisorIds: u.pmoSupervisorScopes.map((scope) => scope.supervisorUserId),
   }));
 
   const serializedOperateurs = operateurs.map((o) => ({
@@ -32,17 +36,27 @@ export default async function AdminUtilisateursPage() {
     supervisorName: o.supervisor?.name ?? null,
   }));
 
+  const serializedSupervisors = supervisors.map((supervisor) => ({
+    id: supervisor.id,
+    name: supervisor.name,
+    email: supervisor.email,
+    operatorCount: supervisor._count.supervisedOperateurs,
+  }));
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Utilisateurs</h1>
-        <p className="text-sm text-muted-foreground">
-          {users.length} compte{users.length > 1 ? "s" : ""}. La désactivation retire l&apos;accès sans supprimer
-          l&apos;historique (§60). L&apos;affectation d&apos;opérateurs à un superviseur (rôle Superviseur) détermine
-          les dossiers qu&apos;il peut consulter et valider.
-        </p>
-      </div>
-      <UsersManager users={serialized} roles={roles} operateurs={serializedOperateurs} currentUserId={session.userId} />
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Sécurité"
+        icon={Users}
+        title="Utilisateurs"
+        description={`${users.length} compte${users.length > 1 ? "s" : ""}. La désactivation retire l'accès sans supprimer l'historique.`}
+        stats={[
+          { label: "Comptes", value: users.length },
+          { label: "Actifs", value: users.filter((u) => u.isActive).length, tone: "success" },
+          { label: "Rôles", value: roles.length },
+          { label: "Opérateurs", value: operateurs.length },
+        ]}
+      />
+      <UsersManager users={serialized} roles={roles} operateurs={serializedOperateurs} supervisors={serializedSupervisors} currentUserId={session.userId} />
     </div>
   );
 }

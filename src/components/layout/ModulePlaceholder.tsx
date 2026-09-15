@@ -17,20 +17,22 @@ export function ModulePlaceholder({
   description: string;
 }) {
   return (
-    <Card>
+    <Card className="mx-auto max-w-2xl border-dashed bg-card/95">
       <CardHeader>
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-            <Construction className="h-5 w-5 text-muted-foreground" />
+        <div className="flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+            <Construction className="h-6 w-6" />
           </div>
-          <div>
-            <CardTitle>{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
+          <div className="space-y-1">
+            <CardTitle className="text-xl tracking-tight">{title}</CardTitle>
+            <CardDescription className="leading-6">{description}</CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent>
-        <Badge variant="outline">Module à construire — {phase}</Badge>
+        <Badge variant="outline" className="rounded-md bg-background/70">
+          Module à construire — {phase}
+        </Badge>
       </CardContent>
     </Card>
   );

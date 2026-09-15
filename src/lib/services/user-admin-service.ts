@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
 import { hashPassword } from "@/lib/auth/password";
 import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/validation/user-admin";
+import { issuePasswordAccessEmail } from "@/lib/services/password-reset-service";
 
 /**
  * CRUD administration des utilisateurs (Phase 15+, §11) — jamais de
@@ -24,6 +25,8 @@ import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/v
 export interface ActionResult {
   error?: string;
   success?: boolean;
+  message?: string;
+  warning?: string;
 }
 
 export async function listUsersWithRoles() {
@@ -33,6 +36,7 @@ export async function listUsersWithRoles() {
     include: {
       role: true,
       operateur: { select: { id: true, matricule: true, isActive: true } },
+      pmoSupervisorScopes: { select: { supervisorUserId: true } },
       _count: { select: { supervisedOperateurs: true } },
     },
   });
@@ -65,6 +69,20 @@ export async function listActiveOperateursForAssignment() {
   });
 }
 
+/** Superviseurs disponibles pour constituer le périmètre d'un compte PMO. */
+export async function listActiveSupervisorsForPmoAssignment() {
+  await requirePermission("USER_MANAGE");
+  return prisma.user.findMany({
+    where: { isActive: true, role: { code: "SUPERVISEUR" } },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      _count: { select: { supervisedOperateurs: true } },
+    },
+  });
+}
 async function nextOperateurMatricule(): Promise<string> {
   const count = await prisma.operateur.count();
   let n = count + 1;
@@ -86,7 +104,9 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
     password: formData.get("password"),
     roleId: formData.get("roleId"),
     telephone: formData.get("telephone"),
+    supervisorIds: formData.getAll("supervisorIds"),
   });
+  const sendInvitation = formData.get("sendInvitation") === "on";
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
 
   const email = parsed.data.email.toLowerCase();
@@ -96,32 +116,76 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
   const role = await prisma.role.findUnique({ where: { id: parsed.data.roleId } });
   if (!role) return { error: "Rôle introuvable." };
 
-  const passwordHash = await hashPassword(parsed.data.password);
-  const ip = await getClientIp();
-
-  const user = await prisma.user.create({
-    data: { name: parsed.data.name, email, passwordHash, roleId: role.id },
-  });
-
-  if (role.code === "OPERATEUR") {
-    const matricule = await nextOperateurMatricule();
-    await prisma.operateur.create({
-      data: {
-        userId: user.id,
-        matricule,
-        nom: parsed.data.name,
-        telephone: parsed.data.telephone || null,
-        email,
-        isActive: true,
-      },
+  if (role.code === "PMO" && parsed.data.supervisorIds.length > 0) {
+    const uniqueSupervisorIds = [...new Set(parsed.data.supervisorIds)];
+    const validSupervisors = await prisma.user.count({
+      where: { id: { in: uniqueSupervisorIds }, isActive: true, role: { code: "SUPERVISEUR" } },
     });
+    if (validSupervisors !== uniqueSupervisorIds.length) {
+      return { error: "Un superviseur sélectionné est inactif ou n'a plus le rôle Superviseur." };
+    }
   }
 
-  await prisma.auditLog.create({
-    data: { userId: session.userId, action: "USER_CREATE", entity: "USER", entityId: user.id, newValue: { name: user.name, email, role: role.code }, ipAddress: ip },
+  const passwordHash = await hashPassword(parsed.data.password);
+  const ip = await getClientIp();
+  const matricule = role.code === "OPERATEUR" ? await nextOperateurMatricule() : null;
+  const supervisorIds = [...new Set(parsed.data.supervisorIds)];
+
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: { name: parsed.data.name, email, passwordHash, roleId: role.id },
+    });
+
+    if (role.code === "OPERATEUR" && matricule) {
+      await tx.operateur.create({
+        data: {
+          userId: created.id,
+          matricule,
+          nom: parsed.data.name,
+          telephone: parsed.data.telephone || null,
+          email,
+          isActive: true,
+        },
+      });
+    }
+
+    if (role.code === "PMO" && supervisorIds.length > 0) {
+      await tx.pmoSupervisorScope.createMany({
+        data: supervisorIds.map((supervisorUserId) => ({ pmoUserId: created.id, supervisorUserId })),
+        skipDuplicates: true,
+      });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        userId: session.userId,
+        action: "USER_CREATE",
+        entity: "USER",
+        entityId: created.id,
+        newValue: { name: created.name, email, role: role.code, pmoSupervisorCount: role.code === "PMO" ? supervisorIds.length : 0 },
+        ipAddress: ip,
+      },
+    });
+    return created;
   });
 
-  return { success: true };
+  if (sendInvitation) {
+    try {
+      await issuePasswordAccessEmail({ user, purpose: "ACTIVATE" });
+      await prisma.auditLog.create({
+        data: { userId: session.userId, action: "USER_INVITATION_EMAIL", entity: "USER", entityId: user.id, ipAddress: ip },
+      });
+      return { success: true, message: "Compte créé et invitation envoyée." };
+    } catch (error) {
+      console.error("User invitation email delivery failed.", error);
+      return {
+        success: true,
+        warning: "Le compte a été créé, mais l'invitation n'a pas pu être envoyée. Vérifiez la configuration Resend puis renvoyez l'accès depuis la liste.",
+      };
+    }
+  }
+
+  return { success: true, message: "Compte créé." };
 }
 
 export async function updateUser(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
@@ -131,10 +195,11 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
     roleId: formData.get("roleId"),
     isActive: formData.get("isActive") === "on",
     operateurIds: formData.getAll("operateurIds"),
+    supervisorIds: formData.getAll("supervisorIds"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
 
-  const before = await prisma.user.findUnique({ where: { id }, include: { role: true, operateur: true } });
+  const before = await prisma.user.findUnique({ where: { id }, include: { role: true, operateur: true, pmoSupervisorScopes: true } });
   if (!before) return { error: "Utilisateur introuvable." };
 
   const newRole = await prisma.role.findUnique({ where: { id: parsed.data.roleId } });
@@ -163,6 +228,15 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
     }
   }
 
+  if (newRole.code === "PMO" && parsed.data.supervisorIds.length > 0) {
+    const validSupervisors = await prisma.user.count({
+      where: { id: { in: parsed.data.supervisorIds }, isActive: true, role: { code: "SUPERVISEUR" } },
+    });
+    if (validSupervisors !== new Set(parsed.data.supervisorIds).size) {
+      return { error: "Un superviseur sélectionné est inactif ou n'a plus le rôle Superviseur." };
+    }
+  }
+
   const ip = await getClientIp();
 
   await prisma.$transaction(async (tx) => {
@@ -188,7 +262,7 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
     // synchronise Operateur.supervisorId sur la liste choisie dans le
     // formulaire. `notIn: desired` avec `desired` vide équivaut à "pas de
     // filtre" côté Prisma (undefined ignoré) -> libère tout le monde.
-    if (newRole.code === "SUPERVISEUR") {
+    if (newRole.code === "SUPERVISEUR" && parsed.data.isActive) {
       const desired = parsed.data.operateurIds;
       await tx.operateur.updateMany({
         where: { supervisorId: id, ...(desired.length ? { id: { notIn: desired } } : {}) },
@@ -205,10 +279,25 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
         });
       }
     } else if (before.role.code === "SUPERVISEUR") {
-      // Rôle changé hors SUPERVISEUR : libère les opérateurs qu'il supervisait
-      // (sinon une affectation resterait en base sans effet visible mais
-      // incohérente si ce compte redevient superviseur plus tard).
+      // Rôle changé hors SUPERVISEUR : libère son équipe et le retire des
+      // périmètres PMO qui le référenceaient.
       await tx.operateur.updateMany({ where: { supervisorId: id }, data: { supervisorId: null } });
+      await tx.pmoSupervisorScope.deleteMany({ where: { supervisorUserId: id } });
+    }
+
+    if (newRole.code === "PMO") {
+      const desired = [...new Set(parsed.data.supervisorIds)];
+      await tx.pmoSupervisorScope.deleteMany({
+        where: { pmoUserId: id, ...(desired.length ? { supervisorUserId: { notIn: desired } } : {}) },
+      });
+      if (desired.length > 0) {
+        await tx.pmoSupervisorScope.createMany({
+          data: desired.map((supervisorUserId) => ({ pmoUserId: id, supervisorUserId })),
+          skipDuplicates: true,
+        });
+      }
+    } else if (before.role.code === "PMO") {
+      await tx.pmoSupervisorScope.deleteMany({ where: { pmoUserId: id } });
     }
 
     await tx.auditLog.create({
@@ -218,7 +307,7 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
         entity: "USER",
         entityId: id,
         oldValue: { name: before.name, role: before.role.code, isActive: before.isActive },
-        newValue: { name: parsed.data.name, role: newRole.code, isActive: parsed.data.isActive },
+        newValue: { name: parsed.data.name, role: newRole.code, isActive: parsed.data.isActive, pmoSupervisorCount: newRole.code === "PMO" ? parsed.data.supervisorIds.length : 0 },
         ipAddress: ip,
       },
     });
@@ -243,10 +332,99 @@ export async function resetUserPassword(id: number, _prevState: ActionResult, fo
 
   await prisma.$transaction([
     prisma.user.update({ where: { id }, data: { passwordHash } }),
+    prisma.passwordResetToken.deleteMany({ where: { userId: id } }),
     prisma.auditLog.create({
       data: { userId: session.userId, action: "PASSWORD_RESET_ADMIN", entity: "USER", entityId: id, ipAddress: ip },
     }),
   ]);
 
   return { success: true };
+}
+
+export async function sendUserAccessEmail(
+  id: number,
+  _prevState: ActionResult,
+  _formData: FormData
+): Promise<ActionResult> {
+  void _prevState;
+  void _formData;
+  const session = await requirePermission("USER_MANAGE");
+  const user = await prisma.user.findUnique({
+    where: { id },
+    select: { id: true, name: true, email: true, isActive: true, lastLoginAt: true },
+  });
+  if (!user) return { error: "Utilisateur introuvable." };
+  if (!user.isActive) return { error: "Activez ce compte avant d'envoyer un accès." };
+
+  const ip = await getClientIp();
+  const purpose = user.lastLoginAt ? "RESET" : "ACTIVATE";
+
+  try {
+    await issuePasswordAccessEmail({ user, purpose });
+    await prisma.auditLog.create({
+      data: {
+        userId: session.userId,
+        action: purpose === "ACTIVATE" ? "USER_INVITATION_EMAIL" : "PASSWORD_RESET_EMAIL_ADMIN",
+        entity: "USER",
+        entityId: user.id,
+        ipAddress: ip,
+      },
+    });
+    return { success: true, message: `Lien sécurisé envoyé à ${user.email}.` };
+  } catch (error) {
+    console.error("User access email delivery failed.", error);
+    return { error: "Envoi impossible. Vérifiez la clé Resend, le domaine expéditeur et l'adresse du destinataire." };
+  }
+}
+
+export async function sendPendingUsersAccessEmails(
+  _prevState: ActionResult,
+  _formData: FormData
+): Promise<ActionResult> {
+  void _prevState;
+  void _formData;
+  const session = await requirePermission("USER_MANAGE");
+  const users = await prisma.user.findMany({
+    where: {
+      isActive: true,
+      lastLoginAt: null,
+      passwordResetTokens: {
+        none: { purpose: "ACTIVATE", usedAt: null, expiresAt: { gt: new Date() } },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    take: 10,
+    select: { id: true, name: true, email: true },
+  });
+
+  if (users.length === 0) {
+    return { success: true, message: "Aucune nouvelle invitation à envoyer pour le moment." };
+  }
+
+  const ip = await getClientIp();
+  let sent = 0;
+  let failed = 0;
+
+  for (const user of users) {
+    try {
+      await issuePasswordAccessEmail({ user, purpose: "ACTIVATE" });
+      await prisma.auditLog.create({
+        data: { userId: session.userId, action: "USER_INVITATION_EMAIL", entity: "USER", entityId: user.id, ipAddress: ip },
+      });
+      sent++;
+    } catch (error) {
+      console.error("Bulk user invitation email delivery failed.", error);
+      failed++;
+    }
+  }
+
+  if (sent === 0) {
+    return { error: "Aucune invitation n'a pu être envoyée. Vérifiez la configuration Resend." };
+  }
+
+  return {
+    success: true,
+    message: `${sent} invitation${sent > 1 ? "s" : ""} envoyée${sent > 1 ? "s" : ""}.`,
+    warning: failed > 0 ? `${failed} envoi${failed > 1 ? "s" : ""} en échec.` : undefined,
+  };
 }

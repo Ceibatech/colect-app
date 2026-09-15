@@ -27,7 +27,7 @@ datasource db {
 
 model Role {
   id          Int      @id @default(autoincrement())
-  code        String   @unique // ADMIN | SUPERVISEUR | OPERATEUR | CONSULTATION
+  code        String   @unique // ADMIN | SUPERVISEUR | OPERATEUR | FINANCE | PMO | EXECUTIF | CONSULTATION
   name        String
   description String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
@@ -96,11 +96,65 @@ model User {
   exports             Export[]
   auditLogs           AuditLog[]
   notifications       Notification[]
+  passwordResetTokens PasswordResetToken[]
+  pmoSupervisorScopes PmoSupervisorScope[] @relation("PmoScopeOwner")
+  pmoScopeMemberships PmoSupervisorScope[] @relation("PmoScopeSupervisor")
+  financeRatesCreated FinanceRate[] @relation("FinanceRateCreatedBy")
 
   @@index([roleId])
   @@map("users")
 }
 
+enum PasswordResetPurpose {
+  RESET
+  ACTIVATE
+}
+
+model PasswordResetToken {
+  id        Int                  @id @default(autoincrement())
+  userId    Int                  @map("user_id")
+  tokenHash String               @unique @map("token_hash") @db.Char(64)
+  purpose   PasswordResetPurpose @default(RESET)
+  expiresAt DateTime             @map("expires_at")
+  usedAt    DateTime?            @map("used_at")
+  createdAt DateTime             @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model PmoSupervisorScope {
+  id               Int      @id @default(autoincrement())
+  pmoUserId        Int      @map("pmo_user_id")
+  supervisorUserId Int      @map("supervisor_user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  pmoUser    User @relation("PmoScopeOwner", fields: [pmoUserId], references: [id], onDelete: Cascade)
+  supervisor User @relation("PmoScopeSupervisor", fields: [supervisorUserId], references: [id], onDelete: Cascade)
+
+  @@unique([pmoUserId, supervisorUserId])
+  @@index([supervisorUserId])
+  @@map("pmo_supervisor_scopes")
+}
+
+model FinanceRate {
+  id                   Int       @id @default(autoincrement())
+  operatorPointValue   Decimal   @map("operator_point_value") @db.Decimal(14, 2)
+  supervisorPointValue Decimal   @map("supervisor_point_value") @db.Decimal(14, 2)
+  currency             String    @default("XOF") @db.Char(3)
+  effectiveFrom        DateTime  @unique @map("effective_from")
+  effectiveTo          DateTime? @map("effective_to")
+  createdById          Int?      @map("created_by_id")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  createdBy User? @relation("FinanceRateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([effectiveFrom, effectiveTo])
+  @@map("finance_rates")
+}
 // NOTE ARCHITECTURE (choix technique documenté) :
 // Une table `operateurs` séparée de `users` est conservée car le cahier
 // des charges y fait référence explicitement comme clé étrangère sur
@@ -555,7 +609,7 @@ model Dossier {
 
   // --- IDENTIFICATION (fiche CG1020) ---
   libelleCarton       String? @map("libelle_carton")
-  codeBarres          String? @unique @map("code_barres")
+  codeBarres          String? @map("code_barres")
   numeroGuichet       String? @map("numero_guichet")
   // Anciennement "N° DDU" — repurposé en "Direction/Service concerné(e)"
   // (liste fermée + "Autres" en saisie libre, cf. src/lib/validation/dossier.ts
@@ -647,6 +701,7 @@ model Dossier {
 
   @@index([siteId])
   @@index([entrepotId])
+  @@index([codeBarres])
   @@index([numeroDdu])
   @@index([numeroDirectionService])
   @@index([numeroGuichet])

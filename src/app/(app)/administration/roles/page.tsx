@@ -1,9 +1,10 @@
 import { requirePermission } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma/client";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Check, Info } from "lucide-react";
+import { Check, Info, Shield } from "lucide-react";
 
 export const metadata = { title: "Rôles — Administration" };
 
@@ -30,41 +31,46 @@ export default async function AdminRolesPage() {
     roles.find((r) => r.id === roleId)?.rolePermissions.some((rp) => rp.permissionId === permissionId) ?? false;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Rôles &amp; permissions</h1>
-        <p className="text-sm text-muted-foreground">{roles.length} rôles, {permissions.length} permissions.</p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Sécurité"
+        icon={Shield}
+        title="Rôles & permissions"
+        description="Matrice en lecture seule des rôles et permissions appliquées à chaque nouvelle connexion."
+        stats={[
+          { label: "Rôles", value: roles.length },
+          { label: "Permissions", value: permissions.length },
+          { label: "Mode", value: "Lecture seule" },
+        ]}
+      />
 
-      <Alert>
-        <Info className="h-4 w-4" />
+      <Alert className="border-primary/20 bg-primary/5">
+        <Info className="h-4 w-4 text-primary" />
         <AlertTitle>Lecture seule</AlertTitle>
         <AlertDescription>
-          Matrice reflétant l&apos;état réel en base (utilisée pour chaque nouvelle connexion). Sa modification n&apos;est
-          pas proposée ici pour éviter de se retrouver bloqué hors de l&apos;application par erreur — contactez l&apos;équipe
-          technique pour un changement de la matrice de permissions.
+          Cette matrice reflète l&apos;état réel en base. Sa modification n&apos;est pas proposée ici afin d&apos;éviter le retrait accidentel d&apos;accès critiques.
         </AlertDescription>
       </Alert>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
+      <div className="overflow-hidden rounded-lg border border-border/70 bg-card/95 shadow-sm">
+        <Table className="min-w-[760px]">
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-muted/60 hover:bg-muted/60">
               <TableHead>Permission</TableHead>
               {roles.map((r) => (
                 <TableHead key={r.id} className="text-center">
-                  <Badge variant="secondary">{r.code}</Badge>
+                  <Badge variant="secondary" className="rounded-md">{r.code}</Badge>
                 </TableHead>
               ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {permissions.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell className="font-mono text-xs whitespace-nowrap">{p.code}</TableCell>
+              <TableRow key={p.id} className="hover:bg-accent/30">
+                <TableCell className="font-mono text-xs font-semibold whitespace-nowrap">{p.code}</TableCell>
                 {roles.map((r) => (
                   <TableCell key={r.id} className="text-center">
-                    {hasPermission(r.id, p.id) ? <Check className="mx-auto h-4 w-4 text-primary" /> : <span className="text-muted-foreground">—</span>}
+                    {hasPermission(r.id, p.id) ? <Check className="mx-auto h-4 w-4 text-brand-green" /> : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                 ))}
               </TableRow>

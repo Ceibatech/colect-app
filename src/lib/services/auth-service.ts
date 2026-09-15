@@ -6,12 +6,54 @@ import { prisma } from "@/lib/prisma/client";
 import { verifyPassword, hashPassword } from "@/lib/auth/password";
 import { signSession, COOKIE_NAME, SESSION_DURATION_SECONDS } from "@/lib/auth/session";
 import { isRateLimited, registerFailedAttempt, clearAttempts } from "@/lib/auth/rate-limit";
-import { loginSchema, changePasswordSchema } from "@/lib/validation/auth";
+import {
+  loginSchema,
+  changePasswordSchema,
+  requestPasswordResetSchema,
+  resetPasswordWithTokenSchema,
+} from "@/lib/validation/auth";
+import { assertEmailConfigured, EmailConfigurationError } from "@/lib/email/resend";
+import {
+  InvalidPasswordResetTokenError,
+  issuePasswordAccessEmail,
+  resetPasswordWithToken,
+} from "@/lib/services/password-reset-service";
 import { getSession, requireUser } from "@/lib/auth/current-user";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
 export interface LoginFormState {
   error?: string;
+}
+
+function getAuthenticationSetupError(error: unknown): string | null {
+  if (!(error instanceof Error)) return null;
+
+  if (error.name === "PrismaClientInitializationError") {
+    if (error.message.includes("Environment variable not found: DATABASE_URL")) {
+      return process.env.NODE_ENV === "production"
+        ? "Service d'authentification temporairement indisponible."
+        : "Configuration locale manquante : renseignez DATABASE_URL dans .env.local, puis relancez le serveur.";
+    }
+
+    return process.env.NODE_ENV === "production"
+      ? "Service d'authentification temporairement indisponible."
+      : "Base de données inaccessible : vérifiez DATABASE_URL, démarrez MySQL/MariaDB, puis relancez le serveur.";
+  }
+
+  if (error.message.includes("AUTH_SECRET")) {
+    return process.env.NODE_ENV === "production"
+      ? "Service d'authentification temporairement indisponible."
+      : "Configuration locale manquante : renseignez AUTH_SECRET dans .env.local, puis relancez le serveur.";
+  }
+
+  return null;
+}
+
+function findLoginUser(email: string) {
+  return prisma.user.findUnique({
+    where: { email: email.toLowerCase() },
+    include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+  });
 }
 
 async function getClientIp(): Promise<string> {
@@ -37,10 +79,14 @@ export async function loginAction(_prevState: LoginFormState, formData: FormData
     return { error: "Trop de tentatives échouées. Réessayez dans quelques minutes." };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email: email.toLowerCase() },
-    include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
-  });
+  let user: Awaited<ReturnType<typeof findLoginUser>>;
+  try {
+    user = await findLoginUser(email);
+  } catch (error) {
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
 
   // Message volontairement générique (ne pas révéler si l'e-mail existe ou non).
   const genericError = "Identifiants incorrects.";
@@ -63,13 +109,20 @@ export async function loginAction(_prevState: LoginFormState, formData: FormData
 
   const permissions = user.role.rolePermissions.map((rp) => rp.permission.code) as PermissionCode[];
 
-  const token = await signSession({
-    userId: user.id,
-    email: user.email,
-    name: user.name,
-    roleCode: user.role.code as RoleCode,
-    permissions,
-  });
+  let token: string;
+  try {
+    token = await signSession({
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      roleCode: user.role.code as RoleCode,
+      permissions,
+    });
+  } catch (error) {
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
 
   const store = await cookies();
   store.set(COOKIE_NAME, token, {
@@ -148,10 +201,114 @@ export async function changePasswordAction(
 
   await prisma.$transaction([
     prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
     prisma.auditLog.create({
       data: { userId: user.id, action: "PASSWORD_CHANGE", entity: "USER", entityId: user.id, ipAddress: ip },
     }),
   ]);
 
   return { success: true };
+}
+
+export interface RequestPasswordResetFormState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function requestPasswordResetAction(
+  _prevState: RequestPasswordResetFormState,
+  formData: FormData
+): Promise<RequestPasswordResetFormState> {
+  const parsed = requestPasswordResetSchema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Adresse e-mail invalide." };
+  }
+
+  const ip = await getClientIp();
+  const email = parsed.data.email.toLowerCase();
+  const emailRateLimitKey = `password-reset:${email}:${ip}`;
+  const ipRateLimitKey = `password-reset-ip:${ip}`;
+  const genericSuccess = { success: true } as const;
+
+  if (isRateLimited(emailRateLimitKey) || isRateLimited(ipRateLimitKey)) return genericSuccess;
+  registerFailedAttempt(emailRateLimitKey);
+  registerFailedAttempt(ipRateLimitKey);
+
+  try {
+    assertEmailConfigured();
+  } catch (error) {
+    const detail = error instanceof EmailConfigurationError ? error.message : "Configuration e-mail invalide.";
+    return {
+      error: process.env.NODE_ENV === "production"
+        ? "Le service e-mail est temporairement indisponible."
+        : `Service e-mail non configuré : ${detail}`,
+    };
+  }
+
+  let user: { id: number; name: string; email: string; isActive: boolean } | null;
+  try {
+    user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, name: true, email: true, isActive: true },
+    });
+  } catch (error) {
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
+
+  if (!user?.isActive) return genericSuccess;
+
+  try {
+    await issuePasswordAccessEmail({ user, purpose: "RESET" });
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        action: "PASSWORD_RESET_REQUEST",
+        entity: "USER",
+        entityId: user.id,
+        ipAddress: ip,
+      },
+    });
+  } catch (error) {
+    console.error("Password reset email delivery failed.", error);
+    if (process.env.NODE_ENV !== "production") {
+      return { error: "L'e-mail n'a pas pu être envoyé. Vérifiez la clé Resend et l'adresse d'expédition." };
+    }
+  }
+
+  return genericSuccess;
+}
+
+export interface ResetPasswordFromLinkFormState {
+  error?: string;
+  success?: boolean;
+}
+
+export async function resetPasswordFromLinkAction(
+  _prevState: ResetPasswordFromLinkFormState,
+  formData: FormData
+): Promise<ResetPasswordFromLinkFormState> {
+  const parsed = resetPasswordWithTokenSchema.safeParse({
+    token: formData.get("token"),
+    newPassword: formData.get("newPassword"),
+    confirmPassword: formData.get("confirmPassword"),
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
+  }
+
+  try {
+    await resetPasswordWithToken({
+      token: parsed.data.token,
+      newPassword: parsed.data.newPassword,
+      ipAddress: await getClientIp(),
+    });
+    return { success: true };
+  } catch (error) {
+    if (error instanceof InvalidPasswordResetTokenError) return { error: error.message };
+    const setupError = getAuthenticationSetupError(error);
+    if (setupError) return { error: setupError };
+    throw error;
+  }
 }

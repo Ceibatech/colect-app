@@ -54,7 +54,7 @@ test.describe("POST /api/import (aperçu — §54, ne modifie jamais la base)", 
     expect(preview.doublons).toBe(0);
 
     // §54 : l'aperçu ne doit rien écrire en base.
-    const existing = await testPrisma.dossier.findUnique({ where: { codeBarres } });
+    const existing = await testPrisma.dossier.findFirst({ where: { codeBarres } });
     expect(existing).toBeNull();
   });
 
@@ -112,7 +112,7 @@ test.describe("POST /api/import/confirm (§54 — revalide tout côté serveur, 
       expect(confirmed.imported).toBe(1);
       expect(confirmed.skipped).toBe(0);
 
-      const created = await testPrisma.dossier.findUnique({ where: { codeBarres } });
+      const created = await testPrisma.dossier.findFirst({ where: { codeBarres } });
       expect(created).not.toBeNull();
       expect(created?.statutCollecte).toBe("BROUILLON");
       createdId = created?.id;

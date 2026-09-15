@@ -94,7 +94,7 @@ Aiven fournit une base `defaultdb`. On lui préfère une base portant le nom mé
 CREATE DATABASE col_invent CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Puis appliquer le schéma (§5) — `prisma migrate deploy` recrée les 29 tables **et les
+Puis appliquer le schéma (§5) — `prisma migrate deploy` recrée les 30 tables **et les
 9 vues de reporting**, celles-ci étant définies dans les migrations
 (`20260813103408_reporting_views`, `20260813150947_evolution_validation_view`).
 
@@ -161,7 +161,11 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 | `AUTH_SECRET` | valeur générée avec `openssl rand -base64 32` — **différente** de celle utilisée en dev, jamais commitée |
 | `NODE_ENV` | `production` |
 | `DOCUMENTS_STORAGE_PATH` | point de montage du disque persistant Render (§4) |
+| `RESEND_API_KEY` | clé serveur Resend active, jamais commitée ni préfixée par `NEXT_PUBLIC_` |
+| `EMAIL_FROM` | `GeoArchives-MULCV <no-reply@ceiba-analytics.com>` après vérification du domaine dans Resend |
+| `APP_URL` | `https://geoarchives.ceiba-analytics.com` — origine utilisée dans les liens de réinitialisation |
 
+**E-mails transactionnels** : vérifier `ceiba-analytics.com` (SPF + DKIM) dans Resend avant d'utiliser l'adresse `no-reply@ceiba-analytics.com`. La clé saisie dans Render doit être une clé serveur renouvelée ; ne jamais reprendre une clé publiée dans un ticket, une conversation ou l'historique Git.
 `AUTH_SECRET` en production conditionne aussi le cookie de session `secure: true`
 (`src/lib/auth/session.ts` / `auth-service.ts`, cf. [SECURITY.md](SECURITY.md)) — un
 `NODE_ENV` mal positionné dégraderait silencieusement la sécurité des cookies.
@@ -194,7 +198,10 @@ vérification du certificat.
    les `devDependencies`, qui incluent pourtant `tailwindcss`/`typescript`/
    `prisma`, indispensables pour *construire* l'app. Bug réel rencontré au
    premier déploiement — voir « État actuel » en tête de ce document.)
-4. Start command : `npm run start`
+4. Start command : `npm run start`. Ce script applique d'abord les migrations
+   Prisma en attente, puis démarre Next.js. Les rôles et permissions ajoutés par
+   migration (`EXECUTIF`, `FINANCE`, `PMO`) deviennent ainsi disponibles dès le
+   redéploiement, sans intervention manuelle dans le Shell Render.
 5. Health check path : **`/api/health`** (route publique ajoutée en Phase 15, voir
    [API.md](API.md#get-apihealth)). ⚠️ Depuis l'incident du 21/08/2026 (§9), cette
    route répond **200 même si la base est injoignable**, en signalant l'état dans le
@@ -225,7 +232,10 @@ Avant la mise en production réelle, deux options :
 **Ne jamais** utiliser `prisma migrate dev` ni `db push --force-reset` en production
 (règle absolue du cahier des charges — destructif). Séquence correcte :
 
-1. Premier déploiement (base vide) : exécuter une fois
+1. Le démarrage de production (`npm run start`) exécute automatiquement
+   `prisma migrate deploy` avant Next.js. La commande est idempotente : seules les
+   migrations en attente sont appliquées. Pour un premier déploiement ou un
+   diagnostic, elle peut aussi être exécutée manuellement :
    ```bash
    npm run db:migrate:deploy
    ```

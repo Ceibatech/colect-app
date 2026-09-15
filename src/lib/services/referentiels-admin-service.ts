@@ -387,13 +387,17 @@ export async function listAllEntrepots() {
       orderBy: [{ site: { nom: "asc" } }, { nom: "asc" }],
       include: { site: { select: { id: true, nom: true } }, _count: { select: { dossiers: true } } },
     }),
-    prisma.dossier.groupBy({
-      by: ["entrepotId"],
+    prisma.dossier.findMany({
       where: { entrepotId: { not: null }, codeBarres: { not: null } },
-      _count: { _all: true },
+      distinct: ["entrepotId", "codeBarres"],
+      select: { entrepotId: true, codeBarres: true },
     }),
   ]);
-  const cartonMap = new Map(cartonCounts.map((c) => [c.entrepotId as number, c._count._all]));
+  const cartonMap = new Map<number, number>();
+  for (const carton of cartonCounts) {
+    if (carton.entrepotId === null) continue;
+    cartonMap.set(carton.entrepotId, (cartonMap.get(carton.entrepotId) ?? 0) + 1);
+  }
 
   return entrepots.map((e) => {
     const cartonsOccupes = cartonMap.get(e.id) ?? 0;

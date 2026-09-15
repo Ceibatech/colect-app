@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { createUser, updateUser, resetUserPassword, type ActionResult } from "@/lib/services/user-admin-service";
 import { cn } from "@/lib/utils";
+import { SendPendingUsersAccessDialog, SendUserAccessButton } from "@/components/administration/UserAccessEmailControls";
 
 export interface UserRow {
   id: number;
@@ -25,6 +26,7 @@ export interface UserRow {
   role: { id: number; code: string; name: string };
   operateur: { id: number; matricule: string; isActive: boolean } | null;
   supervisedCount: number;
+  pmoSupervisorIds: number[];
 }
 
 export interface RoleOption {
@@ -43,6 +45,13 @@ export interface OperateurOption {
   supervisorName: string | null;
 }
 
+export interface SupervisorOption {
+  id: number;
+  name: string;
+  email: string;
+  operatorCount: number;
+}
+
 const initialState: ActionResult = {};
 
 function RoleSelect({
@@ -58,7 +67,7 @@ function RoleSelect({
   value?: string;
   onValueChange?: (value: string) => void;
 }) {
-  const items = roles.map((r) => ({ label: r.name, value: String(r.id) }));
+  const items = roles.map((r) => ({ label: r.name, value: String(r.id), code: r.code }));
   return (
     <Select
       name="roleId"
@@ -74,7 +83,18 @@ function RoleSelect({
       <SelectContent>
         {items.map((o) => (
           <SelectItem key={o.value} value={o.value}>
-            {o.label}
+            <span className="flex w-full items-center justify-between gap-3">
+              <span>{o.label}</span>
+              {o.code === "EXECUTIF" || o.code === "PMO" ? (
+                <span className="rounded-sm border border-primary/20 bg-primary/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-primary">
+                  Lecture seule
+                </span>
+              ) : o.code === "FINANCE" ? (
+                <span className="rounded-sm border border-brand-gold/30 bg-brand-gold/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand-gold">
+                  Budget
+                </span>
+              ) : null}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -154,14 +174,57 @@ function OperateurAssignmentField({
   );
 }
 
-function CreateUserForm({ roles, onSuccess }: { roles: RoleOption[]; onSuccess: () => void }) {
+function PmoSupervisorAssignmentField({
+  supervisors,
+  selected,
+  onToggle,
+  disabled,
+}: {
+  supervisors: SupervisorOption[];
+  selected: number[];
+  onToggle: (id: number, checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>Superviseurs du périmètre</Label>
+      <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border p-2">
+        {supervisors.length === 0 ? (
+          <p className="p-1 text-xs text-muted-foreground">Aucun superviseur actif.</p>
+        ) : supervisors.map((supervisor) => (
+          <div key={supervisor.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50">
+            <Checkbox
+              id={`pmo-supervisor-${supervisor.id}`}
+              checked={selected.includes(supervisor.id)}
+              onCheckedChange={(value) => onToggle(supervisor.id, value === true)}
+              disabled={disabled}
+            />
+            <Label htmlFor={`pmo-supervisor-${supervisor.id}`} className="min-w-0 flex-1 cursor-pointer font-normal">
+              <span className="block truncate">{supervisor.name}</span>
+              <span className="block truncate text-xs text-muted-foreground">{supervisor.operatorCount} opérateur{supervisor.operatorCount > 1 ? "s" : ""} · {supervisor.email}</span>
+            </Label>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs leading-5 text-muted-foreground">Le compte PMO verra uniquement les tableaux de bord des équipes rattachées à ces superviseurs.</p>
+      {selected.map((id) => <input key={id} type="hidden" name="supervisorIds" value={id} />)}
+    </div>
+  );
+}
+function CreateUserForm({ roles, supervisors, onSuccess }: { roles: RoleOption[]; supervisors: SupervisorOption[]; onSuccess: (message?: string, warning?: string) => void }) {
   const [state, formAction, isPending] = useActionState(createUser, initialState);
+  const [roleId, setRoleId] = useState("");
+  const isPmo = roles.find((role) => String(role.id) === roleId)?.code === "PMO";
+  const [selectedSupervisors, setSelectedSupervisors] = useState<number[]>([]);
+  const toggleSupervisor = useCallback((id: number, checked: boolean) => {
+    setSelectedSupervisors((previous) => (checked && !previous.includes(id) ? [...previous, id] : checked ? previous : previous.filter((value) => value !== id)));
+  }, []);
 
   // `onSuccess` doit être mémoïsé (useCallback) côté appelant — voir
   // CommunesManager.tsx pour le détail.
   useEffect(() => {
-    if (state.success) onSuccess();
-  }, [state.success, onSuccess]);
+    if (state.success) onSuccess(state.message, state.warning);
+  }, [state.success, state.message, state.warning, onSuccess]);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -181,16 +244,31 @@ function CreateUserForm({ roles, onSuccess }: { roles: RoleOption[]; onSuccess: 
       <div className="space-y-2">
         <Label htmlFor="password">Mot de passe initial</Label>
         <Input id="password" name="password" type="password" minLength={8} required disabled={isPending} autoComplete="new-password" />
-        <p className="text-xs text-muted-foreground">Au moins 8 caractères — transmettez-le à l&apos;intéressé(e) par un canal sûr.</p>
+        <p className="text-xs text-muted-foreground">Au moins 8 caractères. L&apos;invitation permettra à la personne de le remplacer avant sa première connexion.</p>
+      </div>
+      <div className="flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+        <Checkbox id="sendInvitation" name="sendInvitation" defaultChecked disabled={isPending} />
+        <div className="space-y-1">
+          <Label htmlFor="sendInvitation" className="cursor-pointer font-medium">Envoyer l&apos;invitation par e-mail</Label>
+          <p className="text-xs leading-5 text-muted-foreground">Un lien personnel valable 60 minutes permettra de définir un nouveau mot de passe.</p>
+        </div>
       </div>
       <div className="space-y-2">
         <Label htmlFor="roleId">Rôle</Label>
-        <RoleSelect roles={roles} disabled={isPending} />
+        <RoleSelect roles={roles} value={roleId} onValueChange={setRoleId} disabled={isPending} />
       </div>
       <div className="space-y-2">
         <Label htmlFor="telephone">Téléphone (optionnel — utile si rôle Opérateur)</Label>
         <Input id="telephone" name="telephone" maxLength={30} disabled={isPending} />
       </div>
+      {isPmo ? (
+        <PmoSupervisorAssignmentField
+          supervisors={supervisors}
+          selected={selectedSupervisors}
+          onToggle={toggleSupervisor}
+          disabled={isPending}
+        />
+      ) : null}
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
@@ -205,12 +283,14 @@ function EditUserForm({
   user,
   roles,
   operateurs,
+  supervisors,
   onSuccess,
   canDeactivate,
 }: {
   user: UserRow;
   roles: RoleOption[];
   operateurs: OperateurOption[];
+  supervisors: SupervisorOption[];
   onSuccess: () => void;
   canDeactivate: boolean;
 }) {
@@ -220,12 +300,17 @@ function EditUserForm({
   const [roleId, setRoleId] = useState(String(user.role.id));
   const selectedRoleCode = roles.find((r) => String(r.id) === roleId)?.code;
   const isSuperviseur = selectedRoleCode === "SUPERVISEUR";
+  const isPmo = selectedRoleCode === "PMO";
 
   const [selectedOperateurs, setSelectedOperateurs] = useState<number[]>(() =>
     operateurs.filter((o) => o.supervisorId === user.id).map((o) => o.id)
   );
   const toggleOperateur = useCallback((id: number, checked: boolean) => {
-    setSelectedOperateurs((prev) => (checked ? [...prev, id] : prev.filter((x) => x !== id)));
+    setSelectedOperateurs((prev) => (checked && !prev.includes(id) ? [...prev, id] : checked ? prev : prev.filter((x) => x !== id)));
+  }, []);
+  const [selectedSupervisors, setSelectedSupervisors] = useState<number[]>(user.pmoSupervisorIds);
+  const toggleSupervisor = useCallback((id: number, checked: boolean) => {
+    setSelectedSupervisors((prev) => (checked && !prev.includes(id) ? [...prev, id] : checked ? prev : prev.filter((x) => x !== id)));
   }, []);
 
   // `onSuccess` doit être mémoïsé (useCallback) côté appelant — voir
@@ -266,6 +351,14 @@ function EditUserForm({
           currentSupervisorUserId={user.id}
           selected={selectedOperateurs}
           onToggle={toggleOperateur}
+          disabled={isPending}
+        />
+      ) : null}
+      {isPmo ? (
+        <PmoSupervisorAssignmentField
+          supervisors={supervisors}
+          selected={selectedSupervisors}
+          onToggle={toggleSupervisor}
           disabled={isPending}
         />
       ) : null}
@@ -318,11 +411,13 @@ export function UsersManager({
   users,
   roles,
   operateurs,
+  supervisors,
   currentUserId,
 }: {
   users: UserRow[];
   roles: RoleOption[];
   operateurs: OperateurOption[];
+  supervisors: SupervisorOption[];
   currentUserId: number;
 }) {
   const router = useRouter();
@@ -330,9 +425,10 @@ export function UsersManager({
   const [editId, setEditId] = useState<number | null>(null);
   const [resetId, setResetId] = useState<number | null>(null);
 
-  const onSuccessCreate = useCallback(() => {
+  const onSuccessCreate = useCallback((message?: string, warning?: string) => {
     setCreateOpen(false);
-    toast.success("Compte créé.");
+    if (warning) toast.warning(warning);
+    else toast.success(message ?? "Compte créé.");
     router.refresh();
   }, [router]);
   const onSuccessEdit = useCallback(() => {
@@ -347,22 +443,24 @@ export function UsersManager({
   }, [router]);
 
   const editing = users.find((u) => u.id === editId);
+  const pendingAccessCount = users.filter((user) => user.isActive && !user.lastLoginAt).length;
 
   const dateFmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex flex-col justify-end gap-2 sm:flex-row">
+        <SendPendingUsersAccessDialog pendingCount={pendingAccessCount} />
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger render={<Button><Plus className="mr-1 h-4 w-4" />Nouvel utilisateur</Button>} />
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Nouvel utilisateur</DialogTitle>
               <DialogDescription>
-                Une fiche opérateur est créée automatiquement si le rôle choisi est Opérateur.
+                Choisissez le niveau d&apos;accès adapté. Exécutif dispose d&apos;une lecture globale, PMO d&apos;un périmètre d&apos;équipes et Finance des points et budgets. Aucun de ces profils ne saisit de dossier.
               </DialogDescription>
             </DialogHeader>
-            <CreateUserForm roles={roles} onSuccess={onSuccessCreate} />
+            <CreateUserForm roles={roles} supervisors={supervisors} onSuccess={onSuccessCreate} />
           </DialogContent>
         </Dialog>
       </div>
@@ -387,13 +485,17 @@ export function UsersManager({
                 </TableCell>
                 <TableCell className="whitespace-nowrap">{u.email}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{u.role.code}</Badge>
+                  <Badge variant="secondary">{u.role.name}</Badge>
                   {u.operateur ? (
                     <span className="ml-1 text-xs text-muted-foreground">{u.operateur.matricule}</span>
                   ) : null}
                   {u.role.code === "SUPERVISEUR" ? (
                     <span className="ml-1 text-xs text-muted-foreground">
                       {u.supervisedCount} opérateur{u.supervisedCount > 1 ? "s" : ""}
+                    </span>
+                  ) : u.role.code === "PMO" ? (
+                    <span className="ml-1 text-xs text-muted-foreground">
+                      {u.pmoSupervisorIds.length} superviseur{u.pmoSupervisorIds.length > 1 ? "s" : ""}
                     </span>
                   ) : null}
                 </TableCell>
@@ -408,7 +510,8 @@ export function UsersManager({
                     <Button size="icon-sm" variant="ghost" aria-label="Modifier" onClick={() => setEditId(u.id)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button size="icon-sm" variant="ghost" aria-label="Réinitialiser le mot de passe" onClick={() => setResetId(u.id)}>
+                    <SendUserAccessButton userId={u.id} email={u.email} disabled={!u.isActive} />
+                    <Button size="icon-sm" variant="ghost" aria-label="Réinitialiser le mot de passe manuellement" onClick={() => setResetId(u.id)}>
                       <KeyRound className="h-4 w-4" />
                     </Button>
                   </div>
@@ -420,7 +523,7 @@ export function UsersManager({
       </div>
 
       <Dialog open={editId !== null} onOpenChange={(open) => !open && setEditId(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Modifier l&apos;utilisateur</DialogTitle>
             <DialogDescription>Le changement de rôle prendra effet à la prochaine connexion de l&apos;utilisateur.</DialogDescription>
@@ -430,6 +533,7 @@ export function UsersManager({
               user={editing}
               roles={roles}
               operateurs={operateurs}
+              supervisors={supervisors}
               onSuccess={onSuccessEdit}
               canDeactivate={editing.id !== currentUserId}
             />
@@ -438,10 +542,10 @@ export function UsersManager({
       </Dialog>
 
       <Dialog open={resetId !== null} onOpenChange={(open) => !open && setResetId(null)}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Réinitialiser le mot de passe</DialogTitle>
-            <DialogDescription>Transmettez le nouveau mot de passe à l&apos;intéressé(e) par un canal sûr.</DialogDescription>
+            <DialogDescription>Utilisez cette option uniquement si l&apos;envoi sécurisé par e-mail n&apos;est pas disponible.</DialogDescription>
           </DialogHeader>
           {resetId !== null ? <ResetPasswordForm userId={resetId} onSuccess={onSuccessReset} /> : null}
         </DialogContent>

@@ -1,6 +1,8 @@
+import { Warehouse } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { listAllSites, listAllCommunes } from "@/lib/services/referentiels-admin-service";
 import { SitesManager } from "@/components/administration/SitesManager";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export const metadata = { title: "Sites — Administration" };
 
@@ -35,14 +37,18 @@ export default async function AdminSitesPage() {
   }));
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold">Sites</h1>
-        <p className="text-sm text-muted-foreground">
-          {sites.length} site{sites.length > 1 ? "s" : ""} d&apos;archivage. Proposés en première étape de la
-          Collecte — au moins un site actif est nécessaire pour pouvoir en choisir un.
-        </p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Infrastructure"
+        icon={Warehouse}
+        title="Sites"
+        description={`${sites.length} site${sites.length > 1 ? "s" : ""} d'archivage proposé${sites.length > 1 ? "s" : ""} en première étape de la Collecte.`}
+        stats={[
+          { label: "Total", value: sites.length },
+          { label: "Actifs", value: sites.filter((s) => s.isActive).length, tone: "success" },
+          { label: "Communes", value: communes.filter((c) => c.isActive).length },
+        ]}
+      />
       <SitesManager sites={serialized} communes={communes.filter((c) => c.isActive).map((c) => ({ id: c.id, nom: c.nom }))} />
     </div>
   );

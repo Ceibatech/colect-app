@@ -15,7 +15,9 @@ import type { SessionPayload } from "@/lib/auth/session";
  *   jamais un accès global par défaut — un superviseur non configuré ne
  *   doit rien voir plutôt que tout voir.
  *
- * ADMIN / CONSULTATION : pas de restriction.
+ * - PMO : union des opérateurs rattachés aux superviseurs de son périmètre.
+ *
+ * ADMIN / FINANCE / EXECUTIF / CONSULTATION : pas de restriction.
  */
 
 /** Fiches opérateur affectées à ce superviseur (`userId` = User.id, rôle SUPERVISEUR). */
@@ -37,6 +39,46 @@ export async function getSupervisedOperateurIds(supervisorUserId: number): Promi
 export async function getSupervisorScope(session: SessionPayload): Promise<number[] | null> {
   if (session.roleCode !== "SUPERVISEUR") return null;
   return getSupervisedOperateurIds(session.userId);
+}
+
+/**
+ * Périmètre utilisé par les tableaux de bord : portefeuille personnel pour
+ * un OPERATEUR, équipe affectée pour un SUPERVISEUR, vue globale pour les
+ * rôles de pilotage. Un tableau vide signifie volontairement aucun résultat.
+ */
+export async function getDashboardOperateurScope(session: SessionPayload): Promise<number[] | null> {
+  if (session.roleCode === "OPERATEUR") {
+    const operateur = await prisma.operateur.findUnique({
+      where: { userId: session.userId },
+      select: { id: true },
+    });
+    return operateur ? [operateur.id] : [];
+  }
+
+  if (session.roleCode === "SUPERVISEUR") {
+    return getSupervisedOperateurIds(session.userId);
+  }
+
+  if (session.roleCode === "PMO") {
+    return getPmoSupervisedOperateurIds(session.userId);
+  }
+
+  return null;
+}
+
+/** Opérateurs couverts par les superviseurs explicitement affectés à ce PMO. */
+export async function getPmoSupervisedOperateurIds(pmoUserId: number): Promise<number[]> {
+  const scopes = await prisma.pmoSupervisorScope.findMany({
+    where: { pmoUserId, supervisor: { isActive: true, role: { code: "SUPERVISEUR" } } },
+    select: { supervisorUserId: true },
+  });
+  if (scopes.length === 0) return [];
+
+  const rows = await prisma.operateur.findMany({
+    where: { supervisorId: { in: scopes.map((scope) => scope.supervisorUserId) } },
+    select: { id: true },
+  });
+  return rows.map((row) => row.id);
 }
 
 /**

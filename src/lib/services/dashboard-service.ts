@@ -4,18 +4,14 @@ import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { computeRate as rate } from "@/lib/utils/rate";
-import { getSupervisorScope } from "@/lib/services/access-scope";
+import { computePipelineScore, computeQualityScore } from "@/lib/utils/pipeline-score";
+import { getDashboardOperateurScope } from "@/lib/services/access-scope";
 
 /**
- * Phase 16+ (affectation opérateur -> superviseur) : un SUPERVISEUR ne doit
- * voir, sur TOUT le dashboard, que les agrégats concernant les opérateurs
- * qui lui sont affectés — jamais les vues SQL globales ci-dessous
- * (`vw_*`), qui ne sont pas paramétrables (vues MySQL). Pour ce rôle, les
- * fonctions ci-dessous recalculent donc les mêmes agrégats directement via
- * l'API Prisma (`where operateurId IN (...)`) au lieu d'interroger la vue.
- * Comportement inchangé pour ADMIN/CONSULTATION (et OPERATEUR, qui voyait
- * déjà un dashboard global avant cette phase — non modifié, hors périmètre
- * de cette demande). `getSupervisorScope()` est partagée (access-scope.ts).
+ * Les vues SQL de reporting ne sont pas paramétrables. Les agrégats sont
+ * donc recalculés avec Prisma pour le portefeuille personnel d'un opérateur
+ * pour l'équipe d'un superviseur et pour le portefeuille d'un PMO. ADMIN,
+ * FINANCE, EXECUTIF et CONSULTATION conservent la vue globale.
  */
 
 /** `where` Prisma correspondant à un scope opérateur (tableau vide -> aucun résultat). */
@@ -109,7 +105,7 @@ async function getDashboardKpisScoped(operateurIds: number[]): Promise<Dashboard
 export const getDashboardKpis = cache(async (): Promise<DashboardKpis> => {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) return getDashboardKpisScoped(scope);
 
   const rows = await prisma.$queryRaw<GlobalRow[]>`SELECT * FROM vw_dashboard_global`;
@@ -205,7 +201,7 @@ async function getPipelineEvolutionScoped(
 export async function getPipelineEvolution(): Promise<Array<{ mois: string } & Record<EvolutionType, number>>> {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) return getPipelineEvolutionScoped(scope);
 
   const [collecte, validation, numerisation, indexation, archivage] = await Promise.all([
@@ -261,7 +257,7 @@ export interface RepartitionRow {
 export async function getRepartitionByCommune(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) {
     const grouped = await prisma.dossier.groupBy({
       by: ["communeId"],
@@ -284,7 +280,7 @@ export async function getRepartitionByCommune(): Promise<RepartitionRow[]> {
 /** Répartition par lotissement (§48 item 8) — pas de vue dédiée (non prévue §63), agrégation directe. */
 export async function getRepartitionByLotissement(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
 
   const grouped = await prisma.dossier.groupBy({
     by: ["lotissementId"],
@@ -301,7 +297,7 @@ export async function getRepartitionByLotissement(): Promise<RepartitionRow[]> {
 /** Répartition par nature de dossier (§48 item 9). */
 export async function getRepartitionByNature(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
 
   const grouped = await prisma.dossier.groupBy({
     by: ["natureDossierId"],
@@ -320,7 +316,7 @@ export async function getRepartitionByStatut(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
   const LABELS: Record<string, string> = { EN_ATTENTE: "En attente", EN_CONTROLE: "En contrôle", VALIDE: "Validé", REJETE: "Rejeté" };
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) {
     const grouped = await prisma.dossier.groupBy({
       by: ["statutValidation"],
@@ -340,8 +336,9 @@ export async function getRepartitionByStatut(): Promise<RepartitionRow[]> {
 
 export interface OperateurPerformanceRow {
   id: number;
-  operateur: string;
-  collectes: number;
+  nom: string;
+  matricule: string;
+  total: number;
   soumis: number;
   valides: number;
   rejetes: number;
@@ -349,13 +346,15 @@ export interface OperateurPerformanceRow {
   indexes: number;
   archives: number;
   anomalies: number;
-  performance: number; // % de dossiers archivés parmi les dossiers de l'opérateur
+  dossiersARisque: number;
+  avancement: number;
+  qualite: number;
 }
 
-/** Performance des opérateurs (§48 item 10 / §50) — via la vue Phase 2 + anomalies. */
+/** Pilotage des operateurs : progression du pipeline et qualite du portefeuille. */
 export async function getOperateurPerformance(): Promise<OperateurPerformanceRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
 
   const rows = await prisma.$queryRaw<
     Array<{
@@ -379,33 +378,68 @@ export async function getOperateurPerformance(): Promise<OperateurPerformanceRow
     WHERE a.statut = 'OUVERTE'
     GROUP BY d.operateur_id
   `;
-  const anomalyMap = new Map(anomalyCounts.map((a) => [a.operateur_id, Number(a.total)]));
+  const anomalyMap = new Map(anomalyCounts.map((row) => [row.operateur_id, Number(row.total)]));
 
-  // SUPERVISEUR (Phase 16+) : ne garder que ses opérateurs affectés — la
-  // requête ci-dessus reste globale (petit volume, LEFT JOIN déjà filtré
-  // par `total_dossiers > 0` côté vue), filtrage en mémoire plus simple
-  // qu'une requête dédiée.
-  const scoped = scope ? rows.filter((r) => scope.includes(r.operateur_id)) : rows;
+  const riskCounts = await prisma.$queryRaw<Array<{ operateur_id: number; total: bigint }>>`
+    SELECT risks.operateur_id, COUNT(DISTINCT risks.dossier_id) AS total
+    FROM (
+      SELECT d.operateur_id, d.id AS dossier_id
+      FROM dossiers d
+      WHERE d.statut_validation = 'REJETE'
+      UNION
+      SELECT d.operateur_id, d.id AS dossier_id
+      FROM anomalies a
+      JOIN dossiers d ON d.id = a.dossier_id
+      WHERE a.statut = 'OUVERTE'
+    ) AS risks
+    GROUP BY risks.operateur_id
+  `;
+  const riskMap = new Map(riskCounts.map((row) => [row.operateur_id, Number(row.total)]));
+
+  const scoped = scope ? rows.filter((row) => scope.includes(row.operateur_id)) : rows;
 
   return scoped
-    .map((r) => {
-      const total = Number(r.total_dossiers);
-      const archives = Number(r.total_archives);
+    .map((row) => {
+      const total = Number(row.total_dossiers);
+      const soumis = Number(row.total_soumis);
+      const valides = Number(row.total_valides);
+      const numerises = Number(row.total_numerises);
+      const indexes = Number(row.total_indexes);
+      const archives = Number(row.total_archives);
+      const dossiersARisque = riskMap.get(row.operateur_id) ?? 0;
+
       return {
-        id: r.operateur_id,
-        operateur: `${r.operateur_nom} (${r.operateur_matricule})`,
-        collectes: Number(r.total_soumis),
-        soumis: Number(r.total_soumis),
-        valides: Number(r.total_valides),
-        rejetes: Number(r.total_rejetes),
-        numerises: Number(r.total_numerises),
-        indexes: Number(r.total_indexes),
+        id: row.operateur_id,
+        nom: row.operateur_nom,
+        matricule: row.operateur_matricule,
+        total,
+        soumis,
+        valides,
+        rejetes: Number(row.total_rejetes),
+        numerises,
+        indexes,
         archives,
-        anomalies: anomalyMap.get(r.operateur_id) ?? 0,
-        performance: rate(archives, total),
+        anomalies: anomalyMap.get(row.operateur_id) ?? 0,
+        dossiersARisque,
+        avancement: computePipelineScore({
+          total,
+          submitted: soumis,
+          validated: valides,
+          digitized: numerises,
+          indexed: indexes,
+          archived: archives,
+        }),
+        qualite: computeQualityScore(total, dossiersARisque),
       };
     })
-    .sort((a, b) => b.performance - a.performance);
+    .sort(
+      (a, b) =>
+        b.avancement - a.avancement ||
+        b.qualite - a.qualite ||
+        b.archives - a.archives ||
+        b.total - a.total ||
+        a.nom.localeCompare(b.nom),
+    );
 }
 
 export interface AnomalyEvolutionPoint {
@@ -417,7 +451,7 @@ export interface AnomalyEvolutionPoint {
 export async function getAnomaliesEvolution(): Promise<AnomalyEvolutionPoint[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   if (scope) {
     const anomalies = await prisma.anomalie.findMany({
       where: { dossier: { operateurId: scope.length ? { in: scope } : -1 } },
@@ -458,7 +492,7 @@ export async function getDirectionOverview(): Promise<DirectionOverview> {
   const seuil = new Date();
   seuil.setDate(seuil.getDate() - RETARD_SEUIL_JOURS);
 
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   const operateurFilter = scope ? scopeWhere(scope) : {};
 
   const [dossiersEnRetard, anomaliesCritiques] = await Promise.all([
@@ -490,23 +524,34 @@ export interface CartonsDossiersEtatOverview {
 }
 
 /**
- * Indicateurs état de conservation des cartons/dossiers (Phase 15+),
- * renseignés à la collecte (`etatCarton`/`etatDossier`, cf. schema.prisma).
- * `codeBarres` est unique par dossier — dans ce modèle un code-barres
- * identifie un carton unique, donc "nombre de cartons" = nombre de dossiers
- * avec un code-barres renseigné (pas besoin d'un groupBy distinct).
+ * Indicateurs état de conservation des cartons/dossiers (Phase 15+).
+ * Plusieurs dossiers peuvent partager un carton : les cartons sont donc
+ * comptés par code-barres distinct, jamais par nombre de lignes dossier.
  */
 export async function getCartonsDossiersEtatOverview(): Promise<CartonsDossiersEtatOverview> {
   const session = await requirePermission("DASHBOARD_VIEW");
-  const scope = await getSupervisorScope(session);
+  const scope = await getDashboardOperateurScope(session);
   const base = scope ? scopeWhere(scope) : {};
 
-  const [nombreCartons, nombreDossiers, nombreCartonsDegrades, nombreDossiersDegrades] = await Promise.all([
-    prisma.dossier.count({ where: { ...base, codeBarres: { not: null } } }),
+  const [cartons, nombreDossiers, cartonsDegrades, nombreDossiersDegrades] = await Promise.all([
+    prisma.dossier.findMany({
+      where: { ...base, codeBarres: { not: null } },
+      distinct: ["codeBarres"],
+      select: { codeBarres: true },
+    }),
     prisma.dossier.count({ where: base }),
-    prisma.dossier.count({ where: { ...base, codeBarres: { not: null }, etatCarton: "DEGRADE" } }),
+    prisma.dossier.findMany({
+      where: { ...base, codeBarres: { not: null }, etatCarton: "DEGRADE" },
+      distinct: ["codeBarres"],
+      select: { codeBarres: true },
+    }),
     prisma.dossier.count({ where: { ...base, etatDossier: "DEGRADE" } }),
   ]);
 
-  return { nombreCartons, nombreDossiers, nombreCartonsDegrades, nombreDossiersDegrades };
+  return {
+    nombreCartons: cartons.length,
+    nombreDossiers,
+    nombreCartonsDegrades: cartonsDegrades.length,
+    nombreDossiersDegrades,
+  };
 }

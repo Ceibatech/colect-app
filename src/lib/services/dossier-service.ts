@@ -204,16 +204,6 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
   const natureDossierId = await resolveNatureDossierId(values.natureDossierId ?? null, values.natureDossierAutre);
   const data = { ...cleaned, lotissementId, natureDossierId };
 
-  if (values.codeBarres) {
-    const existing = await prisma.dossier.findFirst({
-      where: { codeBarres: values.codeBarres, ...(draftId ? { id: { not: draftId } } : {}) },
-      select: { id: true, reference: true },
-    });
-    if (existing) {
-      throw new Error(`Ce code-barres est déjà utilisé par le dossier ${existing.reference}.`);
-    }
-  }
-
   if (draftId) {
     const existing = await prisma.dossier.findUnique({ where: { id: draftId } });
     if (!existing) throw new Error("Brouillon introuvable.");

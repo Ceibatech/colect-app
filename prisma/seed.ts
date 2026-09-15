@@ -24,6 +24,9 @@ const ROLES = [
   { code: "ADMIN", name: "Administrateur", description: "Accès complet à l'application." },
   { code: "SUPERVISEUR", name: "Superviseur", description: "Contrôle, validation, rejet, supervision, dashboard, export." },
   { code: "OPERATEUR", name: "Opérateur", description: "Création et modification de ses dossiers, collecte, soumission." },
+  { code: "FINANCE", name: "Finance", description: "Pilotage des points, barèmes et projections budgétaires." },
+  { code: "PMO", name: "PMO", description: "Pilotage en lecture seule du périmètre de superviseurs affecté." },
+  { code: "EXECUTIF", name: "Exécutif", description: "Lecture seule des tableaux de bord globaux de pilotage." },
   { code: "CONSULTATION", name: "Consultation", description: "Consultation, recherche, dashboard uniquement." },
 ];
 

@@ -6,8 +6,10 @@ import { Controller } from "react-hook-form";
 import { DIRECTION_SERVICE_OPTIONS, type DossierFormValues } from "@/lib/validation/dossier";
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EtatConservationField } from "./EtatConservationField";
+import { Box } from "lucide-react";
 
 /** Sentinelle d'interface uniquement — jamais stockée (cf. dossier.ts). */
 const AUTRES = "__AUTRES__";
@@ -29,17 +31,34 @@ export function StepIdentification({
   operateurs,
   isOperateurRole,
   currentUserName,
+  isCartonCarryOver = false,
 }: {
   form: UseFormReturn<DossierFormValues>;
   operateurs: Operateur[];
   isOperateurRole: boolean;
   currentUserName: string;
+  isCartonCarryOver?: boolean;
 }) {
   const { register, control, formState } = form;
   const errors = formState.errors;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      <div className="flex items-start justify-between gap-3 border-b border-border/60 pb-4 sm:col-span-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+            <Box className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">Identification du carton</p>
+            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+              Ces informations seront conservées pour les dossiers suivants du même carton.
+            </p>
+          </div>
+        </div>
+        {isCartonCarryOver ? <Badge className="shrink-0 rounded-md bg-brand-green text-white">Repris</Badge> : null}
+      </div>
+
       <Field className="sm:col-span-2">
         <FieldLabel>Opérateur</FieldLabel>
         <FieldContent>

@@ -24,6 +24,7 @@ export default async function CollecteNouveauPage() {
       natures={natures}
       operateurs={operateurs}
       isOperateurRole={isOperateurRole}
+      currentUserId={session.userId}
       currentUserName={session.name}
     />
   );

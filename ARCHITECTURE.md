@@ -115,7 +115,7 @@ elle vit dans `src/lib/services/`.
 src/
 ├── app/
 │   ├── (auth)/
-│   ├── dashboard/{direction,operateurs,geographie}/
+│   ├── dashboard/{direction,operateurs,geographie,finance,pmo}/
 │   ├── collecte/
 │   ├── dossiers/[id]/
 │   ├── qualite/
@@ -317,7 +317,7 @@ entre `quality-scoring.ts` (pur) et `quality-service.ts` (`"use server"`) en Pha
 | 10 | Import / Export (Excel/CSV) | ✅ Fait — testé (aperçu, doublons, confirmation, export filtré) |
 | 11 | Documents | ✅ Fait — testé (upload, téléchargement, suppression, cloisonnement) |
 | 12 | Audit | ✅ Fait — testé (filtres, permissions, 21 événements réels vérifiés) |
-| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 82 tests unitaires (Vitest) + 53 tests API + 8 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
+| 13 | Tests (unitaires, API, E2E) | ✅ Fait — 119 tests unitaires (Vitest) + 53 tests API + 8 E2E complets (Playwright), voir [TESTING.md](TESTING.md) |
 | 14 | Optimisation | ✅ Fait — requêtes dupliquées mémoïsées, fuite mémoire rate-limit corrigée, error.tsx ajouté, bug réel `loading.tsx`/`redirect()` trouvé et corrigé (retiré) |
 | 15 | Production (GitHub → Render → cPanel) | ✅ Fait et **déployé en réel** — https://geoarchives.ceiba-analytics.com, base cPanel `col_invent`, voir [DEPLOYMENT.md](DEPLOYMENT.md) |
 
@@ -327,14 +327,18 @@ utilisateur connecté peut changer son propre mot de passe (revérification du m
 de passe actuel côté serveur, jamais de confiance dans le seul formulaire).
 Protégé uniquement par `requireUser()` (pas de permission dédiée : ce n'est pas
 une action administrative sur un tiers, à la différence de `USER_MANAGE`).
-Accessible depuis le menu utilisateur (`UserMenu.tsx`).
+Accessible depuis le menu utilisateur (`UserMenu.tsx`). Les routes publiques
+`/mot-de-passe-oublie` et `/reinitialiser-mot-de-passe` complètent ce parcours via
+Resend : jeton aléatoire de 256 bits, empreinte SHA-256 seule en base, expiration à
+60 minutes et consommation atomique unique. Le même mécanisme sert aux invitations
+de compte depuis l'administration, sans jamais transmettre de mot de passe en clair.
 
 **Écrans d'administration CRUD (Phase 15+, hors périmètre initial des 15 phases)** :
 `/administration/communes`, `/lotissements`, `/natures` (référentiels géographiques —
 création/édition, jamais de suppression physique : un référentiel déjà utilisé par un
 dossier reste intègre, seule la désactivation `isActive` le retire des listes proposées
 à la Collecte) et `/administration/utilisateurs` (comptes — création avec mot de passe
-initial, modification, réinitialisation de mot de passe par un administrateur,
+initial, invitation par e-mail individuelle ou groupée, modification et réinitialisation manuelle de secours,
 désactivation). Un utilisateur créé/modifié avec le rôle OPERATEUR obtient/perd
 automatiquement une fiche `operateurs` liée (`user-admin-service.ts::nextOperateurMatricule`)
 — sans ce lien, il ne pourrait pas apparaître dans les listes d'opérateurs actifs ni se
@@ -345,6 +349,16 @@ erreur une permission à son propre compte et de se retrouver bloqué hors de
 l'application — modification à faire via la source canonique
 `src/lib/permissions/constants.ts` + revue humaine.
 
+**Pilotage Finance et PMO (post-déploiement)** : deux rôles spécialisés complètent le
+RBAC sans ouvrir les formulaires métier. `FINANCE` dispose de
+`/dashboard/finance`, d'un export CSV mensuel et de barèmes monétaires datés
+(`finance_rates`). Les unités sont calculées depuis la source de vérité existante
+`workflow_transitions` : une étape acceptée crédite l'opérateur propriétaire du dossier,
+et une validation ou un rejet crédite le superviseur auteur de la décision. Un barème
+ultérieur ferme le précédent; les événements conservent donc la valeur applicable à leur
+date. `PMO` dispose de `/dashboard/pmo` et des vues Direction, Opérateurs et Géographie,
+toutes limitées à l'union des opérateurs rattachés aux superviseurs sélectionnés dans
+`pmo_supervisor_scopes`. PMO et Exécutif n'accèdent jamais aux montants financiers.
 **Bug réel trouvé et corrigé pendant les tests E2E de ces écrans** : les callbacks
 `onSuccess` passés aux formulaires (fermeture de dialogue + toast + `router.refresh()`)
 n'étaient pas mémoïsés dans les composants parents. Comme `router.refresh()` provoque
@@ -406,9 +420,10 @@ superviseur avant de le "voler"). Logique de cloisonnement centralisée dans
 ses agrégats globaux reposent sur des vues SQL (`vw_*`, non paramétrables) — un
 SUPERVISEUR scopé bascule donc sur un recalcul équivalent via l'API Prisma
 (`where operateurId IN (...)`) plutôt que d'interroger la vue, fonction par fonction,
-sans toucher au chemin non scopé utilisé par ADMIN/CONSULTATION (et OPERATEUR, dont le
-dashboard reste global comme avant cette phase — non demandé, non modifié). ADMIN n'est
-jamais soumis à cette restriction.
+sans toucher au chemin non scopé utilisé par ADMIN/FINANCE/EXECUTIF/CONSULTATION. Le rôle
+OPERATEUR conserve quant à lui un
+dashboard personnel limité à sa propre fiche. ADMIN, FINANCE, EXECUTIF et CONSULTATION ne sont
+jamais soumis à cette restriction de périmètre.
 
 **Bug de production non résolu (constaté, non bloquant)** : une erreur d'hydratation
 React (#418) apparaît sur *toutes* les pages en production (Render) — jamais reproduite

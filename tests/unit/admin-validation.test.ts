@@ -83,6 +83,21 @@ describe("updateUserSchema", () => {
   it("rejette un nom vide", () => {
     expect(updateUserSchema.safeParse({ name: "", roleId: 2, isActive: true }).success).toBe(false);
   });
+
+  it("normalise les affectations opérateurs et superviseurs envoyées par FormData", () => {
+    const result = updateUserSchema.safeParse({
+      name: "PMO Programme",
+      roleId: "5",
+      isActive: true,
+      operateurIds: ["2"],
+      supervisorIds: ["7", "8"],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.operateurIds).toEqual([2]);
+      expect(result.data.supervisorIds).toEqual([7, 8]);
+    }
+  });
 });
 
 describe("resetPasswordSchema (réinitialisation par un administrateur)", () => {

@@ -10,7 +10,7 @@ import { PERMISSIONS, ROLE_CODES, ROLE_PERMISSIONS, ROLE_ONLY_ROUTE_PREFIXES } f
  * les tests API/E2E (Playwright) qui frappent de vraies routes protégées.
  */
 describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
-  it("définit une entrée pour chacun des 4 rôles", () => {
+  it("définit une entrée pour chacun des 7 rôles", () => {
     for (const role of ROLE_CODES) {
       expect(ROLE_PERMISSIONS[role]).toBeDefined();
     }
@@ -40,6 +40,23 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     const writeVerbs = /_(CREATE|UPDATE|DELETE|VALIDATE|REJECT|MANAGE|DATA)$/;
     const writePerms = ROLE_PERMISSIONS.CONSULTATION.filter((p) => writeVerbs.test(p));
     expect(writePerms).toEqual([]);
+  });
+
+  it("EXECUTIF est strictement limité aux tableaux de bord", () => {
+    expect(ROLE_PERMISSIONS.EXECUTIF).toEqual(["DASHBOARD_VIEW"]);
+  });
+
+  it("FINANCE ne reçoit que le pilotage financier", () => {
+    expect(ROLE_PERMISSIONS.FINANCE).toEqual(["DASHBOARD_VIEW", "FINANCE_VIEW", "FINANCE_CONFIGURE"]);
+  });
+
+  it("PMO reçoit uniquement les tableaux de bord de son périmètre", () => {
+    expect(ROLE_PERMISSIONS.PMO).toEqual(["DASHBOARD_VIEW", "PMO_VIEW"]);
+  });
+
+  it("réserve les barèmes à ADMIN et FINANCE", () => {
+    const roles = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("FINANCE_CONFIGURE"));
+    expect(new Set(roles)).toEqual(new Set(["ADMIN", "FINANCE"]));
   });
 
   it("seuls ADMIN et SUPERVISEUR ont AUDIT_VIEW", () => {
