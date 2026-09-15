@@ -110,14 +110,6 @@ export const dossierFormSchema = z.object({
   // l'état du carton ci-dessus.
   etatDossier: z.enum(["BON_ETAT", "DEGRADE"]).optional(),
   etatDossierDescription: z.string().max(1000).optional().or(z.literal("")),
-  // Autres pièces (Phase 18+) — champ libre pour toute pièce ne relevant pas
-  // d'un type catégorisable. Reste dans la Collecte : `nombrePieces` et
-  // `typesPieces`, en revanche, ont été retirés d'ici en Phase 20+ pour
-  // constituer la nouvelle étape "Préparation" (entre Validation et
-  // Numérisation) — voir TypesPiecesField.tsx (déplacé vers
-  // PreparationActions dans WorkflowActions.tsx) et
-  // resolveTypesPieceIds() dans workflow-service.ts.
-  autresPieces: z.string().max(1000).optional().or(z.literal("")),
 
   // ÉTAPE 5 — Titulaire
   nom: z.string().max(150).optional().or(z.literal("")),
@@ -131,8 +123,10 @@ export const dossierFormSchema = z.object({
   mobile: z.string().max(30).optional().or(z.literal("")),
 
   // ÉTAPE 7 — Suivi
-  // `nombrePages` retiré d'ici en Phase 20+ — déplacé vers l'étape
-  // "Préparation" (cf. note sur `autresPieces` ci-dessus).
+  // `nombrePages` (Phase 20+) et `autresPieces` (Phase 21+) retirés d'ici —
+  // déplacés vers l'étape "Préparation" (cf. TypesPiecesField.tsx/
+  // PreparationActions dans WorkflowActions.tsx et resolveTypesPieceIds()
+  // dans workflow-service.ts).
   observations: z.string().max(2000).optional().or(z.literal("")),
 });
 
@@ -159,7 +153,7 @@ export const DOSSIER_STEPS = [
   { id: 1, title: "Site", fields: ["siteId", "entrepotId"] },
   { id: 2, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
   { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
-  { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription", "autresPieces"] },
+  { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
   { id: 5, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
   { id: 6, title: "Contact", fields: ["personneContact", "mobile"] },
   { id: 7, title: "Suivi", fields: ["observations"] },

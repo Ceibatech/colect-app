@@ -220,6 +220,13 @@ processus métier — ils ne figurent pas sur la fiche CG1020.
 > principe que pour la Phase 19+ ci-dessus : aucun retraitement rétroactif). Un dossier
 > simplement `VALIDE` (jamais numérisé) reste, lui, `EN_ATTENTE` de préparation — c'est
 > la première fois que l'étape s'applique réellement à lui.
+>
+> **Modifié (Phase 21+)** : `autres_pieces` rejoint `nombre_pieces`/`types_piece`/
+> `nombre_pages` sur la fiche "Préparation" — retiré de la Collecte (`StepDossier.tsx`)
+> pour la même raison (pas toujours connu sur le terrain avant validation). Colonne
+> inchangée, seul le point de saisie change ; l'affichage en lecture sur la fiche dossier
+> (`DossierDetailTabs.tsx`) suit le même déplacement, de l'onglet "Titulaire" vers
+> l'onglet "Préparation".
 
 ## 4. Décisions de conception documentées
 

@@ -6,7 +6,6 @@ import { Controller } from "react-hook-form";
 import type { DossierFormValues } from "@/lib/validation/dossier";
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EtatConservationField } from "./EtatConservationField";
 
@@ -19,12 +18,12 @@ interface NatureDossier {
 const AUTRES = "__AUTRES__";
 
 /**
- * "Nombre de pièces" et "Types de pièces" (Phase 18+) ont été retirés d'ici
- * en Phase 20+ : ils constituent désormais la nouvelle étape "Préparation"
- * (entre Validation et Numérisation, cf. PreparationActions dans
- * WorkflowActions.tsx), plutôt que d'être saisis dès la Collecte —
- * l'opérateur ne connaît pas toujours ces informations sur le terrain, avant
- * même que le dossier soit validé.
+ * "Nombre de pièces" et "Types de pièces" (Phase 18+), puis "Autres pièces"
+ * (Phase 21+) ont été retirés d'ici : ils constituent désormais la nouvelle
+ * étape "Préparation" (entre Validation et Numérisation, cf.
+ * PreparationActions dans WorkflowActions.tsx), plutôt que d'être saisis dès
+ * la Collecte — l'opérateur ne connaît pas toujours ces informations sur le
+ * terrain, avant même que le dossier soit validé.
  */
 export function StepDossier({
   form,
@@ -86,14 +85,6 @@ export function StepDossier({
       </Field>
 
       <EtatConservationField form={form} label="État du dossier" etatField="etatDossier" descriptionField="etatDossierDescription" />
-
-      <Field className="sm:col-span-2">
-        <FieldLabel>Autres pièces</FieldLabel>
-        <FieldContent>
-          <Textarea {...register("autresPieces")} rows={2} placeholder="Préciser toute autre pièce non listée ci-dessus..." />
-          <FieldError errors={[errors.autresPieces]} />
-        </FieldContent>
-      </Field>
     </div>
   );
 }

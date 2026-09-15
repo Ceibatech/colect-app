@@ -194,7 +194,6 @@ export function DossierDetailTabs({
               {dossier.etatDossier === "DEGRADE" ? (
                 <Field label="Description de l'état (dossier)" value={dossier.etatDossierDescription} />
               ) : null}
-              <Field label="Autres pièces" value={dossier.autresPieces} />
               <Field label="Personne à contacter" value={dossier.personneContact} />
               <Field label="Mobile" value={dossier.mobile} />
             </CardContent>
@@ -266,6 +265,7 @@ export function DossierDetailTabs({
                 <Field label="Nombre de pièces" value={dossier.nombrePieces} />
                 <Field label="Nombre de pages" value={dossier.nombrePages} />
                 <Field label="Types de pièces" value={dossier.typesPieces.map((t) => t.libelle).join(", ") || null} />
+                <Field label="Autres pièces" value={dossier.autresPieces} />
                 <Field
                   label="Date de préparation"
                   value={dossier.datePreparation ? dateFmt.format(new Date(dossier.datePreparation)) : null}

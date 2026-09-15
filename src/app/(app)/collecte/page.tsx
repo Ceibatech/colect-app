@@ -53,7 +53,6 @@ export default async function CollectePage({
         communeId: dossier.communeId ?? undefined,
         lotissementNom: dossier.lotissement?.nom ?? undefined,
         natureDossierId: dossier.natureDossierId ?? undefined,
-        autresPieces: dossier.autresPieces ?? undefined,
         etatDossier: dossier.etatDossier ?? undefined,
         etatDossierDescription: dossier.etatDossierDescription ?? undefined,
         nom: dossier.nom ?? undefined,

@@ -99,7 +99,6 @@ export function StepRecap({
         <Row label="Nature du dossier" value={nature} />
         <Row label="État du dossier" value={etatLabel(v.etatDossier)} />
         {v.etatDossier === "DEGRADE" ? <Row label="Description de l'état (dossier)" value={v.etatDossierDescription} /> : null}
-        <Row label="Autres pièces" value={v.autresPieces} />
       </Section>
 
       <Section title="Titulaire" onEdit={() => onEditStep(5)}>

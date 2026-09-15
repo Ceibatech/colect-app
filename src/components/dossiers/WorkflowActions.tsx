@@ -162,6 +162,7 @@ export function PreparationActions({
   const [isPending, startTransition] = useTransition();
   const [nombrePieces, setNombrePieces] = useState("");
   const [typesPieces, setTypesPieces] = useState<string[]>([]);
+  const [autresPieces, setAutresPieces] = useState("");
   const [nombrePages, setNombrePages] = useState("");
 
   if (statutValidation !== "VALIDE" || STAGE_BLOCKED_FOR_OPERATOR.has(statutPreparation)) return null;
@@ -173,6 +174,7 @@ export function PreparationActions({
         await callWorkflowApi(dossierId, "prepare", {
           nombrePieces: nombrePieces ? Number(nombrePieces) : undefined,
           typesPieces,
+          autresPieces: autresPieces.trim() ? autresPieces.trim() : undefined,
           nombrePages: nombrePages ? Number(nombrePages) : undefined,
         });
         toast.success("Préparation soumise, en attente de validation du superviseur.");
@@ -196,7 +198,7 @@ export function PreparationActions({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Préparer ce dossier</DialogTitle>
-          <DialogDescription>Nombre de pièces, types de pièces et nombre de pages du dossier physique.</DialogDescription>
+          <DialogDescription>Nombre de pièces, types de pièces, autres pièces et nombre de pages du dossier physique.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
@@ -214,6 +216,16 @@ export function PreparationActions({
           <div className="space-y-2">
             <Label>Types de pièces dans le dossier</Label>
             <TypesPiecesField value={typesPieces} onChange={setTypesPieces} typesPiece={typesPiece} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="prep-autres-pieces">Autres pièces</Label>
+            <Textarea
+              id="prep-autres-pieces"
+              value={autresPieces}
+              onChange={(e) => setAutresPieces(e.target.value)}
+              rows={2}
+              placeholder="Préciser toute autre pièce non listée ci-dessus..."
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="prep-nombre-pages">Nombre de pages</Label>

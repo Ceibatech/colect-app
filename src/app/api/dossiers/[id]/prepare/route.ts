@@ -10,6 +10,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const dossier = await prepareDossier(dossierId, {
       nombrePieces: typeof body.nombrePieces === "number" ? body.nombrePieces : undefined,
       typesPieces: Array.isArray(body.typesPieces) ? body.typesPieces.filter((t: unknown) => typeof t === "string") : undefined,
+      autresPieces: typeof body.autresPieces === "string" ? body.autresPieces : undefined,
       nombrePages: typeof body.nombrePages === "number" ? body.nombrePages : undefined,
     });
     return NextResponse.json({ dossier });

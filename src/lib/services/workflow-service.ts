@@ -184,13 +184,14 @@ async function resolveTypesPieceIds(tokens: string[] | undefined): Promise<numbe
  * Préparation -> Numérisation -> Indexation -> Archivage). L'opérateur y
  * renseigne nombrePieces/typesPieces/nombrePages — retirés de la Collecte
  * (cf. StepDossier.tsx/StepSuivi.tsx), car pas toujours connus sur le
- * terrain avant même la validation du dossier. Même principe de validation
+ * terrain avant même la validation du dossier. `autresPieces` (Phase 21+)
+ * a rejoint le lot pour la même raison. Même principe de validation
  * superviseur que les 3 étapes suivantes : EN_ATTENTE -> A_VALIDER ->
  * TERMINE/REJETE.
  */
 export async function prepareDossier(
   id: number,
-  data: { nombrePieces?: number; typesPieces?: string[]; nombrePages?: number }
+  data: { nombrePieces?: number; typesPieces?: string[]; autresPieces?: string; nombrePages?: number }
 ) {
   const session = await requireApiPermission("PREPARATION_UPDATE");
   const dossier = await getDossierOr404(id);
@@ -214,6 +215,7 @@ export async function prepareDossier(
       data: {
         statutPreparation: "A_VALIDER",
         ...(data.nombrePieces !== undefined ? { nombrePieces: data.nombrePieces } : {}),
+        ...(data.autresPieces !== undefined ? { autresPieces: data.autresPieces } : {}),
         ...(data.nombrePages !== undefined ? { nombrePages: data.nombrePages } : {}),
         typesPieces: { set: typePieceIds.map((tpId) => ({ id: tpId })) },
       },

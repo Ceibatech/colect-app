@@ -75,7 +75,6 @@ function cleanForDb(values: DossierFormValues) {
     communeId: toNullableNumber(values.communeId),
     etatDossier: clean(values.etatDossier) ?? null,
     etatDossierDescription: values.etatDossier === "DEGRADE" ? clean(values.etatDossierDescription) ?? null : null,
-    autresPieces: clean(values.autresPieces) ?? null,
     nom: clean(values.nom) ?? null,
     prenoms: clean(values.prenoms) ?? null,
     adresse: clean(values.adresse) ?? null,
