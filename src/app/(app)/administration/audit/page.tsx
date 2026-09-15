@@ -64,7 +64,16 @@ export default async function AdminAuditPage({
         ]}
       />
 
-      <AuditFilterBar current={params} users={facets.users} actions={facets.actions} entities={facets.entities} />
+      <AuditFilterBar
+        // cf. DossiersFilterBar dans dossiers/page.tsx : `key` nécessaire
+        // pour remonter le formulaire (Select non contrôlé) sur changement
+        // d'URL, sinon "Réinitialiser" ne remet pas visuellement les champs.
+        key={JSON.stringify(flatSearchParams)}
+        current={params}
+        users={facets.users}
+        actions={facets.actions}
+        entities={facets.entities}
+      />
 
       <AuditTable rows={rows} />
 

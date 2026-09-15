@@ -87,6 +87,12 @@ export default async function DossiersPage({
       </section>
 
       <DossiersFilterBar
+        // Base UI Select (et les <input defaultValue>) sont non contrôlés :
+        // sans ce `key`, une navigation vers une URL différente (dont le
+        // "Réinitialiser" vers /dossiers sans filtre) ne remonte pas le
+        // formulaire, donc les champs gardent visuellement leur ancienne
+        // valeur au lieu de refléter les nouveaux `current`/`defaultValue`.
+        key={JSON.stringify(flatSearchParams)}
         current={params}
         communes={communes.map((c) => ({ value: String(c.id), label: c.nom }))}
         natures={natures.map((n) => ({ value: String(n.id), label: n.libelle }))}
