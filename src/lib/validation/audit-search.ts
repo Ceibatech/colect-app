@@ -15,7 +15,13 @@ export type AuditSearchParams = z.infer<typeof auditSearchParamsSchema>;
 export function parseAuditSearchParams(raw: Record<string, string | string[] | undefined>): AuditSearchParams {
   const flat: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(raw)) {
-    flat[key] = Array.isArray(value) ? value[0] : value;
+    const single = Array.isArray(value) ? value[0] : value;
+    // Un <select> non renseigné ("Tous") soumet une chaîne vide, pas une
+    // absence de paramètre — sans cette normalisation, `z.coerce.number()`
+    // échoue sur "", ce qui fait échouer tout le schéma (safeParse) et
+    // annule au passage les AUTRES filtres pourtant valides (même bug que
+    // dossier-search.ts).
+    flat[key] = single === "" ? undefined : single;
   }
   const parsed = auditSearchParamsSchema.safeParse(flat);
   if (parsed.success) return parsed.data;

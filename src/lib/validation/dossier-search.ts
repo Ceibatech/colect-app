@@ -32,7 +32,13 @@ export type DossierSearchParams = z.infer<typeof dossierSearchParamsSchema>;
 export function parseDossierSearchParams(raw: Record<string, string | string[] | undefined>): DossierSearchParams {
   const flat: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(raw)) {
-    flat[key] = Array.isArray(value) ? value[0] : value;
+    const single = Array.isArray(value) ? value[0] : value;
+    // Un <select> non renseigné ("Tous") soumet une chaîne vide, pas une
+    // absence de paramètre — sans cette normalisation, `z.coerce.number()`/
+    // les enums ci-dessus échouent sur "", ce qui fait échouer tout le
+    // schéma (safeParse) et retombe sur les valeurs par défaut, annulant
+    // au passage les AUTRES filtres pourtant valides.
+    flat[key] = single === "" ? undefined : single;
   }
   const parsed = dossierSearchParamsSchema.safeParse(flat);
   if (parsed.success) return parsed.data;
