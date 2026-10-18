@@ -1,0 +1,77 @@
+# Requires Docker Compose >= 2.30.0 (env_file format: raw).
+name: colect-app
+
+services:
+  app:
+    image: ${APP_IMAGE:-colect-app:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - path: ${APP_ENV_FILE:-/opt/colect-app/shared/app.env}
+        format: raw
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+      DOCUMENTS_STORAGE_PATH: /var/data/documents
+      APP_URL: https://${DOMAIN:?Set DOMAIN to the public hostname}
+    expose:
+      - "3000"
+    # Existing host nginx terminates HTTPS; do not expose Next.js publicly.
+    ports:
+      - "127.0.0.1:${APP_HTTP_PORT:-8300}:3000"
+    volumes:
+      - type: bind
+        source: ${DOCUMENTS_PATH:-/opt/colect-app/shared/documents}
+        target: /var/data/documents
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "node", "deploy/healthcheck.mjs"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    # Only enable on a dedicated server where ports 80/443 are available.
+    profiles: ["caddy"]
+    image: caddy:2-alpine
+    restart: unless-stopped
+    stop_grace_period: 30s
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN to the public hostname}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -111,3 +111,4 @@ npm run test        # les trois suites, dans cet ordre
 - [SECURITY.md](SECURITY.md) — principes de sécurité appliqués
 - [TESTING.md](TESTING.md) — stratégie de tests (unitaires, API, E2E)
 - [DEPLOYMENT.md](DEPLOYMENT.md) — GitHub → Render → cPanel
+- [DEPLOYMENT-CONTABO.md](DEPLOYMENT-CONTABO.md) — bascule Render → Contabo, nginx/HTTPS, automatisation et restauration

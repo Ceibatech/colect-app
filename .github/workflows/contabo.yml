@@ -1,0 +1,174 @@
+name: Validate and deploy to Contabo
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A deployment must finish before another run can replace its release.
+concurrency:
+  group: contabo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    name: Unit tests, lint and production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check out the commit being validated
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install the latest Node.js 22 release
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22.x"
+          check-latest: true
+          cache: npm
+
+      - name: Install dependencies including development tools
+        run: npm ci --include=dev
+
+      - name: Generate the Prisma client without connecting to a database
+        run: npm run db:generate
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Build without production credentials
+        run: npm run build
+
+  deploy:
+    name: Deploy the validated commit
+    needs: validate
+    if: >-
+      vars.CONTABO_ENABLED == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 40
+    steps:
+      - name: Check out the validated commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      # Configure these four SSH secrets in the production environment.
+      # Application secrets remain in /opt/colect-app/shared on the VPS.
+      - name: Transfer the source archive and deploy over verified SSH
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        run: |
+          set -euo pipefail
+          umask 077
+
+          [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid commit SHA." >&2; exit 1; }
+          [[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[0-9]+$ ]] || { echo "Invalid workflow run or attempt ID." >&2; exit 1; }
+          [[ "$(git rev-parse HEAD)" == "$COMMIT_SHA" ]] || { echo "Checkout does not match the validated commit." >&2; exit 1; }
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "Set CONTABO_HOST to the VPS IPv4 address or hostname." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "Set a valid CONTABO_USER." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] && (( 10#$CONTABO_PORT >= 1 && 10#$CONTABO_PORT <= 65535 )) || { echo "Invalid CONTABO_PORT." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "SSH key and verified known_hosts secrets are required." >&2; exit 1; }
+
+          transfer_dir="$(mktemp -d "$RUNNER_TEMP/colect-transfer.XXXXXX")"
+          trap 'rm -rf -- "$transfer_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$transfer_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$transfer_dir/known_hosts"
+          chmod 600 "$transfer_dir/key" "$transfer_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          ssh_options=(
+            -F /dev/null
+            -i "$transfer_dir/key"
+            -p "$CONTABO_PORT"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o IdentityAgent=none
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$transfer_dir/known_hosts"
+            -o GlobalKnownHostsFile=/dev/null
+            -o ConnectTimeout=15
+            -o ServerAliveInterval=30
+            -o ServerAliveCountMax=6
+          )
+          destination="$CONTABO_USER@$CONTABO_HOST"
+
+          # git archive includes only committed source; no local .env or build output.
+          git archive --format=tar.gz --output="$transfer_dir/$COMMIT_SHA.tar.gz" "$COMMIT_SHA"
+          archive_checksum="$(sha256sum "$transfer_dir/$COMMIT_SHA.tar.gz" | cut -d ' ' -f 1)"
+          [[ "$archive_checksum" =~ ^[0-9a-f]{64}$ ]]
+          archive_name="$COMMIT_SHA-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.tar.gz"
+
+          ssh "${ssh_options[@]}" "$destination" bash -s <<'REMOTE'
+          set -euo pipefail
+          test -d /opt/colect-app/shared
+          test -r /opt/colect-app/shared/deploy.env
+          mkdir -p /opt/colect-app/incoming /opt/colect-app/releases
+          REMOTE
+
+          # Every run attempt gets its own archive; noclobber also rejects symlinks.
+          ssh "${ssh_options[@]}" "$destination" \
+            "umask 077; set -C; cat > '/opt/colect-app/incoming/$archive_name'" \
+            < "$transfer_dir/$COMMIT_SHA.tar.gz"
+
+          ssh "${ssh_options[@]}" "$destination" bash -s -- \
+            "$COMMIT_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$archive_checksum" <<'REMOTE'
+          set -euo pipefail
+          umask 027
+          sha="$1"
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+          run_id="$2"
+          run_attempt="$3"
+          expected_checksum="$4"
+          [[ "$run_id" =~ ^[0-9]+$ && "$run_attempt" =~ ^[0-9]+$ ]]
+          [[ "$expected_checksum" =~ ^[0-9a-f]{64}$ ]]
+          archive="/opt/colect-app/incoming/$sha-$run_id-$run_attempt.tar.gz"
+          release="/opt/colect-app/releases/$sha"
+          marker="$release/.source-archive.sha256"
+          trap 'rm -f -- "$archive"' EXIT
+          test -s "$archive"
+          actual_checksum="$(sha256sum "$archive" | cut -d ' ' -f 1)"
+          [[ "$actual_checksum" == "$expected_checksum" ]] || { echo "Uploaded archive checksum mismatch." >&2; exit 1; }
+
+          if [[ -e "$release" || -L "$release" ]]; then
+            # Release sources stay unchanged after extraction. Reuse only a
+            # complete release previously extracted from this exact archive.
+            if [[ ! -d "$release" || -L "$release" || ! -f "$marker" || -L "$marker" ]]; then
+              echo "Existing release has no valid source marker; refusing to overwrite it." >&2
+              exit 1
+            fi
+            [[ "$(cat "$marker")" == "$expected_checksum" ]] || { echo "Existing release source checksum mismatch." >&2; exit 1; }
+          else
+            # A fresh directory prevents merging or overwriting release files.
+            mkdir "$release"
+            tar --extract --gzip --file="$archive" --directory="$release" --no-same-owner --no-same-permissions
+            test -f "$release/deploy/deploy.sh"
+            printf '%s\n' "$expected_checksum" > "$marker"
+          fi
+          test -f "$release/deploy/deploy.sh"
+          bash "$release/deploy/deploy.sh" "$sha"
+          REMOTE
