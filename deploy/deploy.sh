@@ -70,9 +70,11 @@ fi
 # Fail before changing schema/application when the database cannot be backed up.
 dc run --rm --no-deps --volume "$shared/db-backups:/backups" app node deploy/backup-database.mjs
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
-document_backup="$shared/document-backups/documents-$stamp-$revision.tar.gz"
-tar -czf "$document_backup.partial" -C "$DOCUMENTS_PATH" .
-mv -- "$document_backup.partial" "$document_backup"
+document_backup="/backups/documents-$stamp-$revision.tar.gz"
+# Run as the container's uid 1000, which owns the private document directories.
+dc run --rm --no-deps --volume "$shared/document-backups:/backups" app \
+  sh -c 'umask 077; tar -czf "$1.partial" -C /var/data/documents . && mv -- "$1.partial" "$1"' \
+  sh "$document_backup"
 dc run --rm --no-deps app node node_modules/prisma/build/index.js migrate deploy
 
 rollout_started=true

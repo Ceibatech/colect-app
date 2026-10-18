@@ -35,7 +35,7 @@ de ports 80/443 libres. Il reste désactivé sur ce VPS équipé de nginx.
 ```
 
 Créer ces répertoires avant le premier déploiement. Les répertoires
-`shared/documents` et `shared/db-backups` doivent être accessibles en écriture à
+`shared/documents`, `shared/db-backups` et `shared/document-backups` doivent être accessibles en écriture à
 l'UID/GID **1000:1000**, utilisé par le conteneur. Le compte de déploiement doit
 pouvoir lire les deux fichiers de configuration, gérer les versions et utiliser
 Docker. Protéger `app.env` avec le mode **0600** et les sauvegardes avec des droits
