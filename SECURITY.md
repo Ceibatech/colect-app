@@ -91,6 +91,12 @@ implémentation (Phase 12 — Audit).
   Le mode de découverte par lien partagé (`SHAREPOINT_SHARED_FOLDER_URL`) exige une
   permission Graph plus large (`Files.ReadWrite.All` ou `Sites.ReadWrite.All`) et doit
   rester un mode d'amorçage contrôlé.
+- Le versement Alfresco utilise un compte de service dédié, limité au répertoire
+  `ALFRESCO_ROOT_NODE_ID`. Les identifiants `ALFRESCO_USERNAME` et
+  `ALFRESCO_PASSWORD` restent uniquement dans le fichier d'environnement du serveur.
+  L'application vérifie l'empreinte SHA-256 du contenu source avant chaque versement,
+  mémorise le node ID Alfresco et ne supprime jamais automatiquement le nœud final.
+  Le compte administrateur Alfresco ne doit pas être utilisé par GeoArchives.
 
 ## 5. Protection des données / injections
 

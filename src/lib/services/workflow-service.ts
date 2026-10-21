@@ -4,6 +4,7 @@ import { requireApiPermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
 import { ApiError } from "@/lib/utils/api-error";
 import { isOperateurInScope } from "@/lib/services/access-scope";
+import { isAlfrescoDigitalArchiveEnabled } from "@/lib/archive/alfresco-client";
 import type { SessionPayload } from "@/lib/auth/session";
 
 async function getDossierOr404(id: number) {
@@ -568,20 +569,45 @@ export async function validateArchivage(id: number, commentaire?: string) {
   }
 
   const now = new Date();
-  const [updated] = await prisma.$transaction([
-    prisma.dossier.update({ where: { id }, data: { statutArchivage: "TERMINE", dateArchivage: now } }),
-    prisma.dossierHistory.create({
+  const ipAddress = await getClientIp();
+  const digitalArchiveEnabled = isAlfrescoDigitalArchiveEnabled();
+  const result = await prisma.$transaction(async (tx) => {
+    const updated = await tx.dossier.update({
+      where: { id },
+      data: { statutArchivage: "TERMINE", dateArchivage: now },
+    });
+    await tx.dossierHistory.create({
       data: { dossierId: id, userId: session.userId, action: "ARCHIVAGE_VALIDATION", ancienStatut: "A_VALIDER", nouveauStatut: "TERMINE", commentaire },
-    }),
-    prisma.workflowTransition.create({
+    });
+    await tx.workflowTransition.create({
       data: { dossierId: id, workflowType: "ARCHIVAGE", fromStatus: "A_VALIDER", toStatus: "TERMINE", userId: session.userId, commentaire },
-    }),
-    prisma.auditLog.create({
-      data: { userId: session.userId, action: "ARCHIVAGE_VALIDATE", entity: "DOSSIER", entityId: id, ipAddress: await getClientIp() },
-    }),
-  ]);
+    });
+    await tx.auditLog.create({
+      data: { userId: session.userId, action: "ARCHIVAGE_VALIDATE", entity: "DOSSIER", entityId: id, ipAddress },
+    });
+    const queued = digitalArchiveEnabled
+      ? await tx.document.updateMany({
+          where: {
+            dossierId: id,
+            preIndexStatus: "PRET",
+            digitalArchiveStatus: { not: "ARCHIVE" },
+          },
+          data: {
+            digitalArchiveStatus: "EN_ATTENTE",
+            alfrescoArchiveError: null,
+          },
+        })
+      : { count: 0 };
+    return { dossier: updated, queued: queued.count };
+  });
 
-  return updated;
+  return {
+    dossier: result.dossier,
+    digitalArchive: {
+      queued: result.queued,
+      actorUserId: session.userId,
+    },
+  };
 }
 
 export async function rejectArchivage(id: number, commentaire: string) {

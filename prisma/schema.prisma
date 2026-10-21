@@ -925,32 +925,47 @@ enum DocumentPreIndexStatus {
   PRET
 }
 
+enum DigitalArchiveStatus {
+  NON_REQUIS
+  EN_ATTENTE
+  EN_COURS
+  ARCHIVE
+  ERREUR
+}
+
 model Document {
-  id                  Int                    @id @default(autoincrement())
-  dossierId           Int                    @map("dossier_id")
-  nomFichier          String                 @map("nom_fichier")
-  nomOriginal         String                 @map("nom_original")
-  typeMime            String                 @map("type_mime")
-  extension           String
-  taille              Int // octets
-  url                 String                 @db.Text
-  storageProvider     StorageProvider        @default(LOCAL) @map("storage_provider")
-  hash                String?
-  nombrePages         Int?                   @map("nombre_pages")
-  preIndexStatus      DocumentPreIndexStatus @default(A_TRAITER) @map("preindex_status")
-  titreIndexation     String?                @map("titre_indexation")
-  referenceIndexation String?                @map("reference_indexation")
-  dateDocument        DateTime?              @map("date_document")
-  preIndexNotes       String?                @map("preindex_notes") @db.Text
-  typePieceId         Int?                   @map("type_piece_id")
-  preIndexedBy        Int?                   @map("preindexed_by")
-  preIndexedAt        DateTime?              @map("preindexed_at")
-  externalDriveId     String?                @map("external_drive_id")
-  externalItemId      String?                @map("external_item_id")
-  externalWebUrl      String?                @map("external_web_url") @db.Text
-  uploadedBy          Int?                   @map("uploaded_by")
-  createdAt           DateTime               @default(now()) @map("created_at")
-  updatedAt           DateTime               @updatedAt @map("updated_at")
+  id                      Int                    @id @default(autoincrement())
+  dossierId               Int                    @map("dossier_id")
+  nomFichier              String                 @map("nom_fichier")
+  nomOriginal             String                 @map("nom_original")
+  typeMime                String                 @map("type_mime")
+  extension               String
+  taille                  Int // octets
+  url                     String                 @db.Text
+  storageProvider         StorageProvider        @default(LOCAL) @map("storage_provider")
+  hash                    String?
+  nombrePages             Int?                   @map("nombre_pages")
+  preIndexStatus          DocumentPreIndexStatus @default(A_TRAITER) @map("preindex_status")
+  titreIndexation         String?                @map("titre_indexation")
+  referenceIndexation     String?                @map("reference_indexation")
+  dateDocument            DateTime?              @map("date_document")
+  preIndexNotes           String?                @map("preindex_notes") @db.Text
+  typePieceId             Int?                   @map("type_piece_id")
+  preIndexedBy            Int?                   @map("preindexed_by")
+  preIndexedAt            DateTime?              @map("preindexed_at")
+  externalDriveId         String?                @map("external_drive_id")
+  externalItemId          String?                @map("external_item_id")
+  externalWebUrl          String?                @map("external_web_url") @db.Text
+  digitalArchiveStatus    DigitalArchiveStatus   @default(NON_REQUIS) @map("digital_archive_status")
+  alfrescoNodeId          String?                @unique @map("alfresco_node_id")
+  alfrescoWebUrl          String?                @map("alfresco_web_url") @db.Text
+  alfrescoArchivedAt      DateTime?              @map("alfresco_archived_at")
+  alfrescoArchiveError    String?                @map("alfresco_archive_error") @db.Text
+  alfrescoArchiveAttempts Int                    @default(0) @map("alfresco_archive_attempts")
+  lastArchiveAttemptAt    DateTime?              @map("last_archive_attempt_at")
+  uploadedBy              Int?                   @map("uploaded_by")
+  createdAt               DateTime               @default(now()) @map("created_at")
+  updatedAt               DateTime               @updatedAt @map("updated_at")
 
   dossier    Dossier    @relation(fields: [dossierId], references: [id], onDelete: Cascade)
   uploader   User?      @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
@@ -961,6 +976,7 @@ model Document {
   @@index([dossierId])
   @@index([hash])
   @@index([preIndexStatus])
+  @@index([digitalArchiveStatus])
   @@index([typePieceId])
   @@index([preIndexedBy])
   @@map("documents")

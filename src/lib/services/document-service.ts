@@ -25,14 +25,24 @@ const ALLOWED_MIME_TYPES = new Set([
  * l'opérateur qui numérise qui dépose le fichier scanné. La consultation
  * suit `DOSSIER_READ`, déjà requis pour atteindre la fiche dossier.
  */
-async function assertDossierAccessible(dossierId: number, session: SessionPayload) {
-  const dossier = await prisma.dossier.findUnique({ where: { id: dossierId }, select: { id: true, operateurId: true } });
+async function assertDossierAccessible(
+  dossierId: number,
+  session: SessionPayload,
+  options?: { requireMutable?: boolean },
+) {
+  const dossier = await prisma.dossier.findUnique({
+    where: { id: dossierId },
+    select: { id: true, operateurId: true, statutArchivage: true },
+  });
   if (!dossier) throw new ApiError("Dossier introuvable.", 404);
 
   if (session.roleCode === "OPERATEUR" || session.roleCode === "SUPERVISEUR") {
     if (!(await isOperateurInScope(session, dossier.operateurId))) {
       throw new ApiError("Dossier introuvable.", 404);
     }
+  }
+  if (options?.requireMutable && dossier.statutArchivage === "TERMINE") {
+    throw new ApiError("Les documents d'un dossier archivé ne peuvent plus être modifiés.", 409);
   }
   return dossier;
 }
@@ -58,7 +68,7 @@ function throwStorageApiError(error: unknown): never {
 
 export async function uploadDocument(dossierId: number, file: File) {
   const session = await requireApiPermission("NUMERISATION_UPDATE");
-  await assertDossierAccessible(dossierId, session);
+  await assertDossierAccessible(dossierId, session, { requireMutable: true });
 
   if (!ALLOWED_MIME_TYPES.has(file.type)) {
     throw new ApiError("Type de fichier non autorisé (PDF, JPEG, PNG, TIFF uniquement).");
@@ -174,7 +184,7 @@ export async function deleteDocument(documentId: number) {
   const session = await requireApiPermission("NUMERISATION_UPDATE");
   const document = await prisma.document.findUnique({ where: { id: documentId } });
   if (!document) throw new ApiError("Document introuvable.", 404);
-  await assertDossierAccessible(document.dossierId, session);
+  await assertDossierAccessible(document.dossierId, session, { requireMutable: true });
 
   const storage = getStorageProvider(document.storageProvider);
   try {
@@ -213,7 +223,7 @@ export async function preindexDocument(documentId: number, values: unknown) {
 
   const document = await prisma.document.findUnique({ where: { id: documentId } });
   if (!document) throw new ApiError("Document introuvable.", 404);
-  await assertDossierAccessible(document.dossierId, session);
+  await assertDossierAccessible(document.dossierId, session, { requireMutable: true });
 
   if (parsed.data.typePieceId) {
     const typePiece = await prisma.typePiece.findFirst({

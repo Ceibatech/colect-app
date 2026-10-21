@@ -445,6 +445,22 @@ de l'ensemble ; EXECUTIF reste limité aux tableaux de bord. Les services et act
 centralisés dans `transfer-service.ts`/`transfer-actions.ts`, avec les règles pures de
 solde dans `transfer-stock.ts`.
 
+**Versement documentaire Alfresco** : le stockage de travail et l'archive définitive
+restent deux responsabilités distinctes. Les agents déposent et pré-indexent les scans
+dans le provider actif (`LOCAL` ou `SHAREPOINT`). Après validation finale de l'archivage,
+les documents `PRET` sont placés dans une file persistée en base puis copiés vers
+Alfresco par `digital-archive-service.ts`. Le traitement s'exécute après la réponse HTTP,
+contrôle l'empreinte SHA-256 avant envoi, crée un dossier Alfresco déterministe par
+référence de dossier et utilise un nom contenant l'identifiant et le hash du document.
+Une reprise retrouve donc le même nœud au lieu de créer un doublon. La table `documents`
+conserve séparément le statut de versement, le node ID, l'URL, la date, le nombre de
+tentatives et la dernière erreur ; la référence SharePoint/local d'origine n'est jamais
+écrasée. Une erreur Alfresco ne remet pas en cause la validation métier : elle devient
+visible et relançable par un utilisateur doté de `ARCHIVAGE_VALIDATE`. Dès que le dossier
+est archivé, ses pièces deviennent immuables dans GeoArchives. L'intégration emploie
+exclusivement l'API REST Alfresco avec un compte de service limité au répertoire racine
+configuré, jamais un accès direct à la base Alfresco.
+
 **Bug de production non résolu (constaté, non bloquant)** : une erreur d'hydratation
 React (#418) apparaît sur *toutes* les pages en production (Render) — jamais reproduite
 en local (dev ni build de production identique). L'application reste pleinement

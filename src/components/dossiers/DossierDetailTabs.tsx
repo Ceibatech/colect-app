@@ -90,6 +90,10 @@ interface DossierDetail {
     nombrePages: number | null;
     storageProvider: "LOCAL" | "CPANEL" | "S3" | "SHAREPOINT" | "OTHER";
     externalWebUrl: string | null;
+    digitalArchiveStatus: "NON_REQUIS" | "EN_ATTENTE" | "EN_COURS" | "ARCHIVE" | "ERREUR";
+    alfrescoWebUrl: string | null;
+    alfrescoArchivedAt: string | null;
+    alfrescoArchiveError: string | null;
     preIndexStatus: "A_TRAITER" | "BROUILLON" | "PRET";
     titreIndexation: string | null;
     referenceIndexation: string | null;
@@ -128,11 +132,13 @@ export function DossierDetailTabs({
   permissions,
   typesPiece,
   documentStorageProvider,
+  digitalArchiveEnabled,
 }: {
   dossier: DossierDetail;
   permissions: PermissionCode[];
   typesPiece: TypePieceOption[];
   documentStorageProvider: "LOCAL" | "SHAREPOINT";
+  digitalArchiveEnabled: boolean;
 }) {
   // Rendu conditionnel manuel du panneau actif, au lieu du composant
   // <TabsContent> (masquage interne défaillant constaté avec ce composant
@@ -140,6 +146,12 @@ export function DossierDetailTabs({
   // documenté dans ARCHITECTURE.md). <Tabs>/<TabsList>/<TabsTrigger>
   // restent utilisés normalement pour la navigation.
   const [tab, setTab] = useState("informations");
+  const archivedDocumentCount = dossier.documents.filter(
+    (document) => document.digitalArchiveStatus === "ARCHIVE",
+  ).length;
+  const failedArchiveCount = dossier.documents.filter(
+    (document) => document.digitalArchiveStatus === "ERREUR",
+  ).length;
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(String(v))}>
@@ -372,7 +384,18 @@ export function DossierDetailTabs({
         {tab === "archivage" && (
           <Card>
             <CardContent className="space-y-4 pt-6">
-              <Field label="Statut" value={STATUT_ARCHIVAGE_LABELS[dossier.statutArchivage]} />
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Statut physique" value={STATUT_ARCHIVAGE_LABELS[dossier.statutArchivage]} />
+                {digitalArchiveEnabled ? (
+                  <Field
+                    label="Conservation Alfresco"
+                    value={`${archivedDocumentCount}/${dossier.documents.length} document(s)`}
+                  />
+                ) : null}
+                {digitalArchiveEnabled && failedArchiveCount > 0 ? (
+                  <Field label="Versements à reprendre" value={failedArchiveCount} />
+                ) : null}
+              </div>
               {dossier.archivages.map((a) => (
                 <div key={a.id} className="rounded-md border p-3 text-sm">
                   {a.emplacement ?? "Emplacement non renseigné"} {a.referenceArchivage ? `— ${a.referenceArchivage}` : ""}
@@ -406,10 +429,16 @@ export function DossierDetailTabs({
               <DocumentsPanel
                 dossierId={dossier.id}
                 documents={dossier.documents}
-                canManage={permissions.includes("NUMERISATION_UPDATE")}
-                canPreindex={permissions.includes("INDEXATION_UPDATE")}
+                canManage={permissions.includes("NUMERISATION_UPDATE") && dossier.statutArchivage !== "TERMINE"}
+                canPreindex={permissions.includes("INDEXATION_UPDATE") && dossier.statutArchivage !== "TERMINE"}
                 typesPiece={typesPiece}
                 activeStorageProvider={documentStorageProvider}
+                digitalArchiveEnabled={digitalArchiveEnabled}
+                canRetryDigitalArchive={
+                  digitalArchiveEnabled &&
+                  dossier.statutArchivage === "TERMINE" &&
+                  permissions.includes("ARCHIVAGE_VALIDATE")
+                }
               />
             </CardContent>
           </Card>

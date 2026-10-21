@@ -81,6 +81,8 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
       updatedAt: doc.updatedAt.toISOString(),
       dateDocument: doc.dateDocument?.toISOString() ?? null,
       preIndexedAt: doc.preIndexedAt?.toISOString() ?? null,
+      alfrescoArchivedAt: doc.alfrescoArchivedAt?.toISOString() ?? null,
+      lastArchiveAttemptAt: doc.lastArchiveAttemptAt?.toISOString() ?? null,
     })),
     qualityChecks: dossier.qualityChecks.map((qc) => ({
       ...qc,
@@ -125,6 +127,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         permissions={session.permissions}
         typesPiece={typesPiece}
         documentStorageProvider={(process.env.STORAGE_PROVIDER ?? "local").toLowerCase() === "sharepoint" ? "SHAREPOINT" : "LOCAL"}
+        digitalArchiveEnabled={(process.env.ARCHIVE_STORAGE_PROVIDER ?? "").toLowerCase() === "alfresco"}
       />
     </div>
   );

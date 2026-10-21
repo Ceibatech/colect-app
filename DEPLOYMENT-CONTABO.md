@@ -99,6 +99,40 @@ fichier puis laisser le prochain déploiement recréer le conteneur avec ces val
 chmod 600 /opt/colect-app/shared/app.env
 ```
 
+### Archive finale Alfresco
+
+Alfresco ne remplace pas SharePoint : il reçoit une copie définitive uniquement
+après la validation de l'archivage du dossier. Avant activation, corriger le certificat
+HTTPS du domaine Alfresco, créer un compte de service dédié et lui donner les droits
+d'écriture sur un espace racine réservé à GeoArchives. Ne pas utiliser le compte
+`admin` Alfresco.
+
+Ajouter ensuite dans `/opt/colect-app/shared/app.env` :
+
+```dotenv
+ARCHIVE_STORAGE_PROVIDER=alfresco
+ALFRESCO_API_URL=https://archive.ceiba-analytics.com/alfresco
+ALFRESCO_USERNAME=<compte-service-geoarchives>
+ALFRESCO_PASSWORD=<mot-de-passe-long-et-unique>
+ALFRESCO_ROOT_NODE_ID=<node-id-du-repertoire-GeoArchives-MULCV>
+ALFRESCO_WEB_URL=https://archive.ceiba-analytics.com
+ALFRESCO_NODE_TYPE=arc:archiveDocument
+ALFRESCO_CLASSIFICATION=INTERNAL
+```
+
+`ALFRESCO_API_URL` doit pointer vers la racine Alfresco qui expose
+`/api/-default-/public/alfresco/versions/1`. `ALFRESCO_WEB_URL` est facultative et
+sert uniquement à construire le lien d'ouverture dans Share. Après modification :
+
+```bash
+chmod 600 /opt/colect-app/shared/app.env
+docker compose --env-file /opt/colect-app/shared/deploy.env -f /opt/colect-app/current/compose.contabo.yml up -d --force-recreate app
+```
+
+Les dossiers déjà terminés peuvent être versés depuis l'onglet Documents avec
+**Relancer Alfresco**. Les erreurs restent visibles en base et peuvent être reprises
+sans doublonner les nœuds déjà créés.
+
 Le push sur `main` lance le workflow GitHub **Validate and deploy to Contabo** si
 la variable de dépôt `CONTABO_ENABLED=true` est active. Le workflow applique la
 migration Prisma, reconstruit le conteneur et vérifie la base et HTTPS. Il n'est
