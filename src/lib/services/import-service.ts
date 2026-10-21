@@ -1,5 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { parseCsv } from "@/lib/utils/csv";
 import { IMPORT_COLUMNS } from "@/lib/validation/import-columns";
@@ -212,6 +213,50 @@ export interface ConfirmImportResult {
   skipped: number;
 }
 
+const IMPORT_BATCH_SIZE = 500;
+
+function getReferenceSequence(reference: string | undefined, year: number): number {
+  const prefix = `DOS-${year}-`;
+  if (!reference?.startsWith(prefix)) return 1;
+  const sequence = Number(reference.slice(prefix.length));
+  return Number.isSafeInteger(sequence) && sequence >= 0 ? sequence + 1 : 1;
+}
+
+function buildDossierImportData(
+  row: ImportRowResult,
+  maps: RefMaps,
+  reference: string,
+): Prisma.DossierCreateManyInput {
+  const data = row.data;
+  const superficie = data.superficie && Number(data.superficie) > 0 ? Number(data.superficie) : null;
+
+  return {
+    reference,
+    operateurId: maps.operateurByMatricule.get((data.operateurMatricule ?? "").toLowerCase())!,
+    libelleCarton: data.libelleCarton || null,
+    codeBarres: data.codeBarres || null,
+    numeroGuichet: data.numeroGuichet || null,
+    numeroDdu: data.numeroDdu || null,
+    numeroDirectionService: data.numeroDirectionService || null,
+    referenceClassement: data.referenceClassement || null,
+    numeroIlot: data.numeroIlot || null,
+    numeroLot: data.numeroLot || null,
+    superficie,
+    numeroTitreFoncier: data.numeroTitreFoncier || null,
+    communeId: data.communeRef ? (maps.communeByRef.get(data.communeRef.toLowerCase()) ?? null) : null,
+    lotissementId: data.lotissementRef ? (maps.lotissementByRef.get(data.lotissementRef.toLowerCase()) ?? null) : null,
+    natureDossierId: data.natureRef ? (maps.natureByRef.get(data.natureRef.toLowerCase()) ?? null) : null,
+    nom: data.nom || null,
+    prenoms: data.prenoms || null,
+    adresse: data.adresse || null,
+    telephone: data.telephone || null,
+    email: data.email || null,
+    personneContact: data.personneContact || null,
+    mobile: data.mobile || null,
+    statutCollecte: "BROUILLON",
+  };
+}
+
 /**
  * Ré-exécute la validation côté serveur sur les lignes reçues (jamais de
  * confiance dans le statut "valide" renvoyé par le client — §60) et ne crée
@@ -224,7 +269,6 @@ export async function confirmImport(userId: number, fileName: string, dataRows: 
   const validRows = results.filter((r) => r.isValid);
 
   const year = new Date().getFullYear();
-  let seq = (await prisma.dossier.count({ where: { reference: { startsWith: `DOS-${year}-` } } })) + 1;
 
   const importRecord = await prisma.import.create({
     data: {
@@ -240,76 +284,65 @@ export async function confirmImport(userId: number, fileName: string, dataRows: 
     },
   });
 
-  let imported = 0;
-  for (const row of validRows) {
-    const d = row.data;
-    const operateurId = maps.operateurByMatricule.get((d.operateurMatricule ?? "").toLowerCase())!;
-    const communeId = d.communeRef ? (maps.communeByRef.get(d.communeRef.toLowerCase()) ?? null) : null;
-    const lotissementId = d.lotissementRef ? (maps.lotissementByRef.get(d.lotissementRef.toLowerCase()) ?? null) : null;
-    const natureDossierId = d.natureRef ? (maps.natureByRef.get(d.natureRef.toLowerCase()) ?? null) : null;
-    const superficie = d.superficie && Number(d.superficie) > 0 ? Number(d.superficie) : null;
+  try {
+    const imported = await prisma.$transaction(
+      async (tx) => {
+        const latestDossier = await tx.dossier.findFirst({
+          where: { reference: { startsWith: `DOS-${year}-` } },
+          orderBy: { reference: "desc" },
+          select: { reference: true },
+        });
+        let sequence = getReferenceSequence(latestDossier?.reference, year);
+        let createdCount = 0;
 
-    // Retry sur conflit de référence (import concurrent à une collecte en
-    // cours) — même approche que dossier-service.ts::createDossierWithUniqueReference.
-    let attempt = 0;
-    let createdId: number | null = null;
-    while (attempt < 3 && createdId === null) {
-      const reference = `DOS-${year}-${String(seq).padStart(6, "0")}`;
-      seq++;
-      try {
-        const created = await prisma.dossier.create({
-          data: {
-            reference,
-            operateurId,
-            libelleCarton: d.libelleCarton || null,
-            codeBarres: d.codeBarres || null,
-            numeroGuichet: d.numeroGuichet || null,
-            numeroDdu: d.numeroDdu || null,
-            numeroDirectionService: d.numeroDirectionService || null,
-            referenceClassement: d.referenceClassement || null,
-            numeroIlot: d.numeroIlot || null,
-            numeroLot: d.numeroLot || null,
-            superficie,
-            numeroTitreFoncier: d.numeroTitreFoncier || null,
-            communeId,
-            lotissementId,
-            natureDossierId,
-            nom: d.nom || null,
-            prenoms: d.prenoms || null,
-            adresse: d.adresse || null,
-            telephone: d.telephone || null,
-            email: d.email || null,
-            personneContact: d.personneContact || null,
-            mobile: d.mobile || null,
-            statutCollecte: "BROUILLON",
-          },
-        });
-        createdId = created.id;
-        await prisma.dossierHistory.create({
-          data: {
-            dossierId: created.id,
-            userId,
-            action: "IMPORT",
-            nouveauStatut: "BROUILLON",
-            commentaire: `Importé depuis ${fileName} (ligne ${row.line}).`,
-          },
-        });
-        imported++;
-      } catch (e) {
-        attempt++;
-        if (attempt >= 3) {
-          console.error(`Import : échec ligne ${row.line} après ${attempt} tentative(s)`, e);
+        for (let offset = 0; offset < validRows.length; offset += IMPORT_BATCH_SIZE) {
+          const rows = validRows.slice(offset, offset + IMPORT_BATCH_SIZE);
+          const batch = rows.map((row) => {
+            const reference = `DOS-${year}-${String(sequence++).padStart(6, "0")}`;
+            return { row, reference, data: buildDossierImportData(row, maps, reference) };
+          });
+
+          await tx.dossier.createMany({ data: batch.map((item) => item.data) });
+          const created = await tx.dossier.findMany({
+            where: { reference: { in: batch.map((item) => item.reference) } },
+            select: { id: true, reference: true },
+          });
+          if (created.length !== batch.length) {
+            throw new Error(`Import incomplet : ${created.length}/${batch.length} dossiers créés dans un lot.`);
+          }
+
+          const idByReference = new Map(created.map((dossier) => [dossier.reference, dossier.id]));
+          await tx.dossierHistory.createMany({
+            data: batch.map(({ row, reference }) => ({
+              dossierId: idByReference.get(reference)!,
+              userId,
+              action: "IMPORT",
+              nouveauStatut: "BROUILLON",
+              commentaire: `Importé depuis ${fileName} (ligne ${row.line}).`,
+            })),
+          });
+          createdCount += batch.length;
         }
-      }
-    }
+
+        return createdCount;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10_000, timeout: 120_000 },
+    );
+
+    await prisma.import.update({
+      where: { id: importRecord.id },
+      data: { nombreImportes: imported, statut: "TERMINE", completedAt: new Date() },
+    });
+
+    return { importId: importRecord.id, imported, skipped: results.length - imported };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Erreur inconnue pendant l'import.";
+    await prisma.import.update({
+      where: { id: importRecord.id },
+      data: { nombreImportes: 0, statut: "ECHEC", erreurs: { message }, completedAt: new Date() },
+    });
+    throw error;
   }
-
-  await prisma.import.update({
-    where: { id: importRecord.id },
-    data: { nombreImportes: imported, statut: "TERMINE", completedAt: new Date() },
-  });
-
-  return { importId: importRecord.id, imported, skipped: results.length - imported };
 }
 
 /** Génère un modèle .xlsx vierge (en-têtes uniquement) pour faciliter l'import. */
