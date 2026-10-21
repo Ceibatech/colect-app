@@ -78,11 +78,19 @@ implémentation (Phase 12 — Audit).
 
 ## 4. Secrets & configuration
 
-- Aucun secret en dur dans le code : `DATABASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`, `EMAIL_FROM` et `APP_URL` uniquement via variables
-  d'environnement (`.env`, jamais commité — voir `.gitignore`).
+- Aucun secret en dur dans le code : `DATABASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`,
+  `MICROSOFT_CLIENT_SECRET`, `EMAIL_FROM` et `APP_URL` uniquement via variables
+  d'environnement (`.env`, jamais commité — voir `.gitignore`). Les identifiants Graph
+  sont strictement serveur et ne portent jamais le préfixe `NEXT_PUBLIC_`.
 - `.env.example` documente les variables requises sans valeurs réelles.
 - Utilisateur MySQL applicatif dédié (`mulcv_app`), pas de `root` en production (cahier des
   charges §7).
+- L'accès SharePoint utilise le flux OAuth2 applicatif. En production, la configuration
+  recommandée emploie `SHAREPOINT_DRIVE_ID` + `SHAREPOINT_FOLDER_ITEM_ID` et la permission
+  d'application `Sites.Selected`, accordée explicitement au seul site CEIBA Projects.
+  Le mode de découverte par lien partagé (`SHAREPOINT_SHARED_FOLDER_URL`) exige une
+  permission Graph plus large (`Files.ReadWrite.All` ou `Sites.ReadWrite.All`) et doit
+  rester un mode d'amorçage contrôlé.
 
 ## 5. Protection des données / injections
 

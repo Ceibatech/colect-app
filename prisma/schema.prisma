@@ -90,6 +90,7 @@ model User {
   dossierHistory             DossierHistory[]
   workflowTransitions        WorkflowTransition[]
   documentsUploaded          Document[]           @relation("DocumentUploadedBy")
+  documentsPreIndexed        Document[]           @relation("DocumentPreIndexedBy")
   qualityChecks              QualityCheck[]
   anomaliesCorrected         Anomalie[]           @relation("AnomalieCorrigePar")
   imports                    Import[]
@@ -435,7 +436,8 @@ model TypePiece {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  dossiers Dossier[] @relation("DossierTypesPieces")
+  dossiers  Dossier[]  @relation("DossierTypesPieces")
+  documents Document[]
 
   @@map("types_piece")
 }
@@ -913,30 +915,54 @@ enum StorageProvider {
   LOCAL
   CPANEL
   S3
+  SHAREPOINT
   OTHER
 }
 
+enum DocumentPreIndexStatus {
+  A_TRAITER
+  BROUILLON
+  PRET
+}
+
 model Document {
-  id              Int             @id @default(autoincrement())
-  dossierId       Int             @map("dossier_id")
-  nomFichier      String          @map("nom_fichier")
-  nomOriginal     String          @map("nom_original")
-  typeMime        String          @map("type_mime")
-  extension       String
-  taille          Int // octets
-  url             String          @db.Text
-  storageProvider StorageProvider @default(LOCAL) @map("storage_provider")
-  hash            String?
-  nombrePages     Int?            @map("nombre_pages")
-  uploadedBy      Int?            @map("uploaded_by")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  id                  Int                    @id @default(autoincrement())
+  dossierId           Int                    @map("dossier_id")
+  nomFichier          String                 @map("nom_fichier")
+  nomOriginal         String                 @map("nom_original")
+  typeMime            String                 @map("type_mime")
+  extension           String
+  taille              Int // octets
+  url                 String                 @db.Text
+  storageProvider     StorageProvider        @default(LOCAL) @map("storage_provider")
+  hash                String?
+  nombrePages         Int?                   @map("nombre_pages")
+  preIndexStatus      DocumentPreIndexStatus @default(A_TRAITER) @map("preindex_status")
+  titreIndexation     String?                @map("titre_indexation")
+  referenceIndexation String?                @map("reference_indexation")
+  dateDocument        DateTime?              @map("date_document")
+  preIndexNotes       String?                @map("preindex_notes") @db.Text
+  typePieceId         Int?                   @map("type_piece_id")
+  preIndexedBy        Int?                   @map("preindexed_by")
+  preIndexedAt        DateTime?              @map("preindexed_at")
+  externalDriveId     String?                @map("external_drive_id")
+  externalItemId      String?                @map("external_item_id")
+  externalWebUrl      String?                @map("external_web_url") @db.Text
+  uploadedBy          Int?                   @map("uploaded_by")
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
 
-  dossier  Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
-  uploader User?   @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
+  dossier    Dossier    @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  uploader   User?      @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
+  preIndexer User?      @relation("DocumentPreIndexedBy", fields: [preIndexedBy], references: [id])
+  typePiece  TypePiece? @relation(fields: [typePieceId], references: [id])
 
+  @@unique([externalDriveId, externalItemId])
   @@index([dossierId])
   @@index([hash])
+  @@index([preIndexStatus])
+  @@index([typePieceId])
+  @@index([preIndexedBy])
   @@map("documents")
 }
 

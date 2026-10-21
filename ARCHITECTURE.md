@@ -215,13 +215,21 @@ charges) reste en empty state.
 
 **Documents (Phase 11)** : abstraction de stockage (`src/lib/storage/`,
 interface `StorageProvider`) découplant les métadonnées (table `documents`)
-du contenu binaire — implémentation `LocalStorageProvider` (disque, hors
-`public/`) en V1, prête pour un provider S3/cPanel sans changer le code
-appelant (§22/§56). Permission d'ajout/suppression rattachée à
+du contenu binaire. Deux implémentations sont disponibles :
+`LocalStorageProvider` (disque, hors `public/`) et
+`SharePointStorageProvider` (Microsoft Graph, authentification applicative).
+Chaque fichier conserve son provider et, pour SharePoint, les identifiants
+`driveId`/`itemId` nécessaires au téléchargement et à la suppression sans
+dépendre d'une URL publique. Permission d'ajout/suppression rattachée à
 `NUMERISATION_UPDATE` (aucune permission `DOCUMENT_*` au cahier des
-charges §12) — choix documenté. ⚠️ Sur Render, le disque est éphémère : un
-volume persistant ou un provider externe est nécessaire avant la mise en
-production réelle (voir DEPLOYMENT.md, à compléter en Phase 15).
+charges §12) — choix documenté.
+
+La pré-indexation est une étape documentaire portée par `INDEXATION_UPDATE` :
+chaque pièce peut rester `A_TRAITER`, être enregistrée en `BROUILLON`, puis
+passer `PRET` lorsque titre, type de pièce et pagination sont renseignés.
+Lorsqu'un dossier contient des fichiers, sa soumission à l'indexation est
+bloquée tant qu'une pièce n'est pas `PRET`. Les dossiers historiques sans
+document restent compatibles. Voir DEPLOYMENT.md pour la configuration Graph.
 
 **Dashboard (Phase 9)** : palette catégorielle des graphiques Recharts fixée
 dans `globals.css` (`--chart-1` à `--chart-5`, validée accessibilité/CVD via

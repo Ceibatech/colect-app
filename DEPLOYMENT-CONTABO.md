@@ -13,8 +13,9 @@ déploiement indique séparément les étapes effectivement réalisées.
   sur le VPS à `127.0.0.1:8300`. Nginx assure HTTPS et le relais vers ce port.
 - La base MariaDB reste chez GoDaddy avec la `DATABASE_URL` existante. Autoriser
   l'IP du VPS dans l'accès distant MySQL/cPanel si nécessaire.
-- Les documents restent des fichiers locaux : transférer tous les fichiers
-  référencés depuis Render avant la bascule DNS, s'il y en a.
+- Les documents historiques locaux restent montés depuis `shared/documents`.
+  Lorsque `STORAGE_PROVIDER=sharepoint`, les nouveaux scans sont chargés dans
+  SharePoint via Microsoft Graph ; les anciens fichiers locaux restent lisibles.
 
 Le service Caddy est réservé au profil optionnel `caddy`, sur un serveur disposant
 de ports 80/443 libres. Il reste désactivé sur ce VPS équipé de nginx.
@@ -65,6 +66,45 @@ et `DOCUMENTS_STORAGE_PATH=/var/data/documents`.
 Les paramètres d'envoi d'e-mails ne sont pas renseignés dans la configuration
 fournie. Configurer `RESEND_API_KEY` et `EMAIL_FROM` avec un expéditeur validé pour
 activer les e-mails de réinitialisation de mot de passe.
+
+### Microsoft Graph et SharePoint
+
+Pour activer le chargement et la pré-indexation SharePoint, créer une inscription
+d'application dans **Microsoft Entra ID** :
+
+1. **App registrations → New registration**, puis relever le **Tenant ID** et
+   l'**Application (client) ID**.
+2. **Certificates & secrets → New client secret**, puis copier immédiatement la
+   valeur du secret (elle ne sera plus réaffichée).
+3. **API permissions → Microsoft Graph → Application permissions** : pour le
+   premier raccordement par lien partagé, ajouter `Files.ReadWrite.All` et accorder
+   le consentement administrateur. Après découverte du `driveId` et du dossier,
+   remplacer cette permission large par `Sites.Selected` accordée uniquement au
+   site CEIBA Projects.
+4. Ajouter dans `/opt/colect-app/shared/app.env`, sans guillemets :
+
+```dotenv
+STORAGE_PROVIDER=sharepoint
+MICROSOFT_TENANT_ID=<tenant-id>
+MICROSOFT_CLIENT_ID=<application-client-id>
+MICROSOFT_CLIENT_SECRET=<valeur-du-secret>
+SHAREPOINT_SHARED_FOLDER_URL=<lien-partage-du-dossier-ceiba-projects>
+```
+
+Ne pas renseigner `SHAREPOINT_DRIVE_ID` ni `SHAREPOINT_FOLDER_ITEM_ID` pendant ce
+premier test : l'application résout le lien partagé automatiquement. Protéger le
+fichier puis laisser le prochain déploiement recréer le conteneur avec ces valeurs :
+
+```bash
+chmod 600 /opt/colect-app/shared/app.env
+```
+
+Le push sur `main` lance le workflow GitHub **Validate and deploy to Contabo** si
+la variable de dépôt `CONTABO_ENABLED=true` est active. Le workflow applique la
+migration Prisma, reconstruit le conteneur et vérifie la base et HTTPS. Il n'est
+pas nécessaire d'exécuter `git pull` dans `~/geoarchiv/colect-app` pour le chemin
+de déploiement automatisé : les releases immuables sont installées sous
+`/opt/colect-app/releases/<SHA>`.
 
 ## Automatisation GitHub
 

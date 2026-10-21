@@ -75,7 +75,13 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
       dateArchivage: a.dateArchivage?.toISOString() ?? null,
       createdAt: a.createdAt.toISOString(),
     })),
-    documents: dossier.documents.map((doc) => ({ ...doc, createdAt: doc.createdAt.toISOString() })),
+    documents: dossier.documents.map((doc) => ({
+      ...doc,
+      createdAt: doc.createdAt.toISOString(),
+      updatedAt: doc.updatedAt.toISOString(),
+      dateDocument: doc.dateDocument?.toISOString() ?? null,
+      preIndexedAt: doc.preIndexedAt?.toISOString() ?? null,
+    })),
     qualityChecks: dossier.qualityChecks.map((qc) => ({
       ...qc,
       createdAt: qc.createdAt.toISOString(),
@@ -114,7 +120,12 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      <DossierDetailTabs dossier={serialized} permissions={session.permissions} typesPiece={typesPiece} />
+      <DossierDetailTabs
+        dossier={serialized}
+        permissions={session.permissions}
+        typesPiece={typesPiece}
+        documentStorageProvider={(process.env.STORAGE_PROVIDER ?? "local").toLowerCase() === "sharepoint" ? "SHAREPOINT" : "LOCAL"}
+      />
     </div>
   );
 }

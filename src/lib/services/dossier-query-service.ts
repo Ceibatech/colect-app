@@ -128,7 +128,13 @@ export async function getDossierDetail(id: number) {
       numerisations: { orderBy: { createdAt: "desc" } },
       indexations: { orderBy: { createdAt: "desc" } },
       archivages: { orderBy: { createdAt: "desc" } },
-      documents: { orderBy: { createdAt: "desc" } },
+      documents: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          typePiece: { select: { id: true, libelle: true } },
+          preIndexer: { select: { name: true } },
+        },
+      },
       qualityChecks: { orderBy: { createdAt: "desc" }, include: { anomalies: true } },
     },
   });

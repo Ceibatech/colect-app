@@ -4,10 +4,12 @@ import path from "node:path";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission, requireApiPermission } from "@/lib/auth/current-user";
 import { getStorageProvider } from "@/lib/storage";
+import { SharePointStorageError } from "@/lib/storage/sharepoint-storage-provider";
 import { getClientIp } from "@/lib/utils/server-request";
 import type { SessionPayload } from "@/lib/auth/session";
 import { ApiError } from "@/lib/utils/api-error";
 import { isOperateurInScope } from "@/lib/services/access-scope";
+import { documentPreindexSchema } from "@/lib/validation/document-preindex";
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20 Mo
 const ALLOWED_MIME_TYPES = new Set([
@@ -35,6 +37,25 @@ async function assertDossierAccessible(dossierId: number, session: SessionPayloa
   return dossier;
 }
 
+function storageReference(document: {
+  nomFichier: string;
+  externalDriveId: string | null;
+  externalItemId: string | null;
+}) {
+  return {
+    key: document.nomFichier,
+    externalDriveId: document.externalDriveId,
+    externalItemId: document.externalItemId,
+  };
+}
+
+function throwStorageApiError(error: unknown): never {
+  if (error instanceof SharePointStorageError) {
+    throw new ApiError(`Stockage SharePoint indisponible. ${error.message}`, 502);
+  }
+  throw error;
+}
+
 export async function uploadDocument(dossierId: number, file: File) {
   const session = await requireApiPermission("NUMERISATION_UPDATE");
   await assertDossierAccessible(dossierId, session);
@@ -55,43 +76,65 @@ export async function uploadDocument(dossierId: number, file: File) {
   const storageKey = `${dossierId}/${randomUUID()}.${extension}`;
 
   const storage = getStorageProvider();
-  const { url } = await storage.save(storageKey, buffer);
+  let stored;
+  try {
+    stored = await storage.save(storageKey, buffer, { contentType: file.type });
+  } catch (error) {
+    throwStorageApiError(error);
+  }
 
-  const document = await prisma.document.create({
-    data: {
-      dossierId,
-      nomFichier: storageKey,
-      nomOriginal: file.name,
-      typeMime: file.type,
-      extension,
-      taille: file.size,
-      url,
-      storageProvider: "LOCAL",
-      hash,
-      uploadedBy: session.userId,
-    },
-  });
-
-  await prisma.dossierHistory.create({
-    data: {
-      dossierId,
-      userId: session.userId,
-      action: "DOCUMENT_AJOUTE",
-      commentaire: `${file.name} (${(file.size / 1024).toFixed(0)} Ko)`,
-    },
-  });
-  await prisma.auditLog.create({
-    data: {
-      userId: session.userId,
-      action: "DOCUMENT_UPLOAD",
-      entity: "DOCUMENT",
-      entityId: document.id,
-      newValue: { dossierId, nomOriginal: file.name, taille: file.size },
-      ipAddress: await getClientIp(),
-    },
-  });
-
-  return document;
+  try {
+    const ipAddress = await getClientIp();
+    return await prisma.$transaction(async (tx) => {
+      const document = await tx.document.create({
+        data: {
+          dossierId,
+          nomFichier: storageKey,
+          nomOriginal: file.name,
+          typeMime: file.type,
+          extension,
+          taille: file.size,
+          url: stored.url,
+          storageProvider: storage.kind,
+          hash,
+          externalDriveId: stored.externalDriveId,
+          externalItemId: stored.externalItemId,
+          externalWebUrl: stored.externalWebUrl,
+          uploadedBy: session.userId,
+        },
+      });
+      await tx.dossierHistory.create({
+        data: {
+          dossierId,
+          userId: session.userId,
+          action: "DOCUMENT_AJOUTE",
+          commentaire: `${file.name} (${(file.size / 1024).toFixed(0)} Ko) — ${storage.kind}`,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: "DOCUMENT_UPLOAD",
+          entity: "DOCUMENT",
+          entityId: document.id,
+          newValue: { dossierId, nomOriginal: file.name, taille: file.size, storageProvider: storage.kind },
+          ipAddress,
+        },
+      });
+      return document;
+    });
+  } catch (error) {
+    try {
+      await storage.remove({
+        key: storageKey,
+        externalDriveId: stored.externalDriveId,
+        externalItemId: stored.externalItemId,
+      });
+    } catch {
+      // La transaction reste l'erreur principale ; le fichier orphelin pourra être rapproché par son hash.
+    }
+    throw error;
+  }
 }
 
 export async function listDocuments(dossierId: number) {
@@ -106,8 +149,13 @@ export async function getDocumentForDownload(documentId: number) {
   if (!document) throw new ApiError("Document introuvable.", 404);
   await assertDossierAccessible(document.dossierId, session);
 
-  const storage = getStorageProvider();
-  const buffer = await storage.read(document.nomFichier);
+  const storage = getStorageProvider(document.storageProvider);
+  let buffer: Buffer;
+  try {
+    buffer = await storage.read(storageReference(document));
+  } catch (error) {
+    throwStorageApiError(error);
+  }
 
   await prisma.auditLog.create({
     data: {
@@ -128,8 +176,12 @@ export async function deleteDocument(documentId: number) {
   if (!document) throw new ApiError("Document introuvable.", 404);
   await assertDossierAccessible(document.dossierId, session);
 
-  const storage = getStorageProvider();
-  await storage.remove(document.nomFichier);
+  const storage = getStorageProvider(document.storageProvider);
+  try {
+    await storage.remove(storageReference(document));
+  } catch (error) {
+    throwStorageApiError(error);
+  }
   await prisma.document.delete({ where: { id: documentId } });
 
   await prisma.dossierHistory.create({
@@ -149,5 +201,78 @@ export async function deleteDocument(documentId: number) {
       oldValue: { nomOriginal: document.nomOriginal, dossierId: document.dossierId },
       ipAddress: await getClientIp(),
     },
+  });
+}
+
+export async function preindexDocument(documentId: number, values: unknown) {
+  const session = await requireApiPermission("INDEXATION_UPDATE");
+  const parsed = documentPreindexSchema.safeParse(values);
+  if (!parsed.success) {
+    throw new ApiError(parsed.error.issues[0]?.message ?? "Métadonnées de pré-indexation invalides.");
+  }
+
+  const document = await prisma.document.findUnique({ where: { id: documentId } });
+  if (!document) throw new ApiError("Document introuvable.", 404);
+  await assertDossierAccessible(document.dossierId, session);
+
+  if (parsed.data.typePieceId) {
+    const typePiece = await prisma.typePiece.findFirst({
+      where: { id: parsed.data.typePieceId, isActive: true },
+      select: { id: true },
+    });
+    if (!typePiece) throw new ApiError("Type de pièce introuvable ou inactif.");
+  }
+
+  const preIndexStatus = parsed.data.ready ? "PRET" : "BROUILLON";
+  const dateDocument = parsed.data.dateDocument
+    ? new Date(`${parsed.data.dateDocument}T00:00:00.000Z`)
+    : null;
+  const ipAddress = await getClientIp();
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.document.update({
+      where: { id: documentId },
+      data: {
+        titreIndexation: parsed.data.titreIndexation,
+        referenceIndexation: parsed.data.referenceIndexation,
+        dateDocument,
+        nombrePages: parsed.data.nombrePages ?? null,
+        typePieceId: parsed.data.typePieceId ?? null,
+        preIndexNotes: parsed.data.preIndexNotes,
+        preIndexStatus,
+        preIndexedBy: session.userId,
+        preIndexedAt: new Date(),
+      },
+      include: {
+        typePiece: { select: { id: true, libelle: true } },
+        preIndexer: { select: { name: true } },
+      },
+    });
+    await tx.dossierHistory.create({
+      data: {
+        dossierId: document.dossierId,
+        userId: session.userId,
+        action: parsed.data.ready ? "DOCUMENT_PREINDEXE" : "DOCUMENT_PREINDEX_BROUILLON",
+        commentaire: parsed.data.titreIndexation ?? document.nomOriginal,
+      },
+    });
+    await tx.auditLog.create({
+      data: {
+        userId: session.userId,
+        action: "DOCUMENT_PREINDEX",
+        entity: "DOCUMENT",
+        entityId: documentId,
+        newValue: {
+          preIndexStatus,
+          titreIndexation: parsed.data.titreIndexation,
+          referenceIndexation: parsed.data.referenceIndexation,
+          dateDocument: parsed.data.dateDocument,
+          nombrePages: parsed.data.nombrePages ?? null,
+          typePieceId: parsed.data.typePieceId ?? null,
+        },
+        ipAddress,
+      },
+    });
+    return updated;
   });
 }

@@ -160,7 +160,14 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 | `DATABASE_URL` | **Production (cPanel)** : `mysql://<user>:<mdp>@<hote-cpanel>:3306/col_invent`. **Repli (Aiven)** : `mysql://avnadmin:<mdp>@<hote>.aivencloud.com:<port>/col_invent?sslaccept=accept_invalid_certs`. Jamais `localhost` — mot de passe percent-encodé si caractères spéciaux |
 | `AUTH_SECRET` | valeur générée avec `openssl rand -base64 32` — **différente** de celle utilisée en dev, jamais commitée |
 | `NODE_ENV` | `production` |
-| `DOCUMENTS_STORAGE_PATH` | point de montage du disque persistant Render (§4) |
+| `STORAGE_PROVIDER` | `sharepoint` pour activer Microsoft Graph ; `local` pour le disque Render |
+| `DOCUMENTS_STORAGE_PATH` | point de montage du disque persistant Render, utilisé seulement avec `STORAGE_PROVIDER=local` (§4) |
+| `MICROSOFT_TENANT_ID` | identifiant du tenant Microsoft Entra de CEIBA |
+| `MICROSOFT_CLIENT_ID` | identifiant de l'inscription d'application GeoArchives |
+| `MICROSOFT_CLIENT_SECRET` | secret serveur de l'inscription Entra, jamais commité |
+| `SHAREPOINT_DRIVE_ID` | identifiant de la bibliothèque de documents cible (mode recommandé) |
+| `SHAREPOINT_FOLDER_ITEM_ID` | identifiant du dossier racine cible (mode recommandé) |
+| `SHAREPOINT_SHARED_FOLDER_URL` | lien partagé utilisé seulement pour découvrir le dossier si les deux identifiants précédents sont absents |
 | `RESEND_API_KEY` | clé serveur Resend active, jamais commitée ni préfixée par `NEXT_PUBLIC_` |
 | `EMAIL_FROM` | `GeoArchives-MULCV <no-reply@ceiba-analytics.com>` après vérification du domaine dans Resend |
 | `APP_URL` | `https://geoarchives.ceiba-analytics.com` — origine utilisée dans les liens de réinitialisation |
@@ -209,23 +216,34 @@ vérification du certificat.
    réponse (`status !== "ok"`), **pas** sur le code HTTP.
 6. Renseigner les variables d'environnement de la section 2.
 
-## 4. Stockage des documents — disque persistant obligatoire
+## 4. Stockage des documents — SharePoint ou disque persistant
 
 ⚠️ Point déjà signalé en Phase 11 ([ARCHITECTURE.md](ARCHITECTURE.md)) : le disque
 d'une instance Render standard est **éphémère** (perdu à chaque redéploiement/restart).
 `LocalStorageProvider` (`src/lib/storage/`) écrit les documents numérisés sur disque —
 sans disque persistant, tout document uploadé disparaît au prochain déploiement.
 
-Avant la mise en production réelle, deux options :
+Deux options sont disponibles :
 
 - **Render Persistent Disk** (le plus simple, changement de code nul) : attacher un
   disque au service, monté par exemple sur `/var/data/documents`, puis définir
-  `DOCUMENTS_STORAGE_PATH=/var/data/documents`.
-- **Provider externe (S3-compatible)** : implémenter un nouveau `StorageProvider`
-  (interface déjà prête, voir `src/lib/storage/storage-provider.ts`) sans toucher au
-  code appelant — solution préférable si l'application doit un jour tourner sur
-  plusieurs instances (un disque Render n'est monté que sur une seule instance, donc
-  incompatible avec un scaling horizontal).
+  `STORAGE_PROVIDER=local` et `DOCUMENTS_STORAGE_PATH=/var/data/documents`.
+- **SharePoint via Microsoft Graph** (recommandé pour GeoArchives) : définir
+  `STORAGE_PROVIDER=sharepoint`, enregistrer une application dans Microsoft Entra,
+  créer un secret client et renseigner les variables Graph de la section 2. Accorder
+  de préférence la permission applicative `Sites.Selected` au seul site CEIBA Projects,
+  puis renseigner directement `SHAREPOINT_DRIVE_ID` et `SHAREPOINT_FOLDER_ITEM_ID`.
+
+Le mode `SHAREPOINT_SHARED_FOLDER_URL` transforme le lien partagé en identifiant Graph
+`/shares/{shareId}/driveItem`. Il simplifie la découverte initiale, mais l'API `/shares`
+demande actuellement une permission applicative large (`Files.ReadWrite.All` ou
+`Sites.ReadWrite.All`). Après récupération des identifiants, basculer vers le mode
+explicite et restreindre l'application au site concerné.
+
+À l'upload, GeoArchives crée un sous-dossier `Dossier-<id>`, charge le binaire, puis
+enregistre `driveId`, `itemId` et l'URL de consultation dans MySQL. Le secret client ne
+transite jamais dans le navigateur. Le téléchargement et la suppression repassent par
+le serveur et respectent les permissions GeoArchives.
 
 ## 5. Migrations et données de référence
 

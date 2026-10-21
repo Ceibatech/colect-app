@@ -88,6 +88,16 @@ interface DossierDetail {
     taille: number;
     hash: string | null;
     nombrePages: number | null;
+    storageProvider: "LOCAL" | "CPANEL" | "S3" | "SHAREPOINT" | "OTHER";
+    externalWebUrl: string | null;
+    preIndexStatus: "A_TRAITER" | "BROUILLON" | "PRET";
+    titreIndexation: string | null;
+    referenceIndexation: string | null;
+    dateDocument: string | null;
+    preIndexNotes: string | null;
+    preIndexedAt: string | null;
+    typePiece: { id: number; libelle: string } | null;
+    preIndexer: { name: string } | null;
     createdAt: string;
   }>;
   qualityChecks: Array<{
@@ -117,10 +127,12 @@ export function DossierDetailTabs({
   dossier,
   permissions,
   typesPiece,
+  documentStorageProvider,
 }: {
   dossier: DossierDetail;
   permissions: PermissionCode[];
   typesPiece: TypePieceOption[];
+  documentStorageProvider: "LOCAL" | "SHAREPOINT";
 }) {
   // Rendu conditionnel manuel du panneau actif, au lieu du composant
   // <TabsContent> (masquage interne défaillant constaté avec ce composant
@@ -139,9 +151,9 @@ export function DossierDetailTabs({
         <TabsTrigger value="controle">Contrôle</TabsTrigger>
         <TabsTrigger value="preparation">Préparation</TabsTrigger>
         <TabsTrigger value="numerisation">Numérisation</TabsTrigger>
+        <TabsTrigger value="documents">Documents</TabsTrigger>
         <TabsTrigger value="indexation">Indexation</TabsTrigger>
         <TabsTrigger value="archivage">Archivage</TabsTrigger>
-        <TabsTrigger value="documents">Documents</TabsTrigger>
         <TabsTrigger value="historique">Historique</TabsTrigger>
       </TabsList>
 
@@ -395,6 +407,9 @@ export function DossierDetailTabs({
                 dossierId={dossier.id}
                 documents={dossier.documents}
                 canManage={permissions.includes("NUMERISATION_UPDATE")}
+                canPreindex={permissions.includes("INDEXATION_UPDATE")}
+                typesPiece={typesPiece}
+                activeStorageProvider={documentStorageProvider}
               />
             </CardContent>
           </Card>

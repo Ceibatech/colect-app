@@ -252,8 +252,14 @@ processus métier — ils ne figurent pas sur la fiche CG1020.
   Render/cPanel décrit dans le cahier des charges sans bénéfice pour ce projet. Choix
   technique révisable plus tard.
 - **Stockage des documents** : seules les métadonnées (`documents`) sont stockées en base ;
-  aucun blob. `storageProvider` (`LOCAL | CPANEL | S3 | OTHER`) prépare le branchement d'un
-  stockage externe sans migration de schéma.
+  aucun blob. `storageProvider` (`LOCAL | CPANEL | S3 | SHAREPOINT | OTHER`) sélectionne
+  le backend par fichier. `externalDriveId`, `externalItemId` et `externalWebUrl`
+  référencent la pièce SharePoint sans exposer de secret Graph.
+- **Pré-indexation documentaire** : `preIndexStatus` (`A_TRAITER | BROUILLON | PRET`),
+  `titreIndexation`, `referenceIndexation`, `dateDocument`, `nombrePages`,
+  `typePieceId`, `preIndexNotes`, `preIndexedBy` et `preIndexedAt` conservent la
+  qualification métier et son auteur. La disponibilité du binaire reste indépendante
+  de cet état afin de pouvoir reprendre un brouillon sans recharger le fichier.
 - **Unité de stock des transferts** : le modèle historique n'a pas de table `cartons` ; un
   carton est représenté par les dossiers qui partagent le même `codeBarres`, le même site
   et le même entrepôt. À la constitution d'un `transfer_lot`, cette composition est figée

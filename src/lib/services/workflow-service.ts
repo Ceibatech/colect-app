@@ -419,6 +419,15 @@ export async function indexDossier(id: number, scoreQualite?: number) {
     throw new ApiError("Ce dossier est déjà indexé.");
   }
 
+  const documentsACompleter = await prisma.document.count({
+    where: { dossierId: id, preIndexStatus: { not: "PRET" } },
+  });
+  if (documentsACompleter > 0) {
+    throw new ApiError(
+      `${documentsACompleter} document(s) doivent être pré-indexés et déclarés prêts avant de soumettre l'indexation.`,
+    );
+  }
+
   const operateurId = await resolveOperateurId(session);
   const now = new Date();
   const [updated] = await prisma.$transaction([

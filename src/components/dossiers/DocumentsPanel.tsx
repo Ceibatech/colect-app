@@ -3,8 +3,19 @@
 import { useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Upload, Download, Trash2, FileText, Loader2 } from "lucide-react";
+import {
+  CheckCircle2,
+  Cloud,
+  Download,
+  ExternalLink,
+  FileText,
+  HardDrive,
+  Loader2,
+  Trash2,
+  Upload,
+} from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,14 +28,17 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ModulePlaceholder } from "@/components/layout/ModulePlaceholder";
+import { DocumentPreindexDialog, type PreindexDocument } from "@/components/dossiers/DocumentPreindexDialog";
+import type { TypePieceOption } from "@/components/dossiers/TypesPiecesField";
 
-interface DocumentRow {
-  id: number;
-  nomOriginal: string;
+interface DocumentRow extends PreindexDocument {
   typeMime: string;
   taille: number;
   hash: string | null;
-  nombrePages: number | null;
+  storageProvider: "LOCAL" | "CPANEL" | "S3" | "SHAREPOINT" | "OTHER";
+  externalWebUrl: string | null;
+  preIndexedAt: string | null;
+  preIndexer: { name: string } | null;
   createdAt: string;
 }
 
@@ -35,32 +49,61 @@ function formatSize(bytes: number): string {
 }
 
 const ACCEPTED = ".pdf,.jpg,.jpeg,.png,.tif,.tiff";
+const STATUS = {
+  A_TRAITER: { label: "À qualifier", variant: "outline" as const },
+  BROUILLON: { label: "Brouillon", variant: "secondary" as const },
+  PRET: { label: "Prêt", variant: "default" as const },
+};
 
 export function DocumentsPanel({
   dossierId,
   documents,
   canManage,
+  canPreindex,
+  typesPiece,
+  activeStorageProvider,
 }: {
   dossierId: number;
   documents: DocumentRow[];
   canManage: boolean;
+  canPreindex: boolean;
+  typesPiece: TypePieceOption[];
+  activeStorageProvider: "LOCAL" | "SHAREPOINT";
 }) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isPending, startTransition] = useTransition();
+  const readyCount = documents.filter((document) => document.preIndexStatus === "PRET").length;
 
-  function upload(file: File) {
+  function upload(files: File[]) {
     startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        const res = await fetch(`/api/dossiers/${dossierId}/documents`, { method: "POST", body: formData });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Erreur lors de l'ajout du document.");
-        toast.success(`${file.name} ajouté.`);
+      const results = await Promise.all(files.map(async (file) => {
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+          const response = await fetch(`/api/dossiers/${dossierId}/documents`, { method: "POST", body: formData });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error ?? "Erreur lors de l'ajout du document.");
+          return { success: true, name: file.name };
+        } catch (error) {
+          return {
+            success: false,
+            name: file.name,
+            error: error instanceof Error ? error.message : "Erreur lors de l'ajout du document.",
+          };
+        }
+      }));
+      const successes = results.filter((result) => result.success);
+      const failures = results.filter((result) => !result.success);
+
+      if (successes.length > 0) {
+        toast.success(
+          `${successes.length} document(s) chargé(s)${activeStorageProvider === "SHAREPOINT" ? " dans SharePoint" : ""}.`,
+        );
         router.refresh();
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Erreur lors de l'ajout du document.");
+      }
+      if (failures.length > 0) {
+        toast.error(`${failures.length} échec(s). ${failures[0]?.name} : ${failures[0]?.error}`);
       }
       if (fileInputRef.current) fileInputRef.current.value = "";
     });
@@ -74,88 +117,140 @@ export function DocumentsPanel({
         if (!res.ok) throw new Error(data.error ?? "Erreur lors de la suppression.");
         toast.success(`${name} supprimé.`);
         router.refresh();
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Erreur lors de la suppression.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Erreur lors de la suppression.");
       }
     });
   }
 
   return (
-    <div className="space-y-4">
-      {canManage && (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <Button disabled={isPending} onClick={() => fileInputRef.current?.click()}>
-            {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Upload className="mr-1 h-4 w-4" />}
-            Ajouter un document
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPTED}
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) upload(file);
-            }}
-          />
-          <p className="mt-1 text-xs text-muted-foreground">PDF, JPEG, PNG, TIFF — 20 Mo maximum.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-sm font-semibold">Archives numériques</h3>
+            <Badge variant={readyCount === documents.length && documents.length > 0 ? "default" : "outline"}>
+              {readyCount}/{documents.length} pré-indexés
+            </Badge>
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Les fichiers sont qualifiés ici avant la soumission de l&apos;indexation.
+          </p>
         </div>
-      )}
+        {canManage ? (
+          <div className="shrink-0">
+            <Button disabled={isPending} onClick={() => fileInputRef.current?.click()}>
+              {isPending ? <Loader2 className="animate-spin" /> : <Upload />}
+              {activeStorageProvider === "SHAREPOINT" ? "Charger vers SharePoint" : "Ajouter un document"}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPTED}
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? []);
+                if (files.length > 0) upload(files);
+              }}
+            />
+            <p className="mt-1 text-right text-xs text-muted-foreground">PDF, JPEG, PNG, TIFF · 20 Mo max.</p>
+          </div>
+        ) : null}
+      </div>
 
       {documents.length === 0 ? (
         <ModulePlaceholder
           title="Aucun document"
           phase="Ajoutez le premier scan de ce dossier"
-          description="Les documents numérisés associés à ce dossier apparaîtront ici."
+          description="Les archives numériques associées au dossier apparaîtront ici."
         />
       ) : (
-        <div className="space-y-2">
-          {documents.map((d) => (
-            <div key={d.id} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
-              <div className="flex min-w-0 items-center gap-2">
-                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <div className="truncate font-medium">{d.nomOriginal}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatSize(d.taille)} · {d.typeMime} · {new Date(d.createdAt).toLocaleDateString("fr-FR")}
-                    {d.hash && <span className="ml-1 font-mono">· {d.hash.slice(0, 12)}…</span>}
+        <div className="divide-y divide-border overflow-hidden rounded-lg border">
+          {documents.map((document) => {
+            const status = STATUS[document.preIndexStatus];
+            return (
+              <div key={document.id} className="grid gap-4 bg-background p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div className="flex min-w-0 gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border bg-muted/40 text-muted-foreground">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm font-semibold">{document.titreIndexation ?? document.nomOriginal}</p>
+                      <Badge variant={status.variant}>{status.label}</Badge>
+                      <Badge variant="outline" className="gap-1">
+                        {document.storageProvider === "SHAREPOINT" ? <Cloud /> : <HardDrive />}
+                        {document.storageProvider === "SHAREPOINT" ? "SharePoint" : "Local"}
+                      </Badge>
+                    </div>
+                    {document.titreIndexation ? (
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{document.nomOriginal}</p>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>{formatSize(document.taille)}</span>
+                      <span>{document.typePiece?.libelle ?? "Type à renseigner"}</span>
+                      <span>{document.nombrePages ? `${document.nombrePages} page(s)` : "Pagination à renseigner"}</span>
+                      <span>Ajouté le {new Date(document.createdAt).toLocaleDateString("fr-FR")}</span>
+                      {document.preIndexedAt && document.preIndexer ? (
+                        <span className="inline-flex items-center gap-1 text-primary">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Traité par {document.preIndexer.name}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
+
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {canPreindex ? <DocumentPreindexDialog document={document} typesPiece={typesPiece} /> : null}
+                  <a
+                    href={`/api/documents/${document.id}/download`}
+                    aria-label={`Télécharger ${document.nomOriginal}`}
+                    title="Télécharger"
+                    className={buttonVariants({ size: "icon-sm", variant: "ghost" })}
+                  >
+                    <Download className="h-4 w-4" />
+                  </a>
+                  {document.externalWebUrl ? (
+                    <a
+                      href={document.externalWebUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Ouvrir ${document.nomOriginal} dans SharePoint`}
+                      title="Ouvrir dans SharePoint"
+                      className={buttonVariants({ size: "icon-sm", variant: "ghost" })}
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  ) : null}
+                  {canManage ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger
+                        render={
+                          <Button size="icon-sm" variant="ghost" disabled={isPending} aria-label={`Supprimer ${document.nomOriginal}`} title="Supprimer">
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        }
+                      />
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            « {document.nomOriginal} » sera supprimé de {document.storageProvider === "SHAREPOINT" ? "SharePoint" : "l'espace local"}. Cette action est irréversible.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Annuler</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => remove(document.id, document.nomOriginal)}>Supprimer</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <a
-                  href={`/api/documents/${d.id}/download`}
-                  aria-label="Télécharger"
-                  className={buttonVariants({ size: "icon-sm", variant: "ghost" })}
-                >
-                  <Download className="h-4 w-4" />
-                </a>
-                {canManage && (
-                  <AlertDialog>
-                    <AlertDialogTrigger
-                      render={
-                        <Button size="icon-sm" variant="ghost" disabled={isPending} aria-label="Supprimer">
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      }
-                    />
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          « {d.nomOriginal} » sera définitivement supprimé du stockage. Cette action est irréversible.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => remove(d.id, d.nomOriginal)}>Supprimer</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

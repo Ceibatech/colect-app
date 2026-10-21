@@ -153,6 +153,14 @@ uniquement, 20 Mo max. Calcule le hash SHA-256, stocke via le
 `StorageProvider` actif (local par défaut), journalise `dossier_history` +
 `audit_logs`.
 
+### PATCH /api/documents/:id/preindex
+
+Permission : `INDEXATION_UPDATE` (+ cloisonnement). Enregistre le titre, la
+référence métier, la date du document, le type de pièce, la pagination et les
+notes de traitement. `ready: true` exige au minimum titre, type et nombre de
+pages ; le document passe alors à `PRET`. Toute modification est historisée et
+auditée.
+
 ### GET /api/documents/:id/download
 
 Permission : `DOSSIER_READ` (+ cloisonnement). Stream le fichier avec le

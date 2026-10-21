@@ -1,7 +1,7 @@
 import "server-only";
 import { mkdir, readFile, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
-import type { StorageProvider } from "@/lib/storage/storage-provider";
+import type { StorageProvider, StorageReference } from "@/lib/storage/storage-provider";
 
 /**
  * Stockage sur disque local — implémentation par défaut pour le
@@ -34,6 +34,8 @@ function resolveSafePath(key: string): string {
 // `RESOLVED_ROOT` ci-dessus : chemin borné et validé par `resolveSafePath`,
 // jamais une entrée utilisateur brute.
 export class LocalStorageProvider implements StorageProvider {
+  readonly kind = "LOCAL" as const;
+
   async save(key: string, buffer: Buffer): Promise<{ url: string }> {
     const filePath = resolveSafePath(key);
     await mkdir(/*turbopackIgnore: true*/ path.dirname(filePath), { recursive: true });
@@ -41,13 +43,13 @@ export class LocalStorageProvider implements StorageProvider {
     return { url: key };
   }
 
-  async read(key: string): Promise<Buffer> {
-    return readFile(/*turbopackIgnore: true*/ resolveSafePath(key));
+  async read(reference: StorageReference): Promise<Buffer> {
+    return readFile(/*turbopackIgnore: true*/ resolveSafePath(reference.key));
   }
 
-  async remove(key: string): Promise<void> {
+  async remove(reference: StorageReference): Promise<void> {
     try {
-      await unlink(/*turbopackIgnore: true*/ resolveSafePath(key));
+      await unlink(/*turbopackIgnore: true*/ resolveSafePath(reference.key));
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
     }

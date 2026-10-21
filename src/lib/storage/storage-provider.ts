@@ -8,10 +8,24 @@ import "server-only";
  * change d'implémentation.
  */
 export interface StorageProvider {
+  readonly kind: "LOCAL" | "SHAREPOINT";
   /** Enregistre le fichier sous la clé donnée et retourne l'URL/référence à stocker en base. */
-  save(key: string, buffer: Buffer): Promise<{ url: string }>;
+  save(key: string, buffer: Buffer, options?: { contentType?: string }): Promise<StoredFile>;
   /** Relit le contenu d'un fichier précédemment enregistré. */
-  read(key: string): Promise<Buffer>;
+  read(reference: StorageReference): Promise<Buffer>;
   /** Supprime un fichier. Ne doit pas lever si le fichier est déjà absent. */
-  remove(key: string): Promise<void>;
+  remove(reference: StorageReference): Promise<void>;
+}
+
+export interface StoredFile {
+  url: string;
+  externalDriveId?: string;
+  externalItemId?: string;
+  externalWebUrl?: string;
+}
+
+export interface StorageReference {
+  key: string;
+  externalDriveId?: string | null;
+  externalItemId?: string | null;
 }
