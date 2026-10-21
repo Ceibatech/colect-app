@@ -174,14 +174,29 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
           <div><h2 className="font-semibold">Site A · point de départ</h2><p className="text-sm text-muted-foreground">Emplacement qui détient actuellement les dossiers.</p></div>
           <div className="space-y-2">
             <Label>Site d&apos;origine</Label>
-            <Select name="sourceSiteId" value={sourceSiteId} onValueChange={changeSourceSite} disabled={pending}>
+            <Select
+              name="sourceSiteId"
+              items={sites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
+              value={sourceSiteId}
+              onValueChange={changeSourceSite}
+              disabled={pending}
+            >
               <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site d'origine" /></SelectTrigger>
               <SelectContent>{sites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label>Entrepôt / salle d&apos;origine</Label>
-            <Select name="sourceEntrepotId" value={sourceEntrepotId} onValueChange={changeSourceWarehouse} disabled={pending || !sourceSite}>
+            <Select
+              name="sourceEntrepotId"
+              items={[
+                { label: "Sans entrepôt précisé", value: "none" },
+                ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: `${warehouse.nom} · ${warehouse.code}`, value: String(warehouse.id) })),
+              ]}
+              value={sourceEntrepotId}
+              onValueChange={changeSourceWarehouse}
+              disabled={pending || !sourceSite}
+            >
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sans entrepôt précisé</SelectItem>
@@ -197,14 +212,29 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
           <div><h2 className="font-semibold">Site B · destination</h2><p className="text-sm text-muted-foreground">Emplacement qui intégrera le stock après réception signée.</p></div>
           <div className="space-y-2">
             <Label>Site de destination</Label>
-            <Select name="destinationSiteId" value={destinationSiteId} onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }} disabled={pending}>
+            <Select
+              name="destinationSiteId"
+              items={sites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
+              value={destinationSiteId}
+              onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }}
+              disabled={pending}
+            >
               <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site de destination" /></SelectTrigger>
               <SelectContent>{sites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label>Entrepôt / salle de destination</Label>
-            <Select name="destinationEntrepotId" value={destinationEntrepotId} onValueChange={(value) => setDestinationEntrepotId(value ?? "none")} disabled={pending || !destinationSite}>
+            <Select
+              name="destinationEntrepotId"
+              items={[
+                { label: "Sans entrepôt précisé", value: "none" },
+                ...(destinationSite?.entrepots ?? []).map((warehouse) => ({ label: `${warehouse.nom} · ${warehouse.code}`, value: String(warehouse.id) })),
+              ]}
+              value={destinationEntrepotId}
+              onValueChange={(value) => setDestinationEntrepotId(value ?? "none")}
+              disabled={pending || !destinationSite}
+            >
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sans entrepôt précisé</SelectItem>
