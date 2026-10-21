@@ -120,9 +120,12 @@ export function NewTransferForm({ sites, cartons }: { sites: SiteOption[]; carto
 
       <section className="rounded-lg border bg-card shadow-sm">
         <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-end sm:justify-between lg:p-5">
-          <div><h2 className="font-semibold">Cartons prêts au transfert</h2><p className="text-sm text-muted-foreground">Seuls les cartons dont tous les dossiers ont terminé la Préparation sont proposés.</p></div>
-          <div className="relative w-full sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Code-barres, libellé, dossier..." className="pl-9" /></div>
+          <div><h2 className="font-semibold">Stock documentaire identifié</h2><p className="text-sm text-muted-foreground">Recherchez le carton physique préparé sur le site. Tous ses dossiers seront inclus dans le lot.</p></div>
+          <div className="relative w-full sm:w-80"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher carton ou dossier..." className="pl-9" /></div>
         </div>
+        <Alert className="m-4 mb-0 bg-primary/5 lg:m-5 lg:mb-0">
+          <AlertDescription>Le carton est l&apos;unité de stock. La sortie, la réception et le retour mettront à jour son emplacement sans modifier la liste des dossiers rattachés.</AlertDescription>
+        </Alert>
         <div className="max-h-[420px] divide-y overflow-y-auto">
           {!sourceSiteId ? <p className="p-8 text-center text-sm text-muted-foreground">Choisissez d&apos;abord un point de départ.</p> : availableCartons.length === 0 ? <p className="p-8 text-center text-sm text-muted-foreground">Aucun carton prêt et disponible pour ce point de départ.</p> : availableCartons.map((carton) => (
             <label key={carton.key} className="flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/40">
@@ -136,7 +139,7 @@ export function NewTransferForm({ sites, cartons }: { sites: SiteOption[]; carto
           ))}
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/20 px-4 py-3 lg:px-5">
-          <span className="text-sm"><strong>{selected.length}</strong> carton{selected.length > 1 ? "s" : ""} · <strong>{selectedDossiers}</strong> dossier{selectedDossiers > 1 ? "s" : ""}</span>
+          <span className="text-sm">Lot sélectionné : <strong>{selected.length}</strong> carton{selected.length > 1 ? "s" : ""} · <strong>{selectedDossiers}</strong> dossier{selectedDossiers > 1 ? "s" : ""}</span>
           {availableCartons.length > 0 ? <Button type="button" size="sm" variant="ghost" onClick={() => setSelected(availableCartons.every((carton) => selected.includes(carton.key)) ? selected.filter((key) => !availableCartons.some((carton) => carton.key === key)) : [...new Set([...selected, ...availableCartons.map((carton) => carton.key)])])}>{availableCartons.every((carton) => selected.includes(carton.key)) ? "Retirer la liste" : "Sélectionner la liste"}</Button> : null}
         </div>
       </section>
@@ -150,7 +153,7 @@ export function NewTransferForm({ sites, cartons }: { sites: SiteOption[]; carto
       <div className="flex justify-end">
         <Button type="submit" disabled={pending || selected.length === 0 || !sourceSiteId || !destinationSiteId}>
           {pending ? <Loader2 className="animate-spin" /> : <PackageCheck />}
-          Créer le lot de transfert
+          Enregistrer le lot
         </Button>
       </div>
     </form>

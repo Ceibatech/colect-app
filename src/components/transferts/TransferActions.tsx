@@ -97,7 +97,7 @@ export function TransferMovementDialog({
         <DialogHeader>
           <DialogTitle>{label}</DialogTitle>
           <DialogDescription>
-            Sélectionnez les cartons réellement concernés. Le mouvement, le nouveau solde et les deux signatures seront enregistrés ensemble.
+            Sélectionnez les cartons réellement concernés. Le mouvement de stock et les visas des deux responsables habilités seront enregistrés ensemble sur le bordereau.
           </DialogDescription>
         </DialogHeader>
         <form key={formVersion} action={formAction} className="space-y-5">
@@ -132,15 +132,15 @@ export function TransferMovementDialog({
 
           <div className="grid gap-5 border-t pt-5 lg:grid-cols-2">
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
-              <div><h3 className="font-semibold">Visa Ministère</h3><p className="text-xs text-muted-foreground">Agent remettant ou réceptionnant les archives.</p></div>
+              <div><h3 className="font-semibold">Visa du Ministère</h3><p className="text-xs text-muted-foreground">Responsable habilité {type === "RETOUR" ? "à réceptionner le retour sur le site" : "à autoriser la remise des archives"}.</p></div>
               <div className="space-y-2"><Label htmlFor={`${type}-ministryName`}>Nom complet</Label><Input id={`${type}-ministryName`} name="ministryName" required maxLength={120} disabled={pending} /></div>
-              <div className="space-y-2"><Label htmlFor={`${type}-ministryTitle`}>Fonction</Label><Input id={`${type}-ministryTitle`} name="ministryTitle" required maxLength={120} disabled={pending} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-ministryTitle`}>Fonction habilitée</Label><Input id={`${type}-ministryTitle`} name="ministryTitle" required maxLength={120} disabled={pending} /></div>
               <SignaturePad name="ministrySignature" label="Ministère" disabled={pending} />
             </section>
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
-              <div><h3 className="font-semibold">Visa CEIBAC</h3><p className="text-xs text-muted-foreground">Agent prenant en charge ou restituant les archives.</p></div>
+              <div><h3 className="font-semibold">Visa CEIBAC</h3><p className="text-xs text-muted-foreground">Responsable habilité {type === "RETOUR" ? "à remettre les archives au Ministère" : "à prendre en charge les archives"}.</p></div>
               <div className="space-y-2"><Label htmlFor={`${type}-ceibacName`}>Nom complet</Label><Input id={`${type}-ceibacName`} name="ceibacName" required maxLength={120} disabled={pending} /></div>
-              <div className="space-y-2"><Label htmlFor={`${type}-ceibacTitle`}>Fonction</Label><Input id={`${type}-ceibacTitle`} name="ceibacTitle" required maxLength={120} disabled={pending} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-ceibacTitle`}>Fonction habilitée</Label><Input id={`${type}-ceibacTitle`} name="ceibacTitle" required maxLength={120} disabled={pending} /></div>
               <SignaturePad name="ceibacSignature" label="CEIBAC" disabled={pending} />
             </section>
           </div>
@@ -148,7 +148,7 @@ export function TransferMovementDialog({
           <DialogFooter>
             <Button type="submit" disabled={pending || selected.length === 0}>
               {pending ? <Loader2 className="animate-spin" /> : <ClipboardSignature />}
-              Enregistrer le bordereau
+              Signer et enregistrer le bordereau
             </Button>
           </DialogFooter>
         </form>

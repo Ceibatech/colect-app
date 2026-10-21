@@ -46,6 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     permission: "DASHBOARD_VIEW",
+    roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"],
     children: [
       { title: "Vue d'ensemble", href: "/dashboard", icon: LayoutDashboard, permission: "DASHBOARD_VIEW" },
       { title: "Direction", href: "/dashboard/direction", icon: TrendingUp, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "PMO", "CONSULTATION"] },

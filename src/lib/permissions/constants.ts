@@ -4,7 +4,7 @@
  * par l'application (contrôles serveur, middleware, UI conditionnelle).
  */
 
-export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
+export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "GESTIONNAIRE_TRANSFERT", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const PERMISSIONS = [
@@ -91,6 +91,9 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "ARCHIVAGE_VIEW",
     "ARCHIVAGE_UPDATE",
     "IMPORT_DATA",
+  ],
+  GESTIONNAIRE_TRANSFERT: [
+    "DASHBOARD_VIEW",
     "TRANSFER_VIEW",
     "TRANSFER_CREATE",
     "TRANSFER_OPERATE",
@@ -130,5 +133,5 @@ export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly R
   { prefix: "/dashboard/pmo", roles: ["ADMIN", "PMO"] },
   { prefix: "/qualite", roles: ["ADMIN", "SUPERVISEUR"] },
   { prefix: "/import", roles: ["ADMIN", "OPERATEUR"] },
-  { prefix: "/transferts", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR"] },
+  { prefix: "/transferts", roles: ["ADMIN", "SUPERVISEUR", "GESTIONNAIRE_TRANSFERT"] },
 ];

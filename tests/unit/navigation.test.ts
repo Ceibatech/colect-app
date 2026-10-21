@@ -10,6 +10,7 @@ describe("role-aware dashboard navigation", () => {
     ["ADMIN", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie", "/dashboard/finance", "/dashboard/pmo"]],
     ["SUPERVISEUR", ["/dashboard", "/dashboard/operateurs", "/dashboard/geographie"]],
     ["OPERATEUR", ["/dashboard"]],
+    ["GESTIONNAIRE_TRANSFERT", ["/dashboard"]],
     ["FINANCE", ["/dashboard", "/dashboard/finance"]],
     ["PMO", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie", "/dashboard/pmo"]],
     ["EXECUTIF", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie"]],
@@ -38,6 +39,18 @@ describe("role-aware dashboard navigation", () => {
       .map((item) => item.href);
 
     expect(visible).toEqual(["/dashboard"]);
+  });
+
+  it("shows transfers only to the dedicated transfer manager, supervisor and admin", () => {
+    const visibleForManager = NAV_ITEMS
+      .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.GESTIONNAIRE_TRANSFERT, "GESTIONNAIRE_TRANSFERT"))
+      .map((item) => item.href);
+    const visibleForOperator = NAV_ITEMS
+      .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.OPERATEUR, "OPERATEUR"))
+      .map((item) => item.href);
+
+    expect(visibleForManager).toEqual(["/transferts"]);
+    expect(visibleForOperator).not.toContain("/transferts");
   });
 
   it("keeps route restrictions aligned with navigation roles", () => {

@@ -16,8 +16,8 @@ export default async function NewTransferPage() {
       <PageHeader
         eyebrow="Préparation du transfert"
         icon={PackagePlus}
-        title="Constituer un lot"
-        description="Sélectionnez le stock physiquement préparé. La composition sera figée pour garantir une chaîne de garde vérifiable."
+        title="Identifier un lot à transférer"
+        description="Recherchez les cartons déjà inventoriés dans GeoArchives. Tous les dossiers du carton sont rattachés automatiquement et la composition est figée avant la sortie."
         actions={(
           <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}>
             <ArrowLeft /> Retour au registre

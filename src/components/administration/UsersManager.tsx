@@ -93,6 +93,10 @@ function RoleSelect({
                 <span className="rounded-sm border border-brand-gold/30 bg-brand-gold/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand-gold">
                   Budget
                 </span>
+              ) : o.code === "GESTIONNAIRE_TRANSFERT" ? (
+                <span className="rounded-sm border border-brand-green/30 bg-brand-green/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand-green">
+                  Transferts
+                </span>
               ) : null}
             </span>
           </SelectItem>

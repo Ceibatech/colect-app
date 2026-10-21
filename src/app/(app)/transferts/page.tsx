@@ -28,16 +28,16 @@ export default async function TransfersPage() {
         eyebrow="Chaîne de garde"
         icon={Truck}
         title="Registre des transferts"
-        description="Identifiez chaque lot, suivez les cartons sortis du site et conservez les bordereaux signés jusqu'au retour complet."
+        description="Vue ministère du stock documentaire : cartons identifiés dans la base, encore sur site, en transit ou pris en charge par CEIBAC. Chaque mouvement reste lié à un bordereau signé."
         actions={canCreate ? (
           <Link href="/transferts/nouveau" className={buttonVariants()}>
-            <Plus /> Nouveau lot
+            <Plus /> Identifier un lot
           </Link>
         ) : null}
         stats={[
-          { label: "Lots enregistrés", value: data.summary.lots },
-          { label: "Lots ouverts", value: data.summary.open, tone: data.summary.open > 0 ? "warning" : "success" },
-          { label: "Cartons hors site", value: data.summary.outsideOrigin, tone: data.summary.outsideOrigin > 0 ? "warning" : "success" },
+          { label: "Cartons identifiés", value: data.summary.totalCartons },
+          { label: "Encore sur site", value: data.summary.onSite, tone: "success" },
+          { label: "Sortis du site", value: data.summary.outsideOrigin, tone: data.summary.outsideOrigin > 0 ? "warning" : "success" },
           { label: "Chez CEIBAC", value: data.summary.atCeibac, tone: "success" },
         ]}
       />
@@ -46,18 +46,22 @@ export default async function TransfersPage() {
         <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle>Dossiers de garde</CardTitle>
-              <CardDescription>Le solde est calculé carton par carton à partir des mouvements signés.</CardDescription>
+              <CardTitle>Lots et mouvements de stock</CardTitle>
+              <CardDescription>Un carton représente une unité de stock et rattache automatiquement tous ses dossiers identifiés dans la base.</CardDescription>
             </div>
-            <Badge variant="outline" className="w-fit rounded-md">{data.rows.length} lot{data.rows.length > 1 ? "s" : ""}</Badge>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline" className="w-fit rounded-md">{data.summary.identifiedDossiers} dossiers rattachés</Badge>
+              <Badge variant={data.summary.open > 0 ? "secondary" : "outline"} className="w-fit rounded-md">{data.summary.open} lot{data.summary.open > 1 ? "s" : ""} ouvert{data.summary.open > 1 ? "s" : ""}</Badge>
+              <Badge variant={data.summary.inTransit > 0 ? "secondary" : "outline"} className="w-fit rounded-md">{data.summary.inTransit} carton{data.summary.inTransit > 1 ? "s" : ""} en transit</Badge>
+            </div>
           </div>
         </CardHeader>
 
         {data.rows.length === 0 ? (
           <CardContent className="py-14 text-center">
             <Boxes className="mx-auto h-10 w-10 text-muted-foreground/55" />
-            <p className="mt-3 font-medium">Aucun lot de transfert</p>
-            <p className="mt-1 text-sm text-muted-foreground">Le premier lot permettra de figer les cartons et dossiers remis à CEIBAC.</p>
+            <p className="mt-3 font-medium">Aucun lot constitué</p>
+            <p className="mt-1 text-sm text-muted-foreground">Le stock identifié reste entièrement sur les sites du ministère jusqu&apos;au premier bordereau de sortie.</p>
           </CardContent>
         ) : (
           <>

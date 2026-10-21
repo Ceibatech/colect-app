@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/current-user";
 import {
   getDashboardKpis,
@@ -44,6 +45,12 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     description: "Retrouvez vos dossiers en cours, les retours à traiter et votre progression.",
     progress: "Mon avancement",
   },
+  GESTIONNAIRE_TRANSFERT: {
+    eyebrow: "Chaîne de garde",
+    title: "Gestion des transferts",
+    description: "Constituez les lots et suivez les sorties, réceptions et retours documentaires.",
+    progress: "Stock tracé",
+  },
   FINANCE: {
     eyebrow: "Pilotage financier",
     title: "Activité et budget",
@@ -72,6 +79,7 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
 
 export default async function DashboardPage() {
   const session = await requirePermission("DASHBOARD_VIEW");
+  if (session.roleCode === "GESTIONNAIRE_TRANSFERT") redirect("/transferts");
   const isOperator = session.roleCode === "OPERATEUR";
   const isExecutive = session.roleCode === "EXECUTIF";
   const dashboardScopeLabel = session.roleCode === "PMO" ? "Lecture seule · Périmètre PMO" : session.roleCode === "FINANCE" ? "Lecture globale · Données financières protégées" : null;

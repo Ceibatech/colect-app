@@ -10,7 +10,7 @@ import { PERMISSIONS, ROLE_CODES, ROLE_PERMISSIONS, ROLE_ONLY_ROUTE_PREFIXES } f
  * les tests API/E2E (Playwright) qui frappent de vraies routes protégées.
  */
 describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
-  it("définit une entrée pour chacun des 7 rôles", () => {
+  it("définit une entrée pour chacun des 8 rôles", () => {
     for (const role of ROLE_CODES) {
       expect(ROLE_PERMISSIONS[role]).toBeDefined();
     }
@@ -74,6 +74,17 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     const rolesWithReject = ROLE_CODES.filter((r) => ROLE_PERMISSIONS[r].includes("DOSSIER_REJECT"));
     expect(new Set(rolesWithValidate)).toEqual(new Set(["ADMIN", "SUPERVISEUR"]));
     expect(new Set(rolesWithReject)).toEqual(new Set(["ADMIN", "SUPERVISEUR"]));
+  });
+
+  it("réserve les opérations de transfert au gestionnaire dédié et à ADMIN", () => {
+    const rolesWithCreate = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_CREATE"));
+    const rolesWithOperate = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_OPERATE"));
+    const rolesWithAuthorize = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_AUTHORIZE"));
+
+    expect(new Set(rolesWithCreate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
+    expect(new Set(rolesWithOperate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
+    expect(new Set(rolesWithAuthorize)).toEqual(new Set(["ADMIN", "SUPERVISEUR"]));
+    expect(ROLE_PERMISSIONS.OPERATEUR).not.toContain("TRANSFER_VIEW");
   });
 });
 

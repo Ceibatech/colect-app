@@ -93,18 +93,33 @@ export async function getTransferCreateData() {
 
 export async function getTransferDashboardData() {
   await requirePermission("TRANSFER_VIEW");
-  const lots = await prisma.transferLot.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      sourceSite: { select: { nom: true, code: true } },
-      sourceEntrepot: { select: { nom: true, code: true } },
-      destinationSite: { select: { nom: true, code: true } },
-      destinationEntrepot: { select: { nom: true, code: true } },
-      createdBy: { select: { name: true } },
-      items: { select: { status: true, dossierCountSnapshot: true } },
-      _count: { select: { movements: true } },
-    },
-  });
+  const inventoryWhere = { siteId: { not: null }, codeBarres: { not: null } } as const;
+  const [lots, identifiedCartons, identifiedDossiers, activeCustodyItems] = await Promise.all([
+    prisma.transferLot.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        sourceSite: { select: { nom: true, code: true } },
+        sourceEntrepot: { select: { nom: true, code: true } },
+        destinationSite: { select: { nom: true, code: true } },
+        destinationEntrepot: { select: { nom: true, code: true } },
+        createdBy: { select: { name: true } },
+        items: { select: { status: true, dossierCountSnapshot: true } },
+        _count: { select: { movements: true } },
+      },
+    }),
+    prisma.dossier.groupBy({
+      by: ["siteId", "entrepotId", "codeBarres"],
+      where: inventoryWhere,
+    }),
+    prisma.dossier.count({ where: inventoryWhere }),
+    prisma.transferLotItem.findMany({
+      where: {
+        status: { in: ["SORTI", "RECU"] },
+        transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
+      },
+      select: { status: true },
+    }),
+  ]);
 
   const rows = lots.map((lot) => ({
     id: lot.id,
@@ -120,13 +135,22 @@ export async function getTransferDashboardData() {
     stock: getTransferStockSummary(lot.items.map((item) => item.status as TransferItemStatusCode)),
   }));
 
+  const inTransit = activeCustodyItems.filter((item) => item.status === "SORTI").length;
+  const atCeibac = activeCustodyItems.filter((item) => item.status === "RECU").length;
+  const outsideOrigin = inTransit + atCeibac;
+  const totalCartons = identifiedCartons.length;
+
   return {
     rows,
     summary: {
       lots: rows.length,
       open: rows.filter((row) => !["CLOTURE", "ANNULE"].includes(row.status)).length,
-      outsideOrigin: rows.reduce((sum, row) => sum + row.stock.outsideOrigin, 0),
-      atCeibac: rows.reduce((sum, row) => sum + row.stock.atCeibac, 0),
+      totalCartons,
+      identifiedDossiers,
+      onSite: Math.max(totalCartons - outsideOrigin, 0),
+      outsideOrigin,
+      inTransit,
+      atCeibac,
     },
   };
 }
