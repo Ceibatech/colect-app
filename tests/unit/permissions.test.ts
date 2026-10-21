@@ -10,7 +10,7 @@ import { PERMISSIONS, ROLE_CODES, ROLE_PERMISSIONS, ROLE_ONLY_ROUTE_PREFIXES } f
  * les tests API/E2E (Playwright) qui frappent de vraies routes protégées.
  */
 describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
-  it("définit une entrée pour chacun des 8 rôles", () => {
+  it("définit une entrée pour chacun des rôles", () => {
     for (const role of ROLE_CODES) {
       expect(ROLE_PERMISSIONS[role]).toBeDefined();
     }
@@ -80,10 +80,14 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     const rolesWithCreate = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_CREATE"));
     const rolesWithOperate = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_OPERATE"));
     const rolesWithAuthorize = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_AUTHORIZE"));
+    const rolesWithCeibacValidation = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_CEIBAC_VALIDATE"));
+    const rolesWithTracking = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_TRACK"));
 
     expect(new Set(rolesWithCreate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
     expect(new Set(rolesWithOperate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
     expect(new Set(rolesWithAuthorize)).toEqual(new Set(["ADMIN", "SUPERVISEUR"]));
+    expect(new Set(rolesWithCeibacValidation)).toEqual(new Set(["ADMIN", "VALIDATEUR_CEIBAC"]));
+    expect(new Set(rolesWithTracking)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
     expect(ROLE_PERMISSIONS.OPERATEUR).not.toContain("TRANSFER_VIEW");
   });
 });

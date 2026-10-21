@@ -196,13 +196,32 @@ export async function getTransferDashboardData() {
     siteStock,
     summary: {
       lots: rows.length,
-      open: rows.filter((row) => ["BROUILLON", "AUTORISE", "PARTIELLEMENT_SORTI", "EN_TRANSIT", "RECU_PARTIEL", "RETOUR_PARTIEL"].includes(row.status)).length,
+      open: rows.filter((row) => ["BROUILLON", "SOUMIS", "AUTORISE", "PARTIELLEMENT_SORTI", "EN_TRANSIT", "RECU_PARTIEL", "RETOUR_PARTIEL"].includes(row.status)).length,
       totalDossiers,
       onSite,
       inTransit,
       unlocated: Math.max(totalDossiers - onSite - inTransit, 0),
     },
   };
+}
+
+export async function getTransferAuthorization(lotId: number) {
+  await requirePermission("TRANSFER_VIEW");
+  return prisma.transferLot.findFirst({
+    where: { id: lotId, authorizedAt: { not: null }, approvalSignatureData: { not: null } },
+    include: {
+      sourceSite: true,
+      sourceEntrepot: true,
+      destinationSite: true,
+      destinationEntrepot: true,
+      createdBy: { select: { name: true } },
+      authorizedBy: { select: { name: true } },
+      items: {
+        orderBy: { cartonCode: "asc" },
+        include: { dossiers: { include: { dossier: { select: { reference: true, nom: true, prenoms: true } } } } },
+      },
+    },
+  });
 }
 
 export async function getTransferLotDetail(id: number) {

@@ -51,6 +51,12 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     description: "Constituez les lots et suivez les sorties, réceptions et retours documentaires.",
     progress: "Stock tracé",
   },
+  VALIDATEUR_CEIBAC: {
+    eyebrow: "Contrôle CEIBAC",
+    title: "Validations de réception",
+    description: "Contrôlez les constats d'arrivée et signez les réceptions avant le visa final du ministère.",
+    progress: "Réceptions contrôlées",
+  },
   FINANCE: {
     eyebrow: "Pilotage financier",
     title: "Activité et budget",
@@ -79,7 +85,7 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
 
 export default async function DashboardPage() {
   const session = await requirePermission("DASHBOARD_VIEW");
-  if (session.roleCode === "GESTIONNAIRE_TRANSFERT") redirect("/transferts");
+  if (session.roleCode === "GESTIONNAIRE_TRANSFERT" || session.roleCode === "VALIDATEUR_CEIBAC") redirect("/transferts");
   const isOperator = session.roleCode === "OPERATEUR";
   const isExecutive = session.roleCode === "EXECUTIF";
   const dashboardScopeLabel = session.roleCode === "PMO" ? "Lecture seule · Périmètre PMO" : session.roleCode === "FINANCE" ? "Lecture globale · Données financières protégées" : null;

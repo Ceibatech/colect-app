@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarClock, FileText, PackageCheck, Route, ShieldCheck, Truck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, FileText, PackageCheck, Route, ShieldCheck, Truck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { AuthorizeTransferButton, TransferMovementDialog, type TransferMovementItemOption } from "@/components/transferts/TransferActions";
+import { AuthorizeTransferButton, ReceptionApprovalDialog, SubmitTransferButton, TransferMovementDialog, type TransferMovementItemOption } from "@/components/transferts/TransferActions";
+import { ConvoyTrackingPanel } from "@/components/transferts/ConvoyTrackingPanel";
 import { TransferItemStatusBadge, TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -12,10 +13,12 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { getTransferLotDetail } from "@/lib/services/transfer-service";
 import {
   getTransferMovementLabel,
+  getTransferMovementStatusLabel,
   getTransferDossierStockSummary,
   type TransferItemStatusCode,
   type TransferLotStatusCode,
   type TransferMovementTypeCode,
+  type TransferMovementStatusCode,
 } from "@/lib/utils/transfer-stock";
 import { cn } from "@/lib/utils";
 
@@ -44,10 +47,17 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
     status: item.status as TransferItemStatusCode,
     dossierCountSnapshot: item.dossierCountSnapshot,
   })));
-  const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE") && lot.status === "BROUILLON";
-  const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "ANNULE", "CLOTURE"].includes(lot.status);
+  const canSubmit = session.permissions.includes("TRANSFER_SUBMIT") && lot.status === "BROUILLON";
+  const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE") && lot.status === "SOUMIS";
+  const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "SOUMIS", "ANNULE", "CLOTURE"].includes(lot.status);
+  const canTrack = session.permissions.includes("TRANSFER_TRACK");
+  const canValidateCeibac = session.permissions.includes("TRANSFER_CEIBAC_VALIDATE");
+  const canValidateMinistry = session.permissions.includes("TRANSFER_AUTHORIZE");
+  const pendingReceptionItemIds = new Set(lot.movements
+    .filter((movement) => movement.type === "RECEPTION" && ["SOUMIS_CEIBAC", "VALIDE_CEIBAC"].includes(movement.status))
+    .flatMap((movement) => movement.items.map((entry) => entry.transferLotItem.id)));
   const movementOptions = (status: TransferItemStatusCode): TransferMovementItemOption[] => lot.items
-    .filter((item) => item.status === status)
+    .filter((item) => item.status === status && (status !== "SORTI" || !pendingReceptionItemIds.has(item.id)))
     .map((item) => ({ id: item.id, cartonCode: item.cartonCode, cartonLabel: item.cartonLabel, dossierCount: item.dossierCountSnapshot }));
   const dossierRows = lot.items.flatMap((item) => item.dossiers.map((entry) => ({
     ...entry.dossier,
@@ -66,6 +76,8 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         actions={(
           <>
             <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Registre</Link>
+            {lot.authorizedAt ? <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> Autorisation</Link> : null}
+            {canSubmit ? <SubmitTransferButton lotId={lot.id} /> : null}
             {canAuthorize ? <AuthorizeTransferButton lotId={lot.id} /> : null}
           </>
         )}
@@ -77,13 +89,15 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         ]}
       />
 
+      <TransferWorkflow status={lot.status as TransferLotStatusCode} hasDeparture={lot.items.some((item) => item.status !== "PREVU")} hasArrival={lot.items.some((item) => item.status === "RECU" || item.status === "RETOURNE")} />
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="bg-card/95">
           <CardHeader className="border-b border-border/60 pb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Situation du stock</CardTitle>
-                <CardDescription>Le stock est recalculé à chaque sortie, réception au site B et retour au site A.</CardDescription>
+                <CardDescription>Le stock du site B n&apos;augmente qu&apos;après les visas CEIBAC et ministère du constat de réception.</CardDescription>
               </div>
               <TransferLotStatusBadge status={lot.status as TransferLotStatusCode} />
             </div>
@@ -119,6 +133,8 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           </CardContent>
         </Card>
       ) : null}
+
+      {stock.inTransit > 0 ? <ConvoyTrackingPanel lotId={lot.id} canTrack={canTrack} /> : null}
 
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">
@@ -166,12 +182,16 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-4 w-4" /></span>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2"><p className="font-mono font-semibold">{movement.reference}</p><Badge variant="secondary" className="rounded-md">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</Badge></div>
+                    <div className="flex flex-wrap items-center gap-2"><p className="font-mono font-semibold">{movement.reference}</p><Badge variant="secondary" className="rounded-md">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</Badge><Badge variant="outline" className="rounded-md">{getTransferMovementStatusLabel(movement.status as TransferMovementStatusCode)}</Badge>{movement.conditionStatus ? <Badge variant="outline" className="rounded-md">{conditionLabel(movement.conditionStatus)}</Badge> : null}</div>
                     <p className="mt-1 text-sm text-muted-foreground">{movementPlace(lot, movement.type as TransferMovementTypeCode, "from")} <ArrowRight className="mx-1 inline h-3.5 w-3.5" /> {movementPlace(lot, movement.type as TransferMovementTypeCode, "to")} · {movement.items.reduce((sum, item) => sum + item.transferLotItem.dossierCountSnapshot, 0)} dossier{movement.items.reduce((sum, item) => sum + item.transferLotItem.dossierCountSnapshot, 0) > 1 ? "s" : ""}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{dateTimeFormatter.format(movement.occurredAt)} · saisi par {movement.createdBy.name} · visas {movement.signatures.map((signature) => signature.signatoryName).join(" / ")}</p>
                   </div>
                 </div>
-                <Link href={`/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "shrink-0")}><FileText /> Ouvrir le bordereau</Link>
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  {movement.status === "SOUMIS_CEIBAC" && canValidateCeibac ? <ReceptionApprovalDialog movementId={movement.id} stage="CEIBAC" /> : null}
+                  {movement.status === "VALIDE_CEIBAC" && canValidateMinistry ? <ReceptionApprovalDialog movementId={movement.id} stage="MINISTERE" /> : null}
+                  <Link href={`/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><FileText /> Ouvrir le bordereau</Link>
+                </div>
               </article>
             ))}
           </div>
@@ -179,6 +199,28 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
       </Card>
     </div>
   );
+}
+
+function TransferWorkflow({ status, hasDeparture, hasArrival }: { status: TransferLotStatusCode; hasDeparture: boolean; hasArrival: boolean }) {
+  const submitted = status !== "BROUILLON";
+  const authorized = !["BROUILLON", "SOUMIS"].includes(status);
+  const steps = [
+    { label: "Lot soumis", detail: "CEIBAC", complete: submitted },
+    { label: "Sortie autorisée", detail: "Visa ministère", complete: authorized },
+    { label: "Acheminement", detail: "Bordereau + GPS", complete: hasDeparture },
+    { label: "Réception validée", detail: "CEIBAC + ministère", complete: hasArrival },
+  ];
+  return (
+    <Card className="bg-card/95">
+      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {steps.map((step, index) => <div key={step.label} className="flex min-h-20 items-center gap-3 rounded-md border bg-muted/15 p-3"><span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold", step.complete ? "border-brand-green/30 bg-brand-green/10 text-brand-green" : "border-border bg-background text-muted-foreground")}>{step.complete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}</span><div><p className="font-medium">{step.label}</p><p className="text-xs text-muted-foreground">{step.detail}</p></div></div>)}
+      </CardContent>
+    </Card>
+  );
+}
+
+function conditionLabel(status: "CONFORME" | "AVEC_RESERVES" | "NON_CONFORME") {
+  return { CONFORME: "Chargement conforme", AVEC_RESERVES: "Avec réserves", NON_CONFORME: "Non conforme" }[status];
 }
 
 function placeLabel(site: string, warehouse?: string | null) {

@@ -5,7 +5,7 @@ import { Prisma, type TransferItemStatus, type TransferLotStatus, type TransferM
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma/client";
-import { createTransferLotSchema, recordTransferMovementSchema } from "@/lib/validation/transfer";
+import { authorizeTransferLotSchema, createTransferLotSchema, recordTransferMovementSchema, transferApprovalSchema } from "@/lib/validation/transfer";
 import {
   deriveTransferLotStatus,
   getTransferMovementRule,
@@ -194,8 +194,8 @@ export async function createTransferLot(
   }
 }
 
-export async function authorizeTransferLot(id: number): Promise<TransferActionState> {
-  const session = await requirePermission("TRANSFER_AUTHORIZE");
+export async function submitTransferLot(id: number): Promise<TransferActionState> {
+  const session = await requirePermission("TRANSFER_SUBMIT");
   if (!Number.isInteger(id) || id <= 0) return { error: "Lot invalide." };
 
   try {
@@ -203,11 +203,61 @@ export async function authorizeTransferLot(id: number): Promise<TransferActionSt
     await prisma.$transaction(async (tx) => {
       const updated = await tx.transferLot.updateMany({
         where: { id, status: "BROUILLON", items: { some: {} } },
-        data: { status: "AUTORISE", authorizedAt: new Date(), authorizedById: session.userId },
+        data: { status: "SOUMIS", submittedAt: new Date() },
+      });
+      if (updated.count !== 1) throw new TransferRuleError("Ce lot n'est plus disponible pour soumission.");
+      await tx.auditLog.create({
+        data: { userId: session.userId, action: "TRANSFER_LOT_SUBMIT", entity: "TRANSFER_LOT", entityId: id, ipAddress: ip },
+      });
+    });
+    revalidatePath(`/transferts/${id}`);
+    revalidatePath("/transferts");
+    return { success: true, message: "Le lot a été transmis au responsable du ministère pour visa." };
+  } catch (error) {
+    if (error instanceof TransferRuleError) return { error: error.message };
+    console.error("Transfer lot submission failed.", error);
+    return { error: "La soumission du lot a échoué." };
+  }
+}
+
+export async function authorizeTransferLot(
+  id: number,
+  _previous: TransferActionState,
+  formData: FormData,
+): Promise<TransferActionState> {
+  const session = await requirePermission("TRANSFER_AUTHORIZE");
+  if (!Number.isInteger(id) || id <= 0) return { error: "Lot invalide." };
+  const parsed = authorizeTransferLotSchema.safeParse({
+    signatoryName: formData.get("signatoryName"),
+    signatoryTitle: formData.get("signatoryTitle"),
+    signature: formData.get("signature"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };
+
+  try {
+    const ip = await getClientIp();
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.transferLot.updateMany({
+        where: { id, status: "SOUMIS", items: { some: {} } },
+        data: {
+          status: "AUTORISE",
+          authorizedAt: new Date(),
+          authorizedById: session.userId,
+          approvalSignatoryName: parsed.data.signatoryName,
+          approvalSignatoryTitle: parsed.data.signatoryTitle,
+          approvalSignatureData: parsed.data.signature,
+        },
       });
       if (updated.count !== 1) throw new TransferRuleError("Ce lot n'est plus en attente d'autorisation.");
       await tx.auditLog.create({
-        data: { userId: session.userId, action: "TRANSFER_LOT_AUTHORIZE", entity: "TRANSFER_LOT", entityId: id, ipAddress: ip },
+        data: {
+          userId: session.userId,
+          action: "TRANSFER_LOT_AUTHORIZE",
+          entity: "TRANSFER_LOT",
+          entityId: id,
+          newValue: { signatoryName: parsed.data.signatoryName, signatoryTitle: parsed.data.signatoryTitle },
+          ipAddress: ip,
+        },
       });
     });
     revalidatePath(`/transferts/${id}`);
@@ -231,6 +281,7 @@ export async function recordTransferMovement(
     itemIds: formData.getAll("itemIds"),
     occurredAt: formData.get("occurredAt"),
     observations: formData.get("observations"),
+    conditionStatus: formData.get("conditionStatus") || undefined,
     ministryName: formData.get("ministryName"),
     ministryTitle: formData.get("ministryTitle"),
     ministrySignature: formData.get("ministrySignature"),
@@ -264,8 +315,8 @@ export async function recordTransferMovement(
         },
       });
       if (!lot) throw new TransferRuleError("Lot introuvable.");
-      if (["BROUILLON", "ANNULE", "CLOTURE"].includes(lot.status)) {
-        throw new TransferRuleError(lot.status === "BROUILLON" ? "Le lot doit être autorisé avant toute sortie." : "Ce lot ne peut plus recevoir de mouvement.");
+      if (["BROUILLON", "SOUMIS", "ANNULE", "CLOTURE"].includes(lot.status)) {
+        throw new TransferRuleError(["BROUILLON", "SOUMIS"].includes(lot.status) ? "Le lot doit être autorisé avant toute sortie." : "Ce lot ne peut plus recevoir de mouvement.");
       }
 
       const type = parsed.data.type as TransferMovementType;
@@ -276,6 +327,18 @@ export async function recordTransferMovement(
       }
       if (selected.some((item) => !isTransferMovementChronologyValid(parsed.data.type, occurredAt, item, lot.createdAt))) {
         throw new TransferRuleError("La date du mouvement doit être postérieure au jalon précédent de chaque groupe de dossiers.");
+      }
+      if (type === "RECEPTION") {
+        const pendingReception = await tx.transferMovementItem.findFirst({
+          where: {
+            transferLotItemId: { in: itemIds },
+            movement: { type: "RECEPTION", status: { in: ["SOUMIS_CEIBAC", "VALIDE_CEIBAC"] } },
+          },
+          select: { movement: { select: { reference: true } } },
+        });
+        if (pendingReception) {
+          throw new TransferRuleError(`Le constat ${pendingReception.movement.reference} attend déjà une validation pour cette sélection.`);
+        }
       }
 
       const fromSiteId = type === "RETOUR" ? lot.destinationSiteId : lot.sourceSiteId;
@@ -289,6 +352,8 @@ export async function recordTransferMovement(
           transferLotId: lot.id,
           reference: temporaryReference,
           type,
+          status: type === "RECEPTION" ? "SOUMIS_CEIBAC" : "VALIDE_MINISTERE",
+          conditionStatus: type === "RECEPTION" ? parsed.data.conditionStatus : null,
           occurredAt,
           fromSiteId,
           toSiteId,
@@ -302,12 +367,20 @@ export async function recordTransferMovement(
             })),
           },
           signatures: {
-            create: [
+            create: type === "RECEPTION" ? [{
+              party: "CEIBAC",
+              signatoryName: parsed.data.ceibacName,
+              signatoryTitle: parsed.data.ceibacTitle,
+              signatureData: parsed.data.ceibacSignature,
+              capturedById: session.userId,
+              signedAt: occurredAt,
+              ipAddress: ip,
+            }] : [
               {
                 party: "MINISTERE",
-                signatoryName: parsed.data.ministryName,
-                signatoryTitle: parsed.data.ministryTitle,
-                signatureData: parsed.data.ministrySignature,
+                signatoryName: parsed.data.ministryName!,
+                signatoryTitle: parsed.data.ministryTitle!,
+                signatureData: parsed.data.ministrySignature!,
                 capturedById: session.userId,
                 signedAt: occurredAt,
                 ipAddress: ip,
@@ -328,11 +401,23 @@ export async function recordTransferMovement(
       const reference = `BTR-${new Date(occurredAt).getUTCFullYear()}-${String(movement.id).padStart(7, "0")}`;
       await tx.transferMovement.update({ where: { id: movement.id }, data: { reference } });
 
+      if (type === "RECEPTION") {
+        await tx.auditLog.create({
+          data: {
+            userId: session.userId,
+            action: "TRANSFER_RECEPTION_SUBMIT",
+            entity: "TRANSFER_MOVEMENT",
+            entityId: movement.id,
+            newValue: { reference, transferLotId: lot.id, itemCount: itemIds.length, conditionStatus: parsed.data.conditionStatus },
+            ipAddress: ip,
+          },
+        });
+        return { reference, pendingReception: true };
+      }
+
       const expectedLocation = type === "SORTIE"
         ? { siteId: lot.sourceSiteId, entrepotId: lot.sourceEntrepotId }
-        : type === "RECEPTION"
-          ? { siteId: null, entrepotId: null }
-          : { siteId: lot.destinationSiteId, entrepotId: lot.destinationEntrepotId };
+        : { siteId: lot.destinationSiteId, entrepotId: lot.destinationEntrepotId };
       const nextLocation = type === "SORTIE"
         ? { siteId: null, entrepotId: null }
         : { siteId: toSiteId, entrepotId: toEntrepotId };
@@ -348,7 +433,7 @@ export async function recordTransferMovement(
           dossierId,
           userId: session.userId,
           action: `TRANSFER_${type}`,
-          ancienStatut: type === "RECEPTION" ? "EN_TRANSIT" : `SITE_${fromSiteId}`,
+          ancienStatut: `SITE_${fromSiteId}`,
           nouveauStatut: type === "SORTIE" ? "EN_TRANSIT" : `SITE_${toSiteId}`,
           commentaire: `Mouvement physique enregistré par le bordereau ${reference}.`,
           metadata: {
@@ -365,9 +450,7 @@ export async function recordTransferMovement(
 
       const timestampData = type === "SORTIE"
         ? { departedAt: occurredAt }
-        : type === "RECEPTION"
-          ? { receivedAt: occurredAt }
-          : { returnedAt: occurredAt };
+        : { returnedAt: occurredAt };
       const updatedItems = await tx.transferLotItem.updateMany({
         where: { id: { in: itemIds }, transferLotId: lot.id, status: rule.before as TransferItemStatus },
         data: { status: rule.after as TransferItemStatus, ...timestampData },
@@ -390,14 +473,19 @@ export async function recordTransferMovement(
           ipAddress: ip,
         },
       });
-      return { reference };
+      return { reference, pendingReception: false };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     revalidatePath(`/transferts/${lotId}`);
     revalidatePath("/transferts");
     revalidatePath("/dossiers");
     revalidatePath("/dashboard/geographie");
-    return { success: true, message: `Le bordereau ${result.reference} est enregistré.` };
+    return {
+      success: true,
+      message: result.pendingReception
+        ? `Le constat ${result.reference} est soumis au validateur CEIBAC. Le stock reste en transit.`
+        : `Le bordereau ${result.reference} est enregistré.`,
+    };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
@@ -405,5 +493,171 @@ export async function recordTransferMovement(
     }
     console.error("Transfer movement creation failed.", error);
     return { error: "Le mouvement n'a pas pu être enregistré." };
+  }
+}
+
+export async function approveReceptionByCeibac(
+  movementId: number,
+  _previous: TransferActionState,
+  formData: FormData,
+): Promise<TransferActionState> {
+  const session = await requirePermission("TRANSFER_CEIBAC_VALIDATE");
+  if (!Number.isInteger(movementId) || movementId <= 0) return { error: "Constat invalide." };
+  const parsed = transferApprovalSchema.safeParse({
+    signatoryName: formData.get("signatoryName"),
+    signatoryTitle: formData.get("signatoryTitle"),
+    signature: formData.get("signature"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };
+
+  try {
+    const ip = await getClientIp();
+    const movement = await prisma.$transaction(async (tx) => {
+      const current = await tx.transferMovement.findFirst({
+        where: { id: movementId, type: "RECEPTION", status: "SOUMIS_CEIBAC" },
+        select: { id: true, transferLotId: true, reference: true },
+      });
+      if (!current) throw new TransferRuleError("Ce constat n'attend plus le visa CEIBAC.");
+      await tx.transferSignature.create({
+        data: {
+          movementId,
+          party: "CEIBAC_VALIDATOR",
+          signatoryName: parsed.data.signatoryName,
+          signatoryTitle: parsed.data.signatoryTitle,
+          signatureData: parsed.data.signature,
+          capturedById: session.userId,
+          signedAt: new Date(),
+          ipAddress: ip,
+        },
+      });
+      await tx.transferMovement.update({
+        where: { id: movementId },
+        data: { status: "VALIDE_CEIBAC", ceibacValidatedAt: new Date(), ceibacValidatedById: session.userId },
+      });
+      await tx.auditLog.create({
+        data: { userId: session.userId, action: "TRANSFER_RECEPTION_CEIBAC_VALIDATE", entity: "TRANSFER_MOVEMENT", entityId: movementId, ipAddress: ip },
+      });
+      return current;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    revalidatePath(`/transferts/${movement.transferLotId}`);
+    revalidatePath("/transferts");
+    return { success: true, message: `Le constat ${movement.reference} est visé par CEIBAC et transmis au ministère.` };
+  } catch (error) {
+    if (error instanceof TransferRuleError) return { error: error.message };
+    console.error("CEIBAC reception approval failed.", error);
+    return { error: "Le visa CEIBAC n'a pas pu être enregistré." };
+  }
+}
+
+export async function approveReceptionByMinistry(
+  movementId: number,
+  _previous: TransferActionState,
+  formData: FormData,
+): Promise<TransferActionState> {
+  const session = await requirePermission("TRANSFER_AUTHORIZE");
+  if (!Number.isInteger(movementId) || movementId <= 0) return { error: "Constat invalide." };
+  const parsed = transferApprovalSchema.safeParse({
+    signatoryName: formData.get("signatoryName"),
+    signatoryTitle: formData.get("signatoryTitle"),
+    signature: formData.get("signature"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };
+
+  try {
+    const ip = await getClientIp();
+    const result = await prisma.$transaction(async (tx) => {
+      const movement = await tx.transferMovement.findFirst({
+        where: { id: movementId, type: "RECEPTION", status: "VALIDE_CEIBAC" },
+        include: {
+          transferLot: true,
+          items: { include: { transferLotItem: { include: { dossiers: { select: { dossierId: true } } } } } },
+        },
+      });
+      if (!movement) throw new TransferRuleError("Ce constat n'attend plus le visa du ministère.");
+      if (movement.items.length === 0 || movement.items.some((entry) => entry.transferLotItem.status !== "SORTI")) {
+        throw new TransferRuleError("Le stock de ce constat a changé. Actualisez le lot avant de valider.");
+      }
+
+      const dossierIds = [...new Set(movement.items.flatMap((entry) => entry.transferLotItem.dossiers.map((link) => link.dossierId)))];
+      const itemIds = movement.items.map((entry) => entry.transferLotItemId);
+      const updatedDossiers = await tx.dossier.updateMany({
+        where: { id: { in: dossierIds }, siteId: null, entrepotId: null },
+        data: { siteId: movement.transferLot.destinationSiteId, entrepotId: movement.transferLot.destinationEntrepotId },
+      });
+      if (updatedDossiers.count !== dossierIds.length) {
+        throw new TransferRuleError("L'emplacement d'un dossier a changé. Le constat ne peut pas être finalisé.");
+      }
+      const updatedItems = await tx.transferLotItem.updateMany({
+        where: { id: { in: itemIds }, transferLotId: movement.transferLotId, status: "SORTI" },
+        data: { status: "RECU", receivedAt: movement.occurredAt },
+      });
+      if (updatedItems.count !== itemIds.length) throw new TransferRuleError("Le stock a changé pendant la validation.");
+
+      await tx.transferSignature.create({
+        data: {
+          movementId,
+          party: "MINISTERE",
+          signatoryName: parsed.data.signatoryName,
+          signatoryTitle: parsed.data.signatoryTitle,
+          signatureData: parsed.data.signature,
+          capturedById: session.userId,
+          signedAt: new Date(),
+          ipAddress: ip,
+        },
+      });
+      await tx.dossierHistory.createMany({
+        data: dossierIds.map((dossierId) => ({
+          dossierId,
+          userId: session.userId,
+          action: "TRANSFER_RECEPTION",
+          ancienStatut: "EN_TRANSIT",
+          nouveauStatut: `SITE_${movement.transferLot.destinationSiteId}`,
+          commentaire: `Réception finalisée après les visas CEIBAC et ministère par le bordereau ${movement.reference}.`,
+          metadata: {
+            transferLotId: movement.transferLotId,
+            transferMovementId: movement.id,
+            movementReference: movement.reference,
+            fromSiteId: movement.transferLot.sourceSiteId,
+            toSiteId: movement.transferLot.destinationSiteId,
+            toEntrepotId: movement.transferLot.destinationEntrepotId,
+          },
+        })),
+      });
+
+      const finalItems = await tx.transferLotItem.findMany({ where: { transferLotId: movement.transferLotId }, select: { status: true } });
+      const nextStatus = deriveTransferLotStatus(
+        finalItems.map((item) => item.status as TransferItemStatusCode),
+        movement.transferLot.status as TransferLotStatusCode,
+      ) as TransferLotStatus;
+      await tx.transferLot.update({ where: { id: movement.transferLotId }, data: { status: nextStatus } });
+      await tx.transferMovement.update({
+        where: { id: movementId },
+        data: { status: "VALIDE_MINISTERE", ministryValidatedAt: new Date(), ministryValidatedById: session.userId },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: "TRANSFER_RECEPTION_MINISTRY_VALIDATE",
+          entity: "TRANSFER_MOVEMENT",
+          entityId: movementId,
+          newValue: { reference: movement.reference, dossierCount: dossierIds.length, status: nextStatus },
+          ipAddress: ip,
+        },
+      });
+      return { transferLotId: movement.transferLotId, reference: movement.reference };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    revalidatePath(`/transferts/${result.transferLotId}`);
+    revalidatePath("/transferts");
+    revalidatePath("/dossiers");
+    revalidatePath("/dashboard/geographie");
+    return { success: true, message: `Le bordereau ${result.reference} est contre-signé. Le stock du site B est mis à jour.` };
+  } catch (error) {
+    if (error instanceof TransferRuleError) return { error: error.message };
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return { error: "Un autre agent vient de modifier ce stock. Actualisez puis réessayez." };
+    }
+    console.error("Ministry reception approval failed.", error);
+    return { error: "Le visa final du ministère n'a pas pu être enregistré." };
   }
 }

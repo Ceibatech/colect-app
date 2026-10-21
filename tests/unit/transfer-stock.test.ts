@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canApplyTransferStock,
   deriveTransferLotStatus,
   getTransferDossierStockSummary,
   getTransferMovementRule,
@@ -8,6 +9,12 @@ import {
 } from "@/lib/utils/transfer-stock";
 
 describe("transfer stock", () => {
+  it("keeps an arrival out of stock until the final ministry visa", () => {
+    expect(canApplyTransferStock("RECEPTION", "SOUMIS_CEIBAC")).toBe(false);
+    expect(canApplyTransferStock("RECEPTION", "VALIDE_CEIBAC")).toBe(false);
+    expect(canApplyTransferStock("RECEPTION", "VALIDE_MINISTERE")).toBe(true);
+    expect(canApplyTransferStock("SORTIE", "VALIDE_MINISTERE")).toBe(true);
+  });
   it("keeps the exact stock split between origin, transit, CEIBAC and returns", () => {
     expect(getTransferStockSummary(["PREVU", "SORTI", "RECU", "RETOURNE"])).toEqual({
       total: 4,

@@ -27,7 +27,7 @@ datasource db {
 
 model Role {
   id          Int      @id @default(autoincrement())
-  code        String   @unique // ADMIN | SUPERVISEUR | OPERATEUR | GESTIONNAIRE_TRANSFERT | FINANCE | PMO | EXECUTIF | CONSULTATION
+  code        String   @unique // ADMIN | SUPERVISEUR | OPERATEUR | GESTIONNAIRE_TRANSFERT | VALIDATEUR_CEIBAC | FINANCE | PMO | EXECUTIF | CONSULTATION
   name        String
   description String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
@@ -83,28 +83,31 @@ model User {
 
   role Role @relation(fields: [roleId], references: [id])
 
-  operateur                  Operateur?
+  operateur                          Operateur?
   // Phase 16+ (§ affectation superviseur) : opérateurs dont ce user
   // (rôle SUPERVISEUR) a la charge — voir Operateur.supervisorId ci-dessous.
-  supervisedOperateurs       Operateur[]          @relation("OperateurSupervisor")
-  dossierHistory             DossierHistory[]
-  workflowTransitions        WorkflowTransition[]
-  documentsUploaded          Document[]           @relation("DocumentUploadedBy")
-  documentsPreIndexed        Document[]           @relation("DocumentPreIndexedBy")
-  qualityChecks              QualityCheck[]
-  anomaliesCorrected         Anomalie[]           @relation("AnomalieCorrigePar")
-  imports                    Import[]
-  exports                    Export[]
-  auditLogs                  AuditLog[]
-  notifications              Notification[]
-  passwordResetTokens        PasswordResetToken[]
-  pmoSupervisorScopes        PmoSupervisorScope[] @relation("PmoScopeOwner")
-  pmoScopeMemberships        PmoSupervisorScope[] @relation("PmoScopeSupervisor")
-  financeRatesCreated        FinanceRate[]        @relation("FinanceRateCreatedBy")
-  transferLotsCreated        TransferLot[]        @relation("TransferLotCreatedBy")
-  transferLotsAuthorized     TransferLot[]        @relation("TransferLotAuthorizedBy")
-  transferMovementsCreated   TransferMovement[]   @relation("TransferMovementCreatedBy")
-  transferSignaturesCaptured TransferSignature[]  @relation("TransferSignatureCapturedBy")
+  supervisedOperateurs               Operateur[]             @relation("OperateurSupervisor")
+  dossierHistory                     DossierHistory[]
+  workflowTransitions                WorkflowTransition[]
+  documentsUploaded                  Document[]              @relation("DocumentUploadedBy")
+  documentsPreIndexed                Document[]              @relation("DocumentPreIndexedBy")
+  qualityChecks                      QualityCheck[]
+  anomaliesCorrected                 Anomalie[]              @relation("AnomalieCorrigePar")
+  imports                            Import[]
+  exports                            Export[]
+  auditLogs                          AuditLog[]
+  notifications                      Notification[]
+  passwordResetTokens                PasswordResetToken[]
+  pmoSupervisorScopes                PmoSupervisorScope[]    @relation("PmoScopeOwner")
+  pmoScopeMemberships                PmoSupervisorScope[]    @relation("PmoScopeSupervisor")
+  financeRatesCreated                FinanceRate[]           @relation("FinanceRateCreatedBy")
+  transferLotsCreated                TransferLot[]           @relation("TransferLotCreatedBy")
+  transferLotsAuthorized             TransferLot[]           @relation("TransferLotAuthorizedBy")
+  transferMovementsCreated           TransferMovement[]      @relation("TransferMovementCreatedBy")
+  transferMovementsCeibacValidated   TransferMovement[]      @relation("TransferMovementCeibacValidatedBy")
+  transferMovementsMinistryValidated TransferMovement[]      @relation("TransferMovementMinistryValidatedBy")
+  transferSignaturesCaptured         TransferSignature[]     @relation("TransferSignatureCapturedBy")
+  transferTrackingPoints             TransferTrackingPoint[] @relation("TransferTrackingCapturedBy")
 
   @@index([roleId])
   @@map("users")
@@ -163,6 +166,7 @@ model FinanceRate {
 
 enum TransferLotStatus {
   BROUILLON
+  SOUMIS
   AUTORISE
   PARTIELLEMENT_SORTI
   EN_TRANSIT
@@ -189,35 +193,54 @@ enum TransferMovementType {
 enum TransferParty {
   MINISTERE
   CEIBAC
+  CEIBAC_VALIDATOR
+}
+
+enum TransferMovementStatus {
+  SOUMIS_CEIBAC
+  VALIDE_CEIBAC
+  VALIDE_MINISTERE
+  REJETE
+}
+
+enum TransferConditionStatus {
+  CONFORME
+  AVEC_RESERVES
+  NON_CONFORME
 }
 
 // Dossier de garde d'un lot archivistique. Le lotissement foncier reste un
 // référentiel distinct : un TransferLot décrit ici une opération physique de
 // remise, de transport et de restitution de cartons.
 model TransferLot {
-  id                    Int               @id @default(autoincrement())
-  reference             String            @unique
-  sourceSiteId          Int               @map("source_site_id")
-  sourceEntrepotId      Int?              @map("source_entrepot_id")
-  destinationSiteId     Int               @map("destination_site_id")
-  destinationEntrepotId Int?              @map("destination_entrepot_id")
-  status                TransferLotStatus @default(BROUILLON)
-  motif                 String?           @db.Text
-  plannedAt             DateTime?         @map("planned_at")
-  authorizedAt          DateTime?         @map("authorized_at")
-  createdById           Int               @map("created_by_id")
-  authorizedById        Int?              @map("authorized_by_id")
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
+  id                     Int               @id @default(autoincrement())
+  reference              String            @unique
+  sourceSiteId           Int               @map("source_site_id")
+  sourceEntrepotId       Int?              @map("source_entrepot_id")
+  destinationSiteId      Int               @map("destination_site_id")
+  destinationEntrepotId  Int?              @map("destination_entrepot_id")
+  status                 TransferLotStatus @default(BROUILLON)
+  motif                  String?           @db.Text
+  plannedAt              DateTime?         @map("planned_at")
+  submittedAt            DateTime?         @map("submitted_at")
+  authorizedAt           DateTime?         @map("authorized_at")
+  approvalSignatoryName  String?           @map("approval_signatory_name")
+  approvalSignatoryTitle String?           @map("approval_signatory_title")
+  approvalSignatureData  String?           @map("approval_signature_data") @db.LongText
+  createdById            Int               @map("created_by_id")
+  authorizedById         Int?              @map("authorized_by_id")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
 
-  sourceSite          Site               @relation("TransferSourceSite", fields: [sourceSiteId], references: [id])
-  sourceEntrepot      Entrepot?          @relation("TransferSourceEntrepot", fields: [sourceEntrepotId], references: [id])
-  destinationSite     Site               @relation("TransferDestinationSite", fields: [destinationSiteId], references: [id])
-  destinationEntrepot Entrepot?          @relation("TransferDestinationEntrepot", fields: [destinationEntrepotId], references: [id])
-  createdBy           User               @relation("TransferLotCreatedBy", fields: [createdById], references: [id])
-  authorizedBy        User?              @relation("TransferLotAuthorizedBy", fields: [authorizedById], references: [id])
+  sourceSite          Site                    @relation("TransferSourceSite", fields: [sourceSiteId], references: [id])
+  sourceEntrepot      Entrepot?               @relation("TransferSourceEntrepot", fields: [sourceEntrepotId], references: [id])
+  destinationSite     Site                    @relation("TransferDestinationSite", fields: [destinationSiteId], references: [id])
+  destinationEntrepot Entrepot?               @relation("TransferDestinationEntrepot", fields: [destinationEntrepotId], references: [id])
+  createdBy           User                    @relation("TransferLotCreatedBy", fields: [createdById], references: [id])
+  authorizedBy        User?                   @relation("TransferLotAuthorizedBy", fields: [authorizedById], references: [id])
   items               TransferLotItem[]
   movements           TransferMovement[]
+  trackingPoints      TransferTrackingPoint[]
 
   @@index([sourceSiteId, sourceEntrepotId])
   @@index([destinationSiteId, destinationEntrepotId])
@@ -270,26 +293,37 @@ model TransferLotDossier {
 // deux visas sont enregistrés dans la même transaction que le changement de
 // garde, pour éviter un stock sans preuve ou une preuve sans mouvement.
 model TransferMovement {
-  id            Int                  @id @default(autoincrement())
-  transferLotId Int                  @map("transfer_lot_id")
-  reference     String               @unique
-  type          TransferMovementType
-  occurredAt    DateTime             @map("occurred_at")
-  fromSiteId    Int                  @map("from_site_id")
-  toSiteId      Int                  @map("to_site_id")
-  observations  String?              @db.Text
-  createdById   Int                  @map("created_by_id")
-  createdAt     DateTime             @default(now()) @map("created_at")
+  id                    Int                      @id @default(autoincrement())
+  transferLotId         Int                      @map("transfer_lot_id")
+  reference             String                   @unique
+  type                  TransferMovementType
+  status                TransferMovementStatus   @default(VALIDE_MINISTERE)
+  conditionStatus       TransferConditionStatus? @map("condition_status")
+  occurredAt            DateTime                 @map("occurred_at")
+  fromSiteId            Int                      @map("from_site_id")
+  toSiteId              Int                      @map("to_site_id")
+  observations          String?                  @db.Text
+  createdById           Int                      @map("created_by_id")
+  ceibacValidatedAt     DateTime?                @map("ceibac_validated_at")
+  ceibacValidatedById   Int?                     @map("ceibac_validated_by_id")
+  ministryValidatedAt   DateTime?                @map("ministry_validated_at")
+  ministryValidatedById Int?                     @map("ministry_validated_by_id")
+  createdAt             DateTime                 @default(now()) @map("created_at")
 
-  transferLot TransferLot            @relation(fields: [transferLotId], references: [id], onDelete: Cascade)
-  fromSite    Site                   @relation("TransferMovementFromSite", fields: [fromSiteId], references: [id])
-  toSite      Site                   @relation("TransferMovementToSite", fields: [toSiteId], references: [id])
-  createdBy   User                   @relation("TransferMovementCreatedBy", fields: [createdById], references: [id])
-  items       TransferMovementItem[]
-  signatures  TransferSignature[]
+  transferLot         TransferLot            @relation(fields: [transferLotId], references: [id], onDelete: Cascade)
+  fromSite            Site                   @relation("TransferMovementFromSite", fields: [fromSiteId], references: [id])
+  toSite              Site                   @relation("TransferMovementToSite", fields: [toSiteId], references: [id])
+  createdBy           User                   @relation("TransferMovementCreatedBy", fields: [createdById], references: [id])
+  ceibacValidatedBy   User?                  @relation("TransferMovementCeibacValidatedBy", fields: [ceibacValidatedById], references: [id], onDelete: SetNull)
+  ministryValidatedBy User?                  @relation("TransferMovementMinistryValidatedBy", fields: [ministryValidatedById], references: [id], onDelete: SetNull)
+  items               TransferMovementItem[]
+  signatures          TransferSignature[]
 
   @@index([transferLotId, occurredAt])
   @@index([createdById])
+  @@index([status])
+  @@index([ceibacValidatedById])
+  @@index([ministryValidatedById])
   @@map("transfer_movements")
 }
 
@@ -327,6 +361,26 @@ model TransferSignature {
   @@unique([movementId, party])
   @@index([capturedById])
   @@map("transfer_signatures")
+}
+
+model TransferTrackingPoint {
+  id            Int      @id @default(autoincrement())
+  transferLotId Int      @map("transfer_lot_id")
+  capturedById  Int      @map("captured_by_id")
+  latitude      Float
+  longitude     Float
+  accuracy      Float?
+  speed         Float?
+  heading       Float?
+  capturedAt    DateTime @map("captured_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  transferLot TransferLot @relation(fields: [transferLotId], references: [id], onDelete: Cascade)
+  capturedBy  User        @relation("TransferTrackingCapturedBy", fields: [capturedById], references: [id])
+
+  @@index([transferLotId, capturedAt])
+  @@index([capturedById])
+  @@map("transfer_tracking_points")
 }
 
 // NOTE ARCHITECTURE (choix technique documenté) :

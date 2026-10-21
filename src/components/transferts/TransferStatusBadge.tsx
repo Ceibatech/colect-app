@@ -9,6 +9,7 @@ import {
 
 const lotTone: Record<TransferLotStatusCode, string> = {
   BROUILLON: "border-border bg-muted/60 text-muted-foreground",
+  SOUMIS: "border-brand-gold/30 bg-brand-gold/10 text-brand-gold",
   AUTORISE: "border-primary/25 bg-primary/10 text-primary",
   PARTIELLEMENT_SORTI: "border-brand-gold/30 bg-brand-gold/10 text-brand-gold",
   EN_TRANSIT: "border-brand-gold/30 bg-brand-gold/10 text-brand-gold",

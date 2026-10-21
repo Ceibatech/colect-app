@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { PrintButton } from "@/components/transferts/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
 import { getTransferBordereau } from "@/lib/services/transfer-service";
-import { getTransferMovementLabel, type TransferMovementTypeCode } from "@/lib/utils/transfer-stock";
+import { getTransferMovementLabel, getTransferMovementStatusLabel, type TransferMovementStatusCode, type TransferMovementTypeCode } from "@/lib/utils/transfer-stock";
 import { cn } from "@/lib/utils";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" });
@@ -22,6 +22,7 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
   if (!movement) notFound();
   const ministrySignature = movement.signatures.find((signature) => signature.party === "MINISTERE");
   const ceibacSignature = movement.signatures.find((signature) => signature.party === "CEIBAC");
+  const ceibacValidatorSignature = movement.signatures.find((signature) => signature.party === "CEIBAC_VALIDATOR");
   const source = placeLabel(movement.transferLot.sourceSite.nom, movement.transferLot.sourceEntrepot?.nom);
   const destination = placeLabel(movement.transferLot.destinationSite.nom, movement.transferLot.destinationEntrepot?.nom);
   const movementFrom = movement.type === "RETOUR" ? destination : source;
@@ -41,8 +42,9 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#28519f]">GeoArchives-MULCV · Chaîne de garde</p>
-              <h1 className="mt-2 text-2xl font-bold">Bordereau de transfert d&apos;archives</h1>
+              <h1 className="mt-2 text-2xl font-bold">{movement.type === "RECEPTION" ? "Bordereau de déchargement et constat d'arrivée" : "Bordereau de transfert d'archives"}</h1>
               <p className="mt-2 text-sm text-slate-600">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</p>
+              <p className="mt-1 text-xs font-semibold uppercase text-[#28519f]">{getTransferMovementStatusLabel(movement.status as TransferMovementStatusCode)}</p>
             </div>
             <div className="border border-slate-300 px-4 py-3 text-right">
               <p className="text-xs uppercase text-slate-500">Bordereau</p>
@@ -80,21 +82,27 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
             </table>
           </div>
 
+          {movement.conditionStatus ? <div className="mt-5 border border-slate-300 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">État du chargement à l&apos;arrivée</p><p className="mt-2 text-sm font-semibold">{conditionLabel(movement.conditionStatus)}</p></div> : null}
           {movement.observations ? <div className="mt-5 border border-slate-300 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">Observations</p><p className="mt-2 whitespace-pre-wrap text-sm">{movement.observations}</p></div> : null}
         </section>
 
-        <section className="grid border-t border-slate-300 sm:grid-cols-2">
-          <SignatureBlock title={siteVisaTitle} signature={ministrySignature} />
-          <SignatureBlock title="Visa du gestionnaire CEIBAC" signature={ceibacSignature} />
+        <section className={cn("grid border-t border-slate-300", movement.type === "RECEPTION" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
+          {movement.type === "RECEPTION" ? <SignatureBlock title="Constat de l'agent CEIBAC" signature={ceibacSignature} /> : <SignatureBlock title={siteVisaTitle} signature={ministrySignature} />}
+          {movement.type === "RECEPTION" ? <SignatureBlock title="Visa du validateur CEIBAC" signature={ceibacValidatorSignature} /> : <SignatureBlock title="Visa du gestionnaire CEIBAC" signature={ceibacSignature} />}
+          {movement.type === "RECEPTION" ? <SignatureBlock title={`Visa final du ministère · ${destination}`} signature={ministrySignature} /> : null}
         </section>
 
         <footer className="flex flex-col gap-2 border-t border-slate-300 bg-slate-50 px-6 py-4 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-[#068c78]" /> Mouvement enregistré dans GeoArchives-MULCV</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-[#068c78]" /> {movement.status === "VALIDE_MINISTERE" ? "Mouvement validé dans GeoArchives-MULCV" : "Document en cours de validation"}</span>
           <span>Saisie : {movement.createdBy.name} · {dateTimeFormatter.format(movement.createdAt)}</span>
         </footer>
       </article>
     </div>
   );
+}
+
+function conditionLabel(status: "CONFORME" | "AVEC_RESERVES" | "NON_CONFORME") {
+  return { CONFORME: "Conforme", AVEC_RESERVES: "Conforme avec réserves", NON_CONFORME: "Non conforme" }[status];
 }
 
 function SlipField({ label, value }: { label: string; value: string }) {

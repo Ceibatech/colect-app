@@ -17,6 +17,12 @@ const signatureData = z
   .max(500_000, "La signature est trop volumineuse.")
   .regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/, "Le format de signature est invalide.");
 
+const optionalSignature = z.preprocess((value) => value === "" || value === null ? undefined : value, signatureData.optional());
+const optionalShortText = z.preprocess(
+  (value) => value === "" || value === null ? undefined : value,
+  z.string().trim().min(2).max(120).optional(),
+);
+
 export const createTransferLotSchema = z.object({
   sourceSiteId: z.coerce.number().int().positive("Le site de départ est requis."),
   sourceEntrepotId: optionalPositiveInt,
@@ -28,17 +34,50 @@ export const createTransferLotSchema = z.object({
   dossierIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un dossier.").max(500, "Un lot peut contenir au maximum 500 dossiers."),
 });
 
+export const authorizeTransferLotSchema = z.object({
+  signatoryName: z.string().trim().min(2, "Le nom du responsable ministériel est requis.").max(120),
+  signatoryTitle: z.string().trim().min(2, "La fonction du responsable ministériel est requise.").max(120),
+  signature: signatureData,
+});
+
+export const transferApprovalSchema = z.object({
+  signatoryName: z.string().trim().min(2, "Le nom du signataire est requis.").max(120),
+  signatoryTitle: z.string().trim().min(2, "La fonction du signataire est requise.").max(120),
+  signature: signatureData,
+});
+
+export const transferTrackingPointSchema = z.object({
+  latitude: z.coerce.number().min(-90).max(90),
+  longitude: z.coerce.number().min(-180).max(180),
+  accuracy: z.coerce.number().nonnegative().max(100_000).optional(),
+  speed: z.coerce.number().nonnegative().max(200).optional(),
+  heading: z.coerce.number().min(0).max(360).optional(),
+  capturedAt: z.string().datetime(),
+});
+
 export const recordTransferMovementSchema = z.object({
   type: z.enum(TRANSFER_MOVEMENT_TYPES),
   itemIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un groupe de dossiers.").max(500),
   occurredAt: z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), "La date du mouvement est invalide."),
   observations: z.string().trim().max(2_000, "Les observations sont trop longues.").optional().or(z.literal("")),
-  ministryName: z.string().trim().min(2, "Le nom du signataire Ministère est requis.").max(120),
-  ministryTitle: z.string().trim().min(2, "La fonction du signataire Ministère est requise.").max(120),
-  ministrySignature: signatureData,
+  conditionStatus: z.enum(["CONFORME", "AVEC_RESERVES", "NON_CONFORME"]).optional(),
+  ministryName: optionalShortText,
+  ministryTitle: optionalShortText,
+  ministrySignature: optionalSignature,
   ceibacName: z.string().trim().min(2, "Le nom du signataire CEIBAC est requis.").max(120),
   ceibacTitle: z.string().trim().min(2, "La fonction du signataire CEIBAC est requise.").max(120),
   ceibacSignature: signatureData,
+}).superRefine((value, context) => {
+  if (value.type === "RECEPTION") {
+    if (!value.conditionStatus) context.addIssue({ code: "custom", path: ["conditionStatus"], message: "L'état du chargement à l'arrivée est requis." });
+    if (value.conditionStatus !== "CONFORME" && !value.observations) {
+      context.addIssue({ code: "custom", path: ["observations"], message: "Décrivez les réserves ou la non-conformité constatée." });
+    }
+    return;
+  }
+  if (!value.ministryName) context.addIssue({ code: "custom", path: ["ministryName"], message: "Le nom du signataire Ministère est requis." });
+  if (!value.ministryTitle) context.addIssue({ code: "custom", path: ["ministryTitle"], message: "La fonction du signataire Ministère est requise." });
+  if (!value.ministrySignature) context.addIssue({ code: "custom", path: ["ministrySignature"], message: "La signature Ministère est requise." });
 });
 
 export type CreateTransferLotInput = z.infer<typeof createTransferLotSchema>;

@@ -4,7 +4,7 @@
  *
  * Ne charge QUE la structure applicative fixe, jamais de donnée métier
  * inventée (cahier des charges §37/§79) :
- *   - rôles (ADMIN/SUPERVISEUR/OPERATEUR/GESTIONNAIRE_TRANSFERT/FINANCE/PMO/EXECUTIF/CONSULTATION)
+ *   - rôles (ADMIN/SUPERVISEUR/OPERATEUR/GESTIONNAIRE_TRANSFERT/VALIDATEUR_CEIBAC/FINANCE/PMO/EXECUTIF/CONSULTATION)
  *   - permissions + leur association aux rôles (matrice RBAC — source unique
  *     de vérité : src/lib/permissions/constants.ts)
  *   - statuts de workflow (BROUILLON/SOUMIS/EN_CONTROLE/... — états fixes du
@@ -28,6 +28,7 @@ const ROLES = [
   { code: "SUPERVISEUR", name: "Superviseur", description: "Contrôle, validation, rejet, supervision, dashboard, export." },
   { code: "OPERATEUR", name: "Opérateur", description: "Création et modification de ses dossiers, collecte, soumission." },
   { code: "GESTIONNAIRE_TRANSFERT", name: "Gestionnaire des transferts", description: "Constitution des lots, mouvements de stock et bordereaux signés." },
+  { code: "VALIDATEUR_CEIBAC", name: "Validateur CEIBAC", description: "Contrôle et visa CEIBAC des constats de réception documentaire." },
   { code: "FINANCE", name: "Finance", description: "Pilotage des points, barèmes et projections budgétaires." },
   { code: "PMO", name: "PMO", description: "Pilotage en lecture seule du périmètre de superviseurs affecté." },
   { code: "EXECUTIF", name: "Exécutif", description: "Lecture seule des tableaux de bord globaux de pilotage." },

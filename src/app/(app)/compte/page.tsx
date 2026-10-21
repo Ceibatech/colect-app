@@ -13,6 +13,7 @@ const ROLE_LABELS: Record<RoleCode, string> = {
   SUPERVISEUR: "Superviseur",
   OPERATEUR: "Opérateur",
   GESTIONNAIRE_TRANSFERT: "Gestionnaire des transferts",
+  VALIDATEUR_CEIBAC: "Validateur CEIBAC",
   FINANCE: "Finance",
   PMO: "PMO",
   EXECUTIF: "Exécutif",

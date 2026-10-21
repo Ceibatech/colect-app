@@ -11,6 +11,7 @@ describe("role-aware dashboard navigation", () => {
     ["SUPERVISEUR", ["/dashboard", "/dashboard/operateurs", "/dashboard/geographie"]],
     ["OPERATEUR", ["/dashboard"]],
     ["GESTIONNAIRE_TRANSFERT", ["/dashboard"]],
+    ["VALIDATEUR_CEIBAC", ["/dashboard"]],
     ["FINANCE", ["/dashboard", "/dashboard/finance"]],
     ["PMO", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie", "/dashboard/pmo"]],
     ["EXECUTIF", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie"]],
@@ -41,15 +42,19 @@ describe("role-aware dashboard navigation", () => {
     expect(visible).toEqual(["/dashboard"]);
   });
 
-  it("shows transfers only to the dedicated transfer manager, supervisor and admin", () => {
+  it("shows transfers to the dedicated transfer actors and not to operators", () => {
     const visibleForManager = NAV_ITEMS
       .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.GESTIONNAIRE_TRANSFERT, "GESTIONNAIRE_TRANSFERT"))
       .map((item) => item.href);
     const visibleForOperator = NAV_ITEMS
       .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.OPERATEUR, "OPERATEUR"))
       .map((item) => item.href);
+    const visibleForValidator = NAV_ITEMS
+      .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.VALIDATEUR_CEIBAC, "VALIDATEUR_CEIBAC"))
+      .map((item) => item.href);
 
     expect(visibleForManager).toEqual(["/transferts"]);
+    expect(visibleForValidator).toEqual(["/transferts"]);
     expect(visibleForOperator).not.toContain("/transferts");
   });
 

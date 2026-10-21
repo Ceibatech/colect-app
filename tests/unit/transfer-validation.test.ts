@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTransferLotSchema, recordTransferMovementSchema } from "@/lib/validation/transfer";
+import { authorizeTransferLotSchema, createTransferLotSchema, recordTransferMovementSchema } from "@/lib/validation/transfer";
 
 const signature = `data:image/png;base64,${"A".repeat(120)}`;
 
@@ -33,5 +33,38 @@ describe("transfer validation", () => {
     };
     expect(recordTransferMovementSchema.safeParse(base).success).toBe(true);
     expect(recordTransferMovementSchema.safeParse({ ...base, ceibacSignature: "" }).success).toBe(false);
+  });
+
+  it("accepts an arrival report with the CEIBAC field signature only", () => {
+    const result = recordTransferMovementSchema.safeParse({
+      type: "RECEPTION",
+      itemIds: [1],
+      occurredAt: "2026-10-22T10:30",
+      conditionStatus: "AVEC_RESERVES",
+      observations: "Un carton présente un coin humide.",
+      ceibacName: "Agent destination",
+      ceibacTitle: "Convoyeur CEIBAC",
+      ceibacSignature: signature,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("requires observations for a non-conforming arrival report", () => {
+    const result = recordTransferMovementSchema.safeParse({
+      type: "RECEPTION",
+      itemIds: [1],
+      occurredAt: "2026-10-22T10:30",
+      conditionStatus: "NON_CONFORME",
+      observations: "",
+      ceibacName: "Agent destination",
+      ceibacTitle: "Convoyeur CEIBAC",
+      ceibacSignature: signature,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("requires a drawn signature to authorize the lot", () => {
+    expect(authorizeTransferLotSchema.safeParse({ signatoryName: "A. Ministère", signatoryTitle: "Responsable transferts", signature }).success).toBe(true);
+    expect(authorizeTransferLotSchema.safeParse({ signatoryName: "A. Ministère", signatoryTitle: "Responsable transferts", signature: "" }).success).toBe(false);
   });
 });

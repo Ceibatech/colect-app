@@ -6,6 +6,7 @@ export type TransferMovementTypeCode = (typeof TRANSFER_MOVEMENT_TYPES)[number];
 
 export type TransferLotStatusCode =
   | "BROUILLON"
+  | "SOUMIS"
   | "AUTORISE"
   | "PARTIELLEMENT_SORTI"
   | "EN_TRANSIT"
@@ -107,6 +108,7 @@ export function getTransferDossierStockSummary(
 export function getTransferLotStatusLabel(status: TransferLotStatusCode) {
   return {
     BROUILLON: "Brouillon",
+    SOUMIS: "Soumis au ministère",
     AUTORISE: "Autorisé",
     PARTIELLEMENT_SORTI: "Sortie partielle",
     EN_TRANSIT: "En transit",
@@ -116,6 +118,21 @@ export function getTransferLotStatusLabel(status: TransferLotStatusCode) {
     CLOTURE: "Clôturé",
     ANNULE: "Annulé",
   }[status];
+}
+
+export type TransferMovementStatusCode = "SOUMIS_CEIBAC" | "VALIDE_CEIBAC" | "VALIDE_MINISTERE" | "REJETE";
+
+export function getTransferMovementStatusLabel(status: TransferMovementStatusCode) {
+  return {
+    SOUMIS_CEIBAC: "Visa CEIBAC requis",
+    VALIDE_CEIBAC: "Visa ministère requis",
+    VALIDE_MINISTERE: "Validé",
+    REJETE: "Rejeté",
+  }[status];
+}
+
+export function canApplyTransferStock(type: TransferMovementTypeCode, status: TransferMovementStatusCode) {
+  return type !== "RECEPTION" || status === "VALIDE_MINISTERE";
 }
 
 export function getTransferItemStatusLabel(status: TransferItemStatusCode) {
