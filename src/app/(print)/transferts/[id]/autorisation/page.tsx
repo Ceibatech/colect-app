@@ -15,7 +15,7 @@ export default async function TransferAuthorizationPage({ params }: { params: Pr
   const lotId = Number((await params).id);
   if (!Number.isInteger(lotId) || lotId <= 0) notFound();
   const lot = await getTransferAuthorization(lotId);
-  if (!lot || !lot.authorizedAt || !lot.approvalSignatureData) notFound();
+  if (!lot || !lot.authorizedAt) notFound();
   const source = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot?.nom);
   const destination = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot?.nom);
   const dossierCount = lot.items.reduce((sum, item) => sum + item.dossierCountSnapshot, 0);
@@ -35,7 +35,7 @@ export default async function TransferAuthorizationPage({ params }: { params: Pr
           {lot.motif ? <div className="mt-5 border bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">Objet du transfert</p><p className="mt-2 whitespace-pre-wrap text-sm">{lot.motif}</p></div> : null}
         </section>
         <section className="grid border-t border-slate-300 sm:grid-cols-2">
-          <div className="min-h-64 border-b border-slate-300 p-6 sm:border-b-0 sm:border-r"><p className="text-sm font-bold">Visa du responsable ministère</p><div className="relative mt-4 h-28 w-full border-b"><Image src={lot.approvalSignatureData} alt={`Signature de ${lot.approvalSignatoryName ?? "responsable ministère"}`} fill unoptimized className="object-contain object-left-bottom" sizes="420px" /></div><p className="mt-3 font-semibold">{lot.approvalSignatoryName}</p><p className="text-sm text-slate-600">{lot.approvalSignatoryTitle}</p><p className="mt-1 text-xs text-slate-500">Signé le {dateTimeFormatter.format(lot.authorizedAt)}</p></div>
+          <div className="min-h-64 border-b border-slate-300 p-6 sm:border-b-0 sm:border-r"><p className="text-sm font-bold">Visa du responsable ministère</p><div className="relative mt-4 flex h-28 w-full items-end border-b">{lot.approvalSignatureData ? <Image src={lot.approvalSignatureData} alt={`Signature de ${lot.approvalSignatoryName ?? "responsable ministère"}`} fill unoptimized className="object-contain object-left-bottom" sizes="420px" /> : <p className="pb-3 text-sm italic text-slate-500">Visa historique enregistré avant la signature numérique.</p>}</div><p className="mt-3 font-semibold">{lot.approvalSignatoryName ?? lot.authorizedBy?.name ?? "Responsable ministère"}</p><p className="text-sm text-slate-600">{lot.approvalSignatoryTitle ?? "Autorisation historique"}</p><p className="mt-1 text-xs text-slate-500">Signé le {dateTimeFormatter.format(lot.authorizedAt)}</p></div>
           <div className="min-h-64 p-6"><p className="text-sm font-bold">Contrôle CEIBAC à la sortie</p><p className="mt-8 text-sm leading-6 text-slate-600">Le gestionnaire CEIBAC présente ce bordereau au contrôle du site. Le mouvement effectif de sortie fera l&apos;objet d&apos;un bordereau signé distinct dans GeoArchives.</p></div>
         </section>
         <footer className="flex flex-col gap-2 border-t bg-slate-50 px-6 py-4 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between"><span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-[#068c78]" /> Autorisation enregistrée et traçable</span><span>Créé par {lot.createdBy.name} · visa système {lot.authorizedBy?.name ?? "-"}</span></footer>
