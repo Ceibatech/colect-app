@@ -425,6 +425,18 @@ OPERATEUR conserve quant à lui un
 dashboard personnel limité à sa propre fiche. ADMIN, FINANCE, EXECUTIF et CONSULTATION ne sont
 jamais soumis à cette restriction de périmètre.
 
+**Registre de transferts et chaîne de garde** : `/transferts` couvre la constitution d'un
+lot depuis les cartons préparés, son autorisation, les sorties partielles, la réception
+chez CEIBAC et le retour au ministère. La composition du carton n'étant pas matérialisée
+par une table historique dédiée, elle est figée au moment de la constitution à partir du
+triplet site + entrepôt + code-barres ; les références des dossiers sont ensuite
+conservées dans le dossier de garde. Les transitions de stock sont atomiques en base et
+produisent un bordereau imprimable avec deux visas. Matrice d'accès : OPERATEUR consulte,
+constitue et enregistre les mouvements ; SUPERVISEUR consulte et autorise ; ADMIN dispose
+de l'ensemble ; EXECUTIF reste limité aux tableaux de bord. Les services et actions sont
+centralisés dans `transfer-service.ts`/`transfer-actions.ts`, avec les règles pures de
+solde dans `transfer-stock.ts`.
+
 **Bug de production non résolu (constaté, non bloquant)** : une erreur d'hydratation
 React (#418) apparaît sur *toutes* les pages en production (Render) — jamais reproduite
 en local (dev ni build de production identique). L'application reste pleinement

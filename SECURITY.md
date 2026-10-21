@@ -26,7 +26,7 @@
 
 ## 2. Autorisation (RBAC)
 
-- 7 rôles (`ADMIN`, `SUPERVISEUR`, `OPERATEUR`, `FINANCE`, `PMO`, `EXECUTIF`, `CONSULTATION`) et 31 permissions
+- 7 rôles (`ADMIN`, `SUPERVISEUR`, `OPERATEUR`, `FINANCE`, `PMO`, `EXECUTIF`, `CONSULTATION`) et des permissions
   granulaires, stockés en base (`roles`, `permissions`, `role_permissions`) — voir
   [`src/lib/permissions/constants.ts`](src/lib/permissions/constants.ts) (source unique,
   utilisée par le seed **et** l'application).
@@ -60,6 +60,21 @@ Chaque connexion réussie (`LOGIN`), tentative échouée (`LOGIN_FAILED`) et dé
 D'autres actions sensibles (création/modification/suppression/validation/rejet/import/export/
 administration) seront journalisées de la même façon au fur et à mesure de leur
 implémentation (Phase 12 — Audit).
+
+### Chaîne de garde des transferts
+
+- La constitution, l'autorisation et chaque mouvement sont contrôlés par des permissions
+  serveur distinctes (`TRANSFER_CREATE`, `TRANSFER_AUTHORIZE`, `TRANSFER_OPERATE`).
+- La sortie, la réception et le retour sont exécutés dans une transaction sérialisable :
+  création du bordereau, signatures, changement d'état du stock et audit réussissent ou
+  échouent ensemble. Une vérification optimiste de l'état empêche deux agents de déplacer
+  le même carton simultanément.
+- Chaque visa conserve le nom, la fonction, l'horodatage, l'utilisateur ayant capturé la
+  preuve, l'adresse IP et le tracé PNG. Il s'agit d'un **visa manuscrit interne capturé à
+  l'écran**, utile à la traçabilité opérationnelle ; ce mécanisme n'est pas présenté comme
+  une signature électronique qualifiée ou un service de confiance au sens juridique.
+- Les bordereaux sont consultables uniquement par un utilisateur authentifié disposant de
+  `TRANSFER_VIEW`. Le profil Exécutif n'accède pas au registre opérationnel.
 
 ## 4. Secrets & configuration
 

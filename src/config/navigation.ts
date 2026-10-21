@@ -23,6 +23,7 @@ import {
   FileStack,
   WalletCards,
   BriefcaseBusiness,
+  Truck,
 } from "lucide-react";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
@@ -56,6 +57,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { title: "Collecte", href: "/collecte", icon: FilePlus2, permission: "DOSSIER_CREATE" },
   { title: "Dossiers", href: "/dossiers", icon: FolderOpen, permission: "DOSSIER_READ" },
+  { title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW" },
   { title: "Qualité", href: "/qualite", icon: ShieldCheck, permission: "QUALITY_VIEW" },
   { title: "Import", href: "/import", icon: Upload, permission: "IMPORT_DATA" },
   { title: "Export", href: "/export", icon: Download, permission: "EXPORT_DATA" },

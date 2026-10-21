@@ -31,6 +31,7 @@ npm run db:verify
 | Process | `numerisations`, `indexations`, `archivages` | Historique des opérations par dossier |
 | Qualité | `quality_checks`, `anomalies` | Contrôle qualité et suivi des anomalies |
 | Data ops | `imports`, `exports` | Traçabilité des imports/exports en masse |
+| Transferts | `transfer_lots`, `transfer_lot_items`, `transfer_lot_dossiers`, `transfer_movements`, `transfer_movement_items`, `transfer_signatures` | Dossier de garde, stock déplacé et bordereaux signés |
 | Système | `audit_logs`, `notifications`, `settings` | Journalisation, notifications, paramètres |
 
 Détail complet des colonnes : voir `prisma/schema.prisma` (commenté par section, aligné sur
@@ -253,13 +254,27 @@ processus métier — ils ne figurent pas sur la fiche CG1020.
 - **Stockage des documents** : seules les métadonnées (`documents`) sont stockées en base ;
   aucun blob. `storageProvider` (`LOCAL | CPANEL | S3 | OTHER`) prépare le branchement d'un
   stockage externe sans migration de schéma.
+- **Unité de stock des transferts** : le modèle historique n'a pas de table `cartons` ; un
+  carton est représenté par les dossiers qui partagent le même `codeBarres`, le même site
+  et le même entrepôt. À la constitution d'un `transfer_lot`, cette composition est figée
+  dans `transfer_lot_dossiers` avec le nombre de dossiers constaté. Les mouvements portent
+  sur `transfer_lot_items`, jamais directement sur les dossiers : un carton ne peut donc
+  pas être compté deux fois lors d'une sortie partielle. Seuls les cartons dont tous les
+  dossiers ont terminé la Préparation peuvent entrer dans un nouveau lot.
+- **Chaîne de garde** : `transfer_movements` est un journal immuable des sorties,
+  réceptions CEIBAC et retours. Chaque ligne de `transfer_movement_items` conserve l'état
+  avant/après ; l'état courant du carton dans `transfer_lot_items` fournit le solde en
+  temps réel (`PREVU`, `SORTI`, `RECU`, `RETOURNE`). Un lot n'est clôturé que lorsque tous
+  ses cartons sont revenus sur le site d'origine.
 
 ## 5. Contraintes UNIQUE
 
 `users.email`, `roles.code`, `permissions.code`, `communes.code`, `lotissements.code`,
 `natures_dossier.code`, `types_piece.code`, `dossiers.reference`, `dossiers.codeBarres`,
 `operateurs.matricule`, `role_permissions(roleId, permissionId)`,
-`workflow_statuses(workflowType, code)`, `settings.key`.
+`workflow_statuses(workflowType, code)`, `settings.key`, `transfer_lots.reference`,
+`transfer_movements.reference`, `transfer_lot_items(transferLotId, cartonCode)`,
+`transfer_lot_dossiers(transferLotItemId, dossierId)`.
 
 ## 6. Index
 
@@ -269,6 +284,8 @@ Voir `@@index` dans `prisma/schema.prisma` sur `dossiers` : `reference` (via uni
 `natureDossierId`, `operateurId`, les 5 `statut*`, `createdAt`, plus deux index composites
 utiles au dashboard (`communeId+statutArchivage`, `operateurId+statutValidation`). Sur
 `operateurs` : `supervisorId` (Phase 16+, utilisé par tout le cloisonnement SUPERVISEUR).
+Sur les transferts : site/entrepôt/statut/date sur `transfer_lots`,
+`cartonCode+status` sur `transfer_lot_items`, et lot/type/date sur `transfer_movements`.
 
 ## 7. Vues de reporting
 
