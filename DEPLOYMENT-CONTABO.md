@@ -102,27 +102,29 @@ chmod 600 /opt/colect-app/shared/app.env
 ### Archive finale Alfresco
 
 Alfresco ne remplace pas SharePoint : il reçoit une copie définitive uniquement
-après la validation de l'archivage du dossier. Avant activation, corriger le certificat
-HTTPS du domaine Alfresco, créer un compte de service dédié et lui donner les droits
-d'écriture sur un espace racine réservé à GeoArchives. Ne pas utiliser le compte
-`admin` Alfresco.
+après la validation de l'archivage du dossier. Quand Alfresco tourne sur la même VM,
+le déploiement crée automatiquement un compte de service et un espace racine réservés
+à GeoArchives. Le compte `admin` Alfresco sert uniquement à ce provisionnement et
+n'est jamais enregistré dans la configuration applicative.
 
-Ajouter ensuite dans `/opt/colect-app/shared/app.env` :
+Configuration finale écrite dans `/opt/colect-app/shared/app.env` :
 
 ```dotenv
 ARCHIVE_STORAGE_PROVIDER=alfresco
-ALFRESCO_API_URL=https://archive.ceiba-analytics.com/alfresco
+ALFRESCO_API_URL=http://alfresco-geoarchives:8080/alfresco
 ALFRESCO_USERNAME=<compte-service-geoarchives>
 ALFRESCO_PASSWORD=<mot-de-passe-long-et-unique>
 ALFRESCO_ROOT_NODE_ID=<node-id-du-repertoire-GeoArchives-MULCV>
-ALFRESCO_WEB_URL=https://archive.ceiba-analytics.com
 ALFRESCO_NODE_TYPE=arc:archiveDocument
 ALFRESCO_CLASSIFICATION=INTERNAL
 ```
 
 `ALFRESCO_API_URL` doit pointer vers la racine Alfresco qui expose
-`/api/-default-/public/alfresco/versions/1`. `ALFRESCO_WEB_URL` est facultative et
-sert uniquement à construire le lien d'ouverture dans Share. Après modification :
+`/api/-default-/public/alfresco/versions/1`. Sur le VPS mutualisé, le déploiement
+crée le réseau Docker interne `geoarchives-alfresco`, un compte technique isolé et
+le répertoire racine `GeoArchives-MULCV`. Aucun identifiant Alfresco n'est publié
+dans GitHub et l'API documentaire ne doit pas être exposée sur Internet. Après
+modification :
 
 ```bash
 chmod 600 /opt/colect-app/shared/app.env

@@ -30,6 +30,9 @@ services:
         target: /var/data/documents
         bind:
           create_host_path: false
+    networks:
+      - default
+      - alfresco_archive
     healthcheck:
       test: ["CMD", "node", "deploy/healthcheck.mjs"]
       interval: 30s
@@ -75,3 +78,8 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+
+networks:
+  alfresco_archive:
+    name: ${ALFRESCO_DOCKER_NETWORK:-geoarchives-alfresco}
+    external: true

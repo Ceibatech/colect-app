@@ -15,10 +15,12 @@ flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 
 # Read only the supported non-secret settings; never execute an environment file.
 setting() { sed -n "s/^$1=//p" "$shared/deploy.env" | tr -d '\r'; }
-export DOMAIN APP_HTTP_PORT
+export DOMAIN APP_HTTP_PORT ALFRESCO_DOCKER_NETWORK
 DOMAIN=$(setting DOMAIN)
 APP_HTTP_PORT=$(setting APP_HTTP_PORT)
 APP_HTTP_PORT=${APP_HTTP_PORT:-8300}
+ALFRESCO_DOCKER_NETWORK=$(setting ALFRESCO_DOCKER_NETWORK)
+ALFRESCO_DOCKER_NETWORK=${ALFRESCO_DOCKER_NETWORK:-geoarchives-alfresco}
 proxy_mode=$(setting PROXY_MODE)
 proxy_mode=${proxy_mode:-nginx}
 check_https=$(setting CHECK_HTTPS)
@@ -27,10 +29,13 @@ check_https=${check_https:-true}
 [[ "$APP_HTTP_PORT" =~ ^[0-9]{2,5}$ && "$APP_HTTP_PORT" -gt 1024 && "$APP_HTTP_PORT" -lt 65536 ]] || { echo 'Invalid APP_HTTP_PORT.' >&2; exit 1; }
 [[ "$proxy_mode" == nginx || "$proxy_mode" == caddy ]] || { echo 'Invalid PROXY_MODE.' >&2; exit 1; }
 [[ "$check_https" == true || "$check_https" == false ]] || { echo 'Invalid CHECK_HTTPS.' >&2; exit 1; }
+[[ "$ALFRESCO_DOCKER_NETWORK" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$ ]] || { echo 'Invalid ALFRESCO_DOCKER_NETWORK.' >&2; exit 1; }
 export APP_ENV_FILE=$shared/app.env DOCUMENTS_PATH=$shared/documents
 export APP_IMAGE="colect-app:$revision"
 cd "$release"
 dc() { docker compose --project-name colect-app --env-file "$shared/deploy.env" -f "$release/compose.contabo.yml" "$@"; }
+docker network inspect "$ALFRESCO_DOCKER_NETWORK" >/dev/null 2>&1 ||
+  docker network create --internal "$ALFRESCO_DOCKER_NETWORK" >/dev/null
 dc config --quiet
 [[ -d "$DOCUMENTS_PATH" && -d "$shared/db-backups" && -d "$shared/document-backups" ]] || { echo 'Missing persistent storage directories.' >&2; exit 1; }
 
@@ -79,6 +84,7 @@ dc run --rm --no-deps app node node_modules/prisma/build/index.js migrate deploy
 
 rollout_started=true
 dc up -d --no-build --wait --wait-timeout 180 app
+bash "$release/deploy/activate-alfresco.sh" "$revision"
 dc exec -T app node deploy/healthcheck.mjs --readiness
 if [[ "$proxy_mode" == caddy ]]; then
   dc --profile caddy up -d --no-build --wait --wait-timeout 120 caddy
