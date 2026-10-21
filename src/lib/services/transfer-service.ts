@@ -1,26 +1,24 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
-import { encodeTransferCartonKey } from "@/lib/utils/transfer-carton-key";
 import {
-  getTransferStockSummary,
+  getTransferDossierStockSummary,
   type TransferItemStatusCode,
 } from "@/lib/utils/transfer-stock";
 
-export interface TransferCartonOption {
-  key: string;
-  code: string;
-  label: string | null;
-  siteId: number;
-  entrepotId: number | null;
-  dossierCount: number;
-  dossierReferences: string[];
+export interface TransferDossierSearchOptions {
+  sourceSiteId: number;
+  sourceEntrepotId: number | null;
+  q?: string;
+  page: number;
+  pageSize?: number;
 }
 
 export async function getTransferCreateData() {
   await requirePermission("TRANSFER_CREATE");
-  const [sites, dossiers, reservedItems] = await Promise.all([
+  const [sites, locatedDossiers] = await Promise.all([
     prisma.site.findMany({
       where: { isActive: true },
       orderBy: { nom: "asc" },
@@ -35,66 +33,74 @@ export async function getTransferCreateData() {
         },
       },
     }),
+    prisma.dossier.count({ where: { siteId: { not: null } } }),
+  ]);
+
+  return { sites, locatedDossiers };
+}
+
+export async function searchTransferDossiers(options: TransferDossierSearchOptions) {
+  const pageSize = Math.min(Math.max(options.pageSize ?? 40, 1), 100);
+  const page = Math.max(options.page, 1);
+  const query = options.q?.trim();
+  const where: Prisma.DossierWhereInput = {
+    siteId: options.sourceSiteId,
+    entrepotId: options.sourceEntrepotId,
+    transferLotDossiers: {
+      none: {
+        transferLotItem: {
+          status: { in: ["PREVU", "SORTI"] },
+          transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
+        },
+      },
+    },
+    ...(query ? {
+      OR: [
+        { reference: { contains: query } },
+        { codeBarres: { contains: query } },
+        { libelleCarton: { contains: query } },
+        { nom: { contains: query } },
+        { prenoms: { contains: query } },
+        { numeroDdu: { contains: query } },
+        { referenceClassement: { contains: query } },
+      ],
+    } : {}),
+  };
+
+  const [items, total] = await Promise.all([
     prisma.dossier.findMany({
-      where: { siteId: { not: null }, codeBarres: { not: null } },
-      orderBy: [{ siteId: "asc" }, { entrepotId: "asc" }, { codeBarres: "asc" }],
+      where,
+      orderBy: [{ reference: "asc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       select: {
         id: true,
         reference: true,
-        siteId: true,
-        entrepotId: true,
         codeBarres: true,
         libelleCarton: true,
+        nom: true,
+        prenoms: true,
         statutPreparation: true,
+        commune: { select: { nom: true } },
+        natureDossier: { select: { libelle: true } },
+        operateur: { select: { matricule: true, nom: true, prenoms: true } },
       },
     }),
-    prisma.transferLotItem.findMany({
-      where: {
-        status: { not: "RETOURNE" },
-        transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
-      },
-      select: {
-        cartonCode: true,
-        transferLot: { select: { sourceSiteId: true, sourceEntrepotId: true } },
-      },
-    }),
+    prisma.dossier.count({ where }),
   ]);
 
-  const reserved = new Set(
-    reservedItems.map((item) => `${item.transferLot.sourceSiteId}:${item.transferLot.sourceEntrepotId ?? 0}:${item.cartonCode}`),
-  );
-  const grouped = new Map<string, typeof dossiers>();
-  for (const dossier of dossiers) {
-    if (!dossier.siteId || !dossier.codeBarres) continue;
-    const groupKey = `${dossier.siteId}:${dossier.entrepotId ?? 0}:${dossier.codeBarres}`;
-    const group = grouped.get(groupKey) ?? [];
-    group.push(dossier);
-    grouped.set(groupKey, group);
-  }
-
-  const cartons: TransferCartonOption[] = [];
-  for (const [groupKey, group] of grouped) {
-    if (reserved.has(groupKey) || group.some((dossier) => dossier.statutPreparation !== "TERMINE")) continue;
-    const first = group[0];
-    if (!first.siteId || !first.codeBarres) continue;
-    cartons.push({
-      key: encodeTransferCartonKey({ siteId: first.siteId, entrepotId: first.entrepotId, cartonCode: first.codeBarres }),
-      code: first.codeBarres,
-      label: first.libelleCarton,
-      siteId: first.siteId,
-      entrepotId: first.entrepotId,
-      dossierCount: group.length,
-      dossierReferences: group.slice(0, 4).map((dossier) => dossier.reference),
-    });
-  }
-
-  return { sites, cartons };
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
 export async function getTransferDashboardData() {
   await requirePermission("TRANSFER_VIEW");
-  const inventoryWhere = { siteId: { not: null }, codeBarres: { not: null } } as const;
-  const [lots, identifiedCartons, identifiedDossiers, activeCustodyItems] = await Promise.all([
+  const [lots, sites, stockBySite, totalDossiers, onSite, activeItems, inTransitLinks] = await Promise.all([
     prisma.transferLot.findMany({
       orderBy: { createdAt: "desc" },
       include: {
@@ -107,17 +113,29 @@ export async function getTransferDashboardData() {
         _count: { select: { movements: true } },
       },
     }),
-    prisma.dossier.groupBy({
-      by: ["siteId", "entrepotId", "codeBarres"],
-      where: inventoryWhere,
+    prisma.site.findMany({
+      where: { isActive: true },
+      orderBy: { nom: "asc" },
+      select: { id: true, code: true, nom: true },
     }),
-    prisma.dossier.count({ where: inventoryWhere }),
+    prisma.dossier.groupBy({ by: ["siteId"], where: { siteId: { not: null } }, _count: { _all: true } }),
+    prisma.dossier.count(),
+    prisma.dossier.count({ where: { siteId: { not: null } } }),
     prisma.transferLotItem.findMany({
       where: {
-        status: { in: ["SORTI", "RECU"] },
+        status: { in: ["PREVU", "SORTI"] },
         transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
       },
-      select: { status: true },
+      select: {
+        status: true,
+        dossierCountSnapshot: true,
+        transferLot: { select: { sourceSiteId: true, destinationSiteId: true } },
+      },
+    }),
+    prisma.transferLotDossier.findMany({
+      where: { transferLotItem: { status: "SORTI", transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } } } },
+      distinct: ["dossierId"],
+      select: { dossierId: true },
     }),
   ]);
 
@@ -132,25 +150,44 @@ export async function getTransferDashboardData() {
     createdBy: lot.createdBy.name,
     movementCount: lot._count.movements,
     dossierCount: lot.items.reduce((sum, item) => sum + item.dossierCountSnapshot, 0),
-    stock: getTransferStockSummary(lot.items.map((item) => item.status as TransferItemStatusCode)),
+    stock: getTransferDossierStockSummary(lot.items.map((item) => ({
+      status: item.status as TransferItemStatusCode,
+      dossierCountSnapshot: item.dossierCountSnapshot,
+    }))),
   }));
 
-  const inTransit = activeCustodyItems.filter((item) => item.status === "SORTI").length;
-  const atCeibac = activeCustodyItems.filter((item) => item.status === "RECU").length;
-  const outsideOrigin = inTransit + atCeibac;
-  const totalCartons = identifiedCartons.length;
+  const actualStock = new Map(stockBySite.flatMap((row) => row.siteId ? [[row.siteId, row._count._all] as const] : []));
+  const plannedOutbound = new Map<number, number>();
+  const transitOutbound = new Map<number, number>();
+  const transitInbound = new Map<number, number>();
+  for (const item of activeItems) {
+    const sourceId = item.transferLot.sourceSiteId;
+    const destinationId = item.transferLot.destinationSiteId;
+    if (item.status === "PREVU") plannedOutbound.set(sourceId, (plannedOutbound.get(sourceId) ?? 0) + item.dossierCountSnapshot);
+    if (item.status === "SORTI") {
+      transitOutbound.set(sourceId, (transitOutbound.get(sourceId) ?? 0) + item.dossierCountSnapshot);
+      transitInbound.set(destinationId, (transitInbound.get(destinationId) ?? 0) + item.dossierCountSnapshot);
+    }
+  }
+  const siteStock = sites.map((site) => ({
+    ...site,
+    onSite: actualStock.get(site.id) ?? 0,
+    plannedOutbound: plannedOutbound.get(site.id) ?? 0,
+    transitOutbound: transitOutbound.get(site.id) ?? 0,
+    transitInbound: transitInbound.get(site.id) ?? 0,
+  }));
+  const inTransit = inTransitLinks.length;
 
   return {
     rows,
+    siteStock,
     summary: {
       lots: rows.length,
-      open: rows.filter((row) => !["CLOTURE", "ANNULE"].includes(row.status)).length,
-      totalCartons,
-      identifiedDossiers,
-      onSite: Math.max(totalCartons - outsideOrigin, 0),
-      outsideOrigin,
+      open: rows.filter((row) => ["BROUILLON", "AUTORISE", "PARTIELLEMENT_SORTI", "EN_TRANSIT", "RECU_PARTIEL", "RETOUR_PARTIEL"].includes(row.status)).length,
+      totalDossiers,
+      onSite,
       inTransit,
-      atCeibac,
+      unlocated: Math.max(totalDossiers - onSite - inTransit, 0),
     },
   };
 }
@@ -179,7 +216,7 @@ export async function getTransferLotDetail(id: number) {
         orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
         include: {
           createdBy: { select: { name: true } },
-          items: { include: { transferLotItem: { select: { id: true, cartonCode: true, cartonLabel: true } } } },
+          items: { include: { transferLotItem: { select: { id: true, cartonCode: true, cartonLabel: true, dossierCountSnapshot: true } } } },
           signatures: { select: { party: true, signatoryName: true, signatoryTitle: true, signedAt: true } },
         },
       },

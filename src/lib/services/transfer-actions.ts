@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma/client";
 import { createTransferLotSchema, recordTransferMovementSchema } from "@/lib/validation/transfer";
-import { decodeTransferCartonKey } from "@/lib/utils/transfer-carton-key";
 import {
   deriveTransferLotStatus,
   getTransferMovementRule,
@@ -29,6 +28,11 @@ function parseDate(value: string | undefined) {
   return value ? new Date(value) : null;
 }
 
+function parseIdList(value: FormDataEntryValue | null) {
+  if (typeof value !== "string") return [];
+  return value.split(",").map((entry) => entry.trim()).filter(Boolean);
+}
+
 export async function createTransferLot(
   _previous: TransferActionState,
   formData: FormData,
@@ -41,7 +45,7 @@ export async function createTransferLot(
     destinationEntrepotId: formData.get("destinationEntrepotId"),
     plannedAt: formData.get("plannedAt"),
     motif: formData.get("motif"),
-    cartonKeys: formData.getAll("cartonKeys"),
+    dossierIds: parseIdList(formData.get("dossierIds")),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Lot de transfert invalide." };
 
@@ -52,15 +56,10 @@ export async function createTransferLot(
     return { error: "Le point de départ et le point de destination doivent être différents." };
   }
 
-  const decoded = parsed.data.cartonKeys.map(decodeTransferCartonKey);
-  if (decoded.some((value) => value === null)) return { error: "Une référence de carton est invalide." };
-  const cartonCodes = [...new Set(decoded.map((value) => value!.cartonCode))];
-  if (cartonCodes.length !== parsed.data.cartonKeys.length) return { error: "Un carton a été sélectionné plusieurs fois." };
-  if (decoded.some((value) => value!.siteId !== parsed.data.sourceSiteId || value!.entrepotId !== (parsed.data.sourceEntrepotId ?? null))) {
-    return { error: "Tous les cartons doivent appartenir au point de départ sélectionné." };
-  }
+  const dossierIds = [...new Set(parsed.data.dossierIds)];
+  if (dossierIds.length !== parsed.data.dossierIds.length) return { error: "Un dossier a été sélectionné plusieurs fois." };
 
-  const [sourceSite, destinationSite, sourceEntrepot, destinationEntrepot, dossiers] = await Promise.all([
+  const [sourceSite, destinationSite, sourceEntrepot, destinationEntrepot] = await Promise.all([
     prisma.site.findFirst({ where: { id: parsed.data.sourceSiteId, isActive: true }, select: { id: true } }),
     prisma.site.findFirst({ where: { id: parsed.data.destinationSiteId, isActive: true }, select: { id: true } }),
     parsed.data.sourceEntrepotId
@@ -69,50 +68,55 @@ export async function createTransferLot(
     parsed.data.destinationEntrepotId
       ? prisma.entrepot.findFirst({ where: { id: parsed.data.destinationEntrepotId, siteId: parsed.data.destinationSiteId, isActive: true }, select: { id: true } })
       : Promise.resolve(null),
-    prisma.dossier.findMany({
-      where: {
-        siteId: parsed.data.sourceSiteId,
-        entrepotId: parsed.data.sourceEntrepotId ?? null,
-        codeBarres: { in: cartonCodes },
-      },
-      select: { id: true, reference: true, codeBarres: true, libelleCarton: true, statutPreparation: true },
-    }),
   ]);
   if (!sourceSite || !destinationSite) return { error: "Le site de départ ou de destination n'est plus actif." };
   if (parsed.data.sourceEntrepotId && !sourceEntrepot) return { error: "L'entrepôt de départ est invalide." };
   if (parsed.data.destinationEntrepotId && !destinationEntrepot) return { error: "L'entrepôt de destination est invalide." };
 
-  const grouped = new Map<string, typeof dossiers>();
-  for (const dossier of dossiers) {
-    if (!dossier.codeBarres) continue;
-    const group = grouped.get(dossier.codeBarres) ?? [];
-    group.push(dossier);
-    grouped.set(dossier.codeBarres, group);
-  }
-  for (const code of cartonCodes) {
-    const group = grouped.get(code);
-    if (!group?.length) return { error: `Le carton ${code} n'existe plus au point de départ.` };
-    if (group.some((dossier) => dossier.statutPreparation !== "TERMINE")) {
-      return { error: `Le carton ${code} contient au moins un dossier dont la préparation n'est pas terminée.` };
-    }
-  }
-
   try {
     const ip = await getClientIp();
     const result = await prisma.$transaction(async (tx) => {
-      const conflict = await tx.transferLotItem.findFirst({
+      const dossiers = await tx.dossier.findMany({
         where: {
-          cartonCode: { in: cartonCodes },
-          status: { not: "RETOURNE" },
-          transferLot: {
-            sourceSiteId: parsed.data.sourceSiteId,
-            sourceEntrepotId: parsed.data.sourceEntrepotId ?? null,
-            status: { notIn: ["CLOTURE", "ANNULE"] },
+          id: { in: dossierIds },
+          siteId: parsed.data.sourceSiteId,
+          entrepotId: parsed.data.sourceEntrepotId ?? null,
+        },
+        select: { id: true, reference: true, codeBarres: true, libelleCarton: true },
+      });
+      if (dossiers.length !== dossierIds.length) {
+        throw new TransferRuleError("Un dossier sélectionné n'est plus disponible au point de départ. Actualisez la liste.");
+      }
+
+      const conflict = await tx.transferLotDossier.findFirst({
+        where: {
+          dossierId: { in: dossierIds },
+          transferLotItem: {
+            status: { in: ["PREVU", "SORTI"] },
+            transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
           },
         },
-        select: { cartonCode: true, transferLot: { select: { reference: true } } },
+        select: {
+          dossier: { select: { reference: true } },
+          transferLotItem: { select: { transferLot: { select: { reference: true } } } },
+        },
       });
-      if (conflict) throw new TransferRuleError(`Le carton ${conflict.cartonCode} appartient déjà au lot ouvert ${conflict.transferLot.reference}.`);
+      if (conflict) {
+        throw new TransferRuleError(`Le dossier ${conflict.dossier.reference} appartient déjà au lot ouvert ${conflict.transferLotItem.transferLot.reference}.`);
+      }
+
+      const grouped = new Map<string, { code: string; label: string | null; dossiers: typeof dossiers }>();
+      for (const dossier of dossiers) {
+        const key = dossier.codeBarres ? `CARTON:${dossier.codeBarres}` : `DOSSIER:${dossier.id}`;
+        const group = grouped.get(key) ?? {
+          code: dossier.codeBarres ?? `DOSSIER-${dossier.id}`,
+          label: dossier.libelleCarton ?? (dossier.codeBarres ? null : `Dossier ${dossier.reference}`),
+          dossiers: [],
+        };
+        group.dossiers.push(dossier);
+        grouped.set(key, group);
+      }
+      const groups = [...grouped.values()];
 
       const temporaryReference = `TMP-${randomUUID()}`;
       const lot = await tx.transferLot.create({
@@ -131,18 +135,25 @@ export async function createTransferLot(
       const reference = `LOT-${year}-${String(lot.id).padStart(6, "0")}`;
       await tx.transferLot.update({ where: { id: lot.id }, data: { reference } });
 
-      for (const code of cartonCodes) {
-        const group = grouped.get(code)!;
-        await tx.transferLotItem.create({
-          data: {
-            transferLotId: lot.id,
-            cartonCode: code,
-            cartonLabel: group.find((dossier) => dossier.libelleCarton)?.libelleCarton ?? null,
-            dossierCountSnapshot: group.length,
-            dossiers: { create: group.map((dossier) => ({ dossierId: dossier.id })) },
-          },
-        });
-      }
+      await tx.transferLotItem.createMany({
+        data: groups.map((group) => ({
+          transferLotId: lot.id,
+          cartonCode: group.code,
+          cartonLabel: group.label,
+          dossierCountSnapshot: group.dossiers.length,
+        })),
+      });
+      const createdItems = await tx.transferLotItem.findMany({
+        where: { transferLotId: lot.id },
+        select: { id: true, cartonCode: true },
+      });
+      const itemByCode = new Map(createdItems.map((item) => [item.cartonCode, item.id]));
+      await tx.transferLotDossier.createMany({
+        data: groups.flatMap((group) => group.dossiers.map((dossier) => ({
+          transferLotItemId: itemByCode.get(group.code)!,
+          dossierId: dossier.id,
+        }))),
+      });
 
       await tx.auditLog.create({
         data: {
@@ -150,7 +161,7 @@ export async function createTransferLot(
           action: "TRANSFER_LOT_CREATE",
           entity: "TRANSFER_LOT",
           entityId: lot.id,
-          newValue: { reference, cartonCount: cartonCodes.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId },
+          newValue: { reference, dossierCount: dossierIds.length, groupCount: groups.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId },
           ipAddress: ip,
         },
       });
@@ -217,7 +228,7 @@ export async function recordTransferMovement(
   if (!Number.isInteger(lotId) || lotId <= 0) return { error: "Lot invalide." };
 
   const itemIds = [...new Set(parsed.data.itemIds)];
-  if (itemIds.length !== parsed.data.itemIds.length) return { error: "Un carton a été sélectionné plusieurs fois." };
+  if (itemIds.length !== parsed.data.itemIds.length) return { error: "Un groupe de dossiers a été sélectionné plusieurs fois." };
   const occurredAt = new Date(parsed.data.occurredAt);
   if (occurredAt.getTime() > Date.now() + 5 * 60 * 1000) return { error: "La date du mouvement ne peut pas être dans le futur." };
 
@@ -226,7 +237,17 @@ export async function recordTransferMovement(
     const result = await prisma.$transaction(async (tx) => {
       const lot = await tx.transferLot.findUnique({
         where: { id: lotId },
-        include: { items: { select: { id: true, status: true, departedAt: true, receivedAt: true } } },
+        include: {
+          items: {
+            select: {
+              id: true,
+              status: true,
+              departedAt: true,
+              receivedAt: true,
+              dossiers: { select: { dossierId: true } },
+            },
+          },
+        },
       });
       if (!lot) throw new TransferRuleError("Lot introuvable.");
       if (["BROUILLON", "ANNULE", "CLOTURE"].includes(lot.status)) {
@@ -237,14 +258,17 @@ export async function recordTransferMovement(
       const rule = getTransferMovementRule(parsed.data.type);
       const selected = lot.items.filter((item) => itemIds.includes(item.id));
       if (selected.length !== itemIds.length || selected.some((item) => item.status !== rule.before)) {
-        throw new TransferRuleError("La sélection contient un carton qui n'est plus disponible pour ce mouvement.");
+        throw new TransferRuleError("La sélection contient des dossiers qui ne sont plus disponibles pour ce mouvement.");
       }
       if (selected.some((item) => !isTransferMovementChronologyValid(parsed.data.type, occurredAt, item, lot.createdAt))) {
-        throw new TransferRuleError("La date du mouvement doit être postérieure au jalon précédent de chaque carton.");
+        throw new TransferRuleError("La date du mouvement doit être postérieure au jalon précédent de chaque groupe de dossiers.");
       }
 
       const fromSiteId = type === "RETOUR" ? lot.destinationSiteId : lot.sourceSiteId;
       const toSiteId = type === "RETOUR" ? lot.sourceSiteId : lot.destinationSiteId;
+      const fromEntrepotId = type === "RETOUR" ? lot.destinationEntrepotId : lot.sourceEntrepotId;
+      const toEntrepotId = type === "RETOUR" ? lot.sourceEntrepotId : lot.destinationEntrepotId;
+      const dossierIds = [...new Set(selected.flatMap((item) => item.dossiers.map((link) => link.dossierId)))];
       const temporaryReference = `TMP-${randomUUID()}`;
       const movement = await tx.transferMovement.create({
         data: {
@@ -290,6 +314,41 @@ export async function recordTransferMovement(
       const reference = `BTR-${new Date(occurredAt).getUTCFullYear()}-${String(movement.id).padStart(7, "0")}`;
       await tx.transferMovement.update({ where: { id: movement.id }, data: { reference } });
 
+      const expectedLocation = type === "SORTIE"
+        ? { siteId: lot.sourceSiteId, entrepotId: lot.sourceEntrepotId }
+        : type === "RECEPTION"
+          ? { siteId: null, entrepotId: null }
+          : { siteId: lot.destinationSiteId, entrepotId: lot.destinationEntrepotId };
+      const nextLocation = type === "SORTIE"
+        ? { siteId: null, entrepotId: null }
+        : { siteId: toSiteId, entrepotId: toEntrepotId };
+      const updatedDossiers = await tx.dossier.updateMany({
+        where: { id: { in: dossierIds }, ...expectedLocation },
+        data: nextLocation,
+      });
+      if (updatedDossiers.count !== dossierIds.length) {
+        throw new TransferRuleError("L'emplacement d'un dossier a changé pendant l'enregistrement. Actualisez le lot puis réessayez.");
+      }
+      await tx.dossierHistory.createMany({
+        data: dossierIds.map((dossierId) => ({
+          dossierId,
+          userId: session.userId,
+          action: `TRANSFER_${type}`,
+          ancienStatut: type === "RECEPTION" ? "EN_TRANSIT" : `SITE_${fromSiteId}`,
+          nouveauStatut: type === "SORTIE" ? "EN_TRANSIT" : `SITE_${toSiteId}`,
+          commentaire: `Mouvement physique enregistré par le bordereau ${reference}.`,
+          metadata: {
+            transferLotId: lot.id,
+            transferMovementId: movement.id,
+            movementReference: reference,
+            fromSiteId,
+            fromEntrepotId,
+            toSiteId,
+            toEntrepotId,
+          },
+        })),
+      });
+
       const timestampData = type === "SORTIE"
         ? { departedAt: occurredAt }
         : type === "RECEPTION"
@@ -313,7 +372,7 @@ export async function recordTransferMovement(
           action: `TRANSFER_${type}`,
           entity: "TRANSFER_MOVEMENT",
           entityId: movement.id,
-          newValue: { reference, transferLotId: lot.id, itemCount: itemIds.length, status: nextStatus },
+          newValue: { reference, transferLotId: lot.id, itemCount: itemIds.length, dossierCount: dossierIds.length, status: nextStatus },
           ipAddress: ip,
         },
       });
@@ -322,6 +381,8 @@ export async function recordTransferMovement(
 
     revalidatePath(`/transferts/${lotId}`);
     revalidatePath("/transferts");
+    revalidatePath("/dossiers");
+    revalidatePath("/dashboard/geographie");
     return { success: true, message: `Le bordereau ${result.reference} est enregistré.` };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };

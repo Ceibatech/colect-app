@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveTransferLotStatus,
+  getTransferDossierStockSummary,
   getTransferMovementRule,
   getTransferStockSummary,
   isTransferMovementChronologyValid,
@@ -16,6 +17,23 @@ describe("transfer stock", () => {
       returned: 1,
       atOrigin: 2,
       outsideOrigin: 2,
+    });
+  });
+
+  it("weights the operational stock by dossiers instead of carton rows", () => {
+    expect(getTransferDossierStockSummary([
+      { status: "PREVU", dossierCountSnapshot: 3 },
+      { status: "SORTI", dossierCountSnapshot: 2 },
+      { status: "RECU", dossierCountSnapshot: 4 },
+      { status: "RETOURNE", dossierCountSnapshot: 1 },
+    ])).toEqual({
+      total: 10,
+      notDeparted: 3,
+      inTransit: 2,
+      atDestination: 4,
+      returned: 1,
+      atOrigin: 4,
+      outsideOrigin: 6,
     });
   });
 

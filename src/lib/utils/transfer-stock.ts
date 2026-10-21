@@ -78,6 +78,32 @@ export function getTransferStockSummary(statuses: readonly TransferItemStatusCod
   return summary;
 }
 
+export function getTransferDossierStockSummary(
+  items: readonly { status: TransferItemStatusCode; dossierCountSnapshot: number }[],
+) {
+  const summary = {
+    total: 0,
+    notDeparted: 0,
+    inTransit: 0,
+    atDestination: 0,
+    returned: 0,
+    atOrigin: 0,
+    outsideOrigin: 0,
+  };
+
+  for (const item of items) {
+    const volume = Math.max(0, item.dossierCountSnapshot);
+    summary.total += volume;
+    if (item.status === "PREVU") summary.notDeparted += volume;
+    if (item.status === "SORTI") summary.inTransit += volume;
+    if (item.status === "RECU") summary.atDestination += volume;
+    if (item.status === "RETOURNE") summary.returned += volume;
+  }
+  summary.atOrigin = summary.notDeparted + summary.returned;
+  summary.outsideOrigin = summary.inTransit + summary.atDestination;
+  return summary;
+}
+
 export function getTransferLotStatusLabel(status: TransferLotStatusCode) {
   return {
     BROUILLON: "Brouillon",
@@ -85,7 +111,7 @@ export function getTransferLotStatusLabel(status: TransferLotStatusCode) {
     PARTIELLEMENT_SORTI: "Sortie partielle",
     EN_TRANSIT: "En transit",
     RECU_PARTIEL: "Réception partielle",
-    CHEZ_CEIBAC: "Chez CEIBAC",
+    CHEZ_CEIBAC: "Reçu à destination",
     RETOUR_PARTIEL: "Retour partiel",
     CLOTURE: "Clôturé",
     ANNULE: "Annulé",
@@ -96,11 +122,11 @@ export function getTransferItemStatusLabel(status: TransferItemStatusCode) {
   return {
     PREVU: "Encore sur site",
     SORTI: "En transit",
-    RECU: "Chez CEIBAC",
-    RETOURNE: "Retourné au site",
+    RECU: "Reçu sur le site B",
+    RETOURNE: "Retourné au site A",
   }[status];
 }
 
 export function getTransferMovementLabel(type: TransferMovementTypeCode) {
-  return { SORTIE: "Sortie", RECEPTION: "Réception CEIBAC", RETOUR: "Retour au ministère" }[type];
+  return { SORTIE: "Sortie du site A", RECEPTION: "Réception au site B", RETOUR: "Retour au site A" }[type];
 }

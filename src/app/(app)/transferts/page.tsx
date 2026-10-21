@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Boxes, MapPin, Plus, Truck } from "lucide-react";
+import { ArrowRight, Boxes, Building2, MapPin, Plus, Truck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -28,31 +28,69 @@ export default async function TransfersPage() {
         eyebrow="Chaîne de garde"
         icon={Truck}
         title="Registre des transferts"
-        description="Vue ministère du stock documentaire : cartons identifiés dans la base, encore sur site, en transit ou pris en charge par CEIBAC. Chaque mouvement reste lié à un bordereau signé."
+        description="Vue consolidée du stock documentaire par site. Une sortie diminue le site A; une réception signée augmente le site B et conserve la preuve du mouvement."
         actions={canCreate ? (
           <Link href="/transferts/nouveau" className={buttonVariants()}>
             <Plus /> Identifier un lot
           </Link>
         ) : null}
         stats={[
-          { label: "Cartons identifiés", value: data.summary.totalCartons },
-          { label: "Encore sur site", value: data.summary.onSite, tone: "success" },
-          { label: "Sortis du site", value: data.summary.outsideOrigin, tone: data.summary.outsideOrigin > 0 ? "warning" : "success" },
-          { label: "Chez CEIBAC", value: data.summary.atCeibac, tone: "success" },
+          { label: "Dossiers inventoriés", value: data.summary.totalDossiers },
+          { label: "En stock sur site", value: data.summary.onSite, tone: "success" },
+          { label: "En transit", value: data.summary.inTransit, tone: data.summary.inTransit > 0 ? "warning" : "success" },
+          { label: "Sans emplacement", value: data.summary.unlocated, tone: data.summary.unlocated > 0 ? "warning" : "success" },
         ]}
       />
+
+      <Card className="bg-card/95">
+        <CardHeader className="border-b border-border/60 pb-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Building2 className="h-4 w-4" /></span>
+            <div><CardTitle>Stock physique par site</CardTitle><CardDescription>Situation actuelle calculée depuis l&apos;emplacement de chaque dossier et les bordereaux en cours.</CardDescription></div>
+          </div>
+        </CardHeader>
+        <div className="divide-y divide-border/60 lg:hidden">
+          {data.siteStock.map((site) => (
+            <article key={site.id} className="space-y-3 p-4 sm:p-5">
+              <div><p className="font-semibold">{site.nom}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{site.code}</p></div>
+              <div className="grid grid-cols-2 gap-3 border-y border-border/60 py-3 text-sm">
+                <Metric label="Stock sur site" value={site.onSite} />
+                <Metric label="Départs prévus" value={site.plannedOutbound} />
+                <Metric label="Sorties en transit" value={site.transitOutbound} />
+                <Metric label="Arrivées en transit" value={site.transitInbound} />
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto lg:block">
+          <Table className="min-w-[820px]">
+            <TableHeader><TableRow className="bg-muted/45 hover:bg-muted/45"><TableHead className="pl-5">Site</TableHead><TableHead className="text-center">Stock actuel</TableHead><TableHead className="text-center">Départs prévus</TableHead><TableHead className="text-center">Sorties en transit</TableHead><TableHead className="pr-5 text-center">Arrivées en transit</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {data.siteStock.map((site) => (
+                <TableRow key={site.id}>
+                  <TableCell className="pl-5"><p className="font-semibold">{site.nom}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{site.code}</p></TableCell>
+                  <TableCell className="text-center text-lg font-semibold tabular-nums text-primary">{site.onSite}</TableCell>
+                  <TableCell className="text-center font-medium tabular-nums">{site.plannedOutbound}</TableCell>
+                  <TableCell className="text-center font-medium tabular-nums text-brand-gold">{site.transitOutbound}</TableCell>
+                  <TableCell className="pr-5 text-center font-medium tabular-nums text-brand-green">{site.transitInbound}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
 
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Lots et mouvements de stock</CardTitle>
-              <CardDescription>Un carton représente une unité de stock et rattache automatiquement tous ses dossiers identifiés dans la base.</CardDescription>
+              <CardDescription>Chaque lot conserve la liste exacte des dossiers sélectionnés et tous les bordereaux signés.</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="w-fit rounded-md">{data.summary.identifiedDossiers} dossiers rattachés</Badge>
+              <Badge variant="outline" className="w-fit rounded-md">{data.summary.totalDossiers} dossiers inventoriés</Badge>
               <Badge variant={data.summary.open > 0 ? "secondary" : "outline"} className="w-fit rounded-md">{data.summary.open} lot{data.summary.open > 1 ? "s" : ""} ouvert{data.summary.open > 1 ? "s" : ""}</Badge>
-              <Badge variant={data.summary.inTransit > 0 ? "secondary" : "outline"} className="w-fit rounded-md">{data.summary.inTransit} carton{data.summary.inTransit > 1 ? "s" : ""} en transit</Badge>
+              <Badge variant={data.summary.inTransit > 0 ? "secondary" : "outline"} className="w-fit rounded-md">{data.summary.inTransit} dossier{data.summary.inTransit > 1 ? "s" : ""} en transit</Badge>
             </div>
           </div>
         </CardHeader>
@@ -61,7 +99,7 @@ export default async function TransfersPage() {
           <CardContent className="py-14 text-center">
             <Boxes className="mx-auto h-10 w-10 text-muted-foreground/55" />
             <p className="mt-3 font-medium">Aucun lot constitué</p>
-            <p className="mt-1 text-sm text-muted-foreground">Le stock identifié reste entièrement sur les sites du ministère jusqu&apos;au premier bordereau de sortie.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Les dossiers restent dans le stock de leur site jusqu&apos;au premier bordereau de sortie signé.</p>
           </CardContent>
         ) : (
           <>
@@ -76,9 +114,9 @@ export default async function TransfersPage() {
                     <TransferLotStatusBadge status={row.status as TransferLotStatusCode} />
                   </div>
                   <div className="grid grid-cols-3 gap-3 border-y border-border/60 py-3 text-sm">
-                    <Metric label="Cartons" value={row.stock.total} />
-                    <Metric label="Hors site" value={row.stock.outsideOrigin} />
-                    <Metric label="Retournés" value={row.stock.returned} />
+                    <Metric label="Dossiers" value={row.stock.total} />
+                    <Metric label="En circulation" value={row.stock.outsideOrigin} />
+                    <Metric label="Au site B" value={row.stock.atDestination} />
                   </div>
                   <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                     <span>{row.destination}</span>
@@ -94,9 +132,9 @@ export default async function TransfersPage() {
                   <TableRow className="bg-muted/45 hover:bg-muted/45">
                     <TableHead className="pl-5">Lot</TableHead>
                     <TableHead>Trajet</TableHead>
-                    <TableHead className="text-center">Cartons</TableHead>
-                    <TableHead className="text-center">Hors site</TableHead>
-                    <TableHead className="text-center">Chez CEIBAC</TableHead>
+                    <TableHead className="text-center">Dossiers</TableHead>
+                    <TableHead className="text-center">En circulation</TableHead>
+                    <TableHead className="text-center">Au site B</TableHead>
                     <TableHead>Mouvements</TableHead>
                     <TableHead>État</TableHead>
                     <TableHead className="pr-5 text-right">Accès</TableHead>
@@ -115,8 +153,8 @@ export default async function TransfersPage() {
                       </TableCell>
                       <TableCell className="text-center font-semibold tabular-nums">{row.stock.total}</TableCell>
                       <TableCell className="text-center font-semibold tabular-nums text-brand-gold">{row.stock.outsideOrigin}</TableCell>
-                      <TableCell className="text-center font-semibold tabular-nums text-brand-green">{row.stock.atCeibac}</TableCell>
-                      <TableCell><span className="tabular-nums">{row.movementCount}</span><span className="text-muted-foreground"> · {row.dossierCount} dossiers</span></TableCell>
+                      <TableCell className="text-center font-semibold tabular-nums text-brand-green">{row.stock.atDestination}</TableCell>
+                      <TableCell><span className="tabular-nums">{row.movementCount}</span><span className="text-muted-foreground"> bordereau{row.movementCount > 1 ? "x" : ""}</span></TableCell>
                       <TableCell><TransferLotStatusBadge status={row.status as TransferLotStatusCode} /></TableCell>
                       <TableCell className="pr-5 text-right">
                         <Link href={`/transferts/${row.id}`} className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))} aria-label={`Ouvrir ${row.reference}`}>

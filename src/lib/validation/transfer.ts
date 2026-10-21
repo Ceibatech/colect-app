@@ -20,16 +20,16 @@ const signatureData = z
 export const createTransferLotSchema = z.object({
   sourceSiteId: z.coerce.number().int().positive("Le site de départ est requis."),
   sourceEntrepotId: optionalPositiveInt,
-  destinationSiteId: z.coerce.number().int().positive("Le site CEIBAC est requis."),
+  destinationSiteId: z.coerce.number().int().positive("Le site de destination est requis."),
   destinationEntrepotId: optionalPositiveInt,
   plannedAt: optionalDateTime,
   motif: z.string().trim().max(2_000, "Le motif est trop long.").optional().or(z.literal("")),
-  cartonKeys: z.array(z.string().min(5).max(500)).min(1, "Sélectionnez au moins un carton.").max(500),
+  dossierIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un dossier.").max(500, "Un lot peut contenir au maximum 500 dossiers."),
 });
 
 export const recordTransferMovementSchema = z.object({
   type: z.enum(TRANSFER_MOVEMENT_TYPES),
-  itemIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un carton.").max(500),
+  itemIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un groupe de dossiers.").max(500),
   occurredAt: z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), "La date du mouvement est invalide."),
   observations: z.string().trim().max(2_000, "Les observations sont trop longues.").optional().or(z.literal("")),
   ministryName: z.string().trim().min(2, "Le nom du signataire Ministère est requis.").max(120),

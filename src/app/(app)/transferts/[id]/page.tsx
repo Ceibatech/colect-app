@@ -12,7 +12,7 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { getTransferLotDetail } from "@/lib/services/transfer-service";
 import {
   getTransferMovementLabel,
-  getTransferStockSummary,
+  getTransferDossierStockSummary,
   type TransferItemStatusCode,
   type TransferLotStatusCode,
   type TransferMovementTypeCode,
@@ -38,12 +38,23 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   ]);
   if (!lot) notFound();
 
-  const stock = getTransferStockSummary(lot.items.map((item) => item.status as TransferItemStatusCode));
+  const sourceLabel = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot?.nom);
+  const destinationLabel = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot?.nom);
+  const stock = getTransferDossierStockSummary(lot.items.map((item) => ({
+    status: item.status as TransferItemStatusCode,
+    dossierCountSnapshot: item.dossierCountSnapshot,
+  })));
   const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE") && lot.status === "BROUILLON";
   const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "ANNULE", "CLOTURE"].includes(lot.status);
   const movementOptions = (status: TransferItemStatusCode): TransferMovementItemOption[] => lot.items
     .filter((item) => item.status === status)
     .map((item) => ({ id: item.id, cartonCode: item.cartonCode, cartonLabel: item.cartonLabel, dossierCount: item.dossierCountSnapshot }));
+  const dossierRows = lot.items.flatMap((item) => item.dossiers.map((entry) => ({
+    ...entry.dossier,
+    cartonCode: item.cartonCode.startsWith("DOSSIER-") ? null : item.cartonCode,
+    cartonLabel: item.cartonLabel,
+    status: item.status as TransferItemStatusCode,
+  })));
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -51,7 +62,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         eyebrow="Dossier de garde"
         icon={Truck}
         title={<span className="font-mono">{lot.reference}</span>}
-        description={`${placeLabel(lot.sourceSite.nom, lot.sourceEntrepot?.nom)} vers ${placeLabel(lot.destinationSite.nom, lot.destinationEntrepot?.nom)}. La composition du lot reste figée pendant toute la circulation.`}
+        description={`${sourceLabel} vers ${destinationLabel}. Les dossiers sélectionnés restent figés pendant toute la chaîne de garde.`}
         actions={(
           <>
             <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Registre</Link>
@@ -59,10 +70,10 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           </>
         )}
         stats={[
-          { label: "Cartons du lot", value: stock.total },
-          { label: "Encore sur site", value: stock.notDeparted },
-          { label: "Hors site", value: stock.outsideOrigin, tone: stock.outsideOrigin > 0 ? "warning" : "success" },
-          { label: "Retournés", value: stock.returned, tone: "success" },
+          { label: "Dossiers du lot", value: stock.total },
+          { label: "Au site A", value: stock.notDeparted },
+          { label: "En circulation", value: stock.outsideOrigin, tone: stock.outsideOrigin > 0 ? "warning" : "success" },
+          { label: "Retournés au site A", value: stock.returned, tone: "success" },
         ]}
       />
 
@@ -72,16 +83,16 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Situation du stock</CardTitle>
-                <CardDescription>Chaque carton ne peut avancer qu&apos;une fois par étape : sortie, réception CEIBAC, puis retour.</CardDescription>
+                <CardDescription>Le stock est recalculé à chaque sortie, réception au site B et retour au site A.</CardDescription>
               </div>
               <TransferLotStatusBadge status={lot.status as TransferLotStatusCode} />
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StockMetric label="Sur le site d'origine" value={stock.atOrigin} hint="non sorti + retourné" tone="default" />
+            <StockMetric label="Sur le site A" value={stock.atOrigin} hint="non sorti + retourné" tone="default" />
             <StockMetric label="En transit" value={stock.inTransit} hint="sorti, non réceptionné" tone="warning" />
-            <StockMetric label="Chez CEIBAC" value={stock.atCeibac} hint="réception confirmée" tone="success" />
-            <StockMetric label="Dossiers liés" value={lot.items.reduce((sum, item) => sum + item.dossierCountSnapshot, 0)} hint="références figées" tone="default" />
+            <StockMetric label="Sur le site B" value={stock.atDestination} hint="réception confirmée" tone="success" />
+            <StockMetric label="Dossiers identifiés" value={stock.total} hint="composition figée" tone="default" />
           </CardContent>
         </Card>
 
@@ -102,9 +113,9 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <CardDescription>Un bordereau distinct est produit pour chaque mouvement, y compris en cas de sortie ou de retour partiel.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <TransferMovementDialog lotId={lot.id} type="SORTIE" items={movementOptions("PREVU")} />
-            <TransferMovementDialog lotId={lot.id} type="RECEPTION" items={movementOptions("SORTI")} />
-            <TransferMovementDialog lotId={lot.id} type="RETOUR" items={movementOptions("RECU")} />
+            <TransferMovementDialog lotId={lot.id} type="SORTIE" items={movementOptions("PREVU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
+            <TransferMovementDialog lotId={lot.id} type="RECEPTION" items={movementOptions("SORTI")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
+            <TransferMovementDialog lotId={lot.id} type="RETOUR" items={movementOptions("RECU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
           </CardContent>
         </Card>
       ) : null}
@@ -112,30 +123,29 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex items-start justify-between gap-3">
-            <div><CardTitle>Composition du lot</CardTitle><CardDescription>Inventaire exact des cartons et des dossiers au moment de la constitution.</CardDescription></div>
-            <Badge variant="outline" className="rounded-md">{lot.items.length} carton{lot.items.length > 1 ? "s" : ""}</Badge>
+            <div><CardTitle>Dossiers identifiés</CardTitle><CardDescription>Inventaire exact des dossiers approuvés pour ce transfert.</CardDescription></div>
+            <Badge variant="outline" className="rounded-md">{dossierRows.length} dossier{dossierRows.length > 1 ? "s" : ""}</Badge>
           </div>
         </CardHeader>
         <div className="divide-y divide-border/60 lg:hidden">
-          {lot.items.map((item) => (
-            <article key={item.id} className="space-y-3 p-4 sm:p-5">
-              <div className="flex items-start justify-between gap-3"><div><p className="font-mono font-semibold">{item.cartonCode}</p><p className="mt-1 text-sm text-muted-foreground">{item.cartonLabel ?? "Carton sans libellé"}</p></div><TransferItemStatusBadge status={item.status as TransferItemStatusCode} /></div>
-              <p className="text-xs leading-5 text-muted-foreground">{item.dossiers.map((entry) => entry.dossier.reference).join(" · ")}</p>
-              <p className="text-xs font-medium">{item.dossierCountSnapshot} dossier{item.dossierCountSnapshot > 1 ? "s" : ""}</p>
+          {dossierRows.map((dossier) => (
+            <article key={dossier.id} className="space-y-3 p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3"><div><p className="font-mono font-semibold">{dossier.reference}</p><p className="mt-1 text-sm text-muted-foreground">{[dossier.nom, dossier.prenoms].filter(Boolean).join(" ") || "Titulaire non renseigné"}</p></div><TransferItemStatusBadge status={dossier.status} /></div>
+              <p className="text-xs leading-5 text-muted-foreground">{dossier.cartonCode ?? "Sans code-barres"}{dossier.cartonLabel ? ` · ${dossier.cartonLabel}` : ""}</p>
             </article>
           ))}
         </div>
         <div className="hidden overflow-x-auto lg:block">
           <Table className="min-w-[900px]">
-            <TableHeader><TableRow className="bg-muted/45 hover:bg-muted/45"><TableHead className="pl-5">Carton</TableHead><TableHead>Libellé</TableHead><TableHead>Dossiers figés</TableHead><TableHead className="text-center">Volume</TableHead><TableHead className="pr-5">Localisation</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow className="bg-muted/45 hover:bg-muted/45"><TableHead className="pl-5">Dossier</TableHead><TableHead>Titulaire</TableHead><TableHead>Code-barres</TableHead><TableHead>Libellé du carton</TableHead><TableHead className="pr-5">Situation</TableHead></TableRow></TableHeader>
             <TableBody>
-              {lot.items.map((item) => (
-                <TableRow key={item.id}>
-                  <TableCell className="pl-5 font-mono font-semibold">{item.cartonCode}</TableCell>
-                  <TableCell>{item.cartonLabel ?? <span className="text-muted-foreground">Sans libellé</span>}</TableCell>
-                  <TableCell className="max-w-lg"><p className="truncate text-xs text-muted-foreground" title={item.dossiers.map((entry) => entry.dossier.reference).join(" · ")}>{item.dossiers.map((entry) => entry.dossier.reference).join(" · ")}</p></TableCell>
-                  <TableCell className="text-center font-semibold tabular-nums">{item.dossierCountSnapshot}</TableCell>
-                  <TableCell className="pr-5"><TransferItemStatusBadge status={item.status as TransferItemStatusCode} /></TableCell>
+              {dossierRows.map((dossier) => (
+                <TableRow key={dossier.id}>
+                  <TableCell className="pl-5 font-mono font-semibold">{dossier.reference}</TableCell>
+                  <TableCell>{[dossier.nom, dossier.prenoms].filter(Boolean).join(" ") || <span className="text-muted-foreground">Non renseigné</span>}</TableCell>
+                  <TableCell className="font-mono text-sm">{dossier.cartonCode ?? <span className="font-sans text-muted-foreground">Sans code-barres</span>}</TableCell>
+                  <TableCell>{dossier.cartonLabel ?? <span className="text-muted-foreground">Sans libellé</span>}</TableCell>
+                  <TableCell className="pr-5"><TransferItemStatusBadge status={dossier.status} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -157,7 +167,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-4 w-4" /></span>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2"><p className="font-mono font-semibold">{movement.reference}</p><Badge variant="secondary" className="rounded-md">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</Badge></div>
-                    <p className="mt-1 text-sm text-muted-foreground">{movementPlace(lot, movement.type as TransferMovementTypeCode, "from")} <ArrowRight className="mx-1 inline h-3.5 w-3.5" /> {movementPlace(lot, movement.type as TransferMovementTypeCode, "to")} · {movement.items.length} carton{movement.items.length > 1 ? "s" : ""}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{movementPlace(lot, movement.type as TransferMovementTypeCode, "from")} <ArrowRight className="mx-1 inline h-3.5 w-3.5" /> {movementPlace(lot, movement.type as TransferMovementTypeCode, "to")} · {movement.items.reduce((sum, item) => sum + item.transferLotItem.dossierCountSnapshot, 0)} dossier{movement.items.reduce((sum, item) => sum + item.transferLotItem.dossierCountSnapshot, 0) > 1 ? "s" : ""}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{dateTimeFormatter.format(movement.occurredAt)} · saisi par {movement.createdBy.name} · visas {movement.signatures.map((signature) => signature.signatoryName).join(" / ")}</p>
                   </div>
                 </div>

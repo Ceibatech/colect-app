@@ -12,7 +12,7 @@ describe("transfer validation", () => {
       destinationEntrepotId: "",
       plannedAt: "2026-10-22T08:30",
       motif: "Numérisation CEIBAC",
-      cartonKeys: ["1.0.Y2FydG9uLTE"],
+      dossierIds: [11, 12],
     });
     expect(result.success).toBe(true);
   });

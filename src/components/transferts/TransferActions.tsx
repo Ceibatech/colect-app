@@ -49,7 +49,7 @@ export function AuthorizeTransferButton({ lotId }: { lotId: number }) {
   return (
     <Button onClick={authorize} disabled={pending}>
       {pending ? <Loader2 className="animate-spin" /> : <Check />}
-      Autoriser la sortie
+      Valider le lot au départ
     </Button>
   );
 }
@@ -58,10 +58,14 @@ export function TransferMovementDialog({
   lotId,
   type,
   items,
+  sourceLabel,
+  destinationLabel,
 }: {
   lotId: number;
   type: TransferMovementTypeCode;
   items: TransferMovementItemOption[];
+  sourceLabel: string;
+  destinationLabel: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -88,6 +92,14 @@ export function TransferMovementDialog({
   }
 
   const allSelected = items.length > 0 && selected.length === items.length;
+  const siteSignatureTitle = type === "RECEPTION"
+    ? `Visa du site B · ${destinationLabel}`
+    : `Visa du site A · ${sourceLabel}`;
+  const siteSignatureHelp = type === "SORTIE"
+    ? "Le responsable du site d'origine confirme la remise physique des dossiers."
+    : type === "RECEPTION"
+      ? "Le responsable du site de destination confirme l'entrée des dossiers dans son stock."
+      : "Le responsable du site d'origine confirme le retour des dossiers dans son stock.";
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant={type === "SORTIE" ? "default" : "outline"} />} disabled={items.length === 0}>
@@ -97,7 +109,7 @@ export function TransferMovementDialog({
         <DialogHeader>
           <DialogTitle>{label}</DialogTitle>
           <DialogDescription>
-            Sélectionnez les cartons réellement concernés. Le mouvement de stock et les visas des deux responsables habilités seront enregistrés ensemble sur le bordereau.
+            Sélectionnez les dossiers réellement concernés. Le stock, le bordereau et les deux signatures seront enregistrés dans une seule opération.
           </DialogDescription>
         </DialogHeader>
         <form key={formVersion} action={formAction} className="space-y-5">
@@ -107,7 +119,7 @@ export function TransferMovementDialog({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <Label>Cartons du bordereau</Label>
+              <Label>Dossiers du bordereau</Label>
               <Button type="button" size="sm" variant="ghost" onClick={() => setSelected(allSelected ? [] : items.map((item) => item.id))}>
                 {allSelected ? "Tout retirer" : "Tout sélectionner"}
               </Button>
@@ -118,7 +130,7 @@ export function TransferMovementDialog({
                   <Checkbox checked={selected.includes(item.id)} onCheckedChange={(value) => toggle(item.id, value === true)} disabled={pending} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{item.cartonCode}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{item.cartonLabel ?? "Carton sans libellé"} · {item.dossierCount} dossier{item.dossierCount > 1 ? "s" : ""}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{item.cartonLabel ?? "Sans libellé de contenant"} · {item.dossierCount} dossier{item.dossierCount > 1 ? "s" : ""}</span>
                   </span>
                 </label>
               ))}
@@ -132,13 +144,13 @@ export function TransferMovementDialog({
 
           <div className="grid gap-5 border-t pt-5 lg:grid-cols-2">
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
-              <div><h3 className="font-semibold">Visa du Ministère</h3><p className="text-xs text-muted-foreground">Responsable habilité {type === "RETOUR" ? "à réceptionner le retour sur le site" : "à autoriser la remise des archives"}.</p></div>
+              <div><h3 className="font-semibold">{siteSignatureTitle}</h3><p className="text-xs text-muted-foreground">{siteSignatureHelp}</p></div>
               <div className="space-y-2"><Label htmlFor={`${type}-ministryName`}>Nom complet</Label><Input id={`${type}-ministryName`} name="ministryName" required maxLength={120} disabled={pending} /></div>
               <div className="space-y-2"><Label htmlFor={`${type}-ministryTitle`}>Fonction habilitée</Label><Input id={`${type}-ministryTitle`} name="ministryTitle" required maxLength={120} disabled={pending} /></div>
-              <SignaturePad name="ministrySignature" label="Ministère" disabled={pending} />
+              <SignaturePad name="ministrySignature" label={type === "RECEPTION" ? "Site B" : "Site A"} disabled={pending} />
             </section>
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
-              <div><h3 className="font-semibold">Visa CEIBAC</h3><p className="text-xs text-muted-foreground">Responsable habilité {type === "RETOUR" ? "à remettre les archives au Ministère" : "à prendre en charge les archives"}.</p></div>
+              <div><h3 className="font-semibold">Visa du gestionnaire CEIBAC</h3><p className="text-xs text-muted-foreground">L&apos;agent confirme la prise en charge ou la remise physique pendant le mouvement.</p></div>
               <div className="space-y-2"><Label htmlFor={`${type}-ceibacName`}>Nom complet</Label><Input id={`${type}-ceibacName`} name="ceibacName" required maxLength={120} disabled={pending} /></div>
               <div className="space-y-2"><Label htmlFor={`${type}-ceibacTitle`}>Fonction habilitée</Label><Input id={`${type}-ceibacTitle`} name="ceibacTitle" required maxLength={120} disabled={pending} /></div>
               <SignaturePad name="ceibacSignature" label="CEIBAC" disabled={pending} />

@@ -17,19 +17,19 @@ export default async function NewTransferPage() {
         eyebrow="Préparation du transfert"
         icon={PackagePlus}
         title="Identifier un lot à transférer"
-        description="Recherchez les cartons déjà inventoriés dans GeoArchives. Tous les dossiers du carton sont rattachés automatiquement et la composition est figée avant la sortie."
+        description="Sélectionnez les dossiers présents au site A. Leur composition est figée dans le lot avant validation, sortie et réception au site B."
         actions={(
           <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}>
             <ArrowLeft /> Retour au registre
           </Link>
         )}
         stats={[
-          { label: "Cartons disponibles", value: data.cartons.length },
+          { label: "Dossiers localisés", value: data.locatedDossiers },
           { label: "Sites actifs", value: data.sites.length },
-          { label: "Contrôle préalable", value: "Préparation terminée", tone: "success" },
+          { label: "Chaîne de garde", value: "Traçabilité active", tone: "success" },
         ]}
       />
-      <NewTransferForm sites={data.sites} cartons={data.cartons} />
+      <NewTransferForm sites={data.sites} />
     </div>
   );
 }

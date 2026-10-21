@@ -26,6 +26,8 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
   const destination = placeLabel(movement.transferLot.destinationSite.nom, movement.transferLot.destinationEntrepot?.nom);
   const movementFrom = movement.type === "RETOUR" ? destination : source;
   const movementTo = movement.type === "RETOUR" ? source : destination;
+  const dossierCount = movement.items.reduce((sum, entry) => sum + entry.transferLotItem.dossierCountSnapshot, 0);
+  const siteVisaTitle = movement.type === "RECEPTION" ? `Visa du site B · ${destination}` : `Visa du site A · ${source}`;
 
   return (
     <div className="mx-auto max-w-5xl bg-white print:max-w-none">
@@ -59,7 +61,7 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
         <section className="p-6 sm:p-8">
           <div className="mb-4 flex items-end justify-between gap-4">
             <div><h2 className="text-lg font-bold">Inventaire remis</h2><p className="mt-1 text-sm text-slate-600">La liste ci-dessous constitue la preuve du mouvement physique enregistré.</p></div>
-            <p className="text-sm font-semibold">{movement.items.length} carton{movement.items.length > 1 ? "s" : ""}</p>
+            <p className="text-sm font-semibold">{dossierCount} dossier{dossierCount > 1 ? "s" : ""}</p>
           </div>
           <div className="overflow-hidden border border-slate-300">
             <table className="w-full border-collapse text-left text-sm">
@@ -82,8 +84,8 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
         </section>
 
         <section className="grid border-t border-slate-300 sm:grid-cols-2">
-          <SignatureBlock title="Visa Ministère" signature={ministrySignature} />
-          <SignatureBlock title="Visa CEIBAC" signature={ceibacSignature} />
+          <SignatureBlock title={siteVisaTitle} signature={ministrySignature} />
+          <SignatureBlock title="Visa du gestionnaire CEIBAC" signature={ceibacSignature} />
         </section>
 
         <footer className="flex flex-col gap-2 border-t border-slate-300 bg-slate-50 px-6 py-4 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
