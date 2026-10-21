@@ -208,7 +208,7 @@ export async function getTransferDashboardData() {
 export async function getTransferAuthorization(lotId: number) {
   await requirePermission("TRANSFER_VIEW");
   return prisma.transferLot.findFirst({
-    where: { id: lotId, authorizedAt: { not: null }, approvalSignatureData: { not: null } },
+    where: { id: lotId, authorizedAt: { not: null } },
     include: {
       sourceSite: true,
       sourceEntrepot: true,
