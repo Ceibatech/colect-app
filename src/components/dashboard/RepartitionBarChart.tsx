@@ -17,6 +17,7 @@ export function RepartitionBarChart({
   height,
   leftAxisWidth = 120,
   barSize = 14,
+  aggregateTotal,
 }: {
   data: RepartitionRow[];
   colorByCategory?: boolean;
@@ -24,6 +25,7 @@ export function RepartitionBarChart({
   height?: number;
   leftAxisWidth?: number;
   barSize?: number;
+  aggregateTotal?: number;
 }) {
   const rows = data.slice(0, limit);
 
@@ -32,7 +34,8 @@ export function RepartitionBarChart({
   }
 
   const maxValue = Math.max(...rows.map((row) => row.total), 1);
-  const aggregate = rows.reduce((sum, row) => sum + row.total, 0);
+  const visibleTotal = rows.reduce((sum, row) => sum + row.total, 0);
+  const aggregate = Math.max(aggregateTotal ?? visibleTotal, visibleTotal);
   const chartStyle = {
     "--chart-label-width": String(Math.max(leftAxisWidth, 96)) + "px",
     "--chart-bar-height": String(Math.max(10, Math.min(barSize, 18))) + "px",

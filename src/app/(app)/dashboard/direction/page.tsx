@@ -253,7 +253,15 @@ export default async function DashboardDirectionPage() {
                 </p>
               </div>
             </div>
-            <RepartitionBarChart data={natures} colorByCategory limit={8} height={430} leftAxisWidth={190} barSize={16} />
+            <RepartitionBarChart
+              data={natures}
+              colorByCategory
+              limit={8}
+              height={430}
+              leftAxisWidth={190}
+              barSize={16}
+              aggregateTotal={natureMetric?.filled}
+            />
           </CardContent>
         </Card>
       </div>
