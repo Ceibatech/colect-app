@@ -1,6 +1,12 @@
 import type { ReactNode } from "react";
 import { requirePermission, requireRole } from "@/lib/auth/current-user";
-import { getDirectionOverview, getAnomaliesEvolution } from "@/lib/services/dashboard-service";
+import {
+  getAnomaliesEvolution,
+  getDirectionOverview,
+  getInventoryCompletenessOverview,
+  getRepartitionByNature,
+} from "@/lib/services/dashboard-service";
+import type { InventoryCompletenessMetric } from "@/lib/utils/inventory-completeness";
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
 import { AnomaliesEvolutionChart } from "@/components/dashboard/AnomaliesEvolutionChart";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +18,7 @@ import {
   Activity,
   Archive,
   Clock,
+  Database,
   FileCheck2,
   FolderKanban,
   Gauge,
@@ -25,6 +32,9 @@ import {
 } from "lucide-react";
 
 export const metadata = { title: "Dashboard Direction - GeoArchives-MULCV" };
+
+const numberFormatter = new Intl.NumberFormat("fr-FR");
+const rateFormatter = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 type MetricTone = "default" | "success" | "warning" | "destructive";
 
@@ -59,7 +69,12 @@ export default async function DashboardDirectionPage() {
   const session = await requireRole("ADMIN", "EXECUTIF", "PMO", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
 
-  const [overview, anomaliesEvolution] = await Promise.all([getDirectionOverview(), getAnomaliesEvolution()]);
+  const [overview, anomaliesEvolution, inventoryCompleteness, natures] = await Promise.all([
+    getDirectionOverview(),
+    getAnomaliesEvolution(),
+    getInventoryCompletenessOverview(),
+    getRepartitionByNature(),
+  ]);
 
   const globalProgress = computePipelineScore({
     total: overview.total,
@@ -99,6 +114,8 @@ export default async function DashboardDirectionPage() {
     { label: "Indexation", value: overview.tauxIndexation, count: overview.indexes, base: overview.numerises, icon: Tags, tone: "warning" },
     { label: "Archivage", value: overview.tauxArchivage, count: overview.archives, base: overview.indexes, icon: Archive, tone: "default" },
   ];
+  const natureMetric = inventoryCompleteness.metrics.find((metric) => metric.key === "natureDossier");
+  const reliableFields = inventoryCompleteness.metrics.filter((metric) => metric.rate >= 90).length;
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -194,6 +211,53 @@ export default async function DashboardDirectionPage() {
         </CardContent>
       </Card>
 
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]">
+        <Card className="min-w-0 bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Complétude des données d&apos;inventaire</CardTitle>
+                <CardDescription>Part des dossiers disposant d&apos;une valeur exploitable pour chaque information clé.</CardDescription>
+              </div>
+              <Badge variant="outline" className="w-fit rounded-md bg-background/70 tabular-nums">
+                {reliableFields}/12 champs à 90 % ou plus
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <InventoryCompletenessTable metrics={inventoryCompleteness.metrics} />
+          </CardContent>
+        </Card>
+
+        <Card className="min-w-0 bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Nature documentaire</CardTitle>
+                <CardDescription>Composition du portefeuille recensé, classée par volume.</CardDescription>
+              </div>
+              <Badge variant="outline" className="w-fit rounded-md bg-background/70 tabular-nums">
+                {numberFormatter.format(natureMetric?.filled ?? 0)}/{numberFormatter.format(inventoryCompleteness.total)} renseignés
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="mb-4 flex items-center gap-3 rounded-lg border border-border/70 bg-muted/30 p-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+                <Database className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-medium uppercase tracking-[0.1em] text-muted-foreground">Base analysée</p>
+                <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">
+                  {numberFormatter.format(inventoryCompleteness.total)} dossiers
+                </p>
+              </div>
+            </div>
+            <RepartitionBarChart data={natures} colorByCategory limit={8} height={430} leftAxisWidth={190} barSize={16} />
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="bg-card/95">
           <CardHeader className="border-b border-border/60 pb-4">
@@ -229,6 +293,56 @@ export default async function DashboardDirectionPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function InventoryCompletenessTable({ metrics }: { metrics: InventoryCompletenessMetric[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[680px] text-sm">
+        <thead className="bg-muted/45 text-left text-xs uppercase tracking-[0.08em] text-muted-foreground">
+          <tr>
+            <th className="px-4 py-3 font-medium sm:px-5">Information</th>
+            <th className="px-3 py-3 text-right font-medium">Renseignés</th>
+            <th className="w-52 px-3 py-3 font-medium">Taux</th>
+            <th className="px-4 py-3 text-right font-medium sm:px-5">À compléter</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/60">
+          {metrics.map((metric) => {
+            const tone = completenessTone(metric.rate);
+            return (
+              <tr key={metric.key} className="transition-colors hover:bg-muted/25">
+                <td className="px-4 py-3 font-medium text-foreground sm:px-5">{metric.label}</td>
+                <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">
+                  {numberFormatter.format(metric.filled)}
+                </td>
+                <td className="px-3 py-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted"
+                      role="meter"
+                      aria-label={`Complétude ${metric.label}`}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={metric.rate}
+                    >
+                      <div className={cn("h-full rounded-full", metricTones[tone].bar)} style={{ width: `${clampPercent(metric.rate)}%` }} />
+                    </div>
+                    <span className={cn("w-14 text-right font-semibold tabular-nums", metricTones[tone].value)}>
+                      {rateFormatter.format(metric.rate)} %
+                    </span>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums text-muted-foreground sm:px-5">
+                  {numberFormatter.format(metric.missing)}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -308,6 +422,13 @@ function MiniSignal({ label, value }: { label: string; value: ReactNode }) {
       <p className="mt-1 truncate text-sm font-semibold tabular-nums text-foreground">{value}</p>
     </div>
   );
+}
+
+function completenessTone(value: number): MetricTone {
+  if (value >= 90) return "success";
+  if (value >= 70) return "default";
+  if (value >= 40) return "warning";
+  return "destructive";
 }
 
 function clampPercent(value: number) {

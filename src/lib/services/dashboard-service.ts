@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { computeRate as rate } from "@/lib/utils/rate";
+import {
+  buildInventoryCompletenessMetrics,
+  type InventoryCompletenessMetric,
+} from "@/lib/utils/inventory-completeness";
 import { computePipelineScore, computeQualityScore } from "@/lib/utils/pipeline-score";
 import { getDashboardOperateurScope } from "@/lib/services/access-scope";
 
@@ -514,6 +518,76 @@ export async function getDirectionOverview(): Promise<DirectionOverview> {
   ]);
 
   return { ...kpis, dossiersEnRetard, anomaliesCritiques };
+}
+
+interface InventoryCompletenessRow {
+  total: bigint;
+  commune: bigint;
+  lotissement: bigint;
+  libelle_carton: bigint;
+  reference_classement: bigint;
+  numero_lot: bigint;
+  nature_dossier: bigint;
+  numero_ilot: bigint;
+  titre_foncier: bigint;
+  superficie: bigint;
+  numero_ddu: bigint;
+  code_barres: bigint;
+  numero_guichet: bigint;
+}
+
+export interface InventoryCompletenessOverview {
+  total: number;
+  metrics: InventoryCompletenessMetric[];
+}
+
+/** Complétude des informations clés de l'inventaire, sur le périmètre visible. */
+export async function getInventoryCompletenessOverview(): Promise<InventoryCompletenessOverview> {
+  const session = await requirePermission("DASHBOARD_VIEW");
+  const scope = await getDashboardOperateurScope(session);
+  const scopeFilter =
+    scope === null
+      ? Prisma.sql``
+      : scope.length > 0
+        ? Prisma.sql`WHERE operateur_id IN (${Prisma.join(scope)})`
+        : Prisma.sql`WHERE 1 = 0`;
+
+  const [row] = await prisma.$queryRaw<InventoryCompletenessRow[]>(Prisma.sql`
+    SELECT
+      COUNT(*) AS total,
+      COALESCE(SUM(CASE WHEN commune_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS commune,
+      COALESCE(SUM(CASE WHEN lotissement_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS lotissement,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(libelle_carton), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS libelle_carton,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(reference_classement), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS reference_classement,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(numero_lot), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS numero_lot,
+      COALESCE(SUM(CASE WHEN nature_dossier_id IS NOT NULL THEN 1 ELSE 0 END), 0) AS nature_dossier,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(numero_ilot), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS numero_ilot,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(numero_titre_foncier), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS titre_foncier,
+      COALESCE(SUM(CASE WHEN superficie IS NOT NULL THEN 1 ELSE 0 END), 0) AS superficie,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(numero_ddu), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS numero_ddu,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(code_barres), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS code_barres,
+      COALESCE(SUM(CASE WHEN NULLIF(TRIM(numero_guichet), '') IS NOT NULL THEN 1 ELSE 0 END), 0) AS numero_guichet
+    FROM dossiers
+    ${scopeFilter}
+  `);
+
+  const total = Number(row?.total ?? 0);
+  const metrics = buildInventoryCompletenessMetrics(total, {
+    commune: Number(row?.commune ?? 0),
+    lotissement: Number(row?.lotissement ?? 0),
+    libelleCarton: Number(row?.libelle_carton ?? 0),
+    referenceClassement: Number(row?.reference_classement ?? 0),
+    numeroLot: Number(row?.numero_lot ?? 0),
+    natureDossier: Number(row?.nature_dossier ?? 0),
+    numeroIlot: Number(row?.numero_ilot ?? 0),
+    titreFoncier: Number(row?.titre_foncier ?? 0),
+    superficie: Number(row?.superficie ?? 0),
+    numeroDdu: Number(row?.numero_ddu ?? 0),
+    codeBarres: Number(row?.code_barres ?? 0),
+    numeroGuichet: Number(row?.numero_guichet ?? 0),
+  });
+
+  return { total, metrics };
 }
 
 export interface CartonsDossiersEtatOverview {
