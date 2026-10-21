@@ -171,4 +171,5 @@ jobs:
           fi
           test -f "$release/deploy/deploy.sh"
           bash "$release/deploy/deploy.sh" "$sha"
+          bash "$release/deploy/discover-alfresco.sh"
           REMOTE
