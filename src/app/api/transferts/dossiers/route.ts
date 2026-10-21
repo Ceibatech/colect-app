@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
     const result = await searchTransferDossiers({
       sourceSiteId,
       sourceEntrepotId,
+      includeUnlocated: params.get("unlocated") === "1",
       q: params.get("q") ?? undefined,
       page,
       pageSize: 40,

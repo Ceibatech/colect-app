@@ -24,7 +24,7 @@ export default async function NewTransferPage() {
           </Link>
         )}
         stats={[
-          { label: "Dossiers localisés", value: data.locatedDossiers },
+          { label: "Dossiers en base", value: data.totalDossiers },
           { label: "Sites actifs", value: data.sites.length },
           { label: "Chaîne de garde", value: "Traçabilité active", tone: "success" },
         ]}

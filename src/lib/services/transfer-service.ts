@@ -11,6 +11,7 @@ import {
 export interface TransferDossierSearchOptions {
   sourceSiteId: number;
   sourceEntrepotId: number | null;
+  includeUnlocated?: boolean;
   q?: string;
   page: number;
   pageSize?: number;
@@ -18,7 +19,7 @@ export interface TransferDossierSearchOptions {
 
 export async function getTransferCreateData() {
   await requirePermission("TRANSFER_CREATE");
-  const [sites, locatedDossiers] = await Promise.all([
+  const [sites, totalDossiers] = await Promise.all([
     prisma.site.findMany({
       where: { isActive: true },
       orderBy: { nom: "asc" },
@@ -33,38 +34,49 @@ export async function getTransferCreateData() {
         },
       },
     }),
-    prisma.dossier.count({ where: { siteId: { not: null } } }),
+    prisma.dossier.count(),
   ]);
 
-  return { sites, locatedDossiers };
+  return { sites, totalDossiers };
 }
 
 export async function searchTransferDossiers(options: TransferDossierSearchOptions) {
   const pageSize = Math.min(Math.max(options.pageSize ?? 40, 1), 100);
   const page = Math.max(options.page, 1);
   const query = options.q?.trim();
+  const locationWhere: Prisma.DossierWhereInput = options.includeUnlocated
+    ? {
+        OR: [
+          { siteId: options.sourceSiteId, entrepotId: options.sourceEntrepotId },
+          { siteId: null },
+        ],
+      }
+    : { siteId: options.sourceSiteId, entrepotId: options.sourceEntrepotId };
   const where: Prisma.DossierWhereInput = {
-    siteId: options.sourceSiteId,
-    entrepotId: options.sourceEntrepotId,
-    transferLotDossiers: {
-      none: {
-        transferLotItem: {
-          status: { in: ["PREVU", "SORTI"] },
-          transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
+    AND: [
+      locationWhere,
+      {
+        transferLotDossiers: {
+          none: {
+            transferLotItem: {
+              status: { in: ["PREVU", "SORTI"] },
+              transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
+            },
+          },
         },
       },
-    },
-    ...(query ? {
-      OR: [
-        { reference: { contains: query } },
-        { codeBarres: { contains: query } },
-        { libelleCarton: { contains: query } },
-        { nom: { contains: query } },
-        { prenoms: { contains: query } },
-        { numeroDdu: { contains: query } },
-        { referenceClassement: { contains: query } },
-      ],
-    } : {}),
+      ...(query ? [{
+        OR: [
+          { reference: { contains: query } },
+          { codeBarres: { contains: query } },
+          { libelleCarton: { contains: query } },
+          { nom: { contains: query } },
+          { prenoms: { contains: query } },
+          { numeroDdu: { contains: query } },
+          { referenceClassement: { contains: query } },
+        ],
+      }] : []),
+    ],
   };
 
   const [items, total] = await Promise.all([
@@ -76,6 +88,7 @@ export async function searchTransferDossiers(options: TransferDossierSearchOptio
       select: {
         id: true,
         reference: true,
+        siteId: true,
         codeBarres: true,
         libelleCarton: true,
         nom: true,

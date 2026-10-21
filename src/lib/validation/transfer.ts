@@ -22,6 +22,7 @@ export const createTransferLotSchema = z.object({
   sourceEntrepotId: optionalPositiveInt,
   destinationSiteId: z.coerce.number().int().positive("Le site de destination est requis."),
   destinationEntrepotId: optionalPositiveInt,
+  includeUnlocated: z.preprocess((value) => value === "true" || value === "1" || value === "on", z.boolean()),
   plannedAt: optionalDateTime,
   motif: z.string().trim().max(2_000, "Le motif est trop long.").optional().or(z.literal("")),
   dossierIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un dossier.").max(500, "Un lot peut contenir au maximum 500 dossiers."),

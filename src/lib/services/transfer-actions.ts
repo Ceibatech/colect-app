@@ -43,6 +43,7 @@ export async function createTransferLot(
     sourceEntrepotId: formData.get("sourceEntrepotId"),
     destinationSiteId: formData.get("destinationSiteId"),
     destinationEntrepotId: formData.get("destinationEntrepotId"),
+    includeUnlocated: formData.get("includeUnlocated"),
     plannedAt: formData.get("plannedAt"),
     motif: formData.get("motif"),
     dossierIds: parseIdList(formData.get("dossierIds")),
@@ -79,10 +80,12 @@ export async function createTransferLot(
       const dossiers = await tx.dossier.findMany({
         where: {
           id: { in: dossierIds },
-          siteId: parsed.data.sourceSiteId,
-          entrepotId: parsed.data.sourceEntrepotId ?? null,
+          OR: [
+            { siteId: parsed.data.sourceSiteId, entrepotId: parsed.data.sourceEntrepotId ?? null },
+            ...(parsed.data.includeUnlocated ? [{ siteId: null }] : []),
+          ],
         },
-        select: { id: true, reference: true, codeBarres: true, libelleCarton: true },
+        select: { id: true, reference: true, siteId: true, codeBarres: true, libelleCarton: true },
       });
       if (dossiers.length !== dossierIds.length) {
         throw new TransferRuleError("Un dossier sélectionné n'est plus disponible au point de départ. Actualisez la liste.");
@@ -117,6 +120,7 @@ export async function createTransferLot(
         grouped.set(key, group);
       }
       const groups = [...grouped.values()];
+      const unlocatedIds = dossiers.filter((dossier) => dossier.siteId === null).map((dossier) => dossier.id);
 
       const temporaryReference = `TMP-${randomUUID()}`;
       const lot = await tx.transferLot.create({
@@ -134,6 +138,16 @@ export async function createTransferLot(
       const year = new Date().getUTCFullYear();
       const reference = `LOT-${year}-${String(lot.id).padStart(6, "0")}`;
       await tx.transferLot.update({ where: { id: lot.id }, data: { reference } });
+
+      if (unlocatedIds.length > 0) {
+        const attached = await tx.dossier.updateMany({
+          where: { id: { in: unlocatedIds }, siteId: null },
+          data: { siteId: parsed.data.sourceSiteId, entrepotId: parsed.data.sourceEntrepotId ?? null },
+        });
+        if (attached.count !== unlocatedIds.length) {
+          throw new TransferRuleError("L'emplacement d'un dossier historique vient d'être modifié. Actualisez la liste puis réessayez.");
+        }
+      }
 
       await tx.transferLotItem.createMany({
         data: groups.map((group) => ({
@@ -161,7 +175,7 @@ export async function createTransferLot(
           action: "TRANSFER_LOT_CREATE",
           entity: "TRANSFER_LOT",
           entityId: lot.id,
-          newValue: { reference, dossierCount: dossierIds.length, groupCount: groups.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId },
+          newValue: { reference, dossierCount: dossierIds.length, attachedToSourceCount: unlocatedIds.length, groupCount: groups.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId },
           ipAddress: ip,
         },
       });

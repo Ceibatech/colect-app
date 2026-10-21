@@ -10,6 +10,7 @@ describe("transfer validation", () => {
       sourceEntrepotId: "",
       destinationSiteId: "2",
       destinationEntrepotId: "",
+      includeUnlocated: "true",
       plannedAt: "2026-10-22T08:30",
       motif: "Numérisation CEIBAC",
       dossierIds: [11, 12],

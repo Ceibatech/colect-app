@@ -25,6 +25,7 @@ interface SiteOption {
 interface TransferDossierItem {
   id: number;
   reference: string;
+  siteId: number | null;
   codeBarres: string | null;
   libelleCarton: string | null;
   nom: string | null;
@@ -54,6 +55,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
   const [sourceEntrepotId, setSourceEntrepotId] = useState("none");
   const [destinationSiteId, setDestinationSiteId] = useState("");
   const [destinationEntrepotId, setDestinationEntrepotId] = useState("none");
+  const [includeUnlocated, setIncludeUnlocated] = useState(true);
   const [selected, setSelected] = useState<Map<number, TransferDossierItem>>(new Map());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -74,6 +76,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
       setLoading(true);
       setLoadError("");
       const params = new URLSearchParams({ site: sourceSiteId, entrepot: sourceEntrepotId, page: String(page) });
+      if (includeUnlocated) params.set("unlocated", "1");
       if (search.trim()) params.set("q", search.trim());
       try {
         const response = await fetch(`/api/transferts/dossiers?${params}`, { signal: controller.signal });
@@ -92,7 +95,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [sourceSiteId, sourceEntrepotId, search, page]);
+  }, [sourceSiteId, sourceEntrepotId, includeUnlocated, search, page]);
 
   const sourceSite = sites.find((site) => String(site.id) === sourceSiteId);
   const destinationSite = sites.find((site) => String(site.id) === destinationSiteId);
@@ -116,6 +119,14 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
   function changeSourceWarehouse(value: string | null) {
     setSourceEntrepotId(value ?? "none");
     resetSourceSelection();
+  }
+
+  function changeIncludeUnlocated(checked: boolean) {
+    setIncludeUnlocated(checked);
+    setPage(1);
+    if (!checked) {
+      setSelected((current) => new Map([...current].filter(([, item]) => item.siteId !== null)));
+    }
   }
 
   function toggleDossier(item: TransferDossierItem, checked: boolean) {
@@ -155,6 +166,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
   return (
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="dossierIds" value={selectedIds.join(",")} />
+      <input type="hidden" name="includeUnlocated" value={String(includeUnlocated)} />
       {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
 
       <section className="grid gap-5 rounded-lg border bg-card p-4 shadow-sm lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:p-5">
@@ -209,12 +221,18 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
           <div className="relative w-full lg:w-96"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Référence, titulaire, carton..." className="pl-9" disabled={!sourceSiteId} /></div>
         </div>
 
-        <div className="flex flex-col gap-3 border-b bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5">
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            <Badge variant="secondary" className="rounded-md">{selected.size} sélectionné{selected.size > 1 ? "s" : ""}</Badge>
-            <span className="text-muted-foreground">{sourceSiteId ? `${results.total} dossier${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site A pour charger le stock"}</span>
+        <div className="flex flex-col gap-3 border-b bg-muted/20 px-4 py-3 lg:px-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Badge variant="secondary" className="rounded-md">{selected.size} sélectionné{selected.size > 1 ? "s" : ""}</Badge>
+              <span className="text-muted-foreground">{sourceSiteId ? `${results.total} dossier${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site A pour charger le stock"}</span>
+            </div>
+            {results.items.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={toggleCurrentPage}>{allPageSelected ? "Retirer cette page" : "Sélectionner cette page"}</Button> : null}
           </div>
-          {results.items.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={toggleCurrentPage}>{allPageSelected ? "Retirer cette page" : "Sélectionner cette page"}</Button> : null}
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-border/70 bg-background/70 p-3 text-sm">
+            <Checkbox checked={includeUnlocated} onCheckedChange={(value) => changeIncludeUnlocated(value === true)} disabled={pending} />
+            <span><span className="block font-medium">Inclure le stock historique sans emplacement</span><span className="mt-0.5 block text-xs text-muted-foreground">Les dossiers importés sans site seront rattachés au site A uniquement s&apos;ils sont sélectionnés dans ce lot.</span></span>
+          </label>
         </div>
 
         {loadError ? <Alert variant="destructive" className="m-4 lg:m-5"><AlertDescription>{loadError}</AlertDescription></Alert> : null}
@@ -236,7 +254,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
                   {results.items.map((item) => (
                     <TableRow key={item.id} className="hover:bg-accent/25">
                       <TableCell className="pl-5"><Checkbox checked={selected.has(item.id)} onCheckedChange={(value) => toggleDossier(item, value === true)} disabled={pending} aria-label={`Sélectionner ${item.reference}`} /></TableCell>
-                      <TableCell><p className="font-mono font-semibold">{item.reference}</p><p className="mt-1 text-xs text-muted-foreground">Préparation {formatStatus(item.statutPreparation)}</p></TableCell>
+                      <TableCell><p className="font-mono font-semibold">{item.reference}</p><p className="mt-1 text-xs text-muted-foreground">{item.siteId === null ? "Emplacement à confirmer" : `Préparation ${formatStatus(item.statutPreparation)}`}</p></TableCell>
                       <TableCell><p className="font-medium">{personLabel(item)}</p><p className="mt-1 text-xs text-muted-foreground">{item.commune?.nom ?? "Commune non renseignée"}</p></TableCell>
                       <TableCell><p className="font-mono text-sm">{item.codeBarres ?? "Sans code-barres"}</p><p className="mt-1 max-w-60 truncate text-xs text-muted-foreground">{item.libelleCarton ?? "Sans libellé de carton"}</p></TableCell>
                       <TableCell>{item.natureDossier?.libelle ?? <span className="text-muted-foreground">Non renseignée</span>}</TableCell>
@@ -283,7 +301,7 @@ function DossierMobileRow({ item, checked, disabled, onToggle }: { item: Transfe
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center justify-between gap-2"><strong className="font-mono">{item.reference}</strong><span className="text-xs text-muted-foreground">{item.codeBarres ?? "Sans code-barres"}</span></span>
         <span className="mt-1 block font-medium">{personLabel(item)}</span>
-        <span className="mt-1 block text-xs text-muted-foreground">{item.commune?.nom ?? "Commune non renseignée"} · {item.natureDossier?.libelle ?? "Nature non renseignée"}</span>
+        <span className="mt-1 block text-xs text-muted-foreground">{item.siteId === null ? "Emplacement à confirmer" : item.commune?.nom ?? "Commune non renseignée"} · {item.natureDossier?.libelle ?? "Nature non renseignée"}</span>
       </span>
     </label>
   );
