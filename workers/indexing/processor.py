@@ -44,24 +44,61 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> Path:
     output = workspace / "normalized-ocr.pdf"
     language = os.getenv("OCR_LANGUAGE", "fra+eng")
     timeout = int(os.getenv("INDEXING_OCR_TIMEOUT_SECONDS", "900"))
-    subprocess.run(
-        [
-            "ocrmypdf",
-            "--mode", "skip",
-            "--rotate-pages",
-            "--deskew",
-            "--clean",
-            "--output-type", "pdfa-2",
-            "--optimize", "1",
-            "--language", language,
-            str(source_pdf),
-            str(output),
-        ],
-        check=True,
-        timeout=timeout,
-        capture_output=True,
-        text=True,
-    )
+
+    primary_command = [
+        "ocrmypdf",
+        "--mode", "skip",
+        "--rotate-pages",
+        "--deskew",
+        "--clean",
+        "--output-type", "pdfa-2",
+        "--optimize", "1",
+        "--language", language,
+        str(source_pdf),
+        str(output),
+    ]
+    fallback_command = [
+        "ocrmypdf",
+        "--mode", "force",
+        "--output-type", "pdfa-2",
+        "--optimize", "0",
+        "--language", language,
+        str(source_pdf),
+        str(output),
+    ]
+
+    try:
+        subprocess.run(
+            primary_command,
+            check=True,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as primary_error:
+        primary_details = (primary_error.stderr or primary_error.stdout or "").strip()
+        print(
+            f"OCRmyPDF complet indisponible (code {primary_error.returncode}); "
+            "nouvel essai sans rotation, nettoyage ni optimisation. "
+            f"{primary_details[-1200:]}",
+            flush=True,
+        )
+        output.unlink(missing_ok=True)
+        try:
+            subprocess.run(
+                fallback_command,
+                check=True,
+                timeout=timeout,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as fallback_error:
+            fallback_details = (fallback_error.stderr or fallback_error.stdout or "").strip()
+            raise RuntimeError(
+                "OCRmyPDF a échoué dans les deux modes "
+                f"(principal={primary_error.returncode}, secours={fallback_error.returncode}). "
+                f"Détail secours : {fallback_details[-3000:]}"
+            ) from fallback_error
     return output
 
 

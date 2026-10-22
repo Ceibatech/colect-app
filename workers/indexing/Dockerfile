@@ -16,6 +16,7 @@ RUN apt-get update \
       tesseract-ocr \
       tesseract-ocr-eng \
       tesseract-ocr-fra \
+      tesseract-ocr-osd \
       unpaper \
     && rm -rf /var/lib/apt/lists/*
 
