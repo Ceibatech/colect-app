@@ -35,7 +35,7 @@ interface DossierDetail {
   id: number;
   reference: string;
   site: { nom: string; code: string } | null;
-  entrepot: { nom: string; code: string } | null;
+  entrepot: { nom: string; code: string; localisation: string | null } | null;
   libelleCarton: string | null;
   codeBarres: string | null;
   numeroGuichet: string | null;
@@ -174,7 +174,8 @@ export function DossierDetailTabs({
           <Card>
             <CardContent className="grid gap-4 pt-6 sm:grid-cols-3">
               <Field label="Site d'archivage" value={dossier.site ? `${dossier.site.nom} (${dossier.site.code})` : null} />
-              <Field label="Entrepôt" value={dossier.entrepot ? `${dossier.entrepot.nom} (${dossier.entrepot.code})` : null} />
+              <Field label="Salle / espace" value={dossier.entrepot ? `${dossier.entrepot.nom} (${dossier.entrepot.code})` : null} />
+              <Field label="Localisation" value={dossier.entrepot?.localisation} />
               <Field label="Référence" value={dossier.reference} />
               <Field label="Libellé du carton" value={dossier.libelleCarton} />
               <Field label="Code-barres" value={dossier.codeBarres} />

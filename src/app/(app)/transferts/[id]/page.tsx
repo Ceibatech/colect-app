@@ -41,8 +41,8 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   ]);
   if (!lot) notFound();
 
-  const sourceLabel = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot?.nom);
-  const destinationLabel = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot?.nom);
+  const sourceLabel = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot);
+  const destinationLabel = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot);
   const stock = getTransferDossierStockSummary(lot.items.map((item) => ({
     status: item.status as TransferItemStatusCode,
     dossierCountSnapshot: item.dossierCountSnapshot,
@@ -223,17 +223,17 @@ function conditionLabel(status: "CONFORME" | "AVEC_RESERVES" | "NON_CONFORME") {
   return { CONFORME: "Chargement conforme", AVEC_RESERVES: "Avec réserves", NON_CONFORME: "Non conforme" }[status];
 }
 
-function placeLabel(site: string, warehouse?: string | null) {
-  return warehouse ? `${site} · ${warehouse}` : site;
+function placeLabel(site: string, warehouse?: { nom: string; localisation: string | null } | null) {
+  return warehouse ? [site, warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ") : site;
 }
 
 function movementPlace(
-  lot: { sourceSite: { nom: string }; sourceEntrepot: { nom: string } | null; destinationSite: { nom: string }; destinationEntrepot: { nom: string } | null },
+  lot: { sourceSite: { nom: string }; sourceEntrepot: { nom: string; localisation: string | null } | null; destinationSite: { nom: string }; destinationEntrepot: { nom: string; localisation: string | null } | null },
   type: TransferMovementTypeCode,
   side: "from" | "to",
 ) {
-  const source = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot?.nom);
-  const destination = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot?.nom);
+  const source = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot);
+  const destination = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot);
   const returns = type === "RETOUR";
   return side === "from" ? (returns ? destination : source) : (returns ? source : destination);
 }

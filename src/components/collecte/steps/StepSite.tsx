@@ -12,6 +12,7 @@ export interface EntrepotOption {
   id: number;
   code: string;
   nom: string;
+  localisation: string | null;
   typeEntrepot: string | null;
 }
 
@@ -92,14 +93,14 @@ export function StepSite({ form, sites }: { form: UseFormReturn<DossierFormValue
         </Field>
 
         <Field>
-          <FieldLabel>Entrepôt</FieldLabel>
+          <FieldLabel>Salle / espace d&apos;archives</FieldLabel>
           <FieldContent>
             <Controller
               control={control}
               name="entrepotId"
               render={({ field }) => (
                 <Select
-                  items={(selectedSite?.entrepots ?? []).map((e) => ({ label: `${e.nom} (${e.code})`, value: e.id }))}
+                  items={(selectedSite?.entrepots ?? []).map((e) => ({ label: [e.nom, e.localisation].filter(Boolean).join(" · "), value: e.id }))}
                   value={field.value ?? null}
                   onValueChange={field.onChange}
                   disabled={!selectedSite || selectedSite.entrepots.length === 0}
@@ -110,15 +111,15 @@ export function StepSite({ form, sites }: { form: UseFormReturn<DossierFormValue
                         !selectedSite
                           ? "Choisir d'abord un site"
                           : selectedSite.entrepots.length === 0
-                            ? "Aucun entrepôt pour ce site"
-                            : "Sélectionner un entrepôt"
+                            ? "Aucune salle pour ce site"
+                            : "Sélectionner une salle"
                       }
                     />
                   </SelectTrigger>
                   <SelectContent>
                     {(selectedSite?.entrepots ?? []).map((e) => (
                       <SelectItem key={e.id} value={e.id}>
-                        {e.nom} ({e.code})
+                        {[e.nom, e.localisation].filter(Boolean).join(" · ")}
                       </SelectItem>
                     ))}
                   </SelectContent>

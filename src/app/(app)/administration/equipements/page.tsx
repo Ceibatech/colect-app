@@ -22,7 +22,7 @@ export default async function AdminEquipementsPage() {
     dateDernierControle: e.dateDernierControle ? e.dateDernierControle.toISOString().slice(0, 10) : null,
     dateProchaineMaintenance: e.dateProchaineMaintenance ? e.dateProchaineMaintenance.toISOString().slice(0, 10) : null,
     observation: e.observation,
-    entrepot: { id: e.entrepot.id, nom: e.entrepot.nom, site: { id: e.entrepot.site.id, nom: e.entrepot.site.nom } },
+    entrepot: { id: e.entrepot.id, nom: e.entrepot.nom, localisation: e.entrepot.localisation, site: { id: e.entrepot.site.id, nom: e.entrepot.site.nom } },
   }));
 
   return (
@@ -40,7 +40,7 @@ export default async function AdminEquipementsPage() {
       />
       <EquipementsManager
         equipements={serialized}
-        entrepots={entrepots.filter((e) => e.isActive).map((e) => ({ id: e.id, nom: e.nom, site: { nom: e.site.nom } }))}
+        entrepots={entrepots.filter((e) => e.isActive).map((e) => ({ id: e.id, nom: e.nom, localisation: e.localisation, site: { nom: e.site.nom } }))}
       />
     </div>
   );

@@ -38,7 +38,7 @@ export interface EquipementRow {
   dateDernierControle: string | null;
   dateProchaineMaintenance: string | null;
   observation: string | null;
-  entrepot: { id: number; nom: string; site: { id: number; nom: string } };
+  entrepot: { id: number; nom: string; localisation: string | null; site: { id: number; nom: string } };
 }
 
 const initialState: ActionResult = {};
@@ -58,12 +58,12 @@ function EquipementForm({
   onSuccess,
 }: {
   action: (prevState: ActionResult, formData: FormData) => Promise<ActionResult>;
-  entrepots: Array<{ id: number; nom: string; site: { nom: string } }>;
+  entrepots: Array<{ id: number; nom: string; localisation: string | null; site: { nom: string } }>;
   defaultValues?: Partial<EquipementRow>;
   onSuccess: () => void;
 }) {
   const [state, formAction, isPending] = useActionState(action, initialState);
-  const entrepotItems = entrepots.map((e) => ({ label: `${e.nom} — ${e.site.nom}`, value: String(e.id) }));
+  const entrepotItems = entrepots.map((e) => ({ label: [e.nom, e.localisation, e.site.nom].filter(Boolean).join(" — "), value: String(e.id) }));
 
   // `onSuccess` doit être mémoïsé (useCallback) côté appelant — voir
   // CommunesManager.tsx pour le détail.
@@ -80,7 +80,7 @@ function EquipementForm({
       ) : null}
 
       <div className="space-y-2">
-        <Label htmlFor="entrepotId">Entrepôt</Label>
+        <Label htmlFor="entrepotId">Salle / espace</Label>
         <Select
           name="entrepotId"
           items={entrepotItems}
@@ -188,7 +188,7 @@ export function EquipementsManager({
   entrepots,
 }: {
   equipements: EquipementRow[];
-  entrepots: Array<{ id: number; nom: string; site: { nom: string } }>;
+  entrepots: Array<{ id: number; nom: string; localisation: string | null; site: { nom: string } }>;
 }) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
@@ -280,7 +280,7 @@ export function EquipementsManager({
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {e.entrepot.nom} — {e.entrepot.site.nom}
+                    {[e.entrepot.nom, e.entrepot.localisation, e.entrepot.site.nom].filter(Boolean).join(" — ")}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

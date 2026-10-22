@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Pencil } from "lucide-react";
 
 interface Lookups {
-  sites: { id: number; nom: string; code: string; entrepots: { id: number; nom: string; code: string }[] }[];
+  sites: { id: number; nom: string; code: string; entrepots: { id: number; nom: string; code: string; localisation: string | null }[] }[];
   communes: { id: number; nom: string; lotissements: { id: number; nom: string }[] }[];
   natures: { id: number; libelle: string }[];
   operateurs: { id: number; nom: string; prenoms: string | null }[];
@@ -71,7 +71,8 @@ export function StepRecap({
 
       <Section title="Site" onEdit={() => onEditStep(1)}>
         <Row label="Site d'archivage" value={site ? `${site.nom} (${site.code})` : undefined} />
-        <Row label="Entrepôt" value={entrepot ? `${entrepot.nom} (${entrepot.code})` : undefined} />
+        <Row label="Salle / espace" value={entrepot?.nom} />
+        <Row label="Localisation" value={entrepot?.localisation} />
       </Section>
 
       <Section title="Identification" onEdit={() => onEditStep(2)}>

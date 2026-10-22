@@ -16,8 +16,8 @@ export default async function TransferAuthorizationPage({ params }: { params: Pr
   if (!Number.isInteger(lotId) || lotId <= 0) notFound();
   const lot = await getTransferAuthorization(lotId);
   if (!lot || !lot.authorizedAt) notFound();
-  const source = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot?.nom);
-  const destination = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot?.nom);
+  const source = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot);
+  const destination = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot);
   const dossierCount = lot.items.reduce((sum, item) => sum + item.dossierCountSnapshot, 0);
 
   return (
@@ -48,6 +48,6 @@ function SlipField({ label, value }: { label: string; value: string }) {
   return <div className="border-b border-slate-300 p-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><p className="text-xs font-semibold uppercase text-slate-500">{label}</p><p className="mt-2 font-semibold">{value}</p></div>;
 }
 
-function placeLabel(site: string, warehouse?: string | null) {
-  return warehouse ? `${site} · ${warehouse}` : site;
+function placeLabel(site: string, warehouse?: { nom: string; localisation: string | null } | null) {
+  return warehouse ? [site, warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ") : site;
 }

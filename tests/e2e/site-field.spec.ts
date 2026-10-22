@@ -47,7 +47,11 @@ test("Site + Entrepôt : sélectionnés en cascade à l'étape 1, persistés sur
     await expect(page.getByText(site.nom, { exact: false })).toBeVisible();
 
     // L'entrepôt n'est sélectionnable qu'une fois le site choisi (cascade).
-    await selectCombobox(page, "Entrepôt", `${entrepot.nom} (${entrepot.code})`);
+    await selectCombobox(
+      page,
+      "Salle / espace d'archives",
+      [entrepot.nom, entrepot.localisation].filter(Boolean).join(" · "),
+    );
 
     await page.getByRole("button", { name: "Suivant", exact: true }).click();
 

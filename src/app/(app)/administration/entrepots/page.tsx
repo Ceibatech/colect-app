@@ -4,7 +4,7 @@ import { listAllEntrepots, listAllSites } from "@/lib/services/referentiels-admi
 import { EntrepotsManager } from "@/components/administration/EntrepotsManager";
 import { PageHeader } from "@/components/layout/PageHeader";
 
-export const metadata = { title: "Entrepôts — Administration" };
+export const metadata = { title: "Salles et espaces — Administration" };
 
 export default async function AdminEntrepotsPage() {
   await requirePermission("REFERENTIEL_MANAGE");
@@ -15,6 +15,7 @@ export default async function AdminEntrepotsPage() {
     siteId: e.siteId,
     code: e.code,
     nom: e.nom,
+    localisation: e.localisation,
     typeEntrepot: e.typeEntrepot,
     description: e.description,
     isActive: e.isActive,
@@ -88,8 +89,8 @@ export default async function AdminEntrepotsPage() {
       <PageHeader
         eyebrow="Infrastructure"
         icon={PackageOpen}
-        title="Entrepôts"
-        description={`${entrepots.length} entrepôt${entrepots.length > 1 ? "s" : ""}, rattaché${entrepots.length > 1 ? "s" : ""} aux sites d'archivage.`}
+        title="Salles et espaces"
+        description={`${entrepots.length} espace${entrepots.length > 1 ? "s" : ""} physique${entrepots.length > 1 ? "s" : ""}, rattaché${entrepots.length > 1 ? "s" : ""} aux sites d'archivage.`}
         stats={[
           { label: "Total", value: entrepots.length },
           { label: "Actifs", value: entrepots.filter((e) => e.isActive).length, tone: "success" },

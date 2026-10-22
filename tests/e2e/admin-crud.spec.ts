@@ -138,6 +138,7 @@ test("administration : création d'un entrepôt rattaché à un site (Phase 17+)
     await page.getByRole("option", { name: site.nom, exact: true }).click();
     await page.getByLabel("Code entrepôt").fill(code);
     await page.getByLabel("Nom").fill(`Entrepôt E2E ${UNIQUE}`);
+    await page.getByLabel("Localisation dans le site").fill("Mezzanine, Tour D");
     await page.getByRole("button", { name: "Enregistrer" }).click();
 
     await expect(page.getByText("Entrepôt créé.")).toBeVisible();
@@ -146,6 +147,7 @@ test("administration : création d'un entrepôt rattaché à un site (Phase 17+)
     const entrepot = await testPrisma.entrepot.findUniqueOrThrow({ where: { code } });
     entrepotId = entrepot.id;
     expect(entrepot.nom).toBe(`Entrepôt E2E ${UNIQUE}`);
+    expect(entrepot.localisation).toBe("Mezzanine, Tour D");
     expect(entrepot.siteId).toBe(site.id);
     expect(entrepot.isActive).toBe(true);
   } finally {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { communeSchema, lotissementSchema, natureDossierSchema } from "@/lib/validation/referentiels";
+import { communeSchema, entrepotSchema, lotissementSchema, natureDossierSchema } from "@/lib/validation/referentiels";
 import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/validation/user-admin";
 
 describe("communeSchema (CRUD administration, Phase 15+)", () => {
@@ -45,6 +45,30 @@ describe("natureDossierSchema", () => {
 
   it("rejette un libellé vide", () => {
     expect(natureDossierSchema.safeParse({ code: "NAT-TF", libelle: "" }).success).toBe(false);
+  });
+});
+
+describe("entrepotSchema (salles et espaces d'archives)", () => {
+  it("accepte une salle rattachée à un site avec sa localisation", () => {
+    const result = entrepotSchema.safeParse({
+      siteId: "2",
+      code: "MULCV-S01",
+      nom: "Salle 1",
+      localisation: "Mezzanine, Tour D",
+      typeEntrepot: "Salle d'archives",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.localisation).toBe("Mezzanine, Tour D");
+  });
+
+  it("rejette une localisation dépassant la taille de la colonne", () => {
+    expect(entrepotSchema.safeParse({
+      siteId: 2,
+      code: "MULCV-S01",
+      nom: "Salle 1",
+      localisation: "x".repeat(192),
+    }).success).toBe(false);
   });
 });
 

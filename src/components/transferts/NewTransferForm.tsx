@@ -19,7 +19,11 @@ interface SiteOption {
   id: number;
   code: string;
   nom: string;
-  entrepots: Array<{ id: number; code: string; nom: string }>;
+  entrepots: Array<{ id: number; code: string; nom: string; localisation: string | null }>;
+}
+
+function warehouseLabel(warehouse: SiteOption["entrepots"][number]) {
+  return [warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ");
 }
 
 interface TransferDossierItem {
@@ -191,7 +195,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
               name="sourceEntrepotId"
               items={[
                 { label: "Sans entrepôt précisé", value: "none" },
-                ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: `${warehouse.nom} · ${warehouse.code}`, value: String(warehouse.id) })),
+                ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) })),
               ]}
               value={sourceEntrepotId}
               onValueChange={changeSourceWarehouse}
@@ -200,7 +204,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sans entrepôt précisé</SelectItem>
-                {sourceSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.nom} · {warehouse.code}</SelectItem>)}
+                {sourceSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -229,7 +233,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
               name="destinationEntrepotId"
               items={[
                 { label: "Sans entrepôt précisé", value: "none" },
-                ...(destinationSite?.entrepots ?? []).map((warehouse) => ({ label: `${warehouse.nom} · ${warehouse.code}`, value: String(warehouse.id) })),
+                ...(destinationSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) })),
               ]}
               value={destinationEntrepotId}
               onValueChange={(value) => setDestinationEntrepotId(value ?? "none")}
@@ -238,7 +242,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">Sans entrepôt précisé</SelectItem>
-                {destinationSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouse.nom} · {warehouse.code}</SelectItem>)}
+                {destinationSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

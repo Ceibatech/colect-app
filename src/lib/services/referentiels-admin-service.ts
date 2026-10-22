@@ -416,6 +416,7 @@ function parseEntrepotFormData(formData: FormData) {
     siteId: formData.get("siteId"),
     code: formData.get("code"),
     nom: formData.get("nom"),
+    localisation: formData.get("localisation"),
     typeEntrepot: formData.get("typeEntrepot"),
     description: formData.get("description"),
     isActive: formData.get("isActive") === "on",
@@ -486,6 +487,7 @@ function entrepotDataFromInput(input: z.infer<typeof entrepotSchema>) {
     siteId: input.siteId,
     code: input.code,
     nom: input.nom,
+    localisation: input.localisation || null,
     typeEntrepot: input.typeEntrepot || null,
     description: input.description || null,
     isActive: input.isActive,
@@ -643,7 +645,7 @@ export async function listAllEquipements() {
   await requirePermission("REFERENTIEL_MANAGE");
   return prisma.equipement.findMany({
     orderBy: [{ entrepot: { nom: "asc" } }, { type: "asc" }],
-    include: { entrepot: { select: { id: true, nom: true, site: { select: { id: true, nom: true } } } } },
+    include: { entrepot: { select: { id: true, nom: true, localisation: true, site: { select: { id: true, nom: true } } } } },
   });
 }
 

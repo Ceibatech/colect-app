@@ -563,6 +563,10 @@ model Entrepot {
   siteId             Int     @map("site_id")
   code               String  @unique
   nom                String
+  // Emplacement physique de la salle dans le site (bâtiment, tour, étage).
+  // `nom` identifie la salle ; `localisation` permet de la retrouver sans
+  // dupliquer un site pour chaque étage.
+  localisation       String?
   typeEntrepot       String? @map("type_entrepot")
   description        String? @db.Text
   isActive           Boolean @default(true) @map("is_active")

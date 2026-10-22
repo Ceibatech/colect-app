@@ -23,8 +23,8 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
   const ministrySignature = movement.signatures.find((signature) => signature.party === "MINISTERE");
   const ceibacSignature = movement.signatures.find((signature) => signature.party === "CEIBAC");
   const ceibacValidatorSignature = movement.signatures.find((signature) => signature.party === "CEIBAC_VALIDATOR");
-  const source = placeLabel(movement.transferLot.sourceSite.nom, movement.transferLot.sourceEntrepot?.nom);
-  const destination = placeLabel(movement.transferLot.destinationSite.nom, movement.transferLot.destinationEntrepot?.nom);
+  const source = placeLabel(movement.transferLot.sourceSite.nom, movement.transferLot.sourceEntrepot);
+  const destination = placeLabel(movement.transferLot.destinationSite.nom, movement.transferLot.destinationEntrepot);
   const movementFrom = movement.type === "RETOUR" ? destination : source;
   const movementTo = movement.type === "RETOUR" ? source : destination;
   const dossierCount = movement.items.reduce((sum, entry) => sum + entry.transferLotItem.dossierCountSnapshot, 0);
@@ -109,8 +109,8 @@ function SlipField({ label, value }: { label: string; value: string }) {
   return <div className="border-b border-slate-300 p-5 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0"><p className="text-xs font-semibold uppercase text-slate-500">{label}</p><p className="mt-2 font-semibold">{value}</p></div>;
 }
 
-function placeLabel(site: string, warehouse?: string | null) {
-  return warehouse ? `${site} · ${warehouse}` : site;
+function placeLabel(site: string, warehouse?: { nom: string; localisation: string | null } | null) {
+  return warehouse ? [site, warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ") : site;
 }
 
 function SignatureBlock({ title, signature }: { title: string; signature: { signatoryName: string; signatoryTitle: string; signatureData: string; signedAt: Date } | undefined }) {

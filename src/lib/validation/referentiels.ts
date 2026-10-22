@@ -82,6 +82,7 @@ export const entrepotSchema = z.object({
   siteId: z.coerce.number({ message: "Le site est requis" }).int().positive("Le site est requis"),
   code: z.string().min(1, "Le code est requis").max(20),
   nom: z.string().min(1, "Le nom est requis").max(150),
+  localisation: z.string().max(191).optional().or(z.literal("")),
   typeEntrepot: z.string().max(100).optional().or(z.literal("")),
   description: z.string().max(1000).optional().or(z.literal("")),
   isActive: z.coerce.boolean().default(true),

@@ -71,7 +71,7 @@ export const NAV_ITEMS: NavItem[] = [
       { title: "Utilisateurs", href: "/administration/utilisateurs", icon: Users, permission: "USER_MANAGE" },
       { title: "Rôles", href: "/administration/roles", icon: Shield, permission: "ROLE_MANAGE" },
       { title: "Sites", href: "/administration/sites", icon: Warehouse, permission: "REFERENTIEL_MANAGE" },
-      { title: "Entrepôts", href: "/administration/entrepots", icon: PackageOpen, permission: "REFERENTIEL_MANAGE" },
+      { title: "Salles / espaces", href: "/administration/entrepots", icon: PackageOpen, permission: "REFERENTIEL_MANAGE" },
       { title: "Équipements", href: "/administration/equipements", icon: Wrench, permission: "REFERENTIEL_MANAGE" },
       { title: "Communes", href: "/administration/communes", icon: Building2, permission: "REFERENTIEL_MANAGE" },
       { title: "Lotissements", href: "/administration/lotissements", icon: MapPinned, permission: "REFERENTIEL_MANAGE" },

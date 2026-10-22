@@ -21,6 +21,7 @@ export interface EntrepotRow {
   siteId: number;
   code: string;
   nom: string;
+  localisation: string | null;
   typeEntrepot: string | null;
   description: string | null;
   isActive: boolean;
@@ -97,7 +98,7 @@ const initialState: ActionResult = {};
 
 // Non contraignant — la fiche métier donne "Principal / secondaire" comme
 // exemple, pas comme liste fermée.
-const TYPE_ENTREPOT_SUGGESTIONS = ["Principal", "Secondaire"];
+const TYPE_ENTREPOT_SUGGESTIONS = ["Salle d'archives", "Principal", "Secondaire"];
 
 /** Case à cocher compacte pour les listes "Conditions de conservation" / "Sécurité". */
 function CheckField({
@@ -172,7 +173,18 @@ function EntrepotForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="nom">Nom</Label>
-          <Input id="nom" name="nom" placeholder="Entrepôt central" defaultValue={defaultValues?.nom} maxLength={150} required disabled={isPending} />
+          <Input id="nom" name="nom" placeholder="Salle 1" defaultValue={defaultValues?.nom} maxLength={150} required disabled={isPending} />
+        </div>
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor="localisation">Localisation dans le site</Label>
+          <Input
+            id="localisation"
+            name="localisation"
+            placeholder="Mezzanine, Tour D"
+            defaultValue={defaultValues?.localisation ?? ""}
+            maxLength={191}
+            disabled={isPending}
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="typeEntrepot">Type</Label>
@@ -501,11 +513,11 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
     <div className="space-y-4">
       <div className="flex justify-end">
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger render={<Button disabled={sites.length === 0}><Plus className="mr-1 h-4 w-4" />Nouvel entrepôt</Button>} />
+          <DialogTrigger render={<Button disabled={sites.length === 0}><Plus className="mr-1 h-4 w-4" />Nouvelle salle</Button>} />
           <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Nouvel entrepôt</DialogTitle>
-              <DialogDescription>Rattaché à un site existant — un site peut avoir plusieurs entrepôts.</DialogDescription>
+              <DialogTitle>Nouvelle salle ou espace</DialogTitle>
+              <DialogDescription>Chaque salle est rattachée à un site et localisée dans une tour ou un étage.</DialogDescription>
             </DialogHeader>
             <EntrepotForm action={createEntrepot} sites={sites} onSuccess={onSuccessCreate} />
           </DialogContent>
@@ -513,7 +525,7 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
       </div>
       {sites.length === 0 ? (
         <Alert>
-          <AlertDescription>Créez d&apos;abord au moins un site avant d&apos;ajouter un entrepôt.</AlertDescription>
+          <AlertDescription>Créez d&apos;abord au moins un site avant d&apos;ajouter une salle.</AlertDescription>
         </Alert>
       ) : null}
 
@@ -523,6 +535,7 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Nom</TableHead>
+              <TableHead>Localisation</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Site</TableHead>
               <TableHead>Dossiers</TableHead>
@@ -534,8 +547,8 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
           <TableBody>
             {entrepots.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
-                  Aucun entrepôt.
+                <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                  Aucune salle ou espace d&apos;archives.
                 </TableCell>
               </TableRow>
             ) : (
@@ -543,6 +556,7 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
                 <TableRow key={e.id}>
                   <TableCell className="font-mono text-xs">{e.code}</TableCell>
                   <TableCell className="font-medium">{e.nom}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{e.localisation ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{e.typeEntrepot ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{e.site.nom}</TableCell>
                   <TableCell>{e._count.dossiers}</TableCell>
@@ -574,7 +588,7 @@ export function EntrepotsManager({ entrepots, sites }: { entrepots: EntrepotRow[
       <Dialog open={editId !== null} onOpenChange={(open) => !open && setEditId(null)}>
         <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Modifier l&apos;entrepôt</DialogTitle>
+            <DialogTitle>Modifier la salle ou l&apos;espace</DialogTitle>
             <DialogDescription>Désactiver plutôt que renommer le code s&apos;il est déjà utilisé par des dossiers.</DialogDescription>
           </DialogHeader>
           {editing ? (
