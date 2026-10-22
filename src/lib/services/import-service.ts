@@ -4,6 +4,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { parseCsv } from "@/lib/utils/csv";
 import { IMPORT_COLUMNS } from "@/lib/validation/import-columns";
+import {
+  canonicalizeCommuneLabel,
+  canonicalizeLotissementLabel,
+  localityMatchKey,
+} from "@/lib/utils/locality-normalization";
 
 // Réexporté pour compatibilité (les en-têtes sont reconnus de façon
 // insensible à la casse/aux espaces ; Commune, Lotissement et Nature de
@@ -105,23 +110,41 @@ interface RefMaps {
   operateurByMatricule: Map<string, number>;
   communeByRef: Map<string, number>;
   lotissementByRef: Map<string, number>;
+  lotissementCommuneById: Map<number, number>;
   natureByRef: Map<string, number>;
   existingBarcodes: Set<string>;
+}
+
+function resolveCommuneRef(ref: string | undefined, maps: RefMaps): number | null {
+  if (!ref) return null;
+  return maps.communeByRef.get(localityMatchKey(canonicalizeCommuneLabel(ref))) ?? null;
+}
+
+function resolveLotissementRef(ref: string | undefined, maps: RefMaps): number | null {
+  if (!ref) return null;
+  return maps.lotissementByRef.get(localityMatchKey(canonicalizeLotissementLabel(ref))) ?? null;
 }
 
 async function loadRefMaps(): Promise<RefMaps> {
   const [operateurs, communes, lotissements, natures, existingCodeBarres] = await Promise.all([
     prisma.operateur.findMany({ where: { isActive: true }, select: { id: true, matricule: true } }),
     prisma.commune.findMany({ select: { id: true, code: true, nom: true } }),
-    prisma.lotissement.findMany({ select: { id: true, code: true, nom: true } }),
+    prisma.lotissement.findMany({ where: { isActive: true }, select: { id: true, communeId: true, code: true, nom: true } }),
     prisma.natureDossier.findMany({ select: { id: true, code: true, libelle: true } }),
     prisma.dossier.findMany({ where: { codeBarres: { not: null } }, select: { codeBarres: true } }),
   ]);
 
   return {
     operateurByMatricule: new Map(operateurs.map((o) => [o.matricule.toLowerCase(), o.id])),
-    communeByRef: new Map(communes.flatMap((c) => [[c.code.toLowerCase(), c.id], [c.nom.toLowerCase(), c.id]] as const)),
-    lotissementByRef: new Map(lotissements.flatMap((l) => [[l.code.toLowerCase(), l.id], [l.nom.toLowerCase(), l.id]] as const)),
+    communeByRef: new Map(communes.flatMap((c) => [
+      [localityMatchKey(c.code), c.id],
+      [localityMatchKey(canonicalizeCommuneLabel(c.nom)), c.id],
+    ] as const)),
+    lotissementByRef: new Map(lotissements.flatMap((l) => [
+      [localityMatchKey(l.code), l.id],
+      [localityMatchKey(canonicalizeLotissementLabel(l.nom)), l.id],
+    ] as const)),
+    lotissementCommuneById: new Map(lotissements.map((l) => [l.id, l.communeId])),
     natureByRef: new Map(natures.flatMap((n) => [[n.code.toLowerCase(), n.id], [n.libelle.toLowerCase(), n.id]] as const)),
     existingBarcodes: new Set(existingCodeBarres.map((d) => d.codeBarres!)),
   };
@@ -153,11 +176,20 @@ function validateDataRows(dataRows: ImportRowData[], maps: RefMaps): ImportRowRe
       }
     }
 
-    if (data.communeRef && !maps.communeByRef.has(data.communeRef.toLowerCase())) {
-      warnings.push(`Commune "${data.communeRef}" non reconnue — ignorée.`);
+    const communeId = resolveCommuneRef(data.communeRef, maps);
+    const lotissementId = resolveLotissementRef(data.lotissementRef, maps);
+    const lotissementCommuneId = lotissementId ? maps.lotissementCommuneById.get(lotissementId) ?? null : null;
+
+    if (data.communeRef && !communeId) {
+      errors.push(`Commune "${data.communeRef}" non reconnue dans le référentiel.`);
     }
-    if (data.lotissementRef && !maps.lotissementByRef.has(data.lotissementRef.toLowerCase())) {
-      warnings.push(`Lotissement "${data.lotissementRef}" non reconnu — ignoré.`);
+    if (data.lotissementRef && !lotissementId) {
+      errors.push(`Lotissement "${data.lotissementRef}" non reconnu dans le référentiel.`);
+    }
+    if (communeId && lotissementCommuneId && communeId !== lotissementCommuneId) {
+      errors.push("La commune et le lotissement sélectionnés sont incohérents.");
+    } else if (!communeId && lotissementCommuneId) {
+      warnings.push("Commune déduite automatiquement depuis le lotissement.");
     }
     if (data.natureRef && !maps.natureByRef.has(data.natureRef.toLowerCase())) {
       warnings.push(`Nature de dossier "${data.natureRef}" non reconnue — ignorée.`);
@@ -229,6 +261,9 @@ function buildDossierImportData(
 ): Prisma.DossierCreateManyInput {
   const data = row.data;
   const superficie = data.superficie && Number(data.superficie) > 0 ? Number(data.superficie) : null;
+  const lotissementId = resolveLotissementRef(data.lotissementRef, maps);
+  const explicitCommuneId = resolveCommuneRef(data.communeRef, maps);
+  const inferredCommuneId = lotissementId ? maps.lotissementCommuneById.get(lotissementId) ?? null : null;
 
   return {
     reference,
@@ -243,8 +278,8 @@ function buildDossierImportData(
     numeroLot: data.numeroLot || null,
     superficie,
     numeroTitreFoncier: data.numeroTitreFoncier || null,
-    communeId: data.communeRef ? (maps.communeByRef.get(data.communeRef.toLowerCase()) ?? null) : null,
-    lotissementId: data.lotissementRef ? (maps.lotissementByRef.get(data.lotissementRef.toLowerCase()) ?? null) : null,
+    communeId: explicitCommuneId ?? inferredCommuneId,
+    lotissementId,
     natureDossierId: data.natureRef ? (maps.natureByRef.get(data.natureRef.toLowerCase()) ?? null) : null,
     nom: data.nom || null,
     prenoms: data.prenoms || null,

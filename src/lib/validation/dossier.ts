@@ -90,12 +90,8 @@ export const dossierFormSchema = z.object({
     .or(z.literal("")),
   numeroTitreFoncier: z.string().max(100).optional().or(z.literal("")),
   communeId: z.coerce.number().int().positive().optional(),
-  // Saisie libre (Phase 15+, remplace le Select dépendant de la commune) :
-  // le référentiel `lotissements` n'est pas systématiquement pré-rempli
-  // pour chaque commune, ce qui bloquait la saisie. Résolu côté serveur
-  // (find-or-create scopé à la commune) dans dossier-service.ts — la
-  // colonne `lotissementId` (FK) est inchangée et continue d'alimenter
-  // dashboards/exports/filtres sans changement.
+  // L'opérateur peut sélectionner une valeur connue ou proposer une nouvelle
+  // localité. Le serveur harmonise les alias avant de réutiliser/créer la fiche.
   lotissementNom: z.string().max(150).optional().or(z.literal("")),
 
   // ÉTAPE 4 — Dossier

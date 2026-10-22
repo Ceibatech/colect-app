@@ -8,6 +8,11 @@ import {
   canonicalizeTypePieceLabel,
   getTypePieceMatchKey,
 } from "@/lib/utils/type-piece-normalization";
+import {
+  canonicalizeLotissementLabel,
+  expectedCommuneForLotissement,
+  localityMatchKey,
+} from "@/lib/utils/locality-normalization";
 import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema, entrepotSchema, equipementSchema, typePieceSchema } from "@/lib/validation/referentiels";
 
 /**
@@ -87,6 +92,29 @@ export async function updateCommune(id: number, _prevState: ActionResult, formDa
 
 // ------------------------------------------------------------ Lotissements
 
+async function validateLotissementLocality(
+  input: { communeId: number; nom: string },
+  excludeId?: number,
+): Promise<{ nom: string } | { error: string }> {
+  const nom = canonicalizeLotissementLabel(input.nom);
+  const commune = await prisma.commune.findUnique({ where: { id: input.communeId }, select: { nom: true } });
+  if (!commune) return { error: "La commune sélectionnée est introuvable." };
+
+  const expectedCommune = expectedCommuneForLotissement(nom);
+  if (expectedCommune && localityMatchKey(commune.nom) !== localityMatchKey(expectedCommune)) {
+    return { error: `Le lotissement « ${nom} » doit être rattaché à la commune de ${expectedCommune}.` };
+  }
+
+  const siblings = await prisma.lotissement.findMany({
+    where: { communeId: input.communeId, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { nom: true },
+  });
+  if (siblings.some((item) => localityMatchKey(canonicalizeLotissementLabel(item.nom)) === localityMatchKey(nom))) {
+    return { error: `Le lotissement « ${nom} » existe déjà pour ${commune.nom}.` };
+  }
+  return { nom };
+}
+
 export async function listAllLotissements() {
   await requirePermission("REFERENTIEL_MANAGE");
   return prisma.lotissement.findMany({
@@ -109,8 +137,11 @@ export async function createLotissement(_prevState: ActionResult, formData: Form
   const existing = await prisma.lotissement.findUnique({ where: { code: parsed.data.code } });
   if (existing) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
 
+  const locality = await validateLotissementLocality(parsed.data);
+  if ("error" in locality) return locality;
+
   const lotissement = await prisma.lotissement.create({
-    data: { ...parsed.data, description: parsed.data.description || null },
+    data: { ...parsed.data, nom: locality.nom, description: parsed.data.description || null },
   });
   await prisma.auditLog.create({
     data: { userId: session.userId, action: "LOTISSEMENT_CREATE", entity: "LOTISSEMENT", entityId: lotissement.id, newValue: parsed.data, ipAddress: await getClientIp() },
@@ -132,10 +163,13 @@ export async function updateLotissement(id: number, _prevState: ActionResult, fo
   const existing = await prisma.lotissement.findUnique({ where: { code: parsed.data.code } });
   if (existing && existing.id !== id) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
 
+  const locality = await validateLotissementLocality(parsed.data, id);
+  if ("error" in locality) return locality;
+
   const before = await prisma.lotissement.findUnique({ where: { id } });
   const lotissement = await prisma.lotissement.update({
     where: { id },
-    data: { ...parsed.data, description: parsed.data.description || null },
+    data: { ...parsed.data, nom: locality.nom, description: parsed.data.description || null },
   });
   await prisma.auditLog.create({
     data: {

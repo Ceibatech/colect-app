@@ -94,21 +94,16 @@ export function StepFoncier({
       <Field>
         <FieldLabel>Lotissement</FieldLabel>
         <FieldContent>
-          {/* Saisie libre (Phase 15+) : le référentiel lotissements n'est pas
-              systématiquement pré-rempli pour chaque commune — un Select qui
-              dépend d'une liste potentiellement vide bloquait la saisie. La
-              résolution vers la fiche `lotissements` (existante ou créée à la
-              volée) se fait côté serveur, cf. dossier-service.ts. La
-              `datalist` suggère les lotissements déjà connus pour la commune
-              choisie, sans empêcher de taper autre chose. */}
           <Input
             {...register("lotissementNom")}
             list="lotissements-datalist"
             disabled={!selectedCommune}
-            placeholder={selectedCommune ? "Nom du lotissement" : "Choisir d'abord une commune"}
+            placeholder={selectedCommune ? "Sélectionner ou saisir une nouvelle localité" : "Choisir d'abord une commune"}
           />
           <datalist id="lotissements-datalist">
-            {selectedCommune?.lotissements.map((l) => <option key={l.id} value={l.nom} />)}
+            {selectedCommune?.lotissements.map((lotissement) => (
+              <option key={lotissement.id} value={lotissement.nom} />
+            ))}
           </datalist>
           <FieldError errors={[errors.lotissementNom]} />
         </FieldContent>

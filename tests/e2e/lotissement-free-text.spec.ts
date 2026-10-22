@@ -2,12 +2,9 @@ import { test, expect, type Page } from "@playwright/test";
 import { testPrisma, DEMO_USERS } from "../helpers/auth";
 
 /**
- * E2E dédié à la saisie libre du "Lotissement" (Phase 15+, remplace le
- * Select dépendant de la commune — StepFoncier.tsx). Deux chemins couverts :
- * réutilisation d'un lotissement existant (déjà exercé par full-cycle.spec.ts)
- * et création à la volée d'un lotissement encore inconnu pour la commune
- * choisie (resolveLotissementId, dossier-service.ts) — c'est ce second
- * chemin qui est spécifiquement vérifié ici.
+ * E2E de création contrôlée d'une nouvelle localité. Le formulaire accepte
+ * toujours une proposition terrain, mais le serveur canonise son libellé et
+ * réutilise ensuite la même fiche au lieu de créer un doublon.
  */
 
 const UNIQUE = Date.now();
@@ -23,9 +20,10 @@ async function selectCombobox(page: Page, fieldLabel: string, optionLabel: strin
   await page.getByRole("option", { name: optionLabel, exact: true }).click();
 }
 
-test("Lotissement : un nom encore inconnu pour la commune crée une nouvelle fiche référentiel (find-or-create)", async ({ page }) => {
+test("Lotissement : une nouvelle localité est harmonisée puis réutilisée", async ({ page }) => {
   const codeBarres = `TEST-LOT-${UNIQUE}`;
   const nouveauLotissement = `Lotissement E2E Inédit ${UNIQUE}`;
+  const libelleCanonique = nouveauLotissement.toLocaleUpperCase("fr-FR");
   let dossierId: number | undefined;
   let lotissementId: number | undefined;
 
@@ -58,14 +56,14 @@ test("Lotissement : un nom encore inconnu pour la commune crée une nouvelle fic
     const dossier = await testPrisma.dossier.findFirstOrThrow({ where: { codeBarres }, include: { lotissement: true } });
     dossierId = dossier.id;
     expect(dossier.lotissement).not.toBeNull();
-    expect(dossier.lotissement?.nom).toBe(nouveauLotissement);
+    expect(dossier.lotissement?.nom).toBe(libelleCanonique);
     expect(dossier.lotissement?.communeId).toBe(commune.id);
     expect(dossier.lotissement?.isActive).toBe(true);
     lotissementId = dossier.lotissement?.id;
 
     // Ré-enregistrer le même brouillon avec le même nom ne doit PAS dupliquer
     // la fiche référentiel (résolution idempotente).
-    const countBefore = await testPrisma.lotissement.count({ where: { communeId: commune.id, nom: nouveauLotissement } });
+    const countBefore = await testPrisma.lotissement.count({ where: { communeId: commune.id, nom: libelleCanonique } });
     expect(countBefore).toBe(1);
   } finally {
     if (dossierId) await testPrisma.dossier.delete({ where: { id: dossierId } }).catch(() => {});

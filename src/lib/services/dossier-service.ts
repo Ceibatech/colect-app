@@ -6,6 +6,11 @@ import { getClientIp } from "@/lib/utils/server-request";
 import { dossierSubmitSchema, type DossierFormValues } from "@/lib/validation/dossier";
 import type { SessionPayload } from "@/lib/auth/session";
 import { Prisma } from "@prisma/client";
+import {
+  canonicalizeLotissementLabel,
+  expectedCommuneForLotissement,
+  localityMatchKey,
+} from "@/lib/utils/locality-normalization";
 
 const MAX_REFERENCE_ATTEMPTS = 5;
 
@@ -41,9 +46,8 @@ async function resolveOperateurId(session: SessionPayload, formOperateurId?: num
  * `undefined`, ce que Prisma refuse pour un champ Decimal/Int).
  *
  * `lotissementId` et `natureDossierId` (FK réelles) ne sont volontairement
- * PAS calculés ici : la saisie peut être libre côté formulaire
- * (`lotissementNom`, `natureDossierAutre` si "Autres") et est résolue
- * séparément par `resolveLotissementId()`/`resolveNatureDossierId()`, qui
+ * PAS calculés ici : les libellés du formulaire sont résolus séparément par
+ * `resolveLotissementId()`/`resolveNatureDossierId()`, qui
  * ont besoin d'un accès base (find-or-create) — cette fonction reste
  * synchrone et pure.
  */
@@ -86,41 +90,55 @@ function cleanForDb(values: DossierFormValues) {
   };
 }
 
-/** Génère un code de lotissement unique, dérivé du code commune. */
+/** Génère un code technique pour une nouvelle localité proposée sur le terrain. */
 async function generateLotissementCode(communeId: number): Promise<string> {
   const commune = await prisma.commune.findUnique({ where: { id: communeId }, select: { code: true } });
   const base = commune?.code ?? `C${communeId}`;
   const count = await prisma.lotissement.count({ where: { communeId } });
-  let n = count + 1;
-  for (let attempts = 0; attempts < 1000; attempts++) {
-    const candidate = `${base}-LOT-${String(n).padStart(3, "0")}`;
-    const exists = await prisma.lotissement.findUnique({ where: { code: candidate } });
-    if (!exists) return candidate;
-    n++;
+  let sequence = count + 1;
+
+  for (let attempt = 0; attempt < 1000; attempt++, sequence++) {
+    const candidate = `${base}-LOT-${String(sequence).padStart(3, "0")}`;
+    if (!(await prisma.lotissement.findUnique({ where: { code: candidate } }))) return candidate;
   }
-  throw new Error("Impossible de générer un code de lotissement unique.");
+  throw new Error("Impossible de générer le code de la nouvelle localité.");
 }
 
 /**
- * Résout la saisie libre "Lotissement" (Phase 15+) vers une fiche réelle du
- * référentiel `lotissements`, scopée à la commune choisie :
- * - correspondance existante (insensible à la casse/aux espaces) -> réutilisée ;
- * - sinon création à la volée, jamais de doublon silencieux pour la même commune.
- * Ne fait jamais confiance au client — la résolution est refaite à chaque
- * enregistrement, comme le reste de `cleanForDb`.
+ * Résout un lotissement existant ou crée une nouvelle proposition contrôlée.
+ * Les alias historiques sont harmonisés avant toute recherche/création.
  */
 async function resolveLotissementId(communeId: number | null | undefined, nomLibre: string | undefined): Promise<number | null> {
   const nom = nomLibre?.trim();
   if (!communeId || !nom) return null;
 
-  const existing = await prisma.lotissement.findFirst({
-    where: { communeId, nom: { equals: nom } },
+  const commune = await prisma.commune.findUnique({ where: { id: communeId }, select: { nom: true, isActive: true } });
+  if (!commune?.isActive) throw new Error("La commune sélectionnée est introuvable ou inactive.");
+
+  const expectedCommune = expectedCommuneForLotissement(nom);
+  if (expectedCommune && localityMatchKey(commune.nom) !== localityMatchKey(expectedCommune)) {
+    throw new Error(`Le lotissement « ${canonicalizeLotissementLabel(nom)} » appartient à la commune de ${expectedCommune}.`);
+  }
+
+  const canonicalName = canonicalizeLotissementLabel(nom);
+  const activeLotissements = await prisma.lotissement.findMany({
+    where: { communeId, isActive: true },
+    select: { id: true, nom: true },
   });
+  const existing = activeLotissements.find(
+    (lotissement) => localityMatchKey(canonicalizeLotissementLabel(lotissement.nom)) === localityMatchKey(canonicalName),
+  );
   if (existing) return existing.id;
 
   const code = await generateLotissementCode(communeId);
   const created = await prisma.lotissement.create({
-    data: { communeId, code, nom, isActive: true },
+    data: {
+      communeId,
+      code,
+      nom: canonicalName,
+      description: "Localité proposée depuis la collecte et harmonisée automatiquement.",
+      isActive: true,
+    },
   });
   return created.id;
 }
@@ -331,8 +349,7 @@ export async function listMyDrafts() {
 
 export async function getDraftById(id: number) {
   const session = await requirePermission("DOSSIER_CREATE");
-  // `lotissement` inclus pour reconstituer `lotissementNom` (saisie libre,
-  // cf. resolveLotissementId ci-dessus).
+  // `lotissement` inclus pour reconstituer le libellé sélectionné.
   const dossier = await prisma.dossier.findUnique({ where: { id }, include: { lotissement: true } });
   if (!dossier || dossier.statutCollecte !== "BROUILLON") return null;
 
