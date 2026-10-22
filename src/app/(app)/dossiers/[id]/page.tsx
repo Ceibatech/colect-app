@@ -26,22 +26,36 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: dossier ? `${dossier.reference} — Dossiers` : "Dossier — GeoArchives-MULCV" };
 }
 
-export default async function DossierDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function DossierDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const session = await requirePermission("DOSSIER_READ");
   const { id: idParam } = await params;
+  const query = await searchParams;
+  const requestedTab = (Array.isArray(query.tab) ? query.tab[0] : query.tab) === "preparation" ? "preparation" : "informations";
+  const fromPreparation = (Array.isArray(query.from) ? query.from[0] : query.from) === "preparation";
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
   const [dossier, typesPiece] = await Promise.all([getDossierDetail(id), getActiveTypesPiece()]);
   if (!dossier) notFound();
 
+  const sharedPreparationAccess =
+    requestedTab === "preparation" &&
+    session.permissions.includes("PREPARATION_VIEW") &&
+    dossier.statutValidation === "VALIDE";
+
   if (session.roleCode === "OPERATEUR") {
     const operateur = await prisma.operateur.findUnique({ where: { userId: session.userId } });
-    if (!operateur || dossier.operateurId !== operateur.id) notFound();
+    if ((!operateur || dossier.operateurId !== operateur.id) && !sharedPreparationAccess) notFound();
   } else if (session.roleCode === "SUPERVISEUR") {
     // Phase 16+ : un superviseur ne voit que les dossiers des opérateurs
     // qui lui sont affectés (cf. access-scope.ts).
-    if (!(await isOperateurInScope(session, dossier.operateurId))) notFound();
+    if (!(await isOperateurInScope(session, dossier.operateurId)) && !sharedPreparationAccess) notFound();
   }
 
   // Sérialisation : les champs Decimal/Date de Prisma ne traversent pas
@@ -54,6 +68,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
     dateSoumission: dossier.dateSoumission?.toISOString() ?? null,
     dateValidation: dossier.dateValidation?.toISOString() ?? null,
     datePreparation: dossier.datePreparation?.toISOString() ?? null,
+    dateSoumissionPreparation: dossier.dateSoumissionPreparation?.toISOString() ?? null,
     dateNumerisation: dossier.dateNumerisation?.toISOString() ?? null,
     dateIndexation: dossier.dateIndexation?.toISOString() ?? null,
     dateArchivage: dossier.dateArchivage?.toISOString() ?? null,
@@ -95,9 +110,9 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <Link href="/dossiers" className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-1 -ml-2")}>
+          <Link href={fromPreparation ? "/preparation" : "/dossiers"} className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mb-1 -ml-2")}>
             <ArrowLeft className="mr-1 h-4 w-4" />
-            Retour à la liste
+            {fromPreparation ? "Retour à la préparation" : "Retour à la liste"}
           </Link>
           <h1 className="font-mono text-xl font-semibold">{dossier.reference}</h1>
           <p className="text-sm text-muted-foreground">
@@ -128,6 +143,7 @@ export default async function DossierDetailPage({ params }: { params: Promise<{ 
         typesPiece={typesPiece}
         documentStorageProvider={(process.env.STORAGE_PROVIDER ?? "local").toLowerCase() === "sharepoint" ? "SHAREPOINT" : "LOCAL"}
         digitalArchiveEnabled={(process.env.ARCHIVE_STORAGE_PROVIDER ?? "").toLowerCase() === "alfresco"}
+        initialTab={requestedTab}
       />
     </div>
   );

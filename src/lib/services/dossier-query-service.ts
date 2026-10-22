@@ -124,6 +124,7 @@ export async function getDossierDetail(id: number) {
       natureDossier: true,
       typesPieces: true,
       operateur: true,
+      preparateur: { select: { id: true, name: true } },
       history: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } },
       numerisations: { orderBy: { createdAt: "desc" } },
       indexations: { orderBy: { createdAt: "desc" } },

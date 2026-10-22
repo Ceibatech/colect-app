@@ -157,13 +157,24 @@ export function PreparationActions({
   statutValidation,
   statutPreparation,
   typesPiece,
-}: Props & { typesPiece: TypePieceOption[] }) {
+  initialData,
+}: Props & {
+  typesPiece: TypePieceOption[];
+  initialData: {
+    nombrePieces: number | null;
+    typesPieces: string[];
+    autresPieces: string | null;
+    nombrePages: number | null;
+    observationsPreparation: string | null;
+  };
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [nombrePieces, setNombrePieces] = useState("");
-  const [typesPieces, setTypesPieces] = useState<string[]>([]);
-  const [autresPieces, setAutresPieces] = useState("");
-  const [nombrePages, setNombrePages] = useState("");
+  const [nombrePieces, setNombrePieces] = useState(initialData.nombrePieces?.toString() ?? "");
+  const [typesPieces, setTypesPieces] = useState<string[]>(initialData.typesPieces);
+  const [autresPieces, setAutresPieces] = useState(initialData.autresPieces ?? "");
+  const [nombrePages, setNombrePages] = useState(initialData.nombrePages?.toString() ?? "");
+  const [observationsPreparation, setObservationsPreparation] = useState(initialData.observationsPreparation ?? "");
 
   if (statutValidation !== "VALIDE" || STAGE_BLOCKED_FOR_OPERATOR.has(statutPreparation)) return null;
   if (!permissions.includes("PREPARATION_UPDATE")) return null;
@@ -176,6 +187,7 @@ export function PreparationActions({
           typesPieces,
           autresPieces: autresPieces.trim() ? autresPieces.trim() : undefined,
           nombrePages: nombrePages ? Number(nombrePages) : undefined,
+          observationsPreparation: observationsPreparation.trim() ? observationsPreparation.trim() : undefined,
         });
         toast.success("Préparation soumise, en attente de validation du superviseur.");
         router.refresh();
@@ -198,7 +210,9 @@ export function PreparationActions({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Préparer ce dossier</DialogTitle>
-          <DialogDescription>Nombre de pièces, types de pièces, autres pièces et nombre de pages du dossier physique.</DialogDescription>
+          <DialogDescription>
+            Renseignez le contenu et les constats de préparation. Vous serez enregistré comme agent préparateur ; l’auteur de l’inventaire reste inchangé.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
@@ -237,6 +251,17 @@ export function PreparationActions({
               value={nombrePages}
               onChange={(e) => setNombrePages(e.target.value)}
               placeholder="Estimation du nombre de pages du dossier physique"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="prep-observations">Observations de préparation</Label>
+            <Textarea
+              id="prep-observations"
+              value={observationsPreparation}
+              onChange={(e) => setObservationsPreparation(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="État constaté, pièces manquantes, reclassement ou précautions particulières..."
             />
           </div>
         </div>

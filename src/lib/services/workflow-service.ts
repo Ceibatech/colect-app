@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/utils/api-error";
 import { isOperateurInScope } from "@/lib/services/access-scope";
 import { isAlfrescoDigitalArchiveEnabled } from "@/lib/archive/alfresco-client";
 import type { SessionPayload } from "@/lib/auth/session";
+import type { PreparationInput } from "@/lib/validation/preparation";
 
 async function getDossierOr404(id: number) {
   const dossier = await prisma.dossier.findUnique({ where: { id } });
@@ -192,7 +193,7 @@ async function resolveTypesPieceIds(tokens: string[] | undefined): Promise<numbe
  */
 export async function prepareDossier(
   id: number,
-  data: { nombrePieces?: number; typesPieces?: string[]; autresPieces?: string; nombrePages?: number }
+  data: PreparationInput
 ) {
   const session = await requireApiPermission("PREPARATION_UPDATE");
   const dossier = await getDossierOr404(id);
@@ -215,10 +216,17 @@ export async function prepareDossier(
       where: { id },
       data: {
         statutPreparation: "A_VALIDER",
+        preparateurId: session.userId,
+        dateSoumissionPreparation: new Date(),
         ...(data.nombrePieces !== undefined ? { nombrePieces: data.nombrePieces } : {}),
         ...(data.autresPieces !== undefined ? { autresPieces: data.autresPieces } : {}),
         ...(data.nombrePages !== undefined ? { nombrePages: data.nombrePages } : {}),
-        typesPieces: { set: typePieceIds.map((tpId) => ({ id: tpId })) },
+        ...(data.observationsPreparation !== undefined
+          ? { observationsPreparation: data.observationsPreparation }
+          : {}),
+        ...(data.typesPieces !== undefined
+          ? { typesPieces: { set: typePieceIds.map((tpId) => ({ id: tpId })) } }
+          : {}),
       },
     }),
     prisma.dossierHistory.create({

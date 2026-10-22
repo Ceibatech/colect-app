@@ -108,6 +108,7 @@ model User {
   transferMovementsMinistryValidated TransferMovement[]      @relation("TransferMovementMinistryValidatedBy")
   transferSignaturesCaptured         TransferSignature[]     @relation("TransferSignatureCapturedBy")
   transferTrackingPoints             TransferTrackingPoint[] @relation("TransferTrackingCapturedBy")
+  dossiersPrepared                   Dossier[]               @relation("DossierPreparateur")
 
   @@index([roleId])
   @@map("users")
@@ -908,12 +909,17 @@ model Dossier {
   statutIndexation   StatutIndexation   @default(EN_ATTENTE) @map("statut_indexation")
   statutArchivage    StatutArchivage    @default(EN_ATTENTE) @map("statut_archivage")
 
-  dateSoumission   DateTime? @map("date_soumission")
-  dateValidation   DateTime? @map("date_validation")
-  datePreparation  DateTime? @map("date_preparation")
-  dateNumerisation DateTime? @map("date_numerisation")
-  dateIndexation   DateTime? @map("date_indexation")
-  dateArchivage    DateTime? @map("date_archivage")
+  dateSoumission            DateTime? @map("date_soumission")
+  dateValidation            DateTime? @map("date_validation")
+  datePreparation           DateTime? @map("date_preparation")
+  // Agent ayant renseigné la dernière préparation. Il est volontairement
+  // distinct de `operateurId`, qui reste l'auteur de l'inventaire initial.
+  preparateurId             Int?      @map("preparateur_id")
+  dateSoumissionPreparation DateTime? @map("date_soumission_preparation")
+  observationsPreparation   String?   @map("observations_preparation") @db.Text
+  dateNumerisation          DateTime? @map("date_numerisation")
+  dateIndexation            DateTime? @map("date_indexation")
+  dateArchivage             DateTime? @map("date_archivage")
 
   nombrePages  Int?
   observations String? @db.Text
@@ -922,6 +928,7 @@ model Dossier {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   operateur     Operateur      @relation(fields: [operateurId], references: [id])
+  preparateur   User?          @relation("DossierPreparateur", fields: [preparateurId], references: [id], onDelete: SetNull)
   site          Site?          @relation(fields: [siteId], references: [id])
   entrepot      Entrepot?      @relation(fields: [entrepotId], references: [id])
   commune       Commune?       @relation(fields: [communeId], references: [id])
@@ -953,6 +960,7 @@ model Dossier {
   @@index([lotissementId])
   @@index([natureDossierId])
   @@index([operateurId])
+  @@index([preparateurId])
   @@index([statutCollecte])
   @@index([statutValidation])
   @@index([statutPreparation])

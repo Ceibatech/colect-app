@@ -56,6 +56,8 @@ interface DossierDetail {
   nombrePieces: number | null;
   typesPieces: Array<{ id: number; libelle: string }>;
   autresPieces: string | null;
+  preparateur: { id: number; name: string } | null;
+  observationsPreparation: string | null;
   operateur: { nom: string; prenoms: string | null; matricule: string };
   nom: string | null;
   prenoms: string | null;
@@ -74,6 +76,7 @@ interface DossierDetail {
   dateSoumission: string | null;
   dateValidation: string | null;
   datePreparation: string | null;
+  dateSoumissionPreparation: string | null;
   dateNumerisation: string | null;
   dateIndexation: string | null;
   dateArchivage: string | null;
@@ -133,19 +136,21 @@ export function DossierDetailTabs({
   typesPiece,
   documentStorageProvider,
   digitalArchiveEnabled,
+  initialTab = "informations",
 }: {
   dossier: DossierDetail;
   permissions: PermissionCode[];
   typesPiece: TypePieceOption[];
   documentStorageProvider: "LOCAL" | "SHAREPOINT";
   digitalArchiveEnabled: boolean;
+  initialTab?: "informations" | "preparation";
 }) {
   // Rendu conditionnel manuel du panneau actif, au lieu du composant
   // <TabsContent> (masquage interne défaillant constaté avec ce composant
   // Base UI — les panneaux inactifs restaient visibles simultanément ;
   // documenté dans ARCHITECTURE.md). <Tabs>/<TabsList>/<TabsTrigger>
   // restent utilisés normalement pour la navigation.
-  const [tab, setTab] = useState("informations");
+  const [tab, setTab] = useState<string>(initialTab);
   const archivedDocumentCount = dossier.documents.filter(
     (document) => document.digitalArchiveStatus === "ARCHIVE",
   ).length;
@@ -287,10 +292,16 @@ export function DossierDetailTabs({
             <CardContent className="space-y-4 pt-6">
               <div className="grid gap-4 sm:grid-cols-3">
                 <Field label="Statut" value={STATUT_PREPARATION_LABELS[dossier.statutPreparation]} />
+                <Field label="Agent préparateur" value={dossier.preparateur?.name} />
+                <Field
+                  label="Soumise le"
+                  value={dossier.dateSoumissionPreparation ? dateFmt.format(new Date(dossier.dateSoumissionPreparation)) : null}
+                />
                 <Field label="Nombre de pièces" value={dossier.nombrePieces} />
                 <Field label="Nombre de pages" value={dossier.nombrePages} />
                 <Field label="Types de pièces" value={dossier.typesPieces.map((t) => t.libelle).join(", ") || null} />
                 <Field label="Autres pièces" value={dossier.autresPieces} />
+                <Field label="Observations de préparation" value={dossier.observationsPreparation} />
                 <Field
                   label="Date de préparation"
                   value={dossier.datePreparation ? dateFmt.format(new Date(dossier.datePreparation)) : null}
@@ -314,6 +325,13 @@ export function DossierDetailTabs({
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
                 typesPiece={typesPiece}
+                initialData={{
+                  nombrePieces: dossier.nombrePieces,
+                  typesPieces: dossier.typesPieces.map((type) => String(type.id)),
+                  autresPieces: dossier.autresPieces,
+                  nombrePages: dossier.nombrePages,
+                  observationsPreparation: dossier.observationsPreparation,
+                }}
               />
             </CardContent>
           </Card>

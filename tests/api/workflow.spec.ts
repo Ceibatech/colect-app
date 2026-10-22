@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { sessionCookieHeader, DEMO_USERS } from "../helpers/auth";
+import { sessionCookieHeader, DEMO_USERS, loadTestUser, testPrisma } from "../helpers/auth";
 import { createTestDossier, deleteTestDossier } from "../helpers/db";
 
 /**
@@ -114,6 +114,39 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
       expect(body.dossier.statutPreparation).toBe("A_VALIDER");
       expect(body.dossier.nombrePieces).toBe(5);
       expect(body.dossier.nombrePages).toBe(12);
+    } finally {
+      await deleteTestDossier(dossier.id);
+    }
+  });
+
+  test("permet à un agent de préparer un dossier inventorié par un autre opérateur", async ({ request }) => {
+    const preparateurUser = await loadTestUser(DEMO_USERS.operateur1);
+    const autreOperateur = await testPrisma.operateur.findFirstOrThrow({
+      where: { userId: { not: preparateurUser.userId }, isActive: true },
+    });
+    const dossier = await createTestDossier({
+      statutValidation: "VALIDE",
+      operateurId: autreOperateur.id,
+    });
+
+    try {
+      const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
+      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
+        headers: { Cookie: cookie },
+        data: {
+          nombrePieces: 3,
+          typesPieces: [],
+          nombrePages: 18,
+          observationsPreparation: "Ordre des pièces vérifié.",
+        },
+      });
+
+      expect(res.status()).toBe(200);
+      const prepared = await testPrisma.dossier.findUniqueOrThrow({ where: { id: dossier.id } });
+      expect(prepared.operateurId).toBe(autreOperateur.id);
+      expect(prepared.preparateurId).toBe(preparateurUser.userId);
+      expect(prepared.observationsPreparation).toBe("Ordre des pièces vérifié.");
+      expect(prepared.dateSoumissionPreparation).not.toBeNull();
     } finally {
       await deleteTestDossier(dossier.id);
     }
