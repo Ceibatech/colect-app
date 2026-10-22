@@ -4,6 +4,7 @@ import ipaddress
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,33 @@ from paddleocr import PPStructureV3
 
 _structure_pipeline: PPStructureV3 | None = None
 _chat_pipeline: Any | None = None
+
+
+def _run_command(command: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=os.name != "nt",
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as error:
+        if os.name == "nt":
+            process.kill()
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+        stdout, stderr = process.communicate()
+        raise subprocess.TimeoutExpired(
+            command,
+            timeout,
+            output=stdout or error.output,
+            stderr=stderr or error.stderr,
+        ) from error
+    if process.returncode != 0:
+        raise subprocess.CalledProcessError(process.returncode, command, output=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 def _private_ai_endpoint(url: str) -> bool:
@@ -84,13 +112,7 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, P
     ]
 
     try:
-        subprocess.run(
-            primary_command,
-            check=True,
-            timeout=primary_timeout,
-            capture_output=True,
-            text=True,
-        )
+        _run_command(primary_command, primary_timeout)
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as primary_error:
         primary_details = (
             getattr(primary_error, "stderr", "") or getattr(primary_error, "stdout", "") or ""
@@ -104,13 +126,7 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, P
         )
         output.unlink(missing_ok=True)
         try:
-            subprocess.run(
-                fallback_command,
-                check=True,
-                timeout=fallback_timeout,
-                capture_output=True,
-                text=True,
-            )
+            _run_command(fallback_command, fallback_timeout)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as fallback_error:
             fallback_details = (
                 getattr(fallback_error, "stderr", "") or getattr(fallback_error, "stdout", "") or ""
@@ -206,13 +222,7 @@ def _structure_extract(pdf_path: Path, sidecar_path: Path, workspace: Path) -> t
     ]
 
     try:
-        subprocess.run(
-            command,
-            check=True,
-            timeout=timeout,
-            capture_output=True,
-            text=True,
-        )
+        _run_command(command, timeout)
         payload = json.loads(result_path.read_text(encoding="utf-8"))
         text = str(payload.get("text") or "").strip()
         confidence = float(payload.get("confidence") or 0)
