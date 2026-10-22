@@ -7,6 +7,10 @@ import { isOperateurInScope } from "@/lib/services/access-scope";
 import { isAlfrescoDigitalArchiveEnabled } from "@/lib/archive/alfresco-client";
 import type { SessionPayload } from "@/lib/auth/session";
 import type { PreparationInput } from "@/lib/validation/preparation";
+import {
+  canonicalizeTypePieceLabel,
+  getTypePieceMatchKey,
+} from "@/lib/utils/type-piece-normalization";
 
 async function getDossierOr404(id: number) {
   const dossier = await prisma.dossier.findUnique({ where: { id } });
@@ -147,26 +151,32 @@ async function generateTypePieceCode(): Promise<string> {
  * Collecte vers l'étape Préparation) — sélection multiple, chaque entrée
  * étant soit l'id (chaîne numérique) d'un `TypePiece` existant, soit une
  * saisie libre ajoutée à la volée (préfixée "new:" côté interface, cf.
- * TypesPiecesField.tsx), résolue ici vers une fiche `types_piece` existante
- * (insensible à la casse) ou créée. Ne fait jamais confiance aux ids envoyés
- * par le client sans les revérifier en base — même principe que le reste de
- * ce fichier.
+ * TypesPiecesField.tsx), résolue ici vers une fiche `types_piece` canonique
+ * existante ou créée. La comparaison tolère casse, accents, ponctuation et
+ * abréviations métier connues. Ne fait jamais confiance aux ids envoyés par
+ * le client sans les revérifier en base — même principe que le reste de ce
+ * fichier.
  */
 async function resolveTypesPieceIds(tokens: string[] | undefined): Promise<number[]> {
   if (!tokens || tokens.length === 0) return [];
   const ids = new Set<number>();
+  const knownTypes = await prisma.typePiece.findMany({
+    select: { id: true, libelle: true },
+  });
 
   for (const token of tokens) {
     if (token.startsWith("new:")) {
-      const libelle = token.slice(4).trim();
+      const libelle = canonicalizeTypePieceLabel(token.slice(4));
       if (!libelle) continue;
-      const existing = await prisma.typePiece.findFirst({ where: { libelle: { equals: libelle } } });
+      const matchKey = getTypePieceMatchKey(libelle);
+      const existing = knownTypes.find((type) => getTypePieceMatchKey(type.libelle) === matchKey);
       if (existing) {
         ids.add(existing.id);
         continue;
       }
       const code = await generateTypePieceCode();
       const created = await prisma.typePiece.create({ data: { code, libelle, isActive: true } });
+      knownTypes.push({ id: created.id, libelle: created.libelle });
       ids.add(created.id);
       continue;
     }

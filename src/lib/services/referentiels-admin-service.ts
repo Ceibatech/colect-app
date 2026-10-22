@@ -4,6 +4,10 @@ import type { z } from "zod";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
+import {
+  canonicalizeTypePieceLabel,
+  getTypePieceMatchKey,
+} from "@/lib/utils/type-piece-normalization";
 import { communeSchema, lotissementSchema, natureDossierSchema, siteSchema, entrepotSchema, equipementSchema, typePieceSchema } from "@/lib/validation/referentiels";
 
 /**
@@ -196,11 +200,18 @@ export async function createTypePiece(_prevState: ActionResult, formData: FormDa
   const existing = await prisma.typePiece.findUnique({ where: { code: parsed.data.code } });
   if (existing) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
 
+  const canonicalLabel = canonicalizeTypePieceLabel(parsed.data.libelle);
+  const existingLabels = await prisma.typePiece.findMany({ select: { libelle: true } });
+  if (existingLabels.some((type) => getTypePieceMatchKey(type.libelle) === getTypePieceMatchKey(canonicalLabel))) {
+    return { error: `Le type de pièce « ${canonicalLabel} » existe déjà.` };
+  }
+  const normalizedData = { ...parsed.data, libelle: canonicalLabel };
+
   const typePiece = await prisma.typePiece.create({
-    data: { ...parsed.data, description: parsed.data.description || null },
+    data: { ...normalizedData, description: normalizedData.description || null },
   });
   await prisma.auditLog.create({
-    data: { userId: session.userId, action: "TYPE_PIECE_CREATE", entity: "TYPE_PIECE", entityId: typePiece.id, newValue: parsed.data, ipAddress: await getClientIp() },
+    data: { userId: session.userId, action: "TYPE_PIECE_CREATE", entity: "TYPE_PIECE", entityId: typePiece.id, newValue: normalizedData, ipAddress: await getClientIp() },
   });
   return { success: true };
 }
@@ -218,10 +229,20 @@ export async function updateTypePiece(id: number, _prevState: ActionResult, form
   const existing = await prisma.typePiece.findUnique({ where: { code: parsed.data.code } });
   if (existing && existing.id !== id) return { error: `Le code "${parsed.data.code}" est déjà utilisé.` };
 
+  const canonicalLabel = canonicalizeTypePieceLabel(parsed.data.libelle);
+  const existingLabels = await prisma.typePiece.findMany({
+    where: { id: { not: id } },
+    select: { libelle: true },
+  });
+  if (existingLabels.some((type) => getTypePieceMatchKey(type.libelle) === getTypePieceMatchKey(canonicalLabel))) {
+    return { error: `Le type de pièce « ${canonicalLabel} » existe déjà.` };
+  }
+  const normalizedData = { ...parsed.data, libelle: canonicalLabel };
+
   const before = await prisma.typePiece.findUnique({ where: { id } });
   const typePiece = await prisma.typePiece.update({
     where: { id },
-    data: { ...parsed.data, description: parsed.data.description || null },
+    data: { ...normalizedData, description: normalizedData.description || null },
   });
   await prisma.auditLog.create({
     data: {
@@ -230,7 +251,7 @@ export async function updateTypePiece(id: number, _prevState: ActionResult, form
       entity: "TYPE_PIECE",
       entityId: typePiece.id,
       oldValue: before ? { code: before.code, libelle: before.libelle, isActive: before.isActive } : undefined,
-      newValue: parsed.data,
+      newValue: normalizedData,
       ipAddress: await getClientIp(),
     },
   });

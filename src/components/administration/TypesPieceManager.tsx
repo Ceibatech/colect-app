@@ -63,7 +63,7 @@ function TypePieceForm({
       <div className="flex items-center gap-2">
         <Checkbox id="isActive" name="isActive" defaultChecked={defaultValues?.isActive ?? true} disabled={isPending} />
         <Label htmlFor="isActive" className="font-normal">
-          Actif (proposé dans la Collecte)
+          Actif (proposé pendant la préparation)
         </Label>
       </div>
       <DialogFooter>
@@ -79,8 +79,8 @@ function TypePieceForm({
 /**
  * Types de pièces du dossier (Phase 18+) — même schéma d'administration que
  * NaturesManager.tsx : liste fermée mais extensible, alimentée soit ici en
- * amont, soit à la volée depuis la Collecte (StepDossier.tsx, résolu par
- * find-or-create dans dossier-service.ts).
+ * amont, soit à la volée depuis la Préparation (TypesPiecesField.tsx, résolu
+ * et harmonisé dans workflow-service.ts).
  */
 export function TypesPieceManager({ typesPiece }: { typesPiece: TypePieceRow[] }) {
   const router = useRouter();
@@ -108,7 +108,9 @@ export function TypesPieceManager({ typesPiece }: { typesPiece: TypePieceRow[] }
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Nouveau type de pièce</DialogTitle>
-              <DialogDescription>Ex. CNI, Carte résident, Carte consulaire, Extrait topo, Acte de naissance...</DialogDescription>
+              <DialogDescription>
+                Les abréviations et variantes sont converties vers un libellé métier commun.
+              </DialogDescription>
             </DialogHeader>
             <TypePieceForm action={createTypePiece} onSuccess={onSuccessCreate} />
           </DialogContent>

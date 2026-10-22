@@ -62,10 +62,10 @@ const NATURES_DOSSIER = [
 // Types de pièces (Phase 18+) — liste fermée mais extensible, cf. fiche
 // métier "Dossier" / StepDossier.tsx.
 const TYPES_PIECE = [
-  { code: "PIE-001", libelle: "CNI" },
-  { code: "PIE-002", libelle: "Carte résident" },
+  { code: "PIE-001", libelle: "Carte nationale d'identité" },
+  { code: "PIE-002", libelle: "Carte de résident" },
   { code: "PIE-003", libelle: "Carte consulaire" },
-  { code: "PIE-004", libelle: "Extrait topo" },
+  { code: "PIE-004", libelle: "Extrait topographique" },
   { code: "PIE-005", libelle: "Acte de naissance" },
 ];
 
@@ -278,7 +278,11 @@ async function main() {
   // 7bis. Types de pièces (Phase 18+)
   const typesPiece = [];
   for (const t of TYPES_PIECE) {
-    const tp = await prisma.typePiece.upsert({ where: { code: t.code }, update: {}, create: t });
+    const tp = await prisma.typePiece.upsert({
+      where: { code: t.code },
+      update: { libelle: t.libelle },
+      create: t,
+    });
     typesPiece.push(tp);
   }
   console.log(`✔ ${typesPiece.length} types de pièces`);

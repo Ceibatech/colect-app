@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, X } from "lucide-react";
+import { Check, Plus, Sparkles, X } from "lucide-react";
+import {
+  canonicalizeTypePieceLabel,
+  getTypePieceMatchKey,
+  getTypePieceSuggestionScore,
+} from "@/lib/utils/type-piece-normalization";
 
 export interface TypePieceOption {
   id: number;
@@ -46,6 +51,20 @@ export function TypesPiecesField({
 }) {
   const [customInput, setCustomInput] = useState("");
   const customs = value.filter((v) => v.startsWith(NEW_PREFIX));
+  const canonicalInput = canonicalizeTypePieceLabel(customInput);
+  const inputKey = getTypePieceMatchKey(customInput);
+  const suggestions = useMemo(() => {
+    if (!customInput.trim()) return [];
+    return typesPiece
+      .map((type) => ({ type, score: getTypePieceSuggestionScore(customInput, type.libelle) }))
+      .filter(({ score }) => score > 0)
+      .sort((a, b) => b.score - a.score || a.type.libelle.localeCompare(b.type.libelle, "fr"))
+      .slice(0, 4)
+      .map(({ type }) => type);
+  }, [customInput, typesPiece]);
+  const matchingExisting = inputKey
+    ? typesPiece.find((type) => getTypePieceMatchKey(type.libelle) === inputKey)
+    : undefined;
 
   const toggle = (token: string) => {
     onChange(value.includes(token) ? value.filter((v) => v !== token) : [...value, token]);
@@ -55,12 +74,25 @@ export function TypesPiecesField({
     onChange(value.filter((v) => v !== token));
   };
 
+  const selectExisting = (id: number) => {
+    const token = String(id);
+    if (!value.includes(token)) onChange([...value, token]);
+    setCustomInput("");
+  };
+
   const addCustom = () => {
-    const label = customInput.trim();
+    const label = canonicalInput;
     if (!label) return;
-    const alreadyCustom = customs.some((c) => c.slice(NEW_PREFIX.length).toLowerCase() === label.toLowerCase());
-    const matchesExisting = typesPiece.some((t) => t.libelle.toLowerCase() === label.toLowerCase());
-    if (!alreadyCustom && !matchesExisting) {
+    if (matchingExisting) {
+      selectExisting(matchingExisting.id);
+      return;
+    }
+
+    const labelKey = getTypePieceMatchKey(label);
+    const alreadyCustom = customs.some(
+      (token) => getTypePieceMatchKey(token.slice(NEW_PREFIX.length)) === labelKey,
+    );
+    if (!alreadyCustom) {
       onChange([...value, `${NEW_PREFIX}${label}`]);
     }
     setCustomInput("");
@@ -99,23 +131,63 @@ export function TypesPiecesField({
         </div>
       ) : null}
 
-      <div className="mt-2 flex gap-2">
-        <Input
-          value={customInput}
-          onChange={(e) => setCustomInput(e.target.value)}
-          placeholder="Ajouter une pièce absente de la liste..."
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              addCustom();
-            }
-          }}
-        />
+      <div className="mt-2 flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <Input
+            value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
+            placeholder="Rechercher ou ajouter une pièce..."
+            aria-label="Rechercher ou ajouter un type de pièce"
+            aria-expanded={suggestions.length > 0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addCustom();
+              }
+            }}
+          />
+          {customInput.trim() ? (
+            <div className="mt-1 overflow-hidden rounded-md border bg-background shadow-sm">
+              {suggestions.map((suggestion) => {
+                const selected = value.includes(String(suggestion.id));
+                return (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                    onClick={() => selectExisting(suggestion.id)}
+                  >
+                    <span>{suggestion.libelle}</span>
+                    {selected ? (
+                      <span className="flex items-center gap-1 text-xs text-primary">
+                        <Check className="h-3.5 w-3.5" /> Sélectionné
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+              {!matchingExisting && canonicalInput ? (
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 border-t px-3 py-2 text-left text-sm font-medium text-primary hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                  onClick={addCustom}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Ajouter au référentiel : {canonicalInput}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
         <Button type="button" variant="outline" size="sm" onClick={addCustom}>
           <Plus className="h-4 w-4" />
           Ajouter
         </Button>
       </div>
+      <p className="mt-1.5 text-xs text-muted-foreground">
+        Les abréviations et variantes sont harmonisées automatiquement. Toute nouvelle pièce récurrente
+        rejoindra cette liste de propositions.
+      </p>
       {error ? <p className="mt-1 text-sm text-destructive">{error}</p> : null}
     </div>
   );
