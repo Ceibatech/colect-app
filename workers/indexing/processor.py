@@ -45,7 +45,15 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, P
     output = workspace / "normalized-ocr.pdf"
     sidecar = workspace / "ocr-text.txt"
     language = os.getenv("OCR_LANGUAGE", "fra+eng")
-    timeout = int(os.getenv("INDEXING_OCR_TIMEOUT_SECONDS", "900"))
+    configured_timeout = max(30, int(os.getenv("INDEXING_OCR_TIMEOUT_SECONDS", "900")))
+    primary_timeout = min(
+        configured_timeout,
+        max(30, int(os.getenv("INDEXING_OCR_PRIMARY_TIMEOUT_SECONDS", "180"))),
+    )
+    fallback_timeout = min(
+        configured_timeout,
+        max(30, int(os.getenv("INDEXING_OCR_FALLBACK_TIMEOUT_SECONDS", "240"))),
+    )
 
     primary_command = [
         "ocrmypdf",
@@ -55,6 +63,8 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, P
         "--clean",
         "--output-type", "pdfa-2",
         "--optimize", "1",
+        "--jobs", "1",
+        "--tesseract-timeout", "75",
         "--language", language,
         "--sidecar", str(sidecar),
         str(source_pdf),
@@ -65,6 +75,8 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, P
         "--mode", "force",
         "--output-type", "pdfa-2",
         "--optimize", "0",
+        "--jobs", "1",
+        "--tesseract-timeout", "45",
         "--language", language,
         "--sidecar", str(sidecar),
         str(source_pdf),
@@ -75,14 +87,17 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, P
         subprocess.run(
             primary_command,
             check=True,
-            timeout=timeout,
+            timeout=primary_timeout,
             capture_output=True,
             text=True,
         )
-    except subprocess.CalledProcessError as primary_error:
-        primary_details = (primary_error.stderr or primary_error.stdout or "").strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as primary_error:
+        primary_details = (
+            getattr(primary_error, "stderr", "") or getattr(primary_error, "stdout", "") or ""
+        ).strip()
+        primary_code = getattr(primary_error, "returncode", "délai dépassé")
         print(
-            f"OCRmyPDF complet indisponible (code {primary_error.returncode}); "
+            f"OCRmyPDF complet indisponible (code {primary_code}); "
             "nouvel essai sans rotation, nettoyage ni optimisation. "
             f"{primary_details[-1200:]}",
             flush=True,
@@ -92,15 +107,18 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, P
             subprocess.run(
                 fallback_command,
                 check=True,
-                timeout=timeout,
+                timeout=fallback_timeout,
                 capture_output=True,
                 text=True,
             )
-        except subprocess.CalledProcessError as fallback_error:
-            fallback_details = (fallback_error.stderr or fallback_error.stdout or "").strip()
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as fallback_error:
+            fallback_details = (
+                getattr(fallback_error, "stderr", "") or getattr(fallback_error, "stdout", "") or ""
+            ).strip()
+            fallback_code = getattr(fallback_error, "returncode", "délai dépassé")
             raise RuntimeError(
                 "OCRmyPDF a échoué dans les deux modes "
-                f"(principal={primary_error.returncode}, secours={fallback_error.returncode}). "
+                f"(principal={primary_code}, secours={fallback_code}). "
                 f"Détail secours : {fallback_details[-3000:]}"
             ) from fallback_error
     return output, sidecar
