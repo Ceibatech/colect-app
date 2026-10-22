@@ -60,12 +60,18 @@ const RULE_BY_ALIAS = new Map(
 /** Retourne le libellé de référence sans inventer une nouvelle localité. */
 export function canonicalizeLotissementLabel(value: string): string {
   const trimmed = value.trim().replace(/\s+/g, " ");
-  return RULE_BY_ALIAS.get(localityMatchKey(trimmed))?.canonicalName ?? trimmed.toLocaleUpperCase("fr-FR");
+  const key = localityMatchKey(trimmed);
+  const exactRule = RULE_BY_ALIAS.get(key);
+  if (exactRule) return exactRule.canonicalName;
+  if (/^ZONE 4 ?C COMPLEMENT/.test(key)) return "ZONE 4/C";
+  return trimmed.toLocaleUpperCase("fr-FR");
 }
 
 /** Commune imposée par le vocabulaire métier, si la règle est connue. */
 export function expectedCommuneForLotissement(value: string): string | null {
-  return RULE_BY_ALIAS.get(localityMatchKey(value))?.communeName ?? null;
+  const key = localityMatchKey(value);
+  if (/^ZONE 4 ?C COMPLEMENT/.test(key)) return "Marcory";
+  return RULE_BY_ALIAS.get(key)?.communeName ?? null;
 }
 
 /**

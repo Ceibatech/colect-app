@@ -13,6 +13,7 @@ describe("locality normalization", () => {
     "Zone 4 /C",
     "zone4/c",
     "Zone 4/C complémentaire",
+    "Zone 4c complémentaire 3ème tranche",
   ])("fusionne %s sous ZONE 4/C", (value) => {
     expect(canonicalizeLotissementLabel(value)).toBe("ZONE 4/C");
     expect(expectedCommuneForLotissement(value)).toBe("Marcory");
