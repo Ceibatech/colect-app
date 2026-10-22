@@ -21,8 +21,9 @@ describe("locality normalization", () => {
 
   it.each([
     ["Zone 3 marcory", "ZONE 3"],
-    ["Marcory remblais", "REMBLAI"],
-    ["remblais", "REMBLAI"],
+    ["Marcory remblais", "REMBLAIS"],
+    ["remblai", "REMBLAIS"],
+    ["remblais", "REMBLAIS"],
   ])("normalise %s en %s", (value, expected) => {
     expect(canonicalizeLotissementLabel(value)).toBe(expected);
     expect(expectedCommuneForLotissement(value)).toBe("Marcory");
@@ -39,6 +40,7 @@ describe("locality normalization", () => {
 
   it.each([
     ["REMBLAI", "Marcory"],
+    ["REMBLAIS", "Marcory"],
     ["Zone 3 Marcory", "Marcory"],
     ["KOULASSI", "Koumassi"],
     ["KOU", "Koumassi"],

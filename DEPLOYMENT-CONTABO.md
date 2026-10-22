@@ -137,22 +137,40 @@ sans doublonner les nœuds déjà créés.
 
 ### Indexation automatique locale
 
-L'image applicative embarque Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) et
-Tesseract avec les modèles français et anglais. Les PDF contenant déjà une couche
-texte sont lus directement ; seuls les scans sans texte sont convertis en images
-et OCRisés. Aucun fichier documentaire n'est envoyé à un service tiers.
+Le service `indexing-worker` est séparé de l'application. Il utilise OCRmyPDF et
+Tesseract pour produire un PDF/A recherchable, PP-StructureV3 pour la LAD et,
+lorsqu'un modèle local est configuré, PP-ChatOCRv4 pour extraire les champs métier.
+Le scan original reste intact. Le déploiement génère automatiquement
+`INDEXING_WORKER_TOKEN` dans le fichier protégé `shared/app.env`.
 
 Les valeurs suivantes sont optionnelles dans `/opt/colect-app/shared/app.env` :
 
 ```dotenv
 OCR_LANGUAGE=fra+eng
-AUTO_INDEX_MAX_PAGES=20
+AUTO_INDEX_ACCEPT_THRESHOLD=92
+AUTO_INDEX_SECOND_PASS_THRESHOLD=75
+INDEXING_OCR_TIMEOUT_SECONDS=900
+PADDLE_DEVICE=cpu
 ```
 
-`AUTO_INDEX_MAX_PAGES` limite le coût d'une analyse OCR. Les champs recherchés
-se configurent dans **Administration > Champs d'indexation**. Une extraction reste
-une proposition : l'agent doit contrôler les valeurs avant que le document soit
-publié dans la recherche et classé dans Alfresco.
+Pour activer PP-ChatOCRv4 sans transmettre les archives à un tiers, exposer dans le
+réseau Docker un serveur compatible avec l'API OpenAI puis ajouter :
+
+```dotenv
+INDEXING_LLM_BASE_URL=http://modele-local:8000/v1
+INDEXING_LLM_MODEL=<modele-conversation-local>
+INDEXING_EMBEDDING_MODEL=<modele-embeddings-local>
+INDEXING_EMBEDDING_BASE_URL=http://modele-local:8000/v1
+INDEXING_LLM_API_KEY=<jeton-local>
+# Facultatif pour la seconde lecture multimodale :
+INDEXING_MLLM_BASE_URL=http://modele-multimodal-local:8080/v1
+INDEXING_MLLM_MODEL=<modele-multimodal-local>
+```
+
+Par défaut, le worker refuse les URL d'IA publiques. Les champs recherchés se
+configurent dans **Administration > Champs d'indexation**. Un résultat fiable est
+classé automatiquement ; un résultat intermédiaire reçoit une seconde lecture ; un
+résultat ambigu reste recherchable sous le statut **À requalifier**.
 
 Le push sur `main` lance le workflow GitHub **Validate and deploy to Contabo** si
 la variable de dépôt `CONTABO_ENABLED=true` est active. Le workflow applique la

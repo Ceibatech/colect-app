@@ -114,6 +114,13 @@ export async function uploadDocument(dossierId: number, file: File) {
           uploadedBy: session.userId,
         },
       });
+      await tx.documentIndexingJob.create({
+        data: { documentId: document.id, requestedBy: session.userId },
+      });
+      await tx.document.update({
+        where: { id: document.id },
+        data: { automaticIndexStatus: "EN_FILE" },
+      });
       await tx.dossierHistory.create({
         data: {
           dossierId,
@@ -132,7 +139,7 @@ export async function uploadDocument(dossierId: number, file: File) {
           ipAddress,
         },
       });
-      return document;
+      return { ...document, automaticIndexStatus: "EN_FILE" as const };
     });
   } catch (error) {
     try {
@@ -179,6 +186,33 @@ export async function getDocumentForDownload(documentId: number) {
   });
 
   return { document, buffer };
+}
+
+export async function getDocumentDerivativeForDownload(documentId: number, derivativeId: number) {
+  const session = await requireApiPermission("DOSSIER_READ");
+  const derivative = await prisma.documentDerivative.findFirst({
+    where: { id: derivativeId, documentId },
+    include: { document: { select: { dossierId: true, nomOriginal: true } } },
+  });
+  if (!derivative) throw new ApiError("Dérivé documentaire introuvable.", 404);
+  await assertDossierAccessible(derivative.document.dossierId, session);
+  const storage = getStorageProvider(derivative.storageProvider);
+  const buffer = await storage.read({
+    key: derivative.storageKey,
+    externalDriveId: derivative.externalDriveId,
+    externalItemId: derivative.externalItemId,
+  });
+  await prisma.auditLog.create({
+    data: {
+      userId: session.userId,
+      action: "DOCUMENT_DERIVATIVE_DOWNLOAD",
+      entity: "DOCUMENT",
+      entityId: documentId,
+      newValue: { derivativeId, kind: derivative.kind },
+      ipAddress: await getClientIp(),
+    },
+  });
+  return { derivative, originalName: derivative.document.nomOriginal, buffer };
 }
 
 export async function deleteDocument(documentId: number) {
@@ -295,7 +329,7 @@ export async function preindexDocument(documentId: number, values: unknown) {
         preIndexStatus,
         preIndexedBy: session.userId,
         preIndexedAt: new Date(),
-        automaticIndexStatus: parsed.data.ready ? "INDEXE" : document.automaticIndexStatus === "A_TRAITER" ? "A_TRAITER" : "A_VERIFIER",
+        automaticIndexStatus: parsed.data.ready ? "INDEXE" : document.automaticIndexStatus,
         indexedAt: parsed.data.ready ? new Date() : document.indexedAt,
         lastIndexingError: null,
       },

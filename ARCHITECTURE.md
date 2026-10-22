@@ -469,9 +469,23 @@ différence d'environnement serveur (version Node/ICU) entre Render et la machin
 développement locale, non diagnostiquée faute d'accès direct aux logs serveur détaillés
 de l'instance Render. À revisiter si un accès shell à l'instance devient nécessaire.
 
-## 7. Préparation IA (V2, hors périmètre V1)
+## 7. Indexation automatique OCR, LAD et IA
 
-L'architecture (stockage de métadonnées documents séparé du blob, `storageProvider`
-extensible) prépare une future intégration OCR → extraction → classification →
-recherche sémantique → RAG → assistant documentaire → agents IA, **sans l'implémenter
-en V1**, conformément au cahier des charges §78.
+Chaque nouveau scan crée un travail dans `document_indexing_jobs`. Un worker Python
+isolé récupère le fichier par une API interne authentifiée, sans accès direct à la base,
+produit un PDF/A OCR séparé avec OCRmyPDF et analyse sa structure avec PP-StructureV3.
+PP-ChatOCRv4 peut ensuite interroger un modèle et un moteur d'embeddings locaux pour
+extraire les champs configurés dans `indexing_fields`. Le scan original n'est jamais
+écrasé : le PDF/A est enregistré dans `document_derivatives`.
+
+GeoArchives reprend la main pour harmoniser les référentiels, vérifier les champs requis
+et les cohérences commune/lotissement, construire le chemin de classement et décider :
+
+- confiance au moins égale à 92 % et règles cohérentes : `INDEXE` automatiquement ;
+- confiance intermédiaire : `DEUXIEME_LECTURE`, avec un nouveau travail IA ;
+- ambiguïté persistante : `A_REQUALIFIER`, document recherchable sans injection de
+  valeurs incertaines dans les champs officiels.
+
+Les travaux disposent de verrous expirables, de trois tentatives et d'un délai de reprise
+croissant. L'agent humain peut corriger un cas à requalifier, mais n'est plus une étape
+obligatoire du workflow.

@@ -55,6 +55,11 @@ if (!path.isAbsolute(documents) || documents === "/" || documents.includes("\0")
   errors.push("DOCUMENTS_STORAGE_PATH must be an absolute Linux directory path other than /.");
 }
 
+const workerToken = process.env.INDEXING_WORKER_TOKEN || "";
+if (workerToken.length < 32 || /change|example|placeholder/i.test(workerToken)) {
+  errors.push("INDEXING_WORKER_TOKEN must be a generated secret of at least 32 characters.");
+}
+
 if (errors.length) {
   for (const error of errors) console.error(error);
   process.exitCode = 1;

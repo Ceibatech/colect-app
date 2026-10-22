@@ -13,6 +13,14 @@ shared=$base/shared
 exec 9>"$base/deploy.lock"
 flock -n 9 || { echo 'Another deployment is running.' >&2; exit 1; }
 
+# Provision a private app-to-worker credential once. It never enters GitHub or
+# an image layer and is shared only through the protected runtime env file.
+if ! grep -q '^INDEXING_WORKER_TOKEN=' "$shared/app.env"; then
+  command -v openssl >/dev/null 2>&1 || { echo 'openssl is required to provision the indexing worker token.' >&2; exit 1; }
+  printf '\nINDEXING_WORKER_TOKEN=%s\n' "$(openssl rand -hex 32)" >> "$shared/app.env"
+  chmod 600 "$shared/app.env"
+fi
+
 # Read only the supported non-secret settings; never execute an environment file.
 setting() { sed -n "s/^$1=//p" "$shared/deploy.env" | tr -d '\r'; }
 export DOMAIN APP_HTTP_PORT ALFRESCO_DOCKER_NETWORK
@@ -32,6 +40,7 @@ check_https=${check_https:-true}
 [[ "$ALFRESCO_DOCKER_NETWORK" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$ ]] || { echo 'Invalid ALFRESCO_DOCKER_NETWORK.' >&2; exit 1; }
 export APP_ENV_FILE=$shared/app.env DOCUMENTS_PATH=$shared/documents
 export APP_IMAGE="colect-app:$revision"
+export INDEXING_WORKER_IMAGE="colect-indexing-worker:$revision"
 cd "$release"
 dc() { docker compose --project-name colect-app --env-file "$shared/deploy.env" -f "$release/compose.contabo.yml" "$@"; }
 docker network inspect "$ALFRESCO_DOCKER_NETWORK" >/dev/null 2>&1 ||
@@ -50,9 +59,17 @@ on_failure() {
   trap - ERR
   if [[ "$rollout_started" == true && -n "$previous" ]]; then
     echo 'Deployment failed; restoring the previous application image. Database migrations are not reversed.' >&2
-    export APP_IMAGE="colect-app:$(basename "$previous")"
+    dc stop indexing-worker >/dev/null 2>&1 || true
+    previous_revision=$(basename "$previous")
+    export APP_IMAGE="colect-app:$previous_revision"
+    export INDEXING_WORKER_IMAGE="colect-indexing-worker:$previous_revision"
     rollback=(docker compose --project-name colect-app --env-file "$shared/deploy.env" -f "$previous/compose.contabo.yml")
-    "${rollback[@]}" up -d --no-build --wait --wait-timeout 120 app || echo 'Automatic application restore failed; operator action required.' >&2
+    rollback_services=(app)
+    if "${rollback[@]}" config --services | grep -qx 'indexing-worker'; then
+      rollback_services+=(indexing-worker)
+    fi
+    "${rollback[@]}" up -d --no-build --wait --wait-timeout 180 "${rollback_services[@]}" ||
+      echo 'Automatic application restore failed; operator action required.' >&2
     if [[ "$proxy_mode" == caddy ]]; then
       "${rollback[@]}" --profile caddy up -d --no-build caddy || true
     fi
@@ -63,14 +80,14 @@ on_failure() {
 trap on_failure ERR
 
 echo "Building release $revision"
-dc build app
+dc build app indexing-worker
 dc run --rm --no-deps app node deploy/validate-env.mjs
 
 # Keep the database/document snapshot consistent once this VPS serves traffic.
 # The first Render cutover needs an equivalent write pause on the old host.
 if [[ -n "$previous" ]]; then
   rollout_started=true
-  dc stop app
+  dc stop indexing-worker app
 fi
 # Fail before changing schema/application when the database cannot be backed up.
 dc run --rm --no-deps --volume "$shared/db-backups:/backups" app node deploy/backup-database.mjs
@@ -83,7 +100,7 @@ dc run --rm --no-deps --volume "$shared/document-backups:/backups" app \
 dc run --rm --no-deps app node node_modules/prisma/build/index.js migrate deploy
 
 rollout_started=true
-dc up -d --no-build --wait --wait-timeout 180 app
+dc up -d --no-build --wait --wait-timeout 300 app indexing-worker
 bash "$release/deploy/activate-alfresco.sh" "$revision"
 dc exec -T app node deploy/healthcheck.mjs --readiness
 if [[ "$proxy_mode" == caddy ]]; then

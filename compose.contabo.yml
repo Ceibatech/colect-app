@@ -49,6 +49,39 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  indexing-worker:
+    image: ${INDEXING_WORKER_IMAGE:-colect-indexing-worker:local}
+    build:
+      context: ./workers/indexing
+      dockerfile: Dockerfile
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 60s
+    env_file:
+      - path: ${APP_ENV_FILE:-/opt/colect-app/shared/app.env}
+        format: raw
+    environment:
+      GEOARCHIVES_INTERNAL_URL: http://app:3000
+      INDEXING_WORKER_POLL_SECONDS: "4"
+      PADDLE_DEVICE: cpu
+    depends_on:
+      app:
+        condition: service_healthy
+    shm_size: 1gb
+    volumes:
+      - indexing_models:/home/worker/.paddlex
+    networks:
+      - default
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
   caddy:
     # Only enable on a dedicated server where ports 80/443 are available.
     profiles: ["caddy"]
@@ -78,6 +111,7 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  indexing_models:
 
 networks:
   alfresco_archive:

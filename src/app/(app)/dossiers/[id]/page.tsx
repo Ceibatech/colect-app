@@ -102,8 +102,8 @@ export default async function DossierDetailPage({
     })),
     documents: dossier.documents.map((doc) => {
       const safeDocument = Object.fromEntries(
-        Object.entries(doc).filter(([key]) => key !== "extractedText" && key !== "searchText"),
-      ) as Omit<typeof doc, "extractedText" | "searchText">;
+        Object.entries(doc).filter(([key]) => key !== "extractedText" && key !== "searchText" && key !== "derivatives"),
+      ) as Omit<typeof doc, "extractedText" | "searchText" | "derivatives">;
       return {
         ...safeDocument,
         indexingConfidence: doc.indexingConfidence ? Number(doc.indexingConfidence) : null,
@@ -112,6 +112,10 @@ export default async function DossierDetailPage({
           confidence: value.confidence ? Number(value.confidence) : null,
           createdAt: value.createdAt.toISOString(),
           updatedAt: value.updatedAt.toISOString(),
+        })),
+        derivatives: doc.derivatives.map((derivative) => ({
+          ...derivative,
+          createdAt: derivative.createdAt.toISOString(),
         })),
         createdAt: doc.createdAt.toISOString(),
         updatedAt: doc.updatedAt.toISOString(),

@@ -9,6 +9,7 @@ import {
   Cloud,
   Download,
   ExternalLink,
+  FileCheck2,
   FileText,
   HardDrive,
   Loader2,
@@ -46,6 +47,7 @@ interface DocumentRow extends PreindexDocument {
   preIndexedAt: string | null;
   preIndexer: { name: string } | null;
   createdAt: string;
+  derivatives: Array<{ id: number; kind: "PDFA_OCR"; size: number; createdAt: string }>;
 }
 
 function formatSize(bytes: number): string {
@@ -250,6 +252,9 @@ export function DocumentsPanel({
                           {archiveStatus.label}
                         </Badge>
                       ) : null}
+                      {document.derivatives.some((derivative) => derivative.kind === "PDFA_OCR") ? (
+                        <Badge variant="outline" className="gap-1"><FileCheck2 />PDF/A OCR</Badge>
+                      ) : null}
                     </div>
                     {document.titreIndexation ? (
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">{document.nomOriginal}</p>
@@ -282,6 +287,16 @@ export function DocumentsPanel({
                   >
                     <Download className="h-4 w-4" />
                   </a>
+                  {document.derivatives.find((derivative) => derivative.kind === "PDFA_OCR") ? (
+                    <a
+                      href={`/api/documents/${document.id}/derivatives/${document.derivatives.find((derivative) => derivative.kind === "PDFA_OCR")!.id}/download`}
+                      aria-label={`Télécharger la version PDF/A OCR de ${document.nomOriginal}`}
+                      title="Télécharger le PDF/A OCR"
+                      className={buttonVariants({ size: "icon-sm", variant: "ghost" })}
+                    >
+                      <FileCheck2 className="h-4 w-4" />
+                    </a>
+                  ) : null}
                   {document.externalWebUrl ? (
                     <a
                       href={document.externalWebUrl}

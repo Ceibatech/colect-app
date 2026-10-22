@@ -32,7 +32,7 @@ export interface PreindexDocument {
   preIndexNotes: string | null;
   preIndexStatus: "A_TRAITER" | "BROUILLON" | "PRET";
   typePiece: { id: number; libelle: string } | null;
-  automaticIndexStatus: "A_TRAITER" | "EN_COURS" | "A_VERIFIER" | "INDEXE" | "ERREUR";
+  automaticIndexStatus: "A_TRAITER" | "EN_FILE" | "EN_COURS" | "DEUXIEME_LECTURE" | "A_REQUALIFIER" | "INDEXE" | "ERREUR";
   indexingConfidence: number | null;
   classificationPath: string | null;
   lastIndexingError: string | null;
@@ -93,11 +93,11 @@ export function DocumentPreindexDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [form, setForm] = useState<FormState>(() => formStateFromDocument(document, indexingFields));
   const typeItems = typesPiece.map((type) => ({ label: type.libelle, value: String(type.id) }));
-  const triggerLabel = document.automaticIndexStatus === "A_VERIFIER"
-    ? "Contrôler"
+  const triggerLabel = document.automaticIndexStatus === "A_REQUALIFIER"
+    ? "Corriger les métadonnées"
     : document.automaticIndexStatus === "INDEXE"
-      ? "Modifier l'index"
-      : "Pré-indexer";
+      ? "Consulter l'index"
+      : "Renseigner manuellement";
 
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) setForm(formStateFromDocument(document, indexingFields));
@@ -137,7 +137,7 @@ export function DocumentPreindexDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        {document.automaticIndexStatus === "A_VERIFIER" ? <Sparkles /> : <Tags />}
+        {document.automaticIndexStatus === "A_REQUALIFIER" ? <Sparkles /> : <Tags />}
         {triggerLabel}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
@@ -229,7 +229,7 @@ export function DocumentPreindexDialog({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <h3 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" />Champs de recherche</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">Contrôlez les propositions OCR avant de déclarer le document prêt.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Correction facultative des valeurs proposées par le service automatique.</p>
                 </div>
                 {document.indexingConfidence !== null ? (
                   <Badge variant="outline">Confiance {Math.round(document.indexingConfidence)} %</Badge>

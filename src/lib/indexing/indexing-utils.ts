@@ -41,7 +41,7 @@ function aliasesOf(field: IndexingFieldDefinition): string[] {
   return Array.from(new Set([field.label, ...configured].map((value) => value.trim()).filter(Boolean)));
 }
 
-function normalizeValue(rawValue: string, dataType: IndexingFieldDefinition["dataType"]): string {
+export function normalizeIndexValue(rawValue: string, dataType: IndexingFieldDefinition["dataType"]): string {
   const compact = rawValue.replace(/\s+/g, " ").replace(/^[\s:;=\-–—]+|[\s;]+$/g, "").trim();
   if (!compact) return "";
 
@@ -107,7 +107,7 @@ export function extractConfiguredValues(
       for (const line of lines) {
         const candidate = lineCandidate(line, alias);
         if (!candidate) continue;
-        const value = normalizeValue(candidate.rawValue, field.dataType);
+        const value = normalizeIndexValue(candidate.rawValue, field.dataType);
         if (!value || value.length > 500) continue;
         const next = {
           fieldId: field.id,

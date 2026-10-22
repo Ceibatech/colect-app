@@ -92,6 +92,7 @@ model User {
   documentsUploaded                  Document[]              @relation("DocumentUploadedBy")
   documentsPreIndexed                Document[]              @relation("DocumentPreIndexedBy")
   documentIndexingRuns               DocumentIndexingRun[]   @relation("DocumentIndexingRunBy")
+  documentIndexingJobs               DocumentIndexingJob[]   @relation("DocumentIndexingJobRequestedBy")
   qualityChecks                      QualityCheck[]
   anomaliesCorrected                 Anomalie[]              @relation("AnomalieCorrigePar")
   imports                            Import[]
@@ -994,10 +995,29 @@ enum DocumentPreIndexStatus {
 
 enum AutomaticIndexStatus {
   A_TRAITER
+  EN_FILE
   EN_COURS
-  A_VERIFIER
+  DEUXIEME_LECTURE
+  A_REQUALIFIER
   INDEXE
   ERREUR
+}
+
+enum IndexingJobStatus {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+  ERREUR
+  ANNULE
+}
+
+enum IndexingPass {
+  PRINCIPALE
+  SECONDE_LECTURE
+}
+
+enum DocumentDerivativeKind {
+  PDFA_OCR
 }
 
 enum IndexingFieldDataType {
@@ -1068,6 +1088,8 @@ model Document {
   typePiece    TypePiece?            @relation(fields: [typePieceId], references: [id])
   indexValues  DocumentIndexValue[]
   indexingRuns DocumentIndexingRun[]
+  indexingJobs DocumentIndexingJob[]
+  derivatives  DocumentDerivative[]
 
   @@unique([externalDriveId, externalItemId])
   @@index([dossierId])
@@ -1138,6 +1160,53 @@ model DocumentIndexingRun {
   @@index([documentId, startedAt])
   @@index([status])
   @@map("document_indexing_runs")
+}
+
+model DocumentIndexingJob {
+  id           Int               @id @default(autoincrement())
+  documentId   Int               @map("document_id")
+  requestedBy  Int?              @map("requested_by")
+  status       IndexingJobStatus @default(EN_ATTENTE)
+  analysisPass IndexingPass      @default(PRINCIPALE) @map("analysis_pass")
+  attempts     Int               @default(0)
+  maxAttempts  Int               @default(3) @map("max_attempts")
+  availableAt  DateTime          @default(now()) @map("available_at")
+  lockedAt     DateTime?         @map("locked_at")
+  workerId     String?           @map("worker_id")
+  error        String?           @db.Text
+  completedAt  DateTime?         @map("completed_at")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  document  Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  requester User?    @relation("DocumentIndexingJobRequestedBy", fields: [requestedBy], references: [id], onDelete: SetNull)
+
+  @@index([status, availableAt, createdAt])
+  @@index([documentId, status])
+  @@map("document_indexing_jobs")
+}
+
+model DocumentDerivative {
+  id              Int                    @id @default(autoincrement())
+  documentId      Int                    @map("document_id")
+  kind            DocumentDerivativeKind
+  storageProvider StorageProvider        @default(LOCAL) @map("storage_provider")
+  storageKey      String                 @map("storage_key")
+  url             String                 @db.Text
+  mimeType        String                 @map("mime_type")
+  size            Int
+  hash            String
+  externalDriveId String?                @map("external_drive_id")
+  externalItemId  String?                @map("external_item_id")
+  externalWebUrl  String?                @map("external_web_url") @db.Text
+  createdAt       DateTime               @default(now()) @map("created_at")
+  updatedAt       DateTime               @updatedAt @map("updated_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, kind])
+  @@index([hash])
+  @@map("document_derivatives")
 }
 
 // ================================================================

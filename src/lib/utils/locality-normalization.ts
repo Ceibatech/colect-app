@@ -47,7 +47,7 @@ const LOTISSEMENT_RULES: readonly LotissementRule[] = [
     aliases: ["ZONE 3", "ZONE 3 MARCORY", "MARCORY ZONE 3"],
   },
   {
-    canonicalName: "REMBLAI",
+    canonicalName: "REMBLAIS",
     communeName: "Marcory",
     aliases: ["REMBLAI", "REMBLAIS", "MARCORY REMBLAI", "MARCORY REMBLAIS"],
   },

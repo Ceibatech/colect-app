@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { runDossierAutomaticIndexing } from "@/lib/services/automatic-indexing-service";
+import { queueDossierAutomaticIndexing } from "@/lib/services/automatic-indexing-service";
 import { apiErrorResponse, parseIdParam } from "@/lib/utils/api-response";
 
-export const maxDuration = 300;
-
-/** POST /api/dossiers/:id/auto-index — traite tous les scans du dossier. */
+/** POST /api/dossiers/:id/auto-index — met tous les scans en file LAD/IA. */
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const result = await runDossierAutomaticIndexing(parseIdParam(id));
-    return NextResponse.json(result);
+    const result = await queueDossierAutomaticIndexing(parseIdParam(id));
+    return NextResponse.json(result, { status: 202 });
   } catch (error) {
     return apiErrorResponse(error);
   }

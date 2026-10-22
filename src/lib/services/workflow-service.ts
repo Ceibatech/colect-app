@@ -443,13 +443,13 @@ export async function indexDossier(id: number, scoreQualite?: number) {
       dossierId: id,
       OR: [
         { preIndexStatus: { not: "PRET" } },
-        { automaticIndexStatus: { not: "INDEXE" } },
+        { automaticIndexStatus: { notIn: ["INDEXE", "A_REQUALIFIER"] } },
       ],
     },
   });
   if (documentsACompleter > 0) {
     throw new ApiError(
-      `${documentsACompleter} document(s) doivent être analysés, contrôlés et déclarés prêts avant de soumettre l'indexation.`,
+      `${documentsACompleter} document(s) attendent encore le traitement automatique avant de soumettre l'indexation.`,
     );
   }
 

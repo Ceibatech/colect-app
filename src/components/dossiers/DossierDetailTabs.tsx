@@ -107,11 +107,12 @@ interface DossierDetail {
     preIndexedAt: string | null;
     typePiece: { id: number; libelle: string } | null;
     preIndexer: { name: string } | null;
-    automaticIndexStatus: "A_TRAITER" | "EN_COURS" | "A_VERIFIER" | "INDEXE" | "ERREUR";
+    automaticIndexStatus: "A_TRAITER" | "EN_FILE" | "EN_COURS" | "DEUXIEME_LECTURE" | "A_REQUALIFIER" | "INDEXE" | "ERREUR";
     indexingConfidence: number | null;
     classificationPath: string | null;
     indexedAt: string | null;
     lastIndexingError: string | null;
+    derivatives: Array<{ id: number; kind: "PDFA_OCR"; size: number; createdAt: string }>;
     indexValues: Array<{
       fieldId: number;
       value: string;
