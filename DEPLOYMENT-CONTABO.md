@@ -150,8 +150,13 @@ OCR_LANGUAGE=fra+eng
 AUTO_INDEX_ACCEPT_THRESHOLD=92
 AUTO_INDEX_SECOND_PASS_THRESHOLD=75
 INDEXING_OCR_TIMEOUT_SECONDS=900
+INDEXING_LAYOUT_TIMEOUT_SECONDS=180
 PADDLE_DEVICE=cpu
 ```
+
+Si PP-StructureV3 ne termine pas dans ce délai, le worker poursuit avec le texte
+OCRmyPDF/Tesseract au lieu de bloquer la file. Le PDF/A et le moteur de règles restent
+actifs ; PP-StructureV3 sera réessayé sur les traitements suivants.
 
 Pour activer PP-ChatOCRv4 sans transmettre les archives à un tiers, exposer dans le
 réseau Docker un serveur compatible avec l'API OpenAI puis ajouter :

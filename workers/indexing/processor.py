@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -29,7 +30,7 @@ def _private_ai_endpoint(url: str) -> bool:
         return host.endswith(".local") or host.endswith(".internal")
 
 
-def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> Path:
+def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> tuple[Path, Path]:
     source_pdf = source
     if mime_type != "application/pdf":
         source_pdf = workspace / "image-source.pdf"
@@ -42,6 +43,7 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> Path:
             frames[0].save(source_pdf, save_all=True, append_images=frames[1:], resolution=200)
 
     output = workspace / "normalized-ocr.pdf"
+    sidecar = workspace / "ocr-text.txt"
     language = os.getenv("OCR_LANGUAGE", "fra+eng")
     timeout = int(os.getenv("INDEXING_OCR_TIMEOUT_SECONDS", "900"))
 
@@ -54,6 +56,7 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> Path:
         "--output-type", "pdfa-2",
         "--optimize", "1",
         "--language", language,
+        "--sidecar", str(sidecar),
         str(source_pdf),
         str(output),
     ]
@@ -63,6 +66,7 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> Path:
         "--output-type", "pdfa-2",
         "--optimize", "0",
         "--language", language,
+        "--sidecar", str(sidecar),
         str(source_pdf),
         str(output),
     ]
@@ -99,7 +103,7 @@ def _prepare_pdf(source: Path, mime_type: str, workspace: Path) -> Path:
                 f"(principal={primary_error.returncode}, secours={fallback_error.returncode}). "
                 f"Détail secours : {fallback_details[-3000:]}"
             ) from fallback_error
-    return output
+    return output, sidecar
 
 
 def _json_value(result: Any) -> Any:
@@ -149,7 +153,7 @@ def _walk_scores(value: Any, scores: list[float]) -> None:
             _walk_scores(child, scores)
 
 
-def _structure_extract(pdf_path: Path) -> tuple[str, float]:
+def _structure_extract_direct(pdf_path: Path) -> tuple[str, float]:
     global _structure_pipeline
     if _structure_pipeline is None:
         _structure_pipeline = PPStructureV3(
@@ -165,6 +169,45 @@ def _structure_extract(pdf_path: Path) -> tuple[str, float]:
     unique_lines = list(dict.fromkeys(lines))
     confidence = sum(scores) / len(scores) if scores else (82.0 if unique_lines else 30.0)
     return "\n".join(unique_lines), round(max(0.0, min(100.0, confidence)), 2)
+
+
+def _sidecar_extract(sidecar_path: Path) -> tuple[str, float]:
+    text = sidecar_path.read_text(encoding="utf-8", errors="replace").strip() if sidecar_path.exists() else ""
+    return text, 82.0 if text else 30.0
+
+
+def _structure_extract(pdf_path: Path, sidecar_path: Path, workspace: Path) -> tuple[str, float, bool]:
+    result_path = workspace / "pp-structure-result.json"
+    timeout = max(30, int(os.getenv("INDEXING_LAYOUT_TIMEOUT_SECONDS", "180")))
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--structure-extract",
+        str(pdf_path),
+        str(result_path),
+    ]
+
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+        )
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+        text = str(payload.get("text") or "").strip()
+        confidence = float(payload.get("confidence") or 0)
+        if text:
+            return text, confidence, True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError, json.JSONDecodeError) as error:
+        print(
+            f"PP-StructureV3 indisponible après {timeout}s; poursuite avec le texte OCRmyPDF. {error}",
+            flush=True,
+        )
+
+    text, confidence = _sidecar_extract(sidecar_path)
+    return text, confidence, False
 
 
 def _match_chat_fields(payload: Any, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -277,8 +320,8 @@ def process_document(
     fields: list[dict[str, Any]],
     analysis_pass: str,
 ) -> dict[str, Any]:
-    normalized_pdf = _prepare_pdf(source, mime_type, workspace)
-    text, confidence = _structure_extract(normalized_pdf)
+    normalized_pdf, sidecar_path = _prepare_pdf(source, mime_type, workspace)
+    text, confidence, layout_used = _structure_extract(normalized_pdf, sidecar_path, workspace)
     intelligent_fields: list[dict[str, Any]] = []
     chat_engine = ""
     try:
@@ -291,9 +334,23 @@ def process_document(
 
     return {
         "normalizedPdf": normalized_pdf,
-        "engine": f"OCRmyPDF+PP-StructureV3{chat_engine}",
+        "engine": f"OCRmyPDF+{'PP-StructureV3' if layout_used else 'Tesseract'}{chat_engine}",
         "extractedText": text,
         "pageCount": None,
         "confidence": round(confidence, 2),
         "fields": intelligent_fields,
     }
+
+
+def _run_structure_cli() -> None:
+    if len(sys.argv) != 4 or sys.argv[1] != "--structure-extract":
+        raise SystemExit("Usage: processor.py --structure-extract <pdf> <result-json>")
+    text, confidence = _structure_extract_direct(Path(sys.argv[2]))
+    Path(sys.argv[3]).write_text(
+        json.dumps({"text": text, "confidence": confidence}, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+
+if __name__ == "__main__":
+    _run_structure_cli()
