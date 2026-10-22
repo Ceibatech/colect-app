@@ -26,6 +26,7 @@ const LOTISSEMENT_RULES: readonly LotissementRule[] = [
     aliases: [
       "ZONE 4/C",
       "ZONE 4 / C",
+      "ZONE 4 /C",
       "ZONE4/C",
       "ZONE 4 C",
       "1ZONE 4/C",
@@ -38,7 +39,7 @@ const LOTISSEMENT_RULES: readonly LotissementRule[] = [
   {
     canonicalName: "ZONE 4/C TYPE I",
     communeName: "Marcory",
-    aliases: ["ZONE 4/C TYPE I", "ZONE 4 C TYPE I", "ZONE4/C TYPE I"],
+    aliases: ["ZONE 4/C TYPE I", "ZONE 4 /C TYPE I", "ZONE 4 C TYPE I", "ZONE4/C TYPE I"],
   },
   {
     canonicalName: "ZONE 3",

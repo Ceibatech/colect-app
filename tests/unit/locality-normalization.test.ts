@@ -10,6 +10,7 @@ describe("locality normalization", () => {
   it.each([
     "ZONE 4/C",
     "Zone 4 / C",
+    "Zone 4 /C",
     "zone4/c",
     "Zone 4/C complémentaire",
   ])("fusionne %s sous ZONE 4/C", (value) => {
@@ -28,6 +29,7 @@ describe("locality normalization", () => {
 
   it("préserve une distinction métier non déclarée comme alias", () => {
     expect(canonicalizeLotissementLabel("ZONE 4/C TYPE I")).toBe("ZONE 4/C TYPE I");
+    expect(canonicalizeLotissementLabel("ZONE 4 /C TYPE I")).toBe("ZONE 4/C TYPE I");
   });
 
   it("met une nouvelle localité en majuscules sans en changer le sens", () => {
