@@ -30,7 +30,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ModulePlaceholder } from "@/components/layout/ModulePlaceholder";
-import { DocumentPreindexDialog, type PreindexDocument } from "@/components/dossiers/DocumentPreindexDialog";
+import { DocumentPreindexDialog, type IndexingFieldOption, type PreindexDocument } from "@/components/dossiers/DocumentPreindexDialog";
 import type { TypePieceOption } from "@/components/dossiers/TypesPiecesField";
 
 interface DocumentRow extends PreindexDocument {
@@ -74,6 +74,7 @@ export function DocumentsPanel({
   canManage,
   canPreindex,
   typesPiece,
+  indexingFields,
   activeStorageProvider,
   digitalArchiveEnabled,
   canRetryDigitalArchive,
@@ -83,6 +84,7 @@ export function DocumentsPanel({
   canManage: boolean;
   canPreindex: boolean;
   typesPiece: TypePieceOption[];
+  indexingFields: IndexingFieldOption[];
   activeStorageProvider: "LOCAL" | "SHAREPOINT";
   digitalArchiveEnabled: boolean;
   canRetryDigitalArchive: boolean;
@@ -271,7 +273,7 @@ export function DocumentsPanel({
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-2">
-                  {canPreindex ? <DocumentPreindexDialog document={document} typesPiece={typesPiece} /> : null}
+                  {canPreindex ? <DocumentPreindexDialog document={document} typesPiece={typesPiece} indexingFields={indexingFields} /> : null}
                   <a
                     href={`/api/documents/${document.id}/download`}
                     aria-label={`Télécharger ${document.nomOriginal}`}

@@ -325,7 +325,7 @@ export function IndexationActions({ dossierId, permissions, statutNumerisation, 
   return (
     <Button disabled={isPending} onClick={run}>
       {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Tags className="mr-1 h-4 w-4" />}
-      {statutIndexation === "REJETE" ? "Relancer l'indexation" : "Marquer indexé"}
+      {statutIndexation === "REJETE" ? "Relancer l'indexation" : "Soumettre l'indexation contrôlée"}
     </Button>
   );
 }

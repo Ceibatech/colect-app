@@ -439,11 +439,17 @@ export async function indexDossier(id: number, scoreQualite?: number) {
   }
 
   const documentsACompleter = await prisma.document.count({
-    where: { dossierId: id, preIndexStatus: { not: "PRET" } },
+    where: {
+      dossierId: id,
+      OR: [
+        { preIndexStatus: { not: "PRET" } },
+        { automaticIndexStatus: { not: "INDEXE" } },
+      ],
+    },
   });
   if (documentsACompleter > 0) {
     throw new ApiError(
-      `${documentsACompleter} document(s) doivent être pré-indexés et déclarés prêts avant de soumettre l'indexation.`,
+      `${documentsACompleter} document(s) doivent être analysés, contrôlés et déclarés prêts avant de soumettre l'indexation.`,
     );
   }
 

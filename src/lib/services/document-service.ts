@@ -10,6 +10,7 @@ import type { SessionPayload } from "@/lib/auth/session";
 import { ApiError } from "@/lib/utils/api-error";
 import { isOperateurInScope } from "@/lib/services/access-scope";
 import { documentPreindexSchema } from "@/lib/validation/document-preindex";
+import { rebuildDocumentSearchText } from "@/lib/services/automatic-indexing-service";
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20 Mo
 const ALLOWED_MIME_TYPES = new Set([
@@ -233,13 +234,55 @@ export async function preindexDocument(documentId: number, values: unknown) {
     if (!typePiece) throw new ApiError("Type de pièce introuvable ou inactif.");
   }
 
+  const indexingFields = parsed.data.indexValues.length > 0 || parsed.data.ready
+    ? await prisma.indexingField.findMany({
+        where: { isActive: true },
+        select: { id: true, label: true, isRequired: true },
+      })
+    : [];
+  const allowedFieldIds = new Set(indexingFields.map((field) => field.id));
+  if (parsed.data.indexValues.some((value) => !allowedFieldIds.has(value.fieldId))) {
+    throw new ApiError("Un champ d'indexation est introuvable ou inactif.");
+  }
+  if (parsed.data.ready) {
+    const supplied = new Map(parsed.data.indexValues.map((value) => [value.fieldId, value.value.trim()]));
+    const missing = indexingFields.filter((field) => field.isRequired && !supplied.get(field.id));
+    if (missing.length > 0) {
+      throw new ApiError(`Champ d'indexation requis : ${missing.map((field) => field.label).join(", ")}.`);
+    }
+  }
+
   const preIndexStatus = parsed.data.ready ? "PRET" : "BROUILLON";
   const dateDocument = parsed.data.dateDocument
     ? new Date(`${parsed.data.dateDocument}T00:00:00.000Z`)
     : null;
   const ipAddress = await getClientIp();
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
+    for (const indexValue of parsed.data.indexValues) {
+      if (!indexValue.value.trim()) {
+        await tx.documentIndexValue.deleteMany({ where: { documentId, fieldId: indexValue.fieldId } });
+        continue;
+      }
+      await tx.documentIndexValue.upsert({
+        where: { documentId_fieldId: { documentId, fieldId: indexValue.fieldId } },
+        create: {
+          documentId,
+          fieldId: indexValue.fieldId,
+          value: indexValue.value.trim(),
+          rawValue: indexValue.value.trim(),
+          source: "MANUAL",
+          confidence: 100,
+          validated: true,
+        },
+        update: {
+          value: indexValue.value.trim(),
+          source: "MANUAL",
+          confidence: 100,
+          validated: true,
+        },
+      });
+    }
     const updated = await tx.document.update({
       where: { id: documentId },
       data: {
@@ -252,6 +295,9 @@ export async function preindexDocument(documentId: number, values: unknown) {
         preIndexStatus,
         preIndexedBy: session.userId,
         preIndexedAt: new Date(),
+        automaticIndexStatus: parsed.data.ready ? "INDEXE" : document.automaticIndexStatus === "A_TRAITER" ? "A_TRAITER" : "A_VERIFIER",
+        indexedAt: parsed.data.ready ? new Date() : document.indexedAt,
+        lastIndexingError: null,
       },
       include: {
         typePiece: { select: { id: true, libelle: true } },
@@ -285,4 +331,6 @@ export async function preindexDocument(documentId: number, values: unknown) {
     });
     return updated;
   });
+  await rebuildDocumentSearchText(documentId);
+  return updated;
 }

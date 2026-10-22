@@ -16,6 +16,10 @@ export const documentPreindexSchema = z
     nombrePages: z.number().int().positive("Le nombre de pages doit être positif.").max(100_000).nullable().optional(),
     typePieceId: z.number().int().positive().nullable().optional(),
     preIndexNotes: optionalText(2_000),
+    indexValues: z.array(z.object({
+      fieldId: z.number().int().positive(),
+      value: z.string().trim().max(500),
+    })).max(100).optional().default([]),
     ready: z.boolean(),
   })
   .superRefine((value, context) => {

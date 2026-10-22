@@ -134,6 +134,21 @@ export async function getDossierDetail(id: number) {
         include: {
           typePiece: { select: { id: true, libelle: true } },
           preIndexer: { select: { name: true } },
+          indexValues: {
+            orderBy: { field: { sortOrder: "asc" } },
+            include: {
+              field: {
+                select: {
+                  id: true,
+                  key: true,
+                  label: true,
+                  dataType: true,
+                  isRequired: true,
+                  isSearchable: true,
+                },
+              },
+            },
+          },
         },
       },
       qualityChecks: { orderBy: { createdAt: "desc" }, include: { anomalies: true } },

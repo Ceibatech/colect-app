@@ -38,6 +38,7 @@ export interface AlfrescoArchiveInput {
   originalName: string;
   title?: string | null;
   businessReference: string;
+  classificationPath?: string | null;
   hash: string;
   contentType: string;
   buffer: Buffer;
@@ -133,14 +134,14 @@ export class AlfrescoArchiveClient {
     return payload.list.entries.map(({ entry }) => entry);
   }
 
-  private async ensureDossierFolder(dossierReference: string): Promise<AlfrescoEntry> {
-    const folderName = sanitizeAlfrescoName(`Dossier-${dossierReference}`, "Dossier");
-    const children = await this.listChildren(this.config.rootNodeId);
+  private async ensureFolder(parentNodeId: string, requestedName: string): Promise<AlfrescoEntry> {
+    const folderName = sanitizeAlfrescoName(requestedName, "Dossier");
+    const children = await this.listChildren(parentNodeId);
     const existing = children.find((entry) => entry.isFolder && entry.name === folderName);
     if (existing) return existing;
 
     try {
-      const response = await this.request(`/nodes/${encodedNodeId(this.config.rootNodeId)}/children`, {
+      const response = await this.request(`/nodes/${encodedNodeId(parentNodeId)}/children`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: folderName, nodeType: "cm:folder" }),
@@ -148,11 +149,28 @@ export class AlfrescoArchiveClient {
       return ((await response.json()) as AlfrescoEntryResponse).entry;
     } catch (error) {
       if (!(error instanceof AlfrescoArchiveError) || error.status !== 409) throw error;
-      const refreshed = await this.listChildren(this.config.rootNodeId);
+      const refreshed = await this.listChildren(parentNodeId);
       const concurrent = refreshed.find((entry) => entry.isFolder && entry.name === folderName);
       if (!concurrent) throw error;
       return concurrent;
     }
+  }
+
+  private async ensureDossierFolder(dossierReference: string, classificationPath?: string | null): Promise<AlfrescoEntry> {
+    const segments = classificationPath
+      ?.split("/")
+      .map((segment) => segment.trim())
+      .filter(Boolean)
+      .slice(0, 8);
+    if (!segments?.length) return this.ensureFolder(this.config.rootNodeId, `Dossier-${dossierReference}`);
+
+    let parentNodeId = this.config.rootNodeId;
+    let folder: AlfrescoEntry | null = null;
+    for (const segment of segments) {
+      folder = await this.ensureFolder(parentNodeId, segment);
+      parentNodeId = folder.id;
+    }
+    return folder ?? this.ensureFolder(this.config.rootNodeId, `Dossier-${dossierReference}`);
   }
 
   private documentWebUrl(nodeId: string): string | undefined {
@@ -162,7 +180,7 @@ export class AlfrescoArchiveClient {
   }
 
   async archiveDocument(input: AlfrescoArchiveInput): Promise<AlfrescoArchiveResult> {
-    const folder = await this.ensureDossierFolder(input.dossierReference);
+    const folder = await this.ensureDossierFolder(input.dossierReference, input.classificationPath);
     const fileName = sanitizeAlfrescoName(
       `${input.documentId}-${input.hash.slice(0, 12)}-${input.originalName}`,
       `document-${input.documentId}`,

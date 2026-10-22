@@ -21,13 +21,20 @@ RUN npm run build
 
 FROM base AS runner
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends mariadb-client \
+    && apt-get install -y --no-install-recommends \
+      mariadb-client \
+      poppler-utils \
+      tesseract-ocr \
+      tesseract-ocr-eng \
+      tesseract-ocr-fra \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0 \
     DOCUMENTS_STORAGE_PATH=/var/data/documents
+ENV OCR_LANGUAGE=fra+eng \
+    AUTO_INDEX_MAX_PAGES=20
 
 # Keep Prisma CLI and its engines available for the explicit migration step.
 COPY --from=builder --chown=node:node /app/node_modules ./node_modules

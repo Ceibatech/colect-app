@@ -24,6 +24,8 @@ import {
 } from "@/components/dossiers/WorkflowActions";
 import type { TypePieceOption } from "@/components/dossiers/TypesPiecesField";
 import { DocumentsPanel } from "@/components/dossiers/DocumentsPanel";
+import { IndexingWorkspace } from "@/components/dossiers/IndexingWorkspace";
+import type { IndexingFieldOption } from "@/components/dossiers/DocumentPreindexDialog";
 import type { PermissionCode } from "@/lib/permissions/constants";
 import { ETAT_CONSERVATION_OPTIONS } from "@/lib/validation/dossier";
 
@@ -105,6 +107,18 @@ interface DossierDetail {
     preIndexedAt: string | null;
     typePiece: { id: number; libelle: string } | null;
     preIndexer: { name: string } | null;
+    automaticIndexStatus: "A_TRAITER" | "EN_COURS" | "A_VERIFIER" | "INDEXE" | "ERREUR";
+    indexingConfidence: number | null;
+    classificationPath: string | null;
+    indexedAt: string | null;
+    lastIndexingError: string | null;
+    indexValues: Array<{
+      fieldId: number;
+      value: string;
+      confidence: number | null;
+      source: "OCR" | "DOSSIER" | "MANUAL";
+      validated: boolean;
+    }>;
     createdAt: string;
   }>;
   qualityChecks: Array<{
@@ -134,6 +148,7 @@ export function DossierDetailTabs({
   dossier,
   permissions,
   typesPiece,
+  indexingFields,
   documentStorageProvider,
   digitalArchiveEnabled,
   initialTab = "informations",
@@ -141,9 +156,10 @@ export function DossierDetailTabs({
   dossier: DossierDetail;
   permissions: PermissionCode[];
   typesPiece: TypePieceOption[];
+  indexingFields: IndexingFieldOption[];
   documentStorageProvider: "LOCAL" | "SHAREPOINT";
   digitalArchiveEnabled: boolean;
-  initialTab?: "informations" | "preparation";
+  initialTab?: "informations" | "foncier" | "titulaire" | "collecte" | "controle" | "preparation" | "numerisation" | "documents" | "indexation" | "archivage" | "historique";
 }) {
   // Rendu conditionnel manuel du panneau actif, au lieu du composant
   // <TabsContent> (masquage interne défaillant constaté avec ce composant
@@ -373,6 +389,13 @@ export function DossierDetailTabs({
           <Card>
             <CardContent className="space-y-4 pt-6">
               <Field label="Statut" value={STATUT_INDEXATION_LABELS[dossier.statutIndexation]} />
+              <IndexingWorkspace
+                dossierId={dossier.id}
+                documents={dossier.documents}
+                indexingFields={indexingFields}
+                typesPiece={typesPiece}
+                canIndex={permissions.includes("INDEXATION_UPDATE") && dossier.statutArchivage !== "TERMINE"}
+              />
               {dossier.indexations.map((n) => (
                 <div key={n.id} className="rounded-md border p-3 text-sm">
                   Statut : {n.statut} {n.scoreQualite !== null ? `— Score : ${n.scoreQualite}` : ""}
@@ -451,6 +474,7 @@ export function DossierDetailTabs({
                 canManage={permissions.includes("NUMERISATION_UPDATE") && dossier.statutArchivage !== "TERMINE"}
                 canPreindex={permissions.includes("INDEXATION_UPDATE") && dossier.statutArchivage !== "TERMINE"}
                 typesPiece={typesPiece}
+                indexingFields={indexingFields}
                 activeStorageProvider={documentStorageProvider}
                 digitalArchiveEnabled={digitalArchiveEnabled}
                 canRetryDigitalArchive={

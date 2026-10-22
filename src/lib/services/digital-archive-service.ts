@@ -119,6 +119,7 @@ export async function processDossierDigitalArchive(
         title: document.titreIndexation,
         businessReference:
           document.referenceIndexation?.trim() || `${document.dossier.reference}/DOC-${document.id}`,
+        classificationPath: document.classificationPath,
         hash: calculatedHash,
         contentType: document.typeMime,
         buffer,

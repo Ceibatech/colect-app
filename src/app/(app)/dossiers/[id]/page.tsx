@@ -36,12 +36,22 @@ export default async function DossierDetailPage({
   const session = await requirePermission("DOSSIER_READ");
   const { id: idParam } = await params;
   const query = await searchParams;
-  const requestedTab = (Array.isArray(query.tab) ? query.tab[0] : query.tab) === "preparation" ? "preparation" : "informations";
+  const requestedTabValue = Array.isArray(query.tab) ? query.tab[0] : query.tab;
+  const allowedTabs = ["informations", "foncier", "titulaire", "collecte", "controle", "preparation", "numerisation", "documents", "indexation", "archivage", "historique"] as const;
+  const requestedTab = allowedTabs.find((tab) => tab === requestedTabValue) ?? "informations";
   const fromPreparation = (Array.isArray(query.from) ? query.from[0] : query.from) === "preparation";
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const [dossier, typesPiece] = await Promise.all([getDossierDetail(id), getActiveTypesPiece()]);
+  const [dossier, typesPiece, indexingFields] = await Promise.all([
+    getDossierDetail(id),
+    getActiveTypesPiece(),
+    prisma.indexingField.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { label: "asc" }],
+      select: { id: true, key: true, label: true, dataType: true, isRequired: true, isSearchable: true },
+    }),
+  ]);
   if (!dossier) notFound();
 
   const sharedPreparationAccess =
@@ -90,15 +100,28 @@ export default async function DossierDetailPage({
       dateArchivage: a.dateArchivage?.toISOString() ?? null,
       createdAt: a.createdAt.toISOString(),
     })),
-    documents: dossier.documents.map((doc) => ({
-      ...doc,
-      createdAt: doc.createdAt.toISOString(),
-      updatedAt: doc.updatedAt.toISOString(),
-      dateDocument: doc.dateDocument?.toISOString() ?? null,
-      preIndexedAt: doc.preIndexedAt?.toISOString() ?? null,
-      alfrescoArchivedAt: doc.alfrescoArchivedAt?.toISOString() ?? null,
-      lastArchiveAttemptAt: doc.lastArchiveAttemptAt?.toISOString() ?? null,
-    })),
+    documents: dossier.documents.map((doc) => {
+      const safeDocument = Object.fromEntries(
+        Object.entries(doc).filter(([key]) => key !== "extractedText" && key !== "searchText"),
+      ) as Omit<typeof doc, "extractedText" | "searchText">;
+      return {
+        ...safeDocument,
+        indexingConfidence: doc.indexingConfidence ? Number(doc.indexingConfidence) : null,
+        indexValues: doc.indexValues.map((value) => ({
+          ...value,
+          confidence: value.confidence ? Number(value.confidence) : null,
+          createdAt: value.createdAt.toISOString(),
+          updatedAt: value.updatedAt.toISOString(),
+        })),
+        createdAt: doc.createdAt.toISOString(),
+        updatedAt: doc.updatedAt.toISOString(),
+        dateDocument: doc.dateDocument?.toISOString() ?? null,
+        preIndexedAt: doc.preIndexedAt?.toISOString() ?? null,
+        indexedAt: doc.indexedAt?.toISOString() ?? null,
+        alfrescoArchivedAt: doc.alfrescoArchivedAt?.toISOString() ?? null,
+        lastArchiveAttemptAt: doc.lastArchiveAttemptAt?.toISOString() ?? null,
+      };
+    }),
     qualityChecks: dossier.qualityChecks.map((qc) => ({
       ...qc,
       createdAt: qc.createdAt.toISOString(),
@@ -141,6 +164,7 @@ export default async function DossierDetailPage({
         dossier={serialized}
         permissions={session.permissions}
         typesPiece={typesPiece}
+        indexingFields={indexingFields}
         documentStorageProvider={(process.env.STORAGE_PROVIDER ?? "local").toLowerCase() === "sharepoint" ? "SHAREPOINT" : "LOCAL"}
         digitalArchiveEnabled={(process.env.ARCHIVE_STORAGE_PROVIDER ?? "").toLowerCase() === "alfresco"}
         initialTab={requestedTab}

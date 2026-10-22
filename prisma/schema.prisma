@@ -91,6 +91,7 @@ model User {
   workflowTransitions                WorkflowTransition[]
   documentsUploaded                  Document[]              @relation("DocumentUploadedBy")
   documentsPreIndexed                Document[]              @relation("DocumentPreIndexedBy")
+  documentIndexingRuns               DocumentIndexingRun[]   @relation("DocumentIndexingRunBy")
   qualityChecks                      QualityCheck[]
   anomaliesCorrected                 Anomalie[]              @relation("AnomalieCorrigePar")
   imports                            Import[]
@@ -991,6 +992,27 @@ enum DocumentPreIndexStatus {
   PRET
 }
 
+enum AutomaticIndexStatus {
+  A_TRAITER
+  EN_COURS
+  A_VERIFIER
+  INDEXE
+  ERREUR
+}
+
+enum IndexingFieldDataType {
+  TEXT
+  DATE
+  NUMBER
+  IDENTIFIER
+}
+
+enum IndexValueSource {
+  OCR
+  DOSSIER
+  MANUAL
+}
+
 enum DigitalArchiveStatus {
   NON_REQUIS
   EN_ATTENTE
@@ -1019,6 +1041,13 @@ model Document {
   typePieceId             Int?                   @map("type_piece_id")
   preIndexedBy            Int?                   @map("preindexed_by")
   preIndexedAt            DateTime?              @map("preindexed_at")
+  automaticIndexStatus    AutomaticIndexStatus   @default(A_TRAITER) @map("automatic_index_status")
+  extractedText           String?                @map("extracted_text") @db.LongText
+  searchText              String?                @map("search_text") @db.LongText
+  indexingConfidence      Decimal?               @map("indexing_confidence") @db.Decimal(5, 2)
+  classificationPath      String?                @map("classification_path") @db.Text
+  indexedAt               DateTime?              @map("indexed_at")
+  lastIndexingError       String?                @map("last_indexing_error") @db.Text
   externalDriveId         String?                @map("external_drive_id")
   externalItemId          String?                @map("external_item_id")
   externalWebUrl          String?                @map("external_web_url") @db.Text
@@ -1033,10 +1062,12 @@ model Document {
   createdAt               DateTime               @default(now()) @map("created_at")
   updatedAt               DateTime               @updatedAt @map("updated_at")
 
-  dossier    Dossier    @relation(fields: [dossierId], references: [id], onDelete: Cascade)
-  uploader   User?      @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
-  preIndexer User?      @relation("DocumentPreIndexedBy", fields: [preIndexedBy], references: [id])
-  typePiece  TypePiece? @relation(fields: [typePieceId], references: [id])
+  dossier      Dossier               @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  uploader     User?                 @relation("DocumentUploadedBy", fields: [uploadedBy], references: [id])
+  preIndexer   User?                 @relation("DocumentPreIndexedBy", fields: [preIndexedBy], references: [id])
+  typePiece    TypePiece?            @relation(fields: [typePieceId], references: [id])
+  indexValues  DocumentIndexValue[]
+  indexingRuns DocumentIndexingRun[]
 
   @@unique([externalDriveId, externalItemId])
   @@index([dossierId])
@@ -1045,7 +1076,68 @@ model Document {
   @@index([digitalArchiveStatus])
   @@index([typePieceId])
   @@index([preIndexedBy])
+  @@index([automaticIndexStatus])
   @@map("documents")
+}
+
+model IndexingField {
+  id           Int                   @id @default(autoincrement())
+  key          String                @unique
+  label        String
+  aliases      Json
+  dataType     IndexingFieldDataType @default(TEXT) @map("data_type")
+  isRequired   Boolean               @default(false) @map("is_required")
+  isSearchable Boolean               @default(true) @map("is_searchable")
+  isActive     Boolean               @default(true) @map("is_active")
+  sortOrder    Int                   @default(0) @map("sort_order")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+
+  values DocumentIndexValue[]
+
+  @@index([isActive, sortOrder])
+  @@map("indexing_fields")
+}
+
+model DocumentIndexValue {
+  id         Int              @id @default(autoincrement())
+  documentId Int              @map("document_id")
+  fieldId    Int              @map("field_id")
+  value      String           @db.Text
+  rawValue   String?          @map("raw_value") @db.Text
+  confidence Decimal?         @db.Decimal(5, 2)
+  source     IndexValueSource @default(OCR)
+  validated  Boolean          @default(false)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  document Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  field    IndexingField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, fieldId])
+  @@index([fieldId, value(length: 191)])
+  @@map("document_index_values")
+}
+
+model DocumentIndexingRun {
+  id                Int                  @id @default(autoincrement())
+  documentId        Int                  @map("document_id")
+  triggeredBy       Int?                 @map("triggered_by")
+  status            AutomaticIndexStatus @default(EN_COURS)
+  engine            String
+  extractedFields   Json?                @map("extracted_fields")
+  extractedTextSize Int?                 @map("extracted_text_size")
+  confidence        Decimal?             @db.Decimal(5, 2)
+  error             String?              @db.Text
+  startedAt         DateTime             @default(now()) @map("started_at")
+  completedAt       DateTime?            @map("completed_at")
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  actor    User?    @relation("DocumentIndexingRunBy", fields: [triggeredBy], references: [id], onDelete: SetNull)
+
+  @@index([documentId, startedAt])
+  @@index([status])
+  @@map("document_indexing_runs")
 }
 
 // ================================================================

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Tags } from "lucide-react";
+import { Loader2, Sparkles, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -31,6 +32,26 @@ export interface PreindexDocument {
   preIndexNotes: string | null;
   preIndexStatus: "A_TRAITER" | "BROUILLON" | "PRET";
   typePiece: { id: number; libelle: string } | null;
+  automaticIndexStatus: "A_TRAITER" | "EN_COURS" | "A_VERIFIER" | "INDEXE" | "ERREUR";
+  indexingConfidence: number | null;
+  classificationPath: string | null;
+  lastIndexingError: string | null;
+  indexValues: Array<{
+    fieldId: number;
+    value: string;
+    confidence: number | null;
+    source: "OCR" | "DOSSIER" | "MANUAL";
+    validated: boolean;
+  }>;
+}
+
+export interface IndexingFieldOption {
+  id: number;
+  key: string;
+  label: string;
+  dataType: "TEXT" | "DATE" | "NUMBER" | "IDENTIFIER";
+  isRequired: boolean;
+  isSearchable: boolean;
 }
 
 interface FormState {
@@ -40,10 +61,12 @@ interface FormState {
   nombrePages: string;
   typePieceId: string;
   preIndexNotes: string;
+  indexValues: Record<string, string>;
   ready: boolean;
 }
 
-function formStateFromDocument(document: PreindexDocument): FormState {
+function formStateFromDocument(document: PreindexDocument, indexingFields: IndexingFieldOption[]): FormState {
+  const currentValues = new Map(document.indexValues.map((value) => [value.fieldId, value.value]));
   return {
     titreIndexation: document.titreIndexation ?? document.nomOriginal.replace(/\.[^.]+$/, ""),
     referenceIndexation: document.referenceIndexation ?? "",
@@ -51,6 +74,7 @@ function formStateFromDocument(document: PreindexDocument): FormState {
     nombrePages: document.nombrePages ? String(document.nombrePages) : "",
     typePieceId: document.typePiece ? String(document.typePiece.id) : "",
     preIndexNotes: document.preIndexNotes ?? "",
+    indexValues: Object.fromEntries(indexingFields.map((field) => [String(field.id), currentValues.get(field.id) ?? ""])),
     ready: document.preIndexStatus === "PRET",
   };
 }
@@ -58,18 +82,25 @@ function formStateFromDocument(document: PreindexDocument): FormState {
 export function DocumentPreindexDialog({
   document,
   typesPiece,
+  indexingFields,
 }: {
   document: PreindexDocument;
   typesPiece: TypePieceOption[];
+  indexingFields: IndexingFieldOption[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [form, setForm] = useState<FormState>(() => formStateFromDocument(document));
+  const [form, setForm] = useState<FormState>(() => formStateFromDocument(document, indexingFields));
   const typeItems = typesPiece.map((type) => ({ label: type.libelle, value: String(type.id) }));
+  const triggerLabel = document.automaticIndexStatus === "A_VERIFIER"
+    ? "Contrôler"
+    : document.automaticIndexStatus === "INDEXE"
+      ? "Modifier l'index"
+      : "Pré-indexer";
 
   function handleOpenChange(nextOpen: boolean) {
-    if (nextOpen) setForm(formStateFromDocument(document));
+    if (nextOpen) setForm(formStateFromDocument(document, indexingFields));
     setOpen(nextOpen);
   }
 
@@ -87,6 +118,7 @@ export function DocumentPreindexDialog({
           nombrePages: form.nombrePages ? Number(form.nombrePages) : null,
           typePieceId: form.typePieceId ? Number(form.typePieceId) : null,
           preIndexNotes: form.preIndexNotes || null,
+          indexValues: indexingFields.map((field) => ({ fieldId: field.id, value: form.indexValues[String(field.id)] ?? "" })),
           ready: form.ready,
         }),
       });
@@ -105,8 +137,8 @@ export function DocumentPreindexDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={<Button size="sm" variant="outline" />}>
-        <Tags />
-        Pré-indexer
+        {document.automaticIndexStatus === "A_VERIFIER" ? <Sparkles /> : <Tags />}
+        {triggerLabel}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
@@ -191,6 +223,59 @@ export function DocumentPreindexDialog({
               />
             </div>
           </div>
+
+          {indexingFields.length > 0 ? (
+            <section className="space-y-3 border-t pt-5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" />Champs de recherche</h3>
+                  <p className="mt-1 text-xs text-muted-foreground">Contrôlez les propositions OCR avant de déclarer le document prêt.</p>
+                </div>
+                {document.indexingConfidence !== null ? (
+                  <Badge variant="outline">Confiance {Math.round(document.indexingConfidence)} %</Badge>
+                ) : null}
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {indexingFields.map((field) => {
+                  const detected = document.indexValues.find((value) => value.fieldId === field.id);
+                  const inputType = field.dataType === "DATE" ? "date" : field.dataType === "NUMBER" ? "number" : "text";
+                  return (
+                    <div key={field.id} className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <Label htmlFor={`index-field-${document.id}-${field.id}`}>
+                          {field.label}{field.isRequired ? " *" : ""}
+                        </Label>
+                        {detected ? (
+                          <span className="text-[11px] text-muted-foreground">
+                            {detected.source === "OCR" ? "OCR" : detected.source === "DOSSIER" ? "Dossier" : "Vérifié"}
+                            {detected.confidence !== null ? ` · ${Math.round(detected.confidence)} %` : ""}
+                          </span>
+                        ) : null}
+                      </div>
+                      <Input
+                        id={`index-field-${document.id}-${field.id}`}
+                        type={inputType}
+                        value={form.indexValues[String(field.id)] ?? ""}
+                        maxLength={500}
+                        required={form.ready && field.isRequired}
+                        onChange={(event) => setForm((current) => ({
+                          ...current,
+                          indexValues: { ...current.indexValues, [String(field.id)]: event.target.value },
+                        }))}
+                        disabled={isSaving}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {document.classificationPath ? (
+                <div className="rounded-md border bg-muted/35 p-3">
+                  <p className="text-xs font-medium">Classement proposé</p>
+                  <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{document.classificationPath}</p>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/70 bg-muted/25 p-4">
             <Checkbox

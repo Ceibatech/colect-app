@@ -135,6 +135,25 @@ Les dossiers déjà terminés peuvent être versés depuis l'onglet Documents av
 **Relancer Alfresco**. Les erreurs restent visibles en base et peuvent être reprises
 sans doublonner les nœuds déjà créés.
 
+### Indexation automatique locale
+
+L'image applicative embarque Poppler (`pdftotext`, `pdfinfo`, `pdftoppm`) et
+Tesseract avec les modèles français et anglais. Les PDF contenant déjà une couche
+texte sont lus directement ; seuls les scans sans texte sont convertis en images
+et OCRisés. Aucun fichier documentaire n'est envoyé à un service tiers.
+
+Les valeurs suivantes sont optionnelles dans `/opt/colect-app/shared/app.env` :
+
+```dotenv
+OCR_LANGUAGE=fra+eng
+AUTO_INDEX_MAX_PAGES=20
+```
+
+`AUTO_INDEX_MAX_PAGES` limite le coût d'une analyse OCR. Les champs recherchés
+se configurent dans **Administration > Champs d'indexation**. Une extraction reste
+une proposition : l'agent doit contrôler les valeurs avant que le document soit
+publié dans la recherche et classé dans Alfresco.
+
 Le push sur `main` lance le workflow GitHub **Validate and deploy to Contabo** si
 la variable de dépôt `CONTABO_ENABLED=true` est active. Le workflow applique la
 migration Prisma, reconstruit le conteneur et vérifie la base et HTTPS. Il n'est
