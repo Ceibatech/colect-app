@@ -68,14 +68,22 @@ def process_job(job: dict[str, Any]) -> None:
             job["analysisPass"],
         )
         normalized = Path(result.pop("normalizedPdf"))
-        request(
-            f"/api/internal/indexing/jobs/{job_id}/pdfa",
-            method="PUT",
-            payload=normalized.read_bytes(),
-            content_type="application/pdf",
-        )
+        try:
+            request(
+                f"/api/internal/indexing/jobs/{job_id}/pdfa",
+                method="PUT",
+                payload=normalized.read_bytes(),
+                content_type="application/pdf",
+            )
+        except Exception as error:
+            # The searchable metadata remains useful even when derivative
+            # storage is temporarily unavailable. A later retry can recreate it.
+            print(f"Dérivé PDF/A différé pour le travail {job_id}: {error}", flush=True)
         result["workerId"] = WORKER_ID
-        json_request(f"/api/internal/indexing/jobs/{job_id}/complete", payload=result)
+        try:
+            json_request(f"/api/internal/indexing/jobs/{job_id}/complete", payload=result)
+        except Exception as error:
+            raise RuntimeError(f"Finalisation des métadonnées impossible: {error}") from error
 
 
 def main() -> None:
