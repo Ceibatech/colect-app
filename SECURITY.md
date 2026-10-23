@@ -63,8 +63,14 @@ implémentation (Phase 12 — Audit).
 
 ### Chaîne de garde des transferts
 
-- La constitution, l'autorisation et chaque mouvement sont contrôlés par des permissions
-  serveur distinctes (`TRANSFER_CREATE`, `TRANSFER_AUTHORIZE`, `TRANSFER_OPERATE`).
+- La constitution, le visa CEIBAC, l'autorisation ministère et chaque mouvement sont
+  contrôlés par des permissions serveur distinctes (`TRANSFER_CREATE`,
+  `TRANSFER_CEIBAC_APPROVE`, `TRANSFER_AUTHORIZE`, `TRANSFER_OPERATE`). Un lot soumis
+  ne peut pas sauter le visa CEIBAC, et un lot validé par CEIBAC ne peut pas sortir
+  avant le visa ministère. Les actions contrôlent l'état courant en base.
+- `VALIDATEUR_MINISTERE` reçoit seulement `DASHBOARD_VIEW`, `TRANSFER_VIEW` et
+  `TRANSFER_AUTHORIZE`. Il ne peut ni constituer un lot, ni enregistrer un mouvement,
+  ni saisir des positions GPS. L'ajout du rôle n'affecte aucun compte existant.
 - La sortie, la réception et le retour sont exécutés dans une transaction sérialisable :
   création du bordereau, signatures, changement d'état du stock et audit réussissent ou
   échouent ensemble. Une vérification optimiste de l'état empêche deux agents de déplacer

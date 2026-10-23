@@ -4,11 +4,17 @@ import {
   deriveTransferLotStatus,
   getTransferDossierStockSummary,
   getTransferMovementRule,
+  getTransferLotStatusLabel,
   getTransferStockSummary,
   isTransferMovementChronologyValid,
 } from "@/lib/utils/transfer-stock";
 
 describe("transfer stock", () => {
+  it("distinguishes CEIBAC review from ministry authorization before departure", () => {
+    expect(getTransferLotStatusLabel("SOUMIS")).toBe("À valider par CEIBAC");
+    expect(getTransferLotStatusLabel("VALIDE_CEIBAC")).toBe("Visa ministère requis");
+    expect(deriveTransferLotStatus(["PREVU", "PREVU"], "VALIDE_CEIBAC")).toBe("VALIDE_CEIBAC");
+  });
   it("keeps an arrival out of stock until the final ministry visa", () => {
     expect(canApplyTransferStock("RECEPTION", "SOUMIS_CEIBAC")).toBe(false);
     expect(canApplyTransferStock("RECEPTION", "VALIDE_CEIBAC")).toBe(false);

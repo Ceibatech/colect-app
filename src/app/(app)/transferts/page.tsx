@@ -29,11 +29,14 @@ export default async function TransfersPage() {
         icon={Truck}
         title="Registre des transferts"
         description="Vue consolidée du stock documentaire par site. Une sortie diminue le site A; une réception signée augmente le site B et conserve la preuve du mouvement."
-        actions={canCreate ? (
+        actions={<>
+          {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBAC</Link> : null}
+          {session.permissions.includes("TRANSFER_AUTHORIZE") ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
+          {canCreate ? (
           <Link href="/transferts/nouveau" className={buttonVariants()}>
             <Plus /> Identifier un lot
           </Link>
-        ) : null}
+        ) : null}</>}
         stats={[
           { label: "Dossiers inventoriés", value: data.summary.totalDossiers },
           { label: "En stock sur site", value: data.summary.onSite, tone: "success" },

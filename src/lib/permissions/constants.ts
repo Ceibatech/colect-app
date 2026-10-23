@@ -4,7 +4,7 @@
  * par l'application (contrôles serveur, middleware, UI conditionnelle).
  */
 
-export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
+export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const PERMISSIONS = [
@@ -43,6 +43,7 @@ export const PERMISSIONS = [
   "TRANSFER_OPERATE",
   "TRANSFER_AUTHORIZE",
   "TRANSFER_SUBMIT",
+  "TRANSFER_CEIBAC_APPROVE",
   "TRANSFER_CEIBAC_VALIDATE",
   "TRANSFER_TRACK",
   "USER_MANAGE",
@@ -103,7 +104,8 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "TRANSFER_SUBMIT",
     "TRANSFER_TRACK",
   ],
-  VALIDATEUR_CEIBAC: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_CEIBAC_VALIDATE"],
+  VALIDATEUR_CEIBAC: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_CEIBAC_APPROVE", "TRANSFER_CEIBAC_VALIDATE"],
+  VALIDATEUR_MINISTERE: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_AUTHORIZE"],
   FINANCE: ["DASHBOARD_VIEW", "FINANCE_VIEW", "FINANCE_CONFIGURE"],
   PMO: ["DASHBOARD_VIEW", "PMO_VIEW"],
   EXECUTIF: ["DASHBOARD_VIEW"],
@@ -139,5 +141,7 @@ export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly R
   { prefix: "/dashboard/pmo", roles: ["ADMIN", "PMO"] },
   { prefix: "/qualite", roles: ["ADMIN", "SUPERVISEUR"] },
   { prefix: "/import", roles: ["ADMIN", "OPERATEUR"] },
-  { prefix: "/transferts", roles: ["ADMIN", "SUPERVISEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC"] },
+  { prefix: "/transferts/validation-ceibac", roles: ["ADMIN", "VALIDATEUR_CEIBAC"] },
+  { prefix: "/transferts/validation", roles: ["ADMIN", "SUPERVISEUR", "VALIDATEUR_MINISTERE"] },
+  { prefix: "/transferts", roles: ["ADMIN", "SUPERVISEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE"] },
 ];
