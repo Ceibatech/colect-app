@@ -10,7 +10,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Préparation documentaire — GeoArchives-MULCV" };
+export const metadata = { title: "Préparation documentaire — GeoArchives" };
 
 const FILTERS = [
   { value: "A_TRAITER", label: "À préparer" },
@@ -32,6 +32,7 @@ export default async function PreparationPage({
 
   const paginationParams: Record<string, string> = { statut: filters.statut };
   if (filters.q) paginationParams.q = filters.q;
+  if (filters.carton) paginationParams.carton = filters.carton;
 
   return (
     <div className="space-y-5">
@@ -65,13 +66,63 @@ export default async function PreparationPage({
         <Metric label="Rejetés" value={data.summary.rejetes} alert={data.summary.rejetes > 0} />
       </section>
 
+      <section className="border-y border-border/70 py-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="text-base font-semibold">Travail partagé par carton</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Plusieurs agents peuvent traiter le même carton, chacun sur un dossier réservé distinct.
+            </p>
+          </div>
+          <form className="flex min-w-0 flex-1 flex-wrap items-end justify-end gap-2" action="/preparation" method="get">
+            <input type="hidden" name="statut" value={filters.statut} />
+            <label className="min-w-56 flex-1 sm:max-w-md">
+              <span className="mb-1 block text-xs font-medium text-muted-foreground">Carton actif</span>
+              <select
+                name="carton"
+                defaultValue={filters.carton ?? ""}
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+              >
+                <option value="">Tous les cartons</option>
+                {data.cartonChoices.map((carton) => (
+                  <option key={carton.key} value={carton.key}>
+                    {carton.label}{carton.description ? ` — ${carton.description}` : ""} ({carton.dossierCount} dossier{carton.dossierCount > 1 ? "s" : ""})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Button type="submit">Ouvrir</Button>
+          </form>
+        </div>
+
+        {data.selectedCartonSummary ? (
+          <div className="mt-4 grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3 lg:grid-cols-6">
+            <Metric label="Dossiers du carton" value={data.selectedCartonSummary.totalDossiers} />
+            <Metric label="Renseignés" value={data.selectedCartonSummary.renseignes} />
+            <Metric label="En cours" value={data.selectedCartonSummary.enCours} />
+            <Metric label="Restants" value={data.selectedCartonSummary.restants} alert={data.selectedCartonSummary.restants > 0} />
+            <Metric label="Pièces déclarées" value={data.selectedCartonSummary.nombrePieces} />
+            <Metric label="Pages déclarées" value={data.selectedCartonSummary.nombrePages} />
+            <div className="bg-card px-4 py-3 sm:col-span-3 lg:col-span-6">
+              <p className="text-xs uppercase text-muted-foreground">Équipe du carton</p>
+              <p className="mt-1 text-sm font-medium">
+                {data.selectedCartonSummary.agents.join(", ") || "Aucun agent n’a encore pris de dossier en charge."}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Contrôle d’avancement : {data.selectedCartonSummary.renseignes + data.selectedCartonSummary.enCours + data.selectedCartonSummary.restants}/{data.selectedCartonSummary.totalDossiers} dossiers suivis.
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </section>
+
       <section className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm">
         <div className="space-y-4 p-4">
           <div className="flex flex-wrap gap-2" aria-label="Filtrer la file de préparation">
             {FILTERS.map((filter) => (
               <Link
                 key={filter.value}
-                href={`/preparation?statut=${filter.value}${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ""}`}
+                href={`/preparation?statut=${filter.value}${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ""}${filters.carton ? `&carton=${encodeURIComponent(filters.carton)}` : ""}`}
                 className={buttonVariants({ size: "sm", variant: filters.statut === filter.value ? "default" : "outline" })}
               >
                 {filter.label}
@@ -81,6 +132,7 @@ export default async function PreparationPage({
 
           <form className="flex max-w-xl gap-2" action="/preparation" method="get">
             <input type="hidden" name="statut" value={filters.statut} />
+            {filters.carton ? <input type="hidden" name="carton" value={filters.carton} /> : null}
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -94,7 +146,7 @@ export default async function PreparationPage({
           </form>
         </div>
 
-        <PreparationQueueTable items={data.items} permissions={session.permissions} />
+        <PreparationQueueTable items={data.items} permissions={session.permissions} currentUserId={session.userId} />
       </section>
 
       <DataPagination

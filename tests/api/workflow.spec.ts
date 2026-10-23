@@ -5,15 +5,39 @@ import { createTestDossier, deleteTestDossier } from "../helpers/db";
 /**
  * Tests API (Phase 13, §72 ; étendus Phase 19+/20+) : transitions du
  * workflow contrôlé (§42) — validate/reject/prepare/numerize/index/archive.
- * Depuis la Phase 19+, chaque étape opérationnelle passe par une validation
- * superviseur systématique (soumission → À valider → Terminé, ou → Rejeté →
- * relance par l'opérateur). Depuis la Phase 20+, une nouvelle étape
+ * Les contrôles conformes avancent automatiquement ; seules les anomalies
+ * passent par le superviseur (À valider → Terminé/Rejeté). Depuis la Phase 20+, une nouvelle étape
  * "Préparation" s'intercale entre Validation et Numérisation : le cycle
  * complet est désormais Collecte → Validation → Préparation → Numérisation →
  * Indexation → Archivage. Chaque test crée son propre dossier jetable
  * (préfixe `TEST-API-`) dans l'état exact requis pour isoler la transition
  * testée, et le supprime en fin de test.
  */
+
+async function validPreparationData(nombrePieces = 1, nombrePages = nombrePieces) {
+  const typePiece = await testPrisma.typePiece.findFirstOrThrow({ where: { isActive: true } });
+  return {
+    pieceBreakdown: [{ typePiece: String(typePiece.id), nombrePieces, nombrePages }],
+  };
+}
+
+async function createIndexedTestDocument(dossierId: number) {
+  return testPrisma.document.create({
+    data: {
+      dossierId,
+      nomFichier: `${dossierId}/test-indexe.pdf`,
+      nomOriginal: "test-indexe.pdf",
+      typeMime: "application/pdf",
+      extension: "pdf",
+      taille: 128,
+      url: `/test/${dossierId}/test-indexe.pdf`,
+      preIndexStatus: "PRET",
+      automaticIndexStatus: "INDEXE",
+      indexingConfidence: 98,
+      indexedAt: new Date(),
+    },
+  });
+}
 
 test.describe("POST /api/dossiers/[id]/validate", () => {
   test("SUPERVISEUR valide un dossier En contrôle", async ({ request }) => {
@@ -101,19 +125,22 @@ test.describe("POST /api/dossiers/[id]/reject", () => {
 });
 
 test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+)", () => {
-  test("soumet la préparation d'un dossier Validé — passe À valider, pas Terminé", async ({ request }) => {
+  test("valide automatiquement la préparation cohérente d'un dossier", async ({ request }) => {
     const dossier = await createTestDossier({ statutValidation: "VALIDE" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
       const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
         headers: { Cookie: cookie },
-        data: { nombrePieces: 5, typesPieces: [], nombrePages: 12 },
+        data: await validPreparationData(5, 12),
       });
       expect(res.status()).toBe(200);
       const body = await res.json();
-      expect(body.dossier.statutPreparation).toBe("A_VALIDER");
+      expect(body.dossier.statutPreparation).toBe("TERMINE");
       expect(body.dossier.nombrePieces).toBe(5);
       expect(body.dossier.nombrePages).toBe(12);
+      const lines = await testPrisma.preparationPieceLine.findMany({ where: { dossierId: dossier.id } });
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatchObject({ nombrePieces: 5, nombrePages: 12 });
     } finally {
       await deleteTestDossier(dossier.id);
     }
@@ -134,9 +161,7 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
       const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
         headers: { Cookie: cookie },
         data: {
-          nombrePieces: 3,
-          typesPieces: [],
-          nombrePages: 18,
+          ...(await validPreparationData(3, 18)),
           observationsPreparation: "Ordre des pièces vérifié.",
         },
       });
@@ -156,7 +181,10 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
     const dossier = await createTestDossier({ statutValidation: "EN_CONTROLE" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
-      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, { headers: { Cookie: cookie } });
+      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
+        headers: { Cookie: cookie },
+        data: await validPreparationData(),
+      });
       expect(res.status()).toBe(400);
     } finally {
       await deleteTestDossier(dossier.id);
@@ -167,7 +195,10 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
     const dossier = await createTestDossier({ statutValidation: "VALIDE", statutPreparation: "A_VALIDER" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
-      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, { headers: { Cookie: cookie } });
+      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
+        headers: { Cookie: cookie },
+        data: await validPreparationData(),
+      });
       expect(res.status()).toBe(400);
     } finally {
       await deleteTestDossier(dossier.id);
@@ -178,7 +209,10 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
     const dossier = await createTestDossier({ statutValidation: "VALIDE", statutPreparation: "TERMINE" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
-      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, { headers: { Cookie: cookie } });
+      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
+        headers: { Cookie: cookie },
+        data: await validPreparationData(),
+      });
       expect(res.status()).toBe(400);
     } finally {
       await deleteTestDossier(dossier.id);
@@ -189,10 +223,39 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
     const dossier = await createTestDossier({ statutValidation: "VALIDE", statutPreparation: "REJETE" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
-      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, { headers: { Cookie: cookie } });
+      const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
+        headers: { Cookie: cookie },
+        data: await validPreparationData(),
+      });
       expect(res.status()).toBe(200);
       const body = await res.json();
-      expect(body.dossier.statutPreparation).toBe("A_VALIDER");
+      expect(body.dossier.statutPreparation).toBe("TERMINE");
+    } finally {
+      await deleteTestDossier(dossier.id);
+    }
+  });
+});
+
+test.describe("POST /api/dossiers/[id]/prepare/claim", () => {
+  test("réserve un dossier à un seul préparateur", async ({ request }) => {
+    const dossier = await createTestDossier({ statutValidation: "VALIDE" });
+    try {
+      const operateurCookie = await sessionCookieHeader(DEMO_USERS.operateur1);
+      const firstClaim = await request.post(`/api/dossiers/${dossier.id}/prepare/claim`, {
+        headers: { Cookie: operateurCookie },
+      });
+      expect(firstClaim.status()).toBe(200);
+
+      const claimed = await testPrisma.dossier.findUniqueOrThrow({ where: { id: dossier.id } });
+      expect(claimed.statutPreparation).toBe("EN_COURS");
+      expect(claimed.preparateurId).not.toBeNull();
+      expect(claimed.preparationClaimedAt).not.toBeNull();
+
+      const adminCookie = await sessionCookieHeader(DEMO_USERS.admin);
+      const conflictingClaim = await request.post(`/api/dossiers/${dossier.id}/prepare/claim`, {
+        headers: { Cookie: adminCookie },
+      });
+      expect(conflictingClaim.status()).toBe(409);
     } finally {
       await deleteTestDossier(dossier.id);
     }
@@ -253,7 +316,7 @@ test.describe("POST /api/dossiers/[id]/prepare/validate|reject (Phase 20+)", () 
 });
 
 test.describe("POST /api/dossiers/[id]/numerize (soumission opérateur, Phase 19+/20+)", () => {
-  test("soumet la numérisation d'un dossier Préparé — passe À valider, pas Terminé", async ({ request }) => {
+  test("oriente vers le superviseur une numérisation sans fichier", async ({ request }) => {
     const dossier = await createTestDossier({ statutValidation: "VALIDE", statutPreparation: "TERMINE" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
@@ -264,6 +327,23 @@ test.describe("POST /api/dossiers/[id]/numerize (soumission opérateur, Phase 19
       expect(res.status()).toBe(200);
       const body = await res.json();
       expect(body.dossier.statutNumerisation).toBe("A_VALIDER");
+    } finally {
+      await deleteTestDossier(dossier.id);
+    }
+  });
+
+  test("valide automatiquement la numérisation dès qu'un fichier existe", async ({ request }) => {
+    const dossier = await createTestDossier({ statutValidation: "VALIDE", statutPreparation: "TERMINE" });
+    try {
+      await createIndexedTestDocument(dossier.id);
+      const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
+      const res = await request.post(`/api/dossiers/${dossier.id}/numerize`, {
+        headers: { Cookie: cookie },
+        data: { nombrePages: 12 },
+      });
+      expect(res.status()).toBe(200);
+      const body = await res.json();
+      expect(body.dossier.statutNumerisation).toBe("TERMINE");
     } finally {
       await deleteTestDossier(dossier.id);
     }
@@ -398,13 +478,14 @@ test.describe("POST /api/dossiers/[id]/numerize/validate|reject (Phase 19+)", ()
 });
 
 test.describe("POST /api/dossiers/[id]/index (soumission opérateur, Phase 19+)", () => {
-  test("soumet l'indexation d'un dossier Numérisé — passe À valider, pas Terminé", async ({ request }) => {
+  test("valide automatiquement l'indexation lorsque tous les fichiers sont conformes", async ({ request }) => {
     const dossier = await createTestDossier({
       statutValidation: "VALIDE",
       statutPreparation: "TERMINE",
       statutNumerisation: "TERMINE",
     });
     try {
+      await createIndexedTestDocument(dossier.id);
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
       const res = await request.post(`/api/dossiers/${dossier.id}/index`, {
         headers: { Cookie: cookie },
@@ -412,7 +493,7 @@ test.describe("POST /api/dossiers/[id]/index (soumission opérateur, Phase 19+)"
       });
       expect(res.status()).toBe(200);
       const body = await res.json();
-      expect(body.dossier.statutIndexation).toBe("A_VALIDER");
+      expect(body.dossier.statutIndexation).toBe("TERMINE");
     } finally {
       await deleteTestDossier(dossier.id);
     }
@@ -581,7 +662,7 @@ test.describe("POST /api/dossiers/[id]/archive/validate|reject (Phase 19+)", () 
   });
 });
 
-test("cycle complet : Collecte validée → chaque étape opérationnelle soumise puis validée par le superviseur", async ({ request }) => {
+test("cycle continu : les étapes conformes avancent sans validation humaine systématique", async ({ request }) => {
   const dossier = await createTestDossier({ statutValidation: "EN_CONTROLE" });
   try {
     const superviseurCookie = await sessionCookieHeader(DEMO_USERS.superviseur);
@@ -590,35 +671,25 @@ test("cycle complet : Collecte validée → chaque étape opérationnelle soumis
     const r1 = await request.post(`/api/dossiers/${dossier.id}/validate`, { headers: { Cookie: superviseurCookie } });
     expect(r1.status()).toBe(200);
 
-    // Préparation (Phase 20+) : soumission opérateur (-> À valider) puis validation superviseur (-> Terminé).
+    // Préparation cohérente : validation automatique.
     const r1p = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
       headers: { Cookie: operateurCookie },
-      data: { nombrePieces: 4, typesPieces: [], nombrePages: 5 },
+      data: await validPreparationData(4, 5),
     });
     expect(r1p.status()).toBe(200);
-    expect((await r1p.json()).dossier.statutPreparation).toBe("A_VALIDER");
-    const r1pv = await request.post(`/api/dossiers/${dossier.id}/prepare/validate`, { headers: { Cookie: superviseurCookie } });
-    expect(r1pv.status()).toBe(200);
-    expect((await r1pv.json()).dossier.statutPreparation).toBe("TERMINE");
+    expect((await r1p.json()).dossier.statutPreparation).toBe("TERMINE");
 
-    // Numérisation : soumission opérateur (-> À valider) puis validation superviseur (-> Terminé).
+    await createIndexedTestDocument(dossier.id);
+
+    // Le fichier disponible valide la numérisation et l'indexation.
     const r2 = await request.post(`/api/dossiers/${dossier.id}/numerize`, {
       headers: { Cookie: operateurCookie },
       data: { nombrePages: 5 },
     });
     expect(r2.status()).toBe(200);
-    expect((await r2.json()).dossier.statutNumerisation).toBe("A_VALIDER");
-    const r2v = await request.post(`/api/dossiers/${dossier.id}/numerize/validate`, { headers: { Cookie: superviseurCookie } });
-    expect(r2v.status()).toBe(200);
-    expect((await r2v.json()).dossier.statutNumerisation).toBe("TERMINE");
-
-    // Indexation : même principe.
-    const r3 = await request.post(`/api/dossiers/${dossier.id}/index`, { headers: { Cookie: operateurCookie } });
-    expect(r3.status()).toBe(200);
-    expect((await r3.json()).dossier.statutIndexation).toBe("A_VALIDER");
-    const r3v = await request.post(`/api/dossiers/${dossier.id}/index/validate`, { headers: { Cookie: superviseurCookie } });
-    expect(r3v.status()).toBe(200);
-    expect((await r3v.json()).dossier.statutIndexation).toBe("TERMINE");
+    expect((await r2.json()).dossier.statutNumerisation).toBe("TERMINE");
+    const automaticallyIndexed = await testPrisma.dossier.findUniqueOrThrow({ where: { id: dossier.id } });
+    expect(automaticallyIndexed.statutIndexation).toBe("TERMINE");
 
     // Archivage : même principe, dernière étape.
     const r4 = await request.post(`/api/dossiers/${dossier.id}/archive`, {
@@ -641,14 +712,13 @@ test("cycle complet : Collecte validée → chaque étape opérationnelle soumis
   }
 });
 
-test("un rejet renvoie l'étape à l'opérateur, qui peut la relancer jusqu'à validation (testé sur la Préparation)", async ({ request }) => {
+test("un rejet d'exception peut être corrigé puis validé automatiquement", async ({ request }) => {
   const dossier = await createTestDossier({ statutValidation: "VALIDE" });
   try {
     const superviseurCookie = await sessionCookieHeader(DEMO_USERS.superviseur);
     const operateurCookie = await sessionCookieHeader(DEMO_USERS.operateur1);
 
-    const r1 = await request.post(`/api/dossiers/${dossier.id}/prepare`, { headers: { Cookie: operateurCookie } });
-    expect((await r1.json()).dossier.statutPreparation).toBe("A_VALIDER");
+    await testPrisma.dossier.update({ where: { id: dossier.id }, data: { statutPreparation: "A_VALIDER" } });
 
     const r2 = await request.post(`/api/dossiers/${dossier.id}/prepare/reject`, {
       headers: { Cookie: superviseurCookie },
@@ -657,13 +727,12 @@ test("un rejet renvoie l'étape à l'opérateur, qui peut la relancer jusqu'à v
     expect((await r2.json()).dossier.statutPreparation).toBe("REJETE");
 
     // L'opérateur relance — nouvelle soumission autorisée depuis Rejeté.
-    const r3 = await request.post(`/api/dossiers/${dossier.id}/prepare`, { headers: { Cookie: operateurCookie } });
+    const r3 = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
+      headers: { Cookie: operateurCookie },
+      data: await validPreparationData(),
+    });
     expect(r3.status()).toBe(200);
-    expect((await r3.json()).dossier.statutPreparation).toBe("A_VALIDER");
-
-    const r4 = await request.post(`/api/dossiers/${dossier.id}/prepare/validate`, { headers: { Cookie: superviseurCookie } });
-    expect(r4.status()).toBe(200);
-    expect((await r4.json()).dossier.statutPreparation).toBe("TERMINE");
+    expect((await r3.json()).dossier.statutPreparation).toBe("TERMINE");
   } finally {
     await deleteTestDossier(dossier.id);
   }

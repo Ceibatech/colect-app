@@ -16,7 +16,7 @@ vi.mock("@/components/transferts/PrintButton", () => ({
   PrintButton: () => createElement("button", null, "Imprimer"),
 }));
 vi.mock("@/components/transferts/TransferActions", () => ({
-  ApproveTransferLotByCeibacButton: ({ lotId }: { lotId: number }) => createElement("button", { "data-ceibac-lot": lotId }, "Valider CEIBAC"),
+  ApproveTransferLotByCeibacButton: ({ lotId }: { lotId: number }) => createElement("button", { "data-ceibac-lot": lotId }, "Valider CEIBA"),
   AuthorizeTransferButton: ({ lotId }: { lotId: number }) => createElement("button", { "data-ministry-lot": lotId }, "Autoriser"),
   ReceptionApprovalDialog: ({ movementId, stage }: { movementId: number; stage: string }) =>
     createElement("button", { "data-reception": `${stage}:${movementId}` }, "Signer réception"),
@@ -33,14 +33,14 @@ function movement(id: number, type: Movement["type"], status: Movement["status"]
   return {
     id, reference: `BTR-${id}`, type, status, occurredAt: date, createdAt: date,
     dossierCount: 2, items: [], signatures: [],
-    transferLot: { id: 12, reference: "LOT-12", sourceSite: { nom: "Ministère" }, destinationSite: { nom: "CEIBAC" } },
+    transferLot: { id: 12, reference: "LOT-12", sourceSite: { nom: "Ministère" }, destinationSite: { nom: "Site CEIBA" } },
   };
 }
 
 function workspaceData(movements: Movement[] = []): WorkspaceProps["data"] {
   return {
     summary: { pendingLots: 1, pendingReceptions: 1, awaitingCeibac: 1 },
-    lots: [{ id: 12, reference: "LOT-12", createdAt: date, source: "Ministère", destination: "CEIBAC", dossierCount: 2 }],
+    lots: [{ id: 12, reference: "LOT-12", createdAt: date, source: "Ministère", destination: "Site CEIBA", dossierCount: 2 }],
     movements, total: movements.length, page: 1, totalPages: 1,
   };
 }
@@ -48,7 +48,7 @@ function workspaceData(movements: Movement[] = []): WorkspaceProps["data"] {
 function printLot() {
   return {
     id: 12, reference: "LOT-12", authorizedAt: null,
-    sourceSite: { nom: "Ministère" }, destinationSite: { nom: "CEIBAC" },
+    sourceSite: { nom: "Ministère" }, destinationSite: { nom: "Site CEIBA" },
     sourceEntrepot: null, destinationEntrepot: null,
     createdBy: { name: "Gestionnaire" }, authorizedBy: null,
     motif: null, ceibacValidatedAt: null, ceibacSignatoryName: null, ceibacSignatoryTitle: null, ceibacSignatureData: null,
@@ -58,7 +58,7 @@ function printLot() {
 }
 
 describe("transfer validation workspace rendering", () => {
-  it("only offers the ministry signature for CEIBAC-validated receptions", () => {
+  it("only offers the ministry signature for CEIBA-validated receptions", () => {
     const data = workspaceData([
       movement(1, "RECEPTION", "VALIDE_CEIBAC"),
       movement(2, "RECEPTION", "SOUMIS_CEIBAC"),
@@ -87,15 +87,15 @@ describe("transfer validation workspace rendering", () => {
     expect(html).not.toContain("data-reception=");
   });
 
-  it("offers CEIBAC lot and arrival approvals in the CEIBAC workspace", () => {
+  it("offers CEIBA lot and arrival approvals in the CEIBA workspace", () => {
     const data = workspaceData([movement(1, "RECEPTION", "SOUMIS_CEIBAC"), movement(2, "RECEPTION", "VALIDE_CEIBAC")]);
     data.totalPages = 2;
     const html = renderToStaticMarkup(createElement(TransferValidationWorkspace, {
-      data, filters: { statut: "ATTENTE_CEIBAC", page: 1 }, stage: "CEIBAC",
+      data, filters: { statut: "ATTENTE_CEIBAC", page: 1 }, stage: "CEIBA",
     }));
     expect(html).toContain('data-ceibac-lot="12"');
     expect(html).not.toContain("data-ministry-lot=");
-    expect(html.match(/data-reception="[^"]+"/g)).toEqual(['data-reception="CEIBAC:1"']);
+    expect(html.match(/data-reception="[^"]+"/g)).toEqual(['data-reception="CEIBA:1"']);
     expect(html).toContain('href="/transferts/validation-ceibac?statut=ATTENTE_CEIBAC&amp;page=2"');
   });
 });
@@ -110,7 +110,7 @@ describe("transfer lot print rendering", () => {
     expect(html).toContain("Fiche de lot à valider");
     expect(html).toContain("PROJET — SORTIE NON AUTORISÉE");
     expect(html).toContain("Composition à contrôler");
-    expect(html).toContain("En attente de validation CEIBAC.");
+    expect(html).toContain("En attente de validation CEIBA.");
     expect(html).toContain("En attente d’autorisation du ministère.");
     expect(html).not.toContain("Autorisation enregistrée et traçable");
     expect(html).not.toContain("Composition autorisée");
@@ -118,15 +118,15 @@ describe("transfer lot print rendering", () => {
     expect(html).not.toContain("<img");
   });
 
-  it("prints an old authorization without inventing the absent CEIBAC visa", async () => {
+  it("prints an old authorization without inventing the absent CEIBA visa", async () => {
     mocks.authorization.mockResolvedValue({
       ...printLot(), authorizedAt: date, authorizedBy: { name: "Responsable historique" },
     });
     const html = renderToStaticMarkup(await TransferAuthorizationPage({ params: Promise.resolve({ id: "12" }) }));
     expect(html).toContain("Autorisation de sortie et de transfert");
     expect(html).toContain("Autorisation enregistrée et traçable");
-    expect(html).toContain("Ancien circuit : visa CEIBAC non enregistré.");
-    const ceibacVisa = html.match(/Visa du responsable CEIBAC([\s\S]*?)Visa du responsable ministère/)?.[1];
+    expect(html).toContain("Ancien circuit : visa CEIBA non enregistré.");
+    const ceibacVisa = html.match(/Visa du responsable CEIBA([\s\S]*?)Visa du responsable ministère/)?.[1];
     expect(ceibacVisa).toBeDefined();
     expect(ceibacVisa).not.toContain("Signé le");
     expect(ceibacVisa).not.toContain("Responsable historique");

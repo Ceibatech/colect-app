@@ -23,7 +23,7 @@ import {
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const dossier = await prisma.dossier.findUnique({ where: { id: Number(id) }, select: { reference: true } });
-  return { title: dossier ? `${dossier.reference} — Dossiers` : "Dossier — GeoArchives-MULCV" };
+  return { title: dossier ? `${dossier.reference} — Dossiers` : "Dossier — GeoArchives" };
 }
 
 export default async function DossierDetailPage({
@@ -78,6 +78,7 @@ export default async function DossierDetailPage({
     dateSoumission: dossier.dateSoumission?.toISOString() ?? null,
     dateValidation: dossier.dateValidation?.toISOString() ?? null,
     datePreparation: dossier.datePreparation?.toISOString() ?? null,
+    preparationClaimedAt: dossier.preparationClaimedAt?.toISOString() ?? null,
     dateSoumissionPreparation: dossier.dateSoumissionPreparation?.toISOString() ?? null,
     dateNumerisation: dossier.dateNumerisation?.toISOString() ?? null,
     dateIndexation: dossier.dateIndexation?.toISOString() ?? null,
@@ -166,6 +167,7 @@ export default async function DossierDetailPage({
 
       <DossierDetailTabs
         dossier={serialized}
+        currentUserId={session.userId}
         permissions={session.permissions}
         typesPiece={typesPiece}
         indexingFields={indexingFields}

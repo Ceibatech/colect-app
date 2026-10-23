@@ -45,11 +45,14 @@ export type TypePieceInput = z.infer<typeof typePieceSchema>;
  * fiche "Informations générales du site" fournie par le métier. Seuls
  * `code` et `nom` sont obligatoires : les autres champs (contact, adresse,
  * date de mise en service...) peuvent être complétés progressivement.
+ * L'organisation propriétaire est obligatoire car elle détermine le sens
+ * autorisé des transferts entre le ministère et CEIBA.
  */
 export const siteSchema = z.object({
   code: z.string().min(1, "Le code est requis").max(20),
   nom: z.string().min(1, "Le nom est requis").max(150),
   typeSite: z.string().max(100).optional().or(z.literal("")),
+  organisation: z.enum(["MINISTERE", "CEIBA", "AUTRE"]),
   description: z.string().max(1000).optional().or(z.literal("")),
   isActive: z.coerce.boolean().default(true),
   dateMiseEnService: z.string().max(20).optional().or(z.literal("")),

@@ -1,4 +1,4 @@
-# Base de données — GeoArchives-MULCV
+# Base de données — GeoArchives
 
 Base cible : **MySQL 8 / MariaDB**, port `3306`. ORM : **Prisma 6.19.3** (générateur classique `prisma-client-js`).
 
@@ -268,7 +268,7 @@ processus métier — ils ne figurent pas sur la fiche CG1020.
   pas être compté deux fois lors d'une sortie partielle. Seuls les cartons dont tous les
   dossiers ont terminé la Préparation peuvent entrer dans un nouveau lot.
 - **Chaîne de garde** : `transfer_movements` est un journal immuable des sorties,
-  réceptions CEIBAC et retours. Chaque ligne de `transfer_movement_items` conserve l'état
+  réceptions CEIBA et retours. Chaque ligne de `transfer_movement_items` conserve l'état
   avant/après ; l'état courant du carton dans `transfer_lot_items` fournit le solde en
   temps réel (`PREVU`, `SORTI`, `RECU`, `RETOURNE`). Un lot n'est clôturé que lorsque tous
   ses cartons sont revenus sur le site d'origine.

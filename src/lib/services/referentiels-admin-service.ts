@@ -308,6 +308,7 @@ function siteDataFromInput(input: z.infer<typeof siteSchema>) {
     code: input.code,
     nom: input.nom,
     typeSite: input.typeSite || null,
+    organisation: input.organisation,
     description: input.description || null,
     isActive: input.isActive,
     dateMiseEnService: input.dateMiseEnService ? new Date(input.dateMiseEnService) : null,
@@ -333,6 +334,7 @@ function parseSiteFormData(formData: FormData) {
     code: formData.get("code"),
     nom: formData.get("nom"),
     typeSite: formData.get("typeSite"),
+    organisation: formData.get("organisation"),
     description: formData.get("description"),
     isActive: formData.get("isActive") === "on",
     dateMiseEnService: formData.get("dateMiseEnService"),
@@ -675,7 +677,7 @@ export async function reverseGeocodeSite(latitude: number, longitude: number): P
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}&zoom=18&addressdetails=0`;
     const res = await fetch(url, {
-      headers: { "User-Agent": "GeoArchives-MULCV/1.0 (contact: administration MULCV)", Accept: "application/json" },
+      headers: { "User-Agent": "GeoArchives/1.0 (contact: CEIBA Analytics)", Accept: "application/json" },
     });
     if (!res.ok) return { error: "Service de géocodage indisponible." };
     const json = (await res.json()) as { display_name?: string };

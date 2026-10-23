@@ -114,7 +114,7 @@ ARCHIVE_STORAGE_PROVIDER=alfresco
 ALFRESCO_API_URL=http://alfresco-geoarchives:8080/alfresco
 ALFRESCO_USERNAME=<compte-service-geoarchives>
 ALFRESCO_PASSWORD=<mot-de-passe-long-et-unique>
-ALFRESCO_ROOT_NODE_ID=<node-id-du-repertoire-GeoArchives-MULCV>
+ALFRESCO_ROOT_NODE_ID=<node-id-du-repertoire-GeoArchives>
 ALFRESCO_NODE_TYPE=arc:archiveDocument
 ALFRESCO_CLASSIFICATION=INTERNAL
 ```
@@ -122,7 +122,7 @@ ALFRESCO_CLASSIFICATION=INTERNAL
 `ALFRESCO_API_URL` doit pointer vers la racine Alfresco qui expose
 `/api/-default-/public/alfresco/versions/1`. Sur le VPS mutualisé, le déploiement
 crée le réseau Docker interne `geoarchives-alfresco`, un compte technique isolé et
-le répertoire racine `GeoArchives-MULCV`. Aucun identifiant Alfresco n'est publié
+le répertoire racine `GeoArchives`. Aucun identifiant Alfresco n'est publié
 dans GitHub et l'API documentaire ne doit pas être exposée sur Internet. Après
 modification :
 

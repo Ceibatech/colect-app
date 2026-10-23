@@ -28,8 +28,8 @@ const ROLES = [
   { code: "SUPERVISEUR", name: "Superviseur", description: "Contrôle, validation, rejet, supervision, dashboard, export." },
   { code: "OPERATEUR", name: "Opérateur", description: "Création et modification de ses dossiers, collecte, soumission." },
   { code: "GESTIONNAIRE_TRANSFERT", name: "Gestionnaire des transferts", description: "Constitution des lots, mouvements de stock et bordereaux signés." },
-  { code: "VALIDATEUR_CEIBAC", name: "Validateur CEIBAC", description: "Validation des lots avant visa du ministère et contrôle des constats de réception documentaire." },
-  { code: "VALIDATEUR_MINISTERE", name: "Validateur ministère", description: "Autorisation des lots de transfert et contre-signature des réceptions après visa CEIBAC." },
+  { code: "VALIDATEUR_CEIBAC", name: "Validateur CEIBA", description: "Validation des lots avant visa du ministère et contrôle CEIBA des constats de réception documentaire." },
+  { code: "VALIDATEUR_MINISTERE", name: "Validateur ministère", description: "Autorisation des lots de transfert et contre-signature des réceptions après visa CEIBA." },
   { code: "FINANCE", name: "Finance", description: "Pilotage des points, barèmes et projections budgétaires." },
   { code: "PMO", name: "PMO", description: "Pilotage en lecture seule du périmètre de superviseurs affecté." },
   { code: "EXECUTIF", name: "Exécutif", description: "Lecture seule des tableaux de bord globaux de pilotage." },
@@ -81,7 +81,7 @@ async function main() {
 
   const roleByCode: Record<string, number> = {};
   for (const r of ROLES) {
-    const role = await prisma.role.upsert({ where: { code: r.code }, update: {}, create: r });
+    const role = await prisma.role.upsert({ where: { code: r.code }, update: { name: r.name, description: r.description }, create: r });
     roleByCode[r.code] = role.id;
   }
   console.log(`✔ ${ROLES.length} rôles`);
@@ -119,8 +119,8 @@ async function main() {
 
   await prisma.setting.upsert({
     where: { key: "APP_NAME" },
-    update: {},
-    create: { key: "APP_NAME", value: "GeoArchives-MULCV — Numérisation & Indexation", isPublic: true },
+    update: { value: "GeoArchives - SAE interne CEIBA Analytics", isPublic: true },
+    create: { key: "APP_NAME", value: "GeoArchives - SAE interne CEIBA Analytics", isPublic: true },
   });
   console.log("✔ paramètre APP_NAME");
 

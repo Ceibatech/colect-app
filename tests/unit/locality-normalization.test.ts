@@ -44,6 +44,8 @@ describe("locality normalization", () => {
     ["Zone 3 Marcory", "Marcory"],
     ["KOULASSI", "Koumassi"],
     ["KOU", "Koumassi"],
+    ["PORT-BOUET", "Port Bouet"],
+    ["Port-Bouët", "Port Bouet"],
     ["PORY BOUET", "Port Bouet"],
     ["PORT BOUET VRIDI", "Port Bouet"],
   ])("rattache la commune %s à %s", (value, expected) => {

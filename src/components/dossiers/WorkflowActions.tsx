@@ -29,7 +29,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { PermissionCode } from "@/lib/permissions/constants";
-import { TypesPiecesField, type TypePieceOption } from "./TypesPiecesField";
+import type { TypePieceOption } from "./TypesPiecesField";
+import {
+  PreparationPieceBreakdownField,
+  type PreparationPieceLineInput,
+} from "./PreparationPieceBreakdownField";
 
 async function callWorkflowApi(id: number, action: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/dossiers/${id}/${action}`, {
@@ -138,7 +142,7 @@ export function ControleActions({ dossierId, permissions, statutValidation }: Pr
 }
 
 /** Statuts d'une étape pour lesquels l'opérateur ne peut pas (re)lancer l'action :
- * "A_VALIDER" (déjà soumise, en attente du superviseur) et "TERMINE" (déjà validée).
+ * "A_VALIDER" (exception en attente du superviseur) et "TERMINE" (déjà validée).
  * "REJETE" reste autorisé — c'est justement l'état qui permet à l'opérateur de relancer
  * l'action après un rejet (Phase 19+). */
 const STAGE_BLOCKED_FOR_OPERATOR = new Set(["A_VALIDER", "TERMINE"]);
@@ -157,39 +161,54 @@ export function PreparationActions({
   statutValidation,
   statutPreparation,
   typesPiece,
+  currentUserId,
+  preparateurId,
   initialData,
 }: Props & {
   typesPiece: TypePieceOption[];
+  currentUserId: number;
+  preparateurId: number | null;
   initialData: {
-    nombrePieces: number | null;
     typesPieces: string[];
+    pieceBreakdown: PreparationPieceLineInput[];
     autresPieces: string | null;
-    nombrePages: number | null;
     observationsPreparation: string | null;
   };
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [nombrePieces, setNombrePieces] = useState(initialData.nombrePieces?.toString() ?? "");
-  const [typesPieces, setTypesPieces] = useState<string[]>(initialData.typesPieces);
+  const [pieceBreakdown, setPieceBreakdown] = useState<PreparationPieceLineInput[]>(
+    initialData.pieceBreakdown.length > 0
+      ? initialData.pieceBreakdown
+      : initialData.typesPieces.map((typePiece) => ({ typePiece, nombrePieces: 0, nombrePages: 0 })),
+  );
   const [autresPieces, setAutresPieces] = useState(initialData.autresPieces ?? "");
-  const [nombrePages, setNombrePages] = useState(initialData.nombrePages?.toString() ?? "");
   const [observationsPreparation, setObservationsPreparation] = useState(initialData.observationsPreparation ?? "");
+  const breakdownIsValid = pieceBreakdown.length > 0 && pieceBreakdown.every(
+    (line) => line.nombrePieces > 0 && line.nombrePages >= line.nombrePieces,
+  );
 
   if (statutValidation !== "VALIDE" || STAGE_BLOCKED_FOR_OPERATOR.has(statutPreparation)) return null;
   if (!permissions.includes("PREPARATION_UPDATE")) return null;
+  if (statutPreparation === "EN_COURS" && preparateurId !== null && preparateurId !== currentUserId) return null;
 
   function run() {
+    if (!breakdownIsValid) {
+      toast.error("Renseignez le nombre de pièces et de pages pour chaque type.");
+      return;
+    }
     startTransition(async () => {
       try {
-        await callWorkflowApi(dossierId, "prepare", {
-          nombrePieces: nombrePieces ? Number(nombrePieces) : undefined,
-          typesPieces,
+        const result = await callWorkflowApi(dossierId, "prepare", {
+          pieceBreakdown,
           autresPieces: autresPieces.trim() ? autresPieces.trim() : undefined,
-          nombrePages: nombrePages ? Number(nombrePages) : undefined,
           observationsPreparation: observationsPreparation.trim() ? observationsPreparation.trim() : undefined,
         });
-        toast.success("Préparation soumise, en attente de validation du superviseur.");
+        toast.success(
+          result.dossier?.statutPreparation === "TERMINE"
+            ? "Préparation contrôlée et validée automatiquement."
+            : "Préparation transmise au superviseur pour anomalie.",
+        );
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de la préparation.");
@@ -216,20 +235,15 @@ export function PreparationActions({
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="prep-nombre-pieces">Nombre de pièces dans le dossier</Label>
-            <Input
-              id="prep-nombre-pieces"
-              type="number"
-              min={0}
-              step={1}
-              value={nombrePieces}
-              onChange={(e) => setNombrePieces(e.target.value)}
-              placeholder="Ex. 5"
+            <Label>Ventilation des pièces et des pages</Label>
+            <p className="text-xs text-muted-foreground">
+              Sélectionnez chaque type, puis indiquez sa quantité et son nombre total de pages. Les totaux du dossier sont calculés automatiquement.
+            </p>
+            <PreparationPieceBreakdownField
+              value={pieceBreakdown}
+              onChange={setPieceBreakdown}
+              typesPiece={typesPiece}
             />
-          </div>
-          <div className="space-y-2">
-            <Label>Types de pièces dans le dossier</Label>
-            <TypesPiecesField value={typesPieces} onChange={setTypesPieces} typesPiece={typesPiece} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="prep-autres-pieces">Autres pièces</Label>
@@ -239,18 +253,6 @@ export function PreparationActions({
               onChange={(e) => setAutresPieces(e.target.value)}
               rows={2}
               placeholder="Préciser toute autre pièce non listée ci-dessus..."
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="prep-nombre-pages">Nombre de pages</Label>
-            <Input
-              id="prep-nombre-pages"
-              type="number"
-              min={1}
-              step={1}
-              value={nombrePages}
-              onChange={(e) => setNombrePages(e.target.value)}
-              placeholder="Estimation du nombre de pages du dossier physique"
             />
           </div>
           <div className="space-y-2">
@@ -266,7 +268,7 @@ export function PreparationActions({
           </div>
         </div>
         <DialogFooter>
-          <Button disabled={isPending} onClick={run}>
+          <Button disabled={isPending || !breakdownIsValid} onClick={run}>
             {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
             Confirmer la préparation
           </Button>
@@ -286,8 +288,12 @@ export function NumerisationActions({ dossierId, permissions, statutPreparation,
   function run() {
     startTransition(async () => {
       try {
-        await callWorkflowApi(dossierId, "numerize", {});
-        toast.success("Numérisation soumise, en attente de validation du superviseur.");
+        const result = await callWorkflowApi(dossierId, "numerize", {});
+        toast.success(
+          result.dossier?.statutNumerisation === "TERMINE"
+            ? "Numérisation validée automatiquement."
+            : "Numérisation transmise au superviseur : aucun fichier n'est disponible.",
+        );
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de la numérisation.");
@@ -313,8 +319,12 @@ export function IndexationActions({ dossierId, permissions, statutNumerisation, 
   function run() {
     startTransition(async () => {
       try {
-        await callWorkflowApi(dossierId, "index", {});
-        toast.success("Indexation soumise, en attente de validation du superviseur.");
+        const result = await callWorkflowApi(dossierId, "index", {});
+        toast.success(
+          result.dossier?.statutIndexation === "TERMINE"
+            ? "Indexation validée automatiquement."
+            : "Seuls les documents à requalifier ont été transmis au superviseur.",
+        );
         router.refresh();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de l'indexation.");

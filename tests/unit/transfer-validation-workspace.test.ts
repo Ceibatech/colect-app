@@ -61,13 +61,13 @@ describe("transfer validation workspaces", () => {
     mocks.lots.mockResolvedValue([{
       id: 8, reference: "LOT-8", createdAt: new Date("2026-10-23T08:00:00Z"),
       sourceSite: { nom: "Ministère" }, sourceEntrepot: { nom: "Archives", localisation: "Bâtiment A" },
-      destinationSite: { nom: "CEIBAC" }, destinationEntrepot: null,
+      destinationSite: { nom: "Site CEIBA" }, destinationEntrepot: null,
       items: [{ dossierCountSnapshot: 4 }, { dossierCountSnapshot: 7 }],
     }]);
     mocks.movements.mockResolvedValue([{
       id: 5, reference: "REC-5", type: "RECEPTION", status: "VALIDE_CEIBAC",
       items: [{ transferLotItem: { dossierCountSnapshot: 4 } }, { transferLotItem: { dossierCountSnapshot: 7 } }],
-      signatures: [{ signatoryName: "Responsable CEIBAC", party: "CEIBAC_VALIDATOR", signedAt: new Date() }],
+      signatures: [{ signatoryName: "Responsable CEIBA", party: "CEIBAC_VALIDATOR", signedAt: new Date() }],
     }]);
     mocks.movementCount.mockResolvedValueOnce(1).mockResolvedValueOnce(1).mockResolvedValueOnce(3);
 
@@ -81,7 +81,7 @@ describe("transfer validation workspaces", () => {
     });
     expect(mocks.movements.mock.calls[0][0].select.signatures.select)
       .toEqual({ signatoryName: true, party: true, signedAt: true });
-    expect(result.lots[0]).toMatchObject({ source: "Ministère · Archives · Bâtiment A", destination: "CEIBAC", dossierCount: 11 });
+    expect(result.lots[0]).toMatchObject({ source: "Ministère · Archives · Bâtiment A", destination: "Site CEIBA", dossierCount: 11 });
     expect(result.movements[0].dossierCount).toBe(11);
     expect(result.summary).toEqual({ pendingLots: 1, pendingReceptions: 1, awaitingCeibac: 3 });
   });
@@ -108,7 +108,7 @@ describe("transfer validation workspaces", () => {
     expect(result.summary).toEqual({ pendingLots: 0, pendingReceptions: 8, awaitingCeibac: 4 });
   });
 
-  it("gives CEIBAC its own submitted lots and receptions before ministry approval", async () => {
+  it("gives CEIBA its own submitted lots and receptions before ministry approval", async () => {
     const result = await getCeibacTransferValidationWorkspace();
     expect(mocks.requirePermission).toHaveBeenCalledWith("TRANSFER_CEIBAC_APPROVE");
     expect(mocks.lots.mock.calls[0][0].where).toEqual({ status: "SOUMIS" });
@@ -116,7 +116,7 @@ describe("transfer validation workspaces", () => {
     expect(result).toMatchObject({ total: 0, page: 1, totalPages: 1 });
   });
 
-  it("keeps further CEIBAC receptions accessible through pagination and search", async () => {
+  it("keeps further CEIBA receptions accessible through pagination and search", async () => {
     mocks.movementCount.mockResolvedValueOnce(26).mockResolvedValueOnce(0).mockResolvedValueOnce(26);
     const result = await getCeibacTransferValidationWorkspace({ page: 2, q: " LOT-12 " });
     expect(mocks.movements.mock.calls[0][0]).toMatchObject({

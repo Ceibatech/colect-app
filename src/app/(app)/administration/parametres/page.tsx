@@ -16,7 +16,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 
-export const metadata = { title: "Configuration applicative - GeoArchives-MULCV" };
+export const metadata = { title: "Configuration applicative - GeoArchives" };
 
 interface SettingView {
   id: number;

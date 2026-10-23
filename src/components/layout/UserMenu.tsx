@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { logoutAction } from "@/lib/services/auth-service";
-import type { RoleCode } from "@/lib/permissions/constants";
+import { getRoleLabel, type RoleCode } from "@/lib/permissions/constants";
 
 function initials(name: string) {
   return name
@@ -39,7 +39,7 @@ export function UserMenu({ name, email, roleCode }: { name: string; email: strin
             </Avatar>
             <span className="hidden max-w-32 truncate font-medium sm:inline">{name}</span>
             <Badge variant="secondary" className="hidden rounded-md border border-border/60 bg-muted/70 font-semibold sm:inline-flex">
-              {roleCode}
+              {getRoleLabel(roleCode)}
             </Badge>
             <ChevronDown className="hidden h-3.5 w-3.5 text-muted-foreground sm:block" />
           </button>

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Download } from "lucide-react";
 import { PrintButton } from "@/components/transferts/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
 import { getTransferBordereau } from "@/lib/services/transfer-service";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" });
 
-export const metadata = { title: "Bordereau de transfert - GeoArchives-MULCV" };
+export const metadata = { title: "Bordereau de transfert - GeoArchives" };
 
 export default async function TransferSlipPage({ params }: { params: Promise<{ id: string; movementId: string }> }) {
   const { id: idParam, movementId: movementIdParam } = await params;
@@ -21,8 +21,8 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
   const movement = await getTransferBordereau(lotId, movementId);
   if (!movement) notFound();
   const ministrySignature = movement.signatures.find((signature) => signature.party === "MINISTERE");
-  const ceibacSignature = movement.signatures.find((signature) => signature.party === "CEIBAC");
-  const ceibacValidatorSignature = movement.signatures.find((signature) => signature.party === "CEIBAC_VALIDATOR");
+  const ceibaSignature = movement.signatures.find((signature) => signature.party === "CEIBAC");
+  const ceibaValidatorSignature = movement.signatures.find((signature) => signature.party === "CEIBAC_VALIDATOR");
   const source = placeLabel(movement.transferLot.sourceSite.nom, movement.transferLot.sourceEntrepot);
   const destination = placeLabel(movement.transferLot.destinationSite.nom, movement.transferLot.destinationEntrepot);
   const movementFrom = movement.type === "RETOUR" ? destination : source;
@@ -34,14 +34,14 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
     <div className="mx-auto max-w-5xl bg-white print:max-w-none">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link href={`/transferts/${lotId}`} className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Retour au lot</Link>
-        <PrintButton />
+        <div className="flex flex-wrap gap-2"><a href={`/api/transferts/${lotId}/bordereaux/${movementId}`} className={cn(buttonVariants())}><Download /> Télécharger F02</a><PrintButton /></div>
       </div>
 
       <article className="border border-slate-300 bg-white [print-color-adjust:exact]">
         <header className="border-b-4 border-[#28519f] p-6 sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#28519f]">GeoArchives-MULCV · Chaîne de garde</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#28519f]">F02 · GeoArchives · Chaîne de garde</p>
               <h1 className="mt-2 text-2xl font-bold">{movement.type === "RECEPTION" ? "Bordereau de déchargement et constat d'arrivée" : "Bordereau de transfert d'archives"}</h1>
               <p className="mt-2 text-sm text-slate-600">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</p>
               <p className="mt-1 text-xs font-semibold uppercase text-[#28519f]">{getTransferMovementStatusLabel(movement.status as TransferMovementStatusCode)}</p>
@@ -87,13 +87,13 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
         </section>
 
         <section className={cn("grid border-t border-slate-300", movement.type === "RECEPTION" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
-          {movement.type === "RECEPTION" ? <SignatureBlock title="Constat de l'agent CEIBAC" signature={ceibacSignature} /> : <SignatureBlock title={siteVisaTitle} signature={ministrySignature} />}
-          {movement.type === "RECEPTION" ? <SignatureBlock title="Visa du validateur CEIBAC" signature={ceibacValidatorSignature} /> : <SignatureBlock title="Visa du gestionnaire CEIBAC" signature={ceibacSignature} />}
+          {movement.type === "RECEPTION" ? <SignatureBlock title="Constat de l'agent CEIBA" signature={ceibaSignature} /> : <SignatureBlock title={siteVisaTitle} signature={ministrySignature} />}
+          {movement.type === "RECEPTION" ? <SignatureBlock title="Visa du validateur CEIBA" signature={ceibaValidatorSignature} /> : <SignatureBlock title="Visa du gestionnaire CEIBA" signature={ceibaSignature} />}
           {movement.type === "RECEPTION" ? <SignatureBlock title={`Visa final du ministère · ${destination}`} signature={ministrySignature} /> : null}
         </section>
 
         <footer className="flex flex-col gap-2 border-t border-slate-300 bg-slate-50 px-6 py-4 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-          <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-[#068c78]" /> {movement.status === "VALIDE_MINISTERE" ? "Mouvement validé dans GeoArchives-MULCV" : "Document en cours de validation"}</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 text-[#068c78]" /> {movement.status === "VALIDE_MINISTERE" ? "Mouvement validé dans GeoArchives" : "Document en cours de validation"}</span>
           <span>Saisie : {movement.createdBy.name} · {dateTimeFormatter.format(movement.createdAt)}</span>
         </footer>
       </article>

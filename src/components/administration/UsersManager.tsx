@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { createUser, updateUser, resetUserPassword, type ActionResult } from "@/lib/services/user-admin-service";
 import { cn } from "@/lib/utils";
 import { SendPendingUsersAccessDialog, SendUserAccessButton } from "@/components/administration/UserAccessEmailControls";
+import { getRoleLabel, ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
 
 export interface UserRow {
   id: number;
@@ -54,6 +55,11 @@ export interface SupervisorOption {
 
 const initialState: ActionResult = {};
 
+function displayRoleName(role: Pick<RoleOption, "code" | "name">) {
+  if (ROLE_CODES.includes(role.code as RoleCode)) return getRoleLabel(role.code as RoleCode);
+  return role.name.replace(/CEIBAC/gi, "CEIBA");
+}
+
 function RoleSelect({
   roles,
   defaultRoleId,
@@ -67,7 +73,7 @@ function RoleSelect({
   value?: string;
   onValueChange?: (value: string) => void;
 }) {
-  const items = roles.map((r) => ({ label: r.name, value: String(r.id), code: r.code }));
+  const items = roles.map((r) => ({ label: displayRoleName(r), value: String(r.id), code: r.code }));
   return (
     <Select
       name="roleId"
@@ -489,7 +495,7 @@ export function UsersManager({
                 </TableCell>
                 <TableCell className="whitespace-nowrap">{u.email}</TableCell>
                 <TableCell>
-                  <Badge variant="secondary">{u.role.name}</Badge>
+                  <Badge variant="secondary">{displayRoleName(u.role)}</Badge>
                   {u.operateur ? (
                     <span className="ml-1 text-xs text-muted-foreground">{u.operateur.matricule}</span>
                   ) : null}

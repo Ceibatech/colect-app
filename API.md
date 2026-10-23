@@ -1,4 +1,4 @@
-# API — GeoArchives-MULCV
+# API — GeoArchives
 
 L'application expose deux types d'endpoints serveur :
 

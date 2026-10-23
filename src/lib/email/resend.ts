@@ -71,7 +71,7 @@ export async function sendPasswordAccessEmail(message: PasswordAccessMessage): P
   const { apiKey, from } = getEmailConfiguration();
   const resend = new Resend(apiKey);
   const subject = message.purpose === "ACTIVATE"
-    ? "Votre accès GeoArchives-MULCV"
+    ? "Votre accès GeoArchives"
     : "Réinitialisation de votre mot de passe GeoArchives";
 
   const { data, error } = await resend.emails.send(

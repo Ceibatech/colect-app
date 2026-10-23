@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Clock3, FilePlus2, FileEdit } from "lucide-react";
 import type { DossierFormValues } from "@/lib/validation/dossier";
 
-export const metadata = { title: "Collecte — GeoArchives-MULCV" };
+export const metadata = { title: "Collecte — GeoArchives" };
 
 export default async function CollectePage({
   searchParams,

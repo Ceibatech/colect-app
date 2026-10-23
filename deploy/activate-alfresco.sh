@@ -142,13 +142,15 @@ const childrenResponse = await request("/nodes/-my-/children?skipCount=0&maxItem
   secret: password,
 });
 const children = (await childrenResponse.json()).list.entries.map(({ entry }) => entry);
-let root = children.find((entry) => entry.isFolder && entry.name === "GeoArchives-MULCV");
+let root = children.find((entry) => entry.isFolder && entry.name === "GeoArchives");
+// Reuse the legacy production folder so existing archives remain accessible.
+root ??= children.find((entry) => entry.isFolder && entry.name === "GeoArchives-MULCV");
 if (!root) {
   const createResponse = await request("/nodes/-my-/children", {
     username,
     secret: password,
     method: "POST",
-    body: { name: "GeoArchives-MULCV", nodeType: "cm:folder" },
+    body: { name: "GeoArchives", nodeType: "cm:folder" },
   });
   root = (await createResponse.json()).entry;
 }

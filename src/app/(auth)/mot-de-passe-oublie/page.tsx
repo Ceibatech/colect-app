@@ -2,7 +2,7 @@ import Image from "next/image";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
-export const metadata = { title: "Mot de passe oublié - GeoArchives-MULCV" };
+export const metadata = { title: "Mot de passe oublié - GeoArchives" };
 
 export default function ForgotPasswordPage() {
   return (

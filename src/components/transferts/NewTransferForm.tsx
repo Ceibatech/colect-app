@@ -19,6 +19,7 @@ interface SiteOption {
   id: number;
   code: string;
   nom: string;
+  organisation: "MINISTERE" | "CEIBA" | "AUTRE";
   entrepots: Array<{ id: number; code: string; nom: string; localisation: string | null }>;
 }
 
@@ -55,9 +56,11 @@ const MAX_DOSSIERS = 500;
 export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createTransferLot, initialState);
+  const ministrySites = useMemo(() => sites.filter((site) => site.organisation === "MINISTERE"), [sites]);
+  const ceibaSites = useMemo(() => sites.filter((site) => site.organisation === "CEIBA"), [sites]);
   const [sourceSiteId, setSourceSiteId] = useState("");
   const [sourceEntrepotId, setSourceEntrepotId] = useState("none");
-  const [destinationSiteId, setDestinationSiteId] = useState("");
+  const [destinationSiteId, setDestinationSiteId] = useState(() => ceibaSites.length === 1 ? String(ceibaSites[0].id) : "");
   const [destinationEntrepotId, setDestinationEntrepotId] = useState("none");
   const [includeUnlocated, setIncludeUnlocated] = useState(true);
   const [selected, setSelected] = useState<Map<number, TransferDossierItem>>(new Map());
@@ -101,8 +104,8 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
     };
   }, [sourceSiteId, sourceEntrepotId, includeUnlocated, search, page]);
 
-  const sourceSite = sites.find((site) => String(site.id) === sourceSiteId);
-  const destinationSite = sites.find((site) => String(site.id) === destinationSiteId);
+  const sourceSite = ministrySites.find((site) => String(site.id) === sourceSiteId);
+  const destinationSite = ceibaSites.find((site) => String(site.id) === destinationSiteId);
   const selectedIds = useMemo(() => [...selected.keys()], [selected]);
   const allPageSelected = results.items.length > 0 && results.items.every((item) => selected.has(item.id));
 
@@ -175,18 +178,18 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
 
       <section className="grid gap-5 rounded-lg border bg-card p-4 shadow-sm lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:p-5">
         <div className="space-y-4">
-          <div><h2 className="font-semibold">Site A · point de départ</h2><p className="text-sm text-muted-foreground">Emplacement qui détient actuellement les dossiers.</p></div>
+          <div><h2 className="font-semibold">Site du ministère · origine</h2><p className="text-sm text-muted-foreground">Site d&apos;inventaire qui détient actuellement les dossiers.</p></div>
           <div className="space-y-2">
-            <Label>Site d&apos;origine</Label>
+            <Label>Site du ministère</Label>
             <Select
               name="sourceSiteId"
-              items={sites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
+              items={ministrySites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
               value={sourceSiteId}
               onValueChange={changeSourceSite}
               disabled={pending}
             >
-              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site d'origine" /></SelectTrigger>
-              <SelectContent>{sites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site du ministère" /></SelectTrigger>
+              <SelectContent>{ministrySites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
@@ -213,18 +216,18 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
         <div className="hidden h-full items-center text-muted-foreground lg:flex"><ArrowRight className="mt-16 h-6 w-6" /></div>
 
         <div className="space-y-4">
-          <div><h2 className="font-semibold">Site B · destination</h2><p className="text-sm text-muted-foreground">Emplacement qui intégrera le stock après réception signée.</p></div>
+          <div><h2 className="font-semibold">Site CEIBA · destination</h2><p className="text-sm text-muted-foreground">Site de traitement qui intégrera le stock après réception signée.</p></div>
           <div className="space-y-2">
-            <Label>Site de destination</Label>
+            <Label>Site CEIBA</Label>
             <Select
               name="destinationSiteId"
-              items={sites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
+              items={ceibaSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
               value={destinationSiteId}
               onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }}
               disabled={pending}
             >
-              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site de destination" /></SelectTrigger>
-              <SelectContent>{sites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site CEIBA" /></SelectTrigger>
+              <SelectContent>{ceibaSites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
@@ -251,7 +254,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
 
       <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-end lg:justify-between lg:p-5">
-          <div><h2 className="font-semibold">Dossiers disponibles au site A</h2><p className="text-sm text-muted-foreground">Sélectionnez exactement les dossiers remis au gestionnaire de transfert.</p></div>
+          <div><h2 className="font-semibold">Dossiers disponibles au site du ministère</h2><p className="text-sm text-muted-foreground">Sélectionnez les dossiers inventoriés à remettre au gestionnaire de transfert CEIBA.</p></div>
           <div className="relative w-full lg:w-96"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Référence, titulaire, carton..." className="pl-9" disabled={!sourceSiteId} /></div>
         </div>
 
@@ -259,7 +262,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge variant="secondary" className="rounded-md">{selected.size} sélectionné{selected.size > 1 ? "s" : ""}</Badge>
-              <span className="text-muted-foreground">{sourceSiteId ? `${results.total} dossier${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site A pour charger le stock"}</span>
+              <span className="text-muted-foreground">{sourceSiteId ? `${results.total} dossier${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site du ministère pour charger l'inventaire"}</span>
             </div>
             {results.items.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={toggleCurrentPage}>{allPageSelected ? "Retirer cette page" : "Sélectionner cette page"}</Button> : null}
           </div>
@@ -315,7 +318,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
       <section className="grid gap-4 rounded-lg border bg-card p-4 shadow-sm sm:grid-cols-2 lg:p-5">
         <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" disabled={pending} /></div>
         <div className="space-y-2 sm:row-span-2"><Label htmlFor="motif">Objet / contexte</Label><Textarea id="motif" name="motif" rows={4} maxLength={2000} placeholder="Ex. prise en charge pour numérisation et indexation" disabled={pending} /></div>
-        <p className="text-xs leading-5 text-muted-foreground">Après création, soumettez le lot au responsable CEIBAC. Sa validation transmet le lot au ministère pour autorisation. Le stock ne diminue qu&apos;au bordereau de sortie signé ; il augmente au site B après les visas de réception.</p>
+        <p className="text-xs leading-5 text-muted-foreground">Après création, soumettez le lot au responsable CEIBA. Sa validation transmet le lot au ministère pour autorisation. Le stock du site d&apos;inventaire ne diminue qu&apos;après le F02 signé ; le stock du site CEIBA augmente après la réception validée.</p>
       </section>
 
       <div className="flex justify-end">

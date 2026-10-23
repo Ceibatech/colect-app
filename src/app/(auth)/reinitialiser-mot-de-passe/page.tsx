@@ -2,7 +2,7 @@ import Image from "next/image";
 import { KeyRound, ShieldCheck } from "lucide-react";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 
-export const metadata = { title: "Nouveau mot de passe - GeoArchives-MULCV" };
+export const metadata = { title: "Nouveau mot de passe - GeoArchives" };
 
 export default async function ResetPasswordPage({
   searchParams,

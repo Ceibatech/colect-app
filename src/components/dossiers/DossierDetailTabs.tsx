@@ -57,8 +57,17 @@ interface DossierDetail {
   etatDossierDescription: string | null;
   nombrePieces: number | null;
   typesPieces: Array<{ id: number; libelle: string }>;
+  preparationPieceLines: Array<{
+    id: number;
+    typePieceId: number;
+    nombrePieces: number;
+    nombrePages: number;
+    typePiece: { libelle: string };
+    preparedBy: { id: number; name: string };
+  }>;
   autresPieces: string | null;
   preparateur: { id: number; name: string } | null;
+  preparationClaimedAt: string | null;
   observationsPreparation: string | null;
   operateur: { nom: string; prenoms: string | null; matricule: string };
   nom: string | null;
@@ -147,6 +156,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export function DossierDetailTabs({
   dossier,
+  currentUserId,
   permissions,
   typesPiece,
   indexingFields,
@@ -155,6 +165,7 @@ export function DossierDetailTabs({
   initialTab = "informations",
 }: {
   dossier: DossierDetail;
+  currentUserId: number;
   permissions: PermissionCode[];
   typesPiece: TypePieceOption[];
   indexingFields: IndexingFieldOption[];
@@ -314,15 +325,39 @@ export function DossierDetailTabs({
                   label="Soumise le"
                   value={dossier.dateSoumissionPreparation ? dateFmt.format(new Date(dossier.dateSoumissionPreparation)) : null}
                 />
-                <Field label="Nombre de pièces" value={dossier.nombrePieces} />
-                <Field label="Nombre de pages" value={dossier.nombrePages} />
-                <Field label="Types de pièces" value={dossier.typesPieces.map((t) => t.libelle).join(", ") || null} />
                 <Field label="Autres pièces" value={dossier.autresPieces} />
                 <Field label="Observations de préparation" value={dossier.observationsPreparation} />
                 <Field
                   label="Date de préparation"
                   value={dossier.datePreparation ? dateFmt.format(new Date(dossier.datePreparation)) : null}
                 />
+              </div>
+              <div className="overflow-hidden rounded-md border">
+                <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] gap-2 bg-muted/60 px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
+                  <span>Type de pièce</span>
+                  <span className="text-center">Pièces</span>
+                  <span className="text-center">Pages</span>
+                </div>
+                {dossier.preparationPieceLines.length > 0 ? (
+                  <>
+                    {dossier.preparationPieceLines.map((line) => (
+                      <div key={line.id} className="grid grid-cols-[minmax(0,1fr)_96px_96px] gap-2 border-t px-3 py-2.5 text-sm">
+                        <span className="font-medium">{line.typePiece.libelle}</span>
+                        <span className="text-center tabular-nums">{line.nombrePieces}</span>
+                        <span className="text-center tabular-nums">{line.nombrePages}</span>
+                      </div>
+                    ))}
+                    <div className="grid grid-cols-[minmax(0,1fr)_96px_96px] gap-2 border-t bg-muted/35 px-3 py-2.5 text-sm font-semibold">
+                      <span>Total contrôlé</span>
+                      <span className="text-center tabular-nums">{dossier.nombrePieces ?? 0}</span>
+                      <span className="text-center tabular-nums">{dossier.nombrePages ?? 0}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="border-t px-3 py-3 text-sm text-muted-foreground">
+                    Préparation historique sans ventilation par type : {dossier.nombrePieces ?? 0} pièce(s), {dossier.nombrePages ?? 0} page(s), {dossier.typesPieces.map((type) => type.libelle).join(", ") || "types non renseignés"}.
+                  </div>
+                )}
               </div>
               <PreparationValidationActions
                 dossierId={dossier.id}
@@ -342,11 +377,16 @@ export function DossierDetailTabs({
                 statutIndexation={dossier.statutIndexation}
                 statutArchivage={dossier.statutArchivage}
                 typesPiece={typesPiece}
+                currentUserId={currentUserId}
+                preparateurId={dossier.preparateur?.id ?? null}
                 initialData={{
-                  nombrePieces: dossier.nombrePieces,
                   typesPieces: dossier.typesPieces.map((type) => String(type.id)),
+                  pieceBreakdown: dossier.preparationPieceLines.map((line) => ({
+                    typePiece: String(line.typePieceId),
+                    nombrePieces: line.nombrePieces,
+                    nombrePages: line.nombrePages,
+                  })),
                   autresPieces: dossier.autresPieces,
-                  nombrePages: dossier.nombrePages,
                   observationsPreparation: dossier.observationsPreparation,
                 }}
               />

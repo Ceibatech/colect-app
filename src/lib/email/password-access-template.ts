@@ -36,7 +36,7 @@ export function renderPasswordAccessEmail(input: PasswordAccessEmailInput): stri
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#fff;border:1px solid #d9e2ec;border-radius:8px;overflow:hidden">
           <tr><td style="height:4px;background:#008f7a"></td></tr>
           <tr><td style="padding:36px 40px 12px">
-            <p style="margin:0 0 14px;color:#008f7a;font-size:12px;font-weight:700;letter-spacing:1.4px">GEOARCHIVES-MULCV</p>
+            <p style="margin:0 0 14px;color:#008f7a;font-size:12px;font-weight:700;letter-spacing:1.4px">GEOARCHIVES · CEIBA ANALYTICS</p>
             <h1 style="margin:0 0 24px;color:#10243e;font-size:28px;line-height:1.25">${title}</h1>
             <p style="margin:0 0 14px;color:#5c6b7a;font-size:15px;line-height:1.65">Bonjour ${name},</p>
             <p style="margin:0 0 14px;color:#5c6b7a;font-size:15px;line-height:1.65">${explanation}</p>

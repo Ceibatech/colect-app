@@ -10,8 +10,8 @@ import {
 } from "@/lib/utils/transfer-stock";
 
 describe("transfer stock", () => {
-  it("distinguishes CEIBAC review from ministry authorization before departure", () => {
-    expect(getTransferLotStatusLabel("SOUMIS")).toBe("À valider par CEIBAC");
+  it("distinguishes CEIBA review from ministry authorization before departure", () => {
+    expect(getTransferLotStatusLabel("SOUMIS")).toBe("À valider par CEIBA");
     expect(getTransferLotStatusLabel("VALIDE_CEIBAC")).toBe("Visa ministère requis");
     expect(deriveTransferLotStatus(["PREVU", "PREVU"], "VALIDE_CEIBAC")).toBe("VALIDE_CEIBAC");
   });
@@ -19,9 +19,10 @@ describe("transfer stock", () => {
     expect(canApplyTransferStock("RECEPTION", "SOUMIS_CEIBAC")).toBe(false);
     expect(canApplyTransferStock("RECEPTION", "VALIDE_CEIBAC")).toBe(false);
     expect(canApplyTransferStock("RECEPTION", "VALIDE_MINISTERE")).toBe(true);
+    expect(canApplyTransferStock("SORTIE", "VALIDE_CEIBAC")).toBe(false);
     expect(canApplyTransferStock("SORTIE", "VALIDE_MINISTERE")).toBe(true);
   });
-  it("keeps the exact stock split between origin, transit, CEIBAC and returns", () => {
+  it("keeps the exact stock split between origin, transit, CEIBA and returns", () => {
     expect(getTransferStockSummary(["PREVU", "SORTI", "RECU", "RETOURNE"])).toEqual({
       total: 4,
       notDeparted: 1,

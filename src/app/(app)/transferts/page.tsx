@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Boxes, Building2, MapPin, Plus, Truck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
+import { TransferDocumentRegistry, type TransferDocumentItem } from "@/components/transferts/TransferDocumentRegistry";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import { getTransferDashboardData } from "@/lib/services/transfer-service";
 import type { TransferLotStatusCode } from "@/lib/utils/transfer-stock";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Transferts d'archives - GeoArchives-MULCV" };
+export const metadata = { title: "Transferts d'archives - GeoArchives" };
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" });
 
@@ -21,22 +22,107 @@ export default async function TransfersPage() {
     getTransferDashboardData(),
   ]);
   const canCreate = session.permissions.includes("TRANSFER_CREATE");
+  const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE");
+  const canOperate = session.permissions.includes("TRANSFER_OPERATE");
+  const canApproveCeiba = session.permissions.includes("TRANSFER_CEIBAC_APPROVE");
+  const canValidateCeiba = session.permissions.includes("TRANSFER_CEIBAC_VALIDATE");
+  const isCeibaValidator = session.roleCode === "VALIDATEUR_CEIBAC";
+  const canAccessSignedDocuments = canAuthorize || canOperate || canApproveCeiba || canValidateCeiba;
+  const documentTasks: TransferDocumentItem[] = [
+    ...(canApproveCeiba ? data.rows
+      .filter((row) => row.status === "SOUMIS")
+      .map((row) => ({
+        key: `F01-CEIBA-${row.id}`,
+        code: "F01",
+        title: `Lot ${row.reference} à contrôler`,
+        detail: "Le lot attend le visa du responsable CEIBA avant sa transmission au ministère.",
+        status: "Visa CEIBA requis",
+        state: "CEIBA_ACTION",
+        actionHref: `/transferts/${row.id}`,
+        downloadHref: null,
+      } satisfies TransferDocumentItem)) : []),
+    ...(canAuthorize ? data.rows
+      .filter((row) => row.status === "VALIDE_CEIBAC")
+      .map((row) => ({
+        key: `F01-MINISTRY-${row.id}`,
+        code: "F01",
+        title: `Autorisation ${row.reference} à signer`,
+        detail: "Le lot validé par CEIBA attend le visa du responsable du ministère.",
+        status: "Visa ministère requis",
+        state: "MINISTRY_ACTION",
+        actionHref: `/transferts/${row.id}`,
+        downloadHref: null,
+      } satisfies TransferDocumentItem)) : []),
+    ...(canAuthorize ? data.rows.flatMap((row) => row.movements
+      .filter((movement) => movement.status === "VALIDE_CEIBAC")
+      .map((movement) => ({
+        key: `F02-MINISTRY-${movement.id}`,
+        code: "F02",
+        title: `${movement.reference} à contre-signer`,
+        detail: `${row.reference} · bordereau préparé et signé par CEIBA`,
+        status: "Visa ministère requis",
+        state: "MINISTRY_ACTION",
+        actionHref: `/transferts/${row.id}#bordereaux`,
+        downloadHref: `/api/transferts/${row.id}/bordereaux/${movement.id}`,
+      } satisfies TransferDocumentItem))) : []),
+    ...(canValidateCeiba ? data.rows.flatMap((row) => row.movements
+      .filter((movement) => movement.status === "SOUMIS_CEIBAC")
+      .map((movement) => ({
+        key: `F02-CEIBA-${movement.id}`,
+        code: "F02",
+        title: `${movement.reference} à contrôler`,
+        detail: `${row.reference} · constat d'arrivée soumis par l'agent CEIBA`,
+        status: "Visa CEIBA requis",
+        state: "CEIBA_ACTION",
+        actionHref: `/transferts/${row.id}#bordereaux`,
+        downloadHref: `/api/transferts/${row.id}/bordereaux/${movement.id}`,
+      } satisfies TransferDocumentItem))) : []),
+    ...(canAccessSignedDocuments ? data.rows
+      .filter((row) => row.authorizedAt && !["ANNULE", "CLOTURE"].includes(row.status))
+      .map((row) => ({
+        key: `F01-CEIBA-${row.id}`,
+        code: "F01",
+        title: `Autorisation ${row.reference} disponible`,
+        detail: "Copie ministérielle signée, prête pour la préparation du transfert.",
+        status: "Document signé",
+        state: "SIGNED",
+        actionHref: `/transferts/${row.id}`,
+        downloadHref: `/api/transferts/${row.id}/autorisation`,
+      } satisfies TransferDocumentItem)) : []),
+    ...(canAccessSignedDocuments ? data.rows.flatMap((row) => row.movements
+      .filter((movement) => movement.status === "VALIDE_MINISTERE")
+      .map((movement) => ({
+        key: `F02-FINAL-${movement.id}`,
+        code: "F02",
+        title: `${movement.reference} signé`,
+        detail: `${row.reference} · copie finale contre-signée par le ministère`,
+        status: "Document final",
+        state: "SIGNED",
+        actionHref: `/transferts/${row.id}#bordereaux`,
+        downloadHref: `/api/transferts/${row.id}/bordereaux/${movement.id}`,
+      } satisfies TransferDocumentItem))) : []),
+  ];
 
   return (
     <div className="space-y-5 lg:space-y-6">
       <PageHeader
-        eyebrow="Chaîne de garde"
+        eyebrow={isCeibaValidator ? "Transferts d'archives" : "Chaîne de garde"}
         icon={Truck}
-        title="Registre des transferts"
-        description="Vue consolidée du stock documentaire par site. Une sortie diminue le site A; une réception signée augmente le site B et conserve la preuve du mouvement."
-        actions={<>
-          {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBAC</Link> : null}
-          {session.permissions.includes("TRANSFER_AUTHORIZE") ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
-          {canCreate ? (
-          <Link href="/transferts/nouveau" className={buttonVariants()}>
-            <Plus /> Identifier un lot
-          </Link>
-        ) : null}</>}
+        title={isCeibaValidator ? "Validation CEIBA" : "Registre des transferts"}
+        description={isCeibaValidator
+          ? "Contrôlez les lots soumis au responsable CEIBA et les constats d'arrivée avant leur transmission au ministère."
+          : "Vue consolidée du stock documentaire entre les sites d'inventaire du ministère et les sites de traitement CEIBA."}
+        actions={(
+          <>
+            {canApproveCeiba ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBA</Link> : null}
+            {canAuthorize ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
+            {canCreate ? (
+              <Link href="/transferts/nouveau" className={buttonVariants()}>
+                <Plus /> Identifier un lot
+              </Link>
+            ) : null}
+          </>
+        )}
         stats={[
           { label: "Dossiers inventoriés", value: data.summary.totalDossiers },
           { label: "En stock sur site", value: data.summary.onSite, tone: "success" },
@@ -44,6 +130,8 @@ export default async function TransfersPage() {
           { label: "Sans emplacement", value: data.summary.unlocated, tone: data.summary.unlocated > 0 ? "warning" : "success" },
         ]}
       />
+
+      <TransferDocumentRegistry documents={documentTasks} />
 
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">
@@ -55,7 +143,7 @@ export default async function TransfersPage() {
         <div className="divide-y divide-border/60 lg:hidden">
           {data.siteStock.map((site) => (
             <article key={site.id} className="space-y-3 p-4 sm:p-5">
-              <div><p className="font-semibold">{site.nom}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{site.code}</p></div>
+              <div><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{site.nom}</p><Badge variant="outline" className="rounded-md">{site.organisation === "CEIBA" ? "CEIBA" : site.organisation === "MINISTERE" ? "Ministère" : "Autre"}</Badge></div><p className="mt-1 font-mono text-xs text-muted-foreground">{site.code}</p></div>
               <div className="grid grid-cols-2 gap-3 border-y border-border/60 py-3 text-sm">
                 <Metric label="Stock sur site" value={site.onSite} />
                 <Metric label="Départs prévus" value={site.plannedOutbound} />
@@ -71,7 +159,7 @@ export default async function TransfersPage() {
             <TableBody>
               {data.siteStock.map((site) => (
                 <TableRow key={site.id}>
-                  <TableCell className="pl-5"><p className="font-semibold">{site.nom}</p><p className="mt-1 font-mono text-xs text-muted-foreground">{site.code}</p></TableCell>
+                  <TableCell className="pl-5"><div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{site.nom}</p><Badge variant="outline" className="rounded-md">{site.organisation === "CEIBA" ? "CEIBA" : site.organisation === "MINISTERE" ? "Ministère" : "Autre"}</Badge></div><p className="mt-1 font-mono text-xs text-muted-foreground">{site.code}</p></TableCell>
                   <TableCell className="text-center text-lg font-semibold tabular-nums text-primary">{site.onSite}</TableCell>
                   <TableCell className="text-center font-medium tabular-nums">{site.plannedOutbound}</TableCell>
                   <TableCell className="text-center font-medium tabular-nums text-brand-gold">{site.transitOutbound}</TableCell>
@@ -119,7 +207,7 @@ export default async function TransfersPage() {
                   <div className="grid grid-cols-3 gap-3 border-y border-border/60 py-3 text-sm">
                     <Metric label="Dossiers" value={row.stock.total} />
                     <Metric label="En circulation" value={row.stock.outsideOrigin} />
-                    <Metric label="Au site B" value={row.stock.atDestination} />
+                    <Metric label="Au site CEIBA" value={row.stock.atDestination} />
                   </div>
                   <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                     <span>{row.destination}</span>
@@ -137,7 +225,7 @@ export default async function TransfersPage() {
                     <TableHead>Trajet</TableHead>
                     <TableHead className="text-center">Dossiers</TableHead>
                     <TableHead className="text-center">En circulation</TableHead>
-                    <TableHead className="text-center">Au site B</TableHead>
+                    <TableHead className="text-center">Au site CEIBA</TableHead>
                     <TableHead>Mouvements</TableHead>
                     <TableHead>État</TableHead>
                     <TableHead className="pr-5 text-right">Accès</TableHead>

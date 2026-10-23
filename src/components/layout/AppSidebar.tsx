@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { BRAND } from "@/config/branding";
 import { usePathname } from "next/navigation";
 import {
   Sidebar,
@@ -51,8 +52,8 @@ export function AppSidebar({ permissions, roleCode }: { permissions: PermissionC
             priority
           />
           <div className="min-w-0 flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
-            <span className="truncate text-sm font-semibold text-sidebar-foreground">GeoArchives-MULCV</span>
-            <span className="truncate text-xs text-sidebar-foreground/60">Inventaire documentaire</span>
+            <span className="truncate text-sm font-semibold text-sidebar-foreground">{BRAND.productName}</span>
+            <span className="truncate text-xs text-sidebar-foreground/60">SAE interne CEIBA</span>
           </div>
         </div>
       </SidebarHeader>

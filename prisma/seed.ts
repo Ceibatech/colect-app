@@ -25,8 +25,8 @@ const ROLES = [
   { code: "SUPERVISEUR", name: "Superviseur", description: "Contrôle, validation, rejet, supervision, dashboard, export." },
   { code: "OPERATEUR", name: "Opérateur", description: "Création et modification de ses dossiers, collecte, soumission." },
   { code: "GESTIONNAIRE_TRANSFERT", name: "Gestionnaire des transferts", description: "Constitution des lots, mouvements de stock et bordereaux signés." },
-  { code: "VALIDATEUR_CEIBAC", name: "Validateur CEIBAC", description: "Validation des lots avant visa du ministère et contrôle des constats de réception documentaire." },
-  { code: "VALIDATEUR_MINISTERE", name: "Validateur ministère", description: "Autorisation des lots de transfert et contre-signature des réceptions après visa CEIBAC." },
+  { code: "VALIDATEUR_CEIBAC", name: "Validateur CEIBA", description: "Validation des lots avant visa du ministère et contrôle CEIBA des constats de réception documentaire." },
+  { code: "VALIDATEUR_MINISTERE", name: "Validateur ministère", description: "Autorisation des lots de transfert et contre-signature des réceptions après visa CEIBA." },
   { code: "FINANCE", name: "Finance", description: "Pilotage des points, barèmes et projections budgétaires." },
   { code: "PMO", name: "PMO", description: "Pilotage en lecture seule du périmètre de superviseurs affecté." },
   { code: "EXECUTIF", name: "Exécutif", description: "Lecture seule des tableaux de bord globaux de pilotage." },
@@ -47,9 +47,9 @@ const COMMUNES = [
 
 // Sites d'archivage fictifs (Phase 16+) — mêmes réserves que COMMUNES ci-dessus.
 const SITES = [
-  { code: "SITE-DEMO-01", nom: "Site Démo Central", typeSite: "Siège" },
-  { code: "SITE-DEMO-02", nom: "Site Démo Dépôt Nord", typeSite: "Dépôt" },
-  { code: "SITE-DEMO-03", nom: "Site Démo Antenne Sud", typeSite: "Antenne" },
+  { code: "SITE-DEMO-01", nom: "Site ministère - Central", typeSite: "Siège", organisation: "MINISTERE" as const },
+  { code: "SITE-DEMO-02", nom: "Site ministère - Dépôt Nord", typeSite: "Dépôt", organisation: "MINISTERE" as const },
+  { code: "SITE-DEMO-CEIBA", nom: "Site CEIBA", typeSite: "Site de traitement", organisation: "CEIBA" as const },
 ];
 
 const NATURES_DOSSIER = [
@@ -131,7 +131,7 @@ async function main() {
   for (const r of ROLES) {
     const role = await prisma.role.upsert({
       where: { code: r.code },
-      update: {},
+      update: { name: r.name, description: r.description },
       create: r,
     });
     roleByCode[r.code] = role.id;
@@ -241,7 +241,7 @@ async function main() {
   for (const [i, s] of SITES.entries()) {
     const site = await prisma.site.upsert({
       where: { code: s.code },
-      update: {},
+      update: { nom: s.nom, typeSite: s.typeSite, organisation: s.organisation },
       create: { ...s, communeId: communes[i % communes.length]?.id, ville: "Abidjan", region: "Abidjan" },
     });
     sites.push(site);
@@ -301,8 +301,8 @@ async function main() {
   // 9. Paramètres applicatifs
   await prisma.setting.upsert({
     where: { key: "APP_NAME" },
-    update: {},
-    create: { key: "APP_NAME", value: "GeoArchives-MULCV — Numérisation & Indexation", isPublic: true },
+    update: { value: "GeoArchives - SAE interne CEIBA Analytics", isPublic: true },
+    create: { key: "APP_NAME", value: "GeoArchives - SAE interne CEIBA Analytics", isPublic: true },
   });
 
   // 10. Dossiers fictifs + cycle de vie

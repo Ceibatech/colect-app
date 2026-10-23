@@ -21,6 +21,7 @@ export interface SiteRow {
   code: string;
   nom: string;
   typeSite: string | null;
+  organisation: "MINISTERE" | "CEIBA" | "AUTRE";
   description: string | null;
   isActive: boolean;
   dateMiseEnService: string | null; // ISO (YYYY-MM-DD), déjà sérialisé par la page
@@ -48,6 +49,11 @@ const initialState: ActionResult = {};
 // reste en saisie libre, "etc." dans la fiche fournie indique une liste non
 // exhaustive qu'on ne doit pas figer en liste fermée.
 const TYPE_SITE_SUGGESTIONS = ["Siège", "Dépôt", "Antenne"];
+const SITE_ORGANISATIONS = [
+  { value: "MINISTERE", label: "Ministère - site d'inventaire" },
+  { value: "CEIBA", label: "CEIBA - site de traitement" },
+  { value: "AUTRE", label: "Autre organisation" },
+] as const;
 
 /**
  * Géolocalisation du site (Phase 17+) : capture via l'API Geolocation du
@@ -191,7 +197,7 @@ function SiteForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="nom">Nom du site</Label>
-          <Input id="nom" name="nom" placeholder="Site central MULCV" defaultValue={defaultValues?.nom} maxLength={150} required disabled={isPending} />
+          <Input id="nom" name="nom" placeholder="Site ministère - Plateau" defaultValue={defaultValues?.nom} maxLength={150} required disabled={isPending} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="typeSite">Type de site</Label>
@@ -209,6 +215,23 @@ function SiteForm({
               <option key={t} value={t} />
             ))}
           </datalist>
+        </div>
+        <div className="space-y-2">
+          <Label>Organisation propriétaire</Label>
+          <Select
+            name="organisation"
+            items={SITE_ORGANISATIONS}
+            defaultValue={defaultValues?.organisation ?? "MINISTERE"}
+            disabled={isPending}
+          >
+            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {SITE_ORGANISATIONS.map((organisation) => (
+                <SelectItem key={organisation.value} value={organisation.value}>{organisation.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Détermine si le site peut être utilisé comme origine ministère ou destination CEIBA dans les transferts.</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="dateMiseEnService">Date de mise en service</Label>
@@ -347,6 +370,7 @@ export function SitesManager({ sites, communes }: { sites: SiteRow[]; communes: 
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Nom</TableHead>
+              <TableHead>Organisation</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Commune</TableHead>
               <TableHead>Dossiers</TableHead>
@@ -357,7 +381,7 @@ export function SitesManager({ sites, communes }: { sites: SiteRow[]; communes: 
           <TableBody>
             {sites.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                <TableCell colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
                   Aucun site. Créez-en un pour qu&apos;il soit proposé dans la Collecte.
                 </TableCell>
               </TableRow>
@@ -366,6 +390,7 @@ export function SitesManager({ sites, communes }: { sites: SiteRow[]; communes: 
                 <TableRow key={s.id}>
                   <TableCell className="font-mono text-xs">{s.code}</TableCell>
                   <TableCell className="font-medium">{s.nom}</TableCell>
+                  <TableCell><Badge variant="outline">{s.organisation === "MINISTERE" ? "Ministère" : s.organisation === "CEIBA" ? "CEIBA" : "Autre"}</Badge></TableCell>
                   <TableCell className="text-sm text-muted-foreground">{s.typeSite ?? "—"}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{s.commune?.nom ?? "—"}</TableCell>
                   <TableCell>{s._count.dossiers}</TableCell>

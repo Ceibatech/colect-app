@@ -86,7 +86,12 @@ export function CollecteWizard({
   const [currentStep, setCurrentStep] = useState(1);
   const [draftId, setDraftId] = useState<number | undefined>(initialDraftId);
   const [isPending, startTransition] = useTransition();
-  const [done, setDone] = useState<{ reference: string; carton: ActiveCartonValues } | null>(null);
+  const [done, setDone] = useState<{
+    reference: string;
+    carton: ActiveCartonValues;
+    autoValidated: boolean;
+    anomalyCount: number;
+  } | null>(null);
   const [isContinuingCarton, setIsContinuingCarton] = useState(false);
 
   const form = useForm<DossierFormValues>({
@@ -228,8 +233,17 @@ export function CollecteWizard({
     startTransition(async () => {
       try {
         const result = await submitDossier(values, draftId);
-        setDone({ reference: result.reference, carton: extractActiveCartonValues(values) });
-        toast.success(`Dossier ${result.reference} soumis avec succès.`);
+        setDone({
+          reference: result.reference,
+          carton: extractActiveCartonValues(values),
+          autoValidated: result.autoValidated,
+          anomalyCount: result.anomalyCount,
+        });
+        toast.success(
+          result.autoValidated
+            ? `Dossier ${result.reference} validé automatiquement.`
+            : `Dossier ${result.reference} transmis au superviseur.`,
+        );
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de la soumission du dossier.");
       }
@@ -253,7 +267,11 @@ export function CollecteWizard({
             <p className="text-sm text-muted-foreground">
               Référence : <span className="font-mono font-semibold text-foreground">{done.reference}</span>
             </p>
-            <p className="text-sm text-muted-foreground">Le dossier est maintenant en contrôle avant validation.</p>
+            <p className="text-sm text-muted-foreground">
+              {done.autoValidated
+                ? "Aucune anomalie bloquante : le dossier est déjà disponible pour la préparation."
+                : `${done.anomalyCount} anomalie(s) détectée(s) : seul ce dossier remonte au superviseur.`}
+            </p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
             <Button variant="outline" onClick={() => router.push("/dashboard")}>

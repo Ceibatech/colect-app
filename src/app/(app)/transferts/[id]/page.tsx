@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, FileText, PackageCheck, Route, ShieldCheck, Truck } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Download, FileText, PackageCheck, Route, ShieldCheck, Truck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ApproveTransferLotByCeibacButton, AuthorizeTransferButton, ReceptionApprovalDialog, SubmitTransferButton, TransferMovementDialog, type TransferMovementItemOption } from "@/components/transferts/TransferActions";
 import { ConvoyTrackingPanel } from "@/components/transferts/ConvoyTrackingPanel";
@@ -27,7 +27,7 @@ const dateFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium" });
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return { title: `Lot ${id} - Transferts GeoArchives-MULCV` };
+  return { title: `Lot ${id} - Transferts GeoArchives` };
 }
 
 export default async function TransferDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -52,13 +52,13 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE") && lot.status === "VALIDE_CEIBAC";
   const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "SOUMIS", "VALIDE_CEIBAC", "ANNULE", "CLOTURE"].includes(lot.status);
   const canTrack = session.permissions.includes("TRANSFER_TRACK");
-  const canValidateCeibac = session.permissions.includes("TRANSFER_CEIBAC_VALIDATE");
+  const canValidateCeiba = session.permissions.includes("TRANSFER_CEIBAC_VALIDATE");
   const canValidateMinistry = session.permissions.includes("TRANSFER_AUTHORIZE");
-  const pendingReceptionItemIds = new Set(lot.movements
-    .filter((movement) => movement.type === "RECEPTION" && ["SOUMIS_CEIBAC", "VALIDE_CEIBAC"].includes(movement.status))
+  const pendingMovementItemIds = new Set(lot.movements
+    .filter((movement) => ["SOUMIS_CEIBAC", "VALIDE_CEIBAC"].includes(movement.status))
     .flatMap((movement) => movement.items.map((entry) => entry.transferLotItem.id)));
   const movementOptions = (status: TransferItemStatusCode): TransferMovementItemOption[] => lot.items
-    .filter((item) => item.status === status && (status !== "SORTI" || !pendingReceptionItemIds.has(item.id)))
+    .filter((item) => item.status === status && !pendingMovementItemIds.has(item.id))
     .map((item) => ({ id: item.id, cartonCode: item.cartonCode, cartonLabel: item.cartonLabel, dossierCount: item.dossierCountSnapshot }));
   const dossierRows = lot.items.flatMap((item) => item.dossiers.map((entry) => ({
     ...entry.dossier,
@@ -77,9 +77,10 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         actions={(
           <>
             <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Registre</Link>
-            <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> {lot.authorizedAt ? "Autorisation" : "Fiche du lot"}</Link>
+            <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> {lot.authorizedAt ? "Prévisualiser F01" : "Fiche du lot"}</Link>
+            {lot.authorizedAt ? <a href={`/api/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><Download /> Télécharger F01</a> : null}
             {canValidateMinistry ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
-            {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBAC</Link> : null}
+            {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBA</Link> : null}
             {canSubmit ? <SubmitTransferButton lotId={lot.id} /> : null}
             {canApproveCeibac ? <ApproveTransferLotByCeibacButton lotId={lot.id} /> : null}
             {canAuthorize ? <AuthorizeTransferButton lotId={lot.id} /> : null}
@@ -87,9 +88,9 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         )}
         stats={[
           { label: "Dossiers du lot", value: stock.total },
-          { label: "Au site A", value: stock.notDeparted },
+          { label: "Au site du ministère", value: stock.notDeparted },
           { label: "En circulation", value: stock.outsideOrigin, tone: stock.outsideOrigin > 0 ? "warning" : "success" },
-          { label: "Retournés au site A", value: stock.returned, tone: "success" },
+          { label: "Retournés au ministère", value: stock.returned, tone: "success" },
         ]}
       />
 
@@ -101,15 +102,15 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Situation du stock</CardTitle>
-                <CardDescription>Le stock du site B n&apos;augmente qu&apos;après les visas CEIBAC et ministère du constat de réception.</CardDescription>
+                <CardDescription>Le stock du site CEIBA n&apos;augmente qu&apos;après les visas CEIBA et ministère du constat de réception.</CardDescription>
               </div>
               <TransferLotStatusBadge status={lot.status as TransferLotStatusCode} />
             </div>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <StockMetric label="Sur le site A" value={stock.atOrigin} hint="non sorti + retourné" tone="default" />
+            <StockMetric label="Site du ministère" value={stock.atOrigin} hint="non sorti + retourné" tone="default" />
             <StockMetric label="En transit" value={stock.inTransit} hint="sorti, non réceptionné" tone="warning" />
-            <StockMetric label="Sur le site B" value={stock.atDestination} hint="réception confirmée" tone="success" />
+            <StockMetric label="Site CEIBA" value={stock.atDestination} hint="réception confirmée" tone="success" />
             <StockMetric label="Dossiers identifiés" value={stock.total} hint="composition figée" tone="default" />
           </CardContent>
         </Card>
@@ -118,7 +119,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           <CardHeader><CardTitle>Traçabilité</CardTitle><CardDescription>Responsables et jalons du dossier.</CardDescription></CardHeader>
           <CardContent className="space-y-4 text-sm">
             <TraceRow icon={CalendarClock} label="Créé" value={`${dateTimeFormatter.format(lot.createdAt)} par ${lot.createdBy.name}`} />
-            <TraceRow icon={ShieldCheck} label="Validation CEIBAC" value={lot.ceibacValidatedAt ? `${dateTimeFormatter.format(lot.ceibacValidatedAt)} par ${lot.ceibacSignatoryName ?? "CEIBAC"}` : lot.authorizedAt ? "Ancien circuit : visa CEIBAC non enregistré" : "En attente"} />
+            <TraceRow icon={ShieldCheck} label="Validation CEIBA" value={lot.ceibacValidatedAt ? `${dateTimeFormatter.format(lot.ceibacValidatedAt)} par ${lot.ceibacSignatoryName ?? "CEIBA"}` : lot.authorizedAt ? "Ancien circuit : visa CEIBA non enregistré" : "En attente"} />
             <TraceRow icon={ShieldCheck} label="Autorisation" value={lot.authorizedAt && lot.authorizedBy ? `${dateTimeFormatter.format(lot.authorizedAt)} par ${lot.authorizedBy.name}` : "En attente"} />
             <TraceRow icon={Route} label="Transfert prévu" value={lot.plannedAt ? dateFormatter.format(lot.plannedAt) : "Non planifié"} />
           </CardContent>
@@ -174,7 +175,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         </div>
       </Card>
 
-      <Card className="bg-card/95">
+      <Card id="bordereaux" className="scroll-mt-20 bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex items-start justify-between gap-3"><div><CardTitle>Bordereaux et mouvements</CardTitle><CardDescription>Historique immuable des remises, réceptions et retours signés.</CardDescription></div><Badge variant="outline" className="rounded-md">{lot.movements.length}</Badge></div>
         </CardHeader>
@@ -193,9 +194,10 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
                   </div>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
-                  {movement.status === "SOUMIS_CEIBAC" && canValidateCeibac ? <ReceptionApprovalDialog movementId={movement.id} stage="CEIBAC" /> : null}
-                  {movement.status === "VALIDE_CEIBAC" && canValidateMinistry ? <ReceptionApprovalDialog movementId={movement.id} stage="MINISTERE" /> : null}
-                  <Link href={`/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><FileText /> Ouvrir le bordereau</Link>
+                  {movement.status === "SOUMIS_CEIBAC" && canValidateCeiba ? <ReceptionApprovalDialog movementId={movement.id} movementType={movement.type as TransferMovementTypeCode} stage="CEIBA" /> : null}
+                  {movement.status === "VALIDE_CEIBAC" && canValidateMinistry ? <ReceptionApprovalDialog movementId={movement.id} movementType={movement.type as TransferMovementTypeCode} stage="MINISTERE" /> : null}
+                  <Link href={`/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><FileText /> Prévisualiser F02</Link>
+                  <a href={`/api/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><Download /> Télécharger F02</a>
                 </div>
               </article>
             ))}
@@ -209,10 +211,10 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
 function TransferWorkflow({ submitted, ceibacApproved, authorized, hasDeparture, hasArrival }: { submitted: boolean; ceibacApproved: boolean; authorized: boolean; hasDeparture: boolean; hasArrival: boolean }) {
   const steps = [
     { label: "Lot soumis", detail: "Gestionnaire", complete: submitted },
-    { label: "Lot validé", detail: "Responsable CEIBAC", complete: ceibacApproved },
+    { label: "Lot validé", detail: "Responsable CEIBA", complete: ceibacApproved },
     { label: "Sortie autorisée", detail: "Visa ministère", complete: authorized },
     { label: "Acheminement", detail: "Bordereau + GPS", complete: hasDeparture },
-    { label: "Réception validée", detail: "CEIBAC + ministère", complete: hasArrival },
+    { label: "Réception validée", detail: "CEIBA + ministère", complete: hasArrival },
   ];
   return (
     <Card className="bg-card/95">

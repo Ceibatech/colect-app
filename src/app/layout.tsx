@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { BRAND } from "@/config/branding";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,10 +18,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "GeoArchives-MULCV",
+    default: BRAND.productName,
     template: "%s",
   },
-  description: "GeoArchives-MULCV — statut archivage : numérisation & indexation",
+  description: `${BRAND.productName} - ${BRAND.productDescriptor}`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

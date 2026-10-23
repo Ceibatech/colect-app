@@ -7,6 +7,23 @@
 export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
+export const ROLE_LABELS: Record<RoleCode, string> = {
+  ADMIN: "Administrateur",
+  SUPERVISEUR: "Superviseur",
+  OPERATEUR: "Opérateur",
+  GESTIONNAIRE_TRANSFERT: "Gestionnaire des transferts",
+  VALIDATEUR_CEIBAC: "Validateur CEIBA",
+  VALIDATEUR_MINISTERE: "Validateur ministère",
+  FINANCE: "Finance",
+  PMO: "PMO",
+  EXECUTIF: "Exécutif",
+  CONSULTATION: "Consultation",
+};
+
+export function getRoleLabel(roleCode: RoleCode) {
+  return ROLE_LABELS[roleCode];
+}
+
 export const PERMISSIONS = [
   "DASHBOARD_VIEW",
   "DOSSIER_CREATE",

@@ -7,15 +7,18 @@ import type { PermissionCode } from "@/lib/permissions/constants";
 import type { PreparationWorkspaceItem } from "@/lib/services/preparation-service";
 import { cn } from "@/lib/utils";
 import { STATUT_PREPARATION_LABELS, statutBadgeVariant } from "@/lib/utils/dossier-status";
+import { PreparationClaimButton } from "./PreparationClaimButton";
 
 const dateFmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 
 export function PreparationQueueTable({
   items,
   permissions,
+  currentUserId,
 }: {
   items: PreparationWorkspaceItem[];
   permissions: PermissionCode[];
+  currentUserId: number;
 }) {
   if (items.length === 0) {
     return (
@@ -37,6 +40,7 @@ export function PreparationQueueTable({
         <TableHeader>
           <TableRow className="bg-muted/55 hover:bg-muted/55">
             <TableHead>Dossier</TableHead>
+            <TableHead>Carton</TableHead>
             <TableHead>Site</TableHead>
             <TableHead>Inventorié par</TableHead>
             <TableHead>Préparé par</TableHead>
@@ -47,11 +51,15 @@ export function PreparationQueueTable({
         </TableHeader>
         <TableBody>
           {items.map((item) => {
-            const canPrepare =
+            const canClaim =
               permissions.includes("PREPARATION_UPDATE") &&
-              (item.statutPreparation === "EN_ATTENTE" || item.statutPreparation === "REJETE");
+              (item.statutPreparation === "EN_ATTENTE" || item.statutPreparation === "REJETE" || item.preparationClaimExpired);
+            const canContinue =
+              permissions.includes("PREPARATION_UPDATE") &&
+              item.statutPreparation === "EN_COURS" &&
+              item.preparateurId === currentUserId;
             const canValidate = permissions.includes("PREPARATION_VALIDATE") && item.statutPreparation === "A_VALIDER";
-            const actionLabel = canPrepare ? "Préparer" : canValidate ? "Contrôler" : "Consulter";
+            const actionLabel = canContinue ? "Continuer" : canValidate ? "Contrôler" : "Consulter";
 
             return (
               <TableRow key={item.id} className="hover:bg-accent/30">
@@ -60,6 +68,10 @@ export function PreparationQueueTable({
                   <p className="mt-1 text-xs text-muted-foreground">
                     {[item.nom, item.prenoms].filter(Boolean).join(" ") || item.libelleCarton || "Titulaire non renseigné"}
                   </p>
+                </TableCell>
+                <TableCell>
+                  <p className="font-medium">{item.codeBarres ?? item.libelleCarton ?? "Non identifié"}</p>
+                  {item.codeBarres && item.libelleCarton ? <p className="text-xs text-muted-foreground">{item.libelleCarton}</p> : null}
                 </TableCell>
                 <TableCell>{item.site?.nom ?? "À confirmer"}</TableCell>
                 <TableCell>
@@ -76,13 +88,17 @@ export function PreparationQueueTable({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Link
-                    href={`/dossiers/${item.id}?tab=preparation&from=preparation`}
-                    className={cn(buttonVariants({ size: "sm", variant: canPrepare || canValidate ? "default" : "outline" }), "whitespace-nowrap")}
-                  >
-                    {canPrepare || canValidate ? <ClipboardCheck className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}
-                    {actionLabel}
-                  </Link>
+                  {canClaim ? (
+                    <PreparationClaimButton dossierId={item.id} />
+                  ) : (
+                    <Link
+                      href={`/dossiers/${item.id}?tab=preparation&from=preparation`}
+                      className={cn(buttonVariants({ size: "sm", variant: canContinue || canValidate ? "default" : "outline" }), "whitespace-nowrap")}
+                    >
+                      {canContinue || canValidate ? <ClipboardCheck className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}
+                      {actionLabel}
+                    </Link>
+                  )}
                 </TableCell>
               </TableRow>
             );

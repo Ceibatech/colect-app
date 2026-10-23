@@ -15,7 +15,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-export const metadata = { title: "Performance opérateurs - GeoArchives-MULCV" };
+export const metadata = { title: "Performance opérateurs - GeoArchives" };
 
 const PIPELINE_LABELS = ["Soumission", "Validation", "Numérisation", "Indexation", "Archivage"];
 

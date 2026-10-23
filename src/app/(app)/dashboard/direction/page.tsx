@@ -16,7 +16,10 @@ import { computePipelineScore } from "@/lib/utils/pipeline-score";
 import { cn } from "@/lib/utils";
 import {
   Activity,
+  AlertCircle,
   Archive,
+  Calculator,
+  CheckCircle2,
   Clock,
   Database,
   FileCheck2,
@@ -31,12 +34,21 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export const metadata = { title: "Dashboard Direction - GeoArchives-MULCV" };
+export const metadata = { title: "Dashboard Direction - GeoArchives" };
 
 const numberFormatter = new Intl.NumberFormat("fr-FR");
 const rateFormatter = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 type MetricTone = "default" | "success" | "warning" | "destructive";
+type FormulaControlStatus = "ok" | "review" | "empty";
+
+interface FormulaControlRow {
+  label: string;
+  formula: string;
+  sources: string;
+  result: string;
+  status: FormulaControlStatus;
+}
 
 const metricTones: Record<MetricTone, { bar: string; icon: string; value: string; surface: string }> = {
   default: {
@@ -116,6 +128,44 @@ export default async function DashboardDirectionPage() {
   ];
   const natureMetric = inventoryCompleteness.metrics.find((metric) => metric.key === "natureDossier");
   const reliableFields = inventoryCompleteness.metrics.filter((metric) => metric.rate >= 90).length;
+  const pipelineNumerator = overview.soumis + overview.valides + overview.numerises + overview.indexes + overview.archives;
+  const formulaControls: FormulaControlRow[] = [
+    {
+      label: "Indice pipeline",
+      formula: "(Soumis + validés + numérisés + indexés + archivés) ÷ (5 × total) × 100",
+      sources: `${formatNumber(pipelineNumerator)} jalons atteints ÷ ${formatNumber(overview.total * 5)} jalons possibles × 100`,
+      result: `${globalProgress} %`,
+      status: pipelineControlStatus(overview),
+    },
+    {
+      label: "Reste à archiver",
+      formula: "Total des dossiers − dossiers archivés",
+      sources: `${formatNumber(overview.total)} − ${formatNumber(overview.archives)}`,
+      result: formatNumber(backlog),
+      status: overview.archives <= overview.total ? "ok" : "review",
+    },
+    ...stageRows.map((stage) => ({
+      label: `Taux de ${stage.label.toLocaleLowerCase("fr-FR")}`,
+      formula: "Dossiers ayant atteint le jalon ÷ base éligible × 100",
+      sources: `${formatNumber(stage.count)} ÷ ${formatNumber(stage.base)} × 100`,
+      result: `${rateFormatter.format(stage.value)} %`,
+      status: ratioControlStatus(stage.count, stage.base),
+    })),
+    {
+      label: "Taux de rejet",
+      formula: "Dossiers rejetés ÷ total des dossiers × 100",
+      sources: `${formatNumber(overview.rejetes)} ÷ ${formatNumber(overview.total)} × 100`,
+      result: `${rateFormatter.format(rejectionRate)} %`,
+      status: ratioControlStatus(overview.rejetes, overview.total),
+    },
+    {
+      label: "Taux de retard",
+      formula: "Dossiers non archivés sans mise à jour depuis 30 jours ÷ total × 100",
+      sources: `${formatNumber(overview.dossiersEnRetard)} ÷ ${formatNumber(overview.total)} × 100`,
+      result: `${rateFormatter.format(lateRate)} %`,
+      status: ratioControlStatus(overview.dossiersEnRetard, overview.total),
+    },
+  ];
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -193,6 +243,30 @@ export default async function DashboardDirectionPage() {
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+                <Calculator className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <CardTitle>Contrôle des indicateurs calculés</CardTitle>
+                <CardDescription>
+                  Les formules et leurs valeurs sources sont affichées pour rendre chaque résultat vérifiable.
+                </CardDescription>
+              </div>
+            </div>
+            <Badge variant="outline" className="w-fit rounded-md bg-background/70 tabular-nums">
+              {formulaControls.length} calculs contrôlés
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <FormulaControlTable rows={formulaControls} />
+        </CardContent>
+      </Card>
+
+      <Card className="bg-card/95">
+        <CardHeader className="border-b border-border/60 pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <CardTitle>Progression par &eacute;tape</CardTitle>
               <CardDescription>Chaque jalon contribue à parts égales à l&apos;indice consolidé.</CardDescription>
@@ -222,6 +296,11 @@ export default async function DashboardDirectionPage() {
               <Badge variant="outline" className="w-fit rounded-md bg-background/70 tabular-nums">
                 {reliableFields}/12 champs à 90 % ou plus
               </Badge>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+              <span><strong className="font-medium text-foreground">Taux</strong> = renseignés ÷ total × 100</span>
+              <span><strong className="font-medium text-foreground">À compléter</strong> = total − renseignés</span>
+              <span className="tabular-nums">Base actuelle : {formatNumber(inventoryCompleteness.total)} dossiers</span>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -302,6 +381,61 @@ export default async function DashboardDirectionPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function FormulaControlTable({ rows }: { rows: FormulaControlRow[] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[900px] text-sm">
+        <thead className="bg-muted/45 text-left text-xs uppercase tracking-[0.08em] text-muted-foreground">
+          <tr>
+            <th className="px-4 py-3 font-medium sm:px-5">Indicateur</th>
+            <th className="px-3 py-3 font-medium">Formule métier</th>
+            <th className="px-3 py-3 font-medium">Valeurs utilisées</th>
+            <th className="px-3 py-3 text-right font-medium">Résultat</th>
+            <th className="px-4 py-3 text-right font-medium sm:px-5">Contrôle</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/60">
+          {rows.map((row) => (
+            <tr key={row.label} className="align-top transition-colors hover:bg-muted/25">
+              <td className="px-4 py-3 font-medium text-foreground sm:px-5">{row.label}</td>
+              <td className="max-w-sm px-3 py-3 text-xs leading-5 text-muted-foreground">{row.formula}</td>
+              <td className="max-w-sm px-3 py-3 font-mono text-xs leading-5 text-foreground">{row.sources}</td>
+              <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">{row.result}</td>
+              <td className="px-4 py-3 text-right sm:px-5">
+                <FormulaControlBadge status={row.status} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function FormulaControlBadge({ status }: { status: FormulaControlStatus }) {
+  if (status === "ok") {
+    return (
+      <Badge variant="outline" className="rounded-md border-brand-green/30 bg-brand-green/5 text-brand-green">
+        <CheckCircle2 data-icon="inline-start" /> Cohérent
+      </Badge>
+    );
+  }
+
+  if (status === "empty") {
+    return (
+      <Badge variant="outline" className="rounded-md bg-background text-muted-foreground">
+        <AlertCircle data-icon="inline-start" /> Base vide
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="destructive" className="rounded-md">
+      <AlertCircle data-icon="inline-start" /> À vérifier
+    </Badge>
   );
 }
 
@@ -445,4 +579,26 @@ function clampPercent(value: number) {
 
 function plural(value: number, singular: string, pluralLabel: string) {
   return value === 1 ? singular : pluralLabel;
+}
+
+function ratioControlStatus(numerator: number, denominator: number): FormulaControlStatus {
+  if (denominator <= 0) return "empty";
+  return numerator >= 0 && numerator <= denominator ? "ok" : "review";
+}
+
+function pipelineControlStatus(overview: {
+  total: number;
+  soumis: number;
+  valides: number;
+  numerises: number;
+  indexes: number;
+  archives: number;
+}): FormulaControlStatus {
+  if (overview.total <= 0) return "empty";
+  const milestones = [overview.soumis, overview.valides, overview.numerises, overview.indexes, overview.archives];
+  return milestones.every((value) => value >= 0 && value <= overview.total) ? "ok" : "review";
+}
+
+function formatNumber(value: number) {
+  return numberFormatter.format(value);
 }

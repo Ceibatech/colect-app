@@ -74,7 +74,7 @@ test("administration : création d'un site (Phase 16+)", async ({ page }) => {
 });
 
 test("administration : géolocalisation d'un site via le bouton 'Capturer ma position GPS' (Phase 17+)", async ({ page, context }) => {
-  // Coordonnées de test (siège du MULCV, Abidjan Plateau — valeur d'exemple,
+  // Coordonnées de test (site du ministère, Abidjan Plateau - valeur d'exemple,
   // seule la mécanique de capture est testée ici). Le géocodage inverse
   // (adresse GPS) appelle un vrai service externe (OpenStreetMap/Nominatim)
   // — non asserté ici pour ne pas rendre ce test dépendant d'un réseau tiers.

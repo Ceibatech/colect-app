@@ -15,7 +15,7 @@ type WorkspaceData = Awaited<ReturnType<typeof getTransferValidationWorkspace>>;
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 const FILTERS = [
   { value: "A_VALIDER", label: "À signer par le ministère" },
-  { value: "ATTENTE_CEIBAC", label: "En attente du visa CEIBAC" },
+  { value: "ATTENTE_CEIBAC", label: "En attente du visa CEIBA" },
   { value: "VALIDES", label: "Validés" },
   { value: "TOUS", label: "Tous les bordereaux" },
 ] as const;
@@ -23,7 +23,7 @@ const FILTERS = [
 export function TransferValidationWorkspace({ data, filters, stage }: {
   data: WorkspaceData;
   filters: TransferValidationSearch;
-  stage: "CEIBAC" | "MINISTERE";
+  stage: "CEIBA" | "MINISTERE";
 }) {
   const ministry = stage === "MINISTERE";
   const basePath = ministry ? "/transferts/validation" : "/transferts/validation-ceibac";
@@ -35,9 +35,9 @@ export function TransferValidationWorkspace({ data, filters, stage }: {
       <PageHeader
         eyebrow="Transferts d’archives"
         icon={ShieldCheck}
-        title={ministry ? "Validation ministère" : "Validation CEIBAC"}
+        title={ministry ? "Validation ministère" : "Validation CEIBA"}
         description={ministry
-          ? "Examinez les lots validés par CEIBAC, autorisez leur sortie et consultez les bordereaux de réception à contre-signer."
+          ? "Examinez les lots validés par CEIBA, autorisez leur sortie et consultez les bordereaux de réception à contre-signer."
           : "Contrôlez les lots soumis par le gestionnaire avant leur transmission au ministère, puis les constats d’arrivée."}
         actions={<Link href="/transferts" className={buttonVariants({ variant: "outline" })}><ArrowLeft /> Registre et suivi</Link>}
         stats={[
@@ -50,8 +50,8 @@ export function TransferValidationWorkspace({ data, filters, stage }: {
         <CardHeader>
           <CardTitle>{ministry ? "Autorisation de sortie des lots" : "Validation des lots avant départ"}</CardTitle>
           <CardDescription>{ministry
-            ? "Ces lots ont reçu le visa CEIBAC. La sortie reste bloquée jusqu’à votre autorisation."
-            : "Ces lots attendent le visa du responsable CEIBAC. Votre signature les transmet au ministère."}</CardDescription>
+            ? "Ces lots ont reçu le visa CEIBA. La sortie reste bloquée jusqu’à votre autorisation."
+            : "Ces lots attendent le visa du responsable CEIBA. Votre signature les transmet au ministère."}</CardDescription>
         </CardHeader>
         {data.lots.length === 0 ? <CardContent><p className="text-sm text-muted-foreground">Aucun lot en attente à cette étape.</p></CardContent> : (
           <div className="divide-y border-t">
@@ -117,7 +117,7 @@ export function TransferValidationWorkspace({ data, filters, stage }: {
                   <Link href={`/transferts/${movement.transferLot.id}/bordereaux/${movement.id}`} className={buttonVariants({ variant: "outline" })}><FileText /> Ouvrir le bordereau</Link>
                   <Link href={`/transferts/${movement.transferLot.id}`} className={buttonVariants({ variant: "outline" })}>Lot et suivi</Link>
                   {movement.type === "RECEPTION" && movement.status === (ministry ? "VALIDE_CEIBAC" : "SOUMIS_CEIBAC")
-                    ? <ReceptionApprovalDialog movementId={movement.id} stage={stage} /> : null}
+                    ? <ReceptionApprovalDialog movementId={movement.id} movementType={movement.type} stage={stage} /> : null}
                 </div>
               </article>
             ))}

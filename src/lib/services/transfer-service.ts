@@ -21,12 +21,13 @@ export async function getTransferCreateData() {
   await requirePermission("TRANSFER_CREATE");
   const [sites, totalDossiers] = await Promise.all([
     prisma.site.findMany({
-      where: { isActive: true },
+      where: { isActive: true, organisation: { in: ["MINISTERE", "CEIBA"] } },
       orderBy: { nom: "asc" },
       select: {
         id: true,
         code: true,
         nom: true,
+        organisation: true,
         entrepots: {
           where: { isActive: true },
           orderBy: { nom: "asc" },
@@ -123,13 +124,16 @@ export async function getTransferDashboardData() {
         destinationEntrepot: { select: { nom: true, code: true, localisation: true } },
         createdBy: { select: { name: true } },
         items: { select: { status: true, dossierCountSnapshot: true } },
-        _count: { select: { movements: true } },
+        movements: {
+          orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+          select: { id: true, reference: true, type: true, status: true, occurredAt: true },
+        },
       },
     }),
     prisma.site.findMany({
       where: { isActive: true },
       orderBy: { nom: "asc" },
-      select: { id: true, code: true, nom: true },
+      select: { id: true, code: true, nom: true, organisation: true },
     }),
     prisma.dossier.groupBy({ by: ["siteId"], where: { siteId: { not: null } }, _count: { _all: true } }),
     prisma.dossier.count(),
@@ -159,9 +163,11 @@ export async function getTransferDashboardData() {
     source: lot.sourceEntrepot ? [lot.sourceSite.nom, lot.sourceEntrepot.nom, lot.sourceEntrepot.localisation].filter(Boolean).join(" · ") : lot.sourceSite.nom,
     destination: lot.destinationEntrepot ? [lot.destinationSite.nom, lot.destinationEntrepot.nom, lot.destinationEntrepot.localisation].filter(Boolean).join(" · ") : lot.destinationSite.nom,
     plannedAt: lot.plannedAt,
+    authorizedAt: lot.authorizedAt,
     createdAt: lot.createdAt,
     createdBy: lot.createdBy.name,
-    movementCount: lot._count.movements,
+    movementCount: lot.movements.length,
+    movements: lot.movements,
     dossierCount: lot.items.reduce((sum, item) => sum + item.dossierCountSnapshot, 0),
     stock: getTransferDossierStockSummary(lot.items.map((item) => ({
       status: item.status as TransferItemStatusCode,

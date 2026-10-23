@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Pilotage financier - GeoArchives-MULCV" };
+export const metadata = { title: "Pilotage financier - GeoArchives" };
 
 export default async function FinanceDashboardPage({
   searchParams,

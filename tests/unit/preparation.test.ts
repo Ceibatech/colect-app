@@ -4,10 +4,11 @@ import { parsePreparationSearch, preparationInputSchema } from "@/lib/validation
 describe("preparationInputSchema", () => {
   test("accepte et nettoie les informations métier de préparation", () => {
     const result = preparationInputSchema.parse({
-      nombrePieces: 8,
-      typesPieces: ["1", "new:Plan de lotissement"],
+      pieceBreakdown: [
+        { typePiece: "1", nombrePieces: 3, nombrePages: 12 },
+        { typePiece: "new:Plan de lotissement", nombrePieces: 5, nombrePages: 30 },
+      ],
       autresPieces: "  Procès-verbal  ",
-      nombrePages: 42,
       observationsPreparation: "  Agrafes retirées et ordre vérifié.  ",
     });
 
@@ -16,8 +17,19 @@ describe("preparationInputSchema", () => {
   });
 
   test("refuse les quantités incohérentes", () => {
-    expect(preparationInputSchema.safeParse({ nombrePieces: -1 }).success).toBe(false);
-    expect(preparationInputSchema.safeParse({ nombrePages: 0 }).success).toBe(false);
+    expect(preparationInputSchema.safeParse({ pieceBreakdown: [] }).success).toBe(false);
+    expect(preparationInputSchema.safeParse({
+      pieceBreakdown: [{ typePiece: "1", nombrePieces: 3, nombrePages: 2 }],
+    }).success).toBe(false);
+  });
+
+  test("refuse un type déclaré deux fois", () => {
+    expect(preparationInputSchema.safeParse({
+      pieceBreakdown: [
+        { typePiece: "1", nombrePieces: 1, nombrePages: 1 },
+        { typePiece: "1", nombrePieces: 2, nombrePages: 4 },
+      ],
+    }).success).toBe(false);
   });
 });
 

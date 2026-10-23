@@ -27,7 +27,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-export const metadata = { title: "Conformité documentaire - GeoArchives-MULCV" };
+export const metadata = { title: "Conformité documentaire - GeoArchives" };
 
 type QualityTone = "default" | "success" | "warning" | "destructive";
 

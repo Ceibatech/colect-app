@@ -5,7 +5,7 @@ import { NAV_ITEMS } from "@/config/navigation";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export const metadata = { title: "Administration — GeoArchives-MULCV" };
+export const metadata = { title: "Administration — GeoArchives" };
 
 export default async function AdministrationPage() {
   const session = await requirePermission("USER_MANAGE");

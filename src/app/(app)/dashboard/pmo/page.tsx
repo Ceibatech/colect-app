@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Pilotage PMO - GeoArchives-MULCV" };
+export const metadata = { title: "Pilotage PMO - GeoArchives" };
 
 export default async function PmoDashboardPage() {
   const overview = await getPmoOverview();

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Eye, FileSearch, Pencil } from "lucide-react";
+import { AlertTriangle, Eye, FileSearch, Pencil } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -44,6 +44,7 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
             <TableHead>Opérateur</TableHead>
             <TableHead>Collecte</TableHead>
             <TableHead>Validation</TableHead>
+            <TableHead>Anomalies</TableHead>
             <TableHead>Préparation</TableHead>
             <TableHead>Numérisation</TableHead>
             <TableHead>Indexation</TableHead>
@@ -73,6 +74,16 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
                 <Badge variant={statutBadgeVariant(d.statutValidation)} className="rounded-md">
                   {STATUT_VALIDATION_LABELS[d.statutValidation]}
                 </Badge>
+              </TableCell>
+              <TableCell>
+                {d.anomalies.length > 0 ? (
+                  <Badge variant="destructive" className="rounded-md whitespace-nowrap">
+                    <AlertTriangle className="mr-1 h-3 w-3" />
+                    {d.anomalies.length}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
               </TableCell>
               <TableCell>
                 <Badge variant={statutBadgeVariant(d.statutPreparation)} className="rounded-md">

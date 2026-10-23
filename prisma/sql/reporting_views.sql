@@ -1,5 +1,5 @@
 -- ================================================================
--- Vues SQL de reporting — GeoArchives-MULCV
+-- Vues SQL de reporting — GeoArchives
 -- Ce fichier est la source de vérité ; son contenu est copié tel quel
 -- dans une migration Prisma dédiée (prisma/migrations/..._reporting_views)
 -- afin que les vues restent reproductibles via `prisma migrate deploy`.

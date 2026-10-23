@@ -4,22 +4,9 @@ import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { RoleCode } from "@/lib/permissions/constants";
+import { getRoleLabel } from "@/lib/permissions/constants";
 
-export const metadata = { title: "Sécurité du compte - GeoArchives-MULCV" };
-
-const ROLE_LABELS: Record<RoleCode, string> = {
-  ADMIN: "Administrateur",
-  SUPERVISEUR: "Superviseur",
-  OPERATEUR: "Opérateur",
-  GESTIONNAIRE_TRANSFERT: "Gestionnaire des transferts",
-  VALIDATEUR_CEIBAC: "Validateur CEIBAC",
-  VALIDATEUR_MINISTERE: "Validateur ministère",
-  FINANCE: "Finance",
-  PMO: "PMO",
-  EXECUTIF: "Exécutif",
-  CONSULTATION: "Consultation",
-};
+export const metadata = { title: "Sécurité du compte - GeoArchives" };
 
 export default async function ComptePage() {
   const session = await requireUser();
@@ -34,7 +21,7 @@ export default async function ComptePage() {
         actions={<Badge variant="outline" className="rounded-md bg-background/80">Compte actif</Badge>}
         stats={[
           { label: "Utilisateur", value: session.name },
-          { label: "Rôle", value: ROLE_LABELS[session.roleCode] },
+          { label: "Rôle", value: getRoleLabel(session.roleCode) },
           { label: "Adresse de connexion", value: session.email },
         ]}
       />

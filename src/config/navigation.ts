@@ -67,7 +67,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW",
     children: [
       { title: "Registre et bordereaux", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW" },
-      { title: "Validation CEIBAC", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
+      { title: "Validation CEIBA", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
       { title: "Validation ministère", href: "/transferts/validation", icon: ShieldCheck, permission: "TRANSFER_AUTHORIZE" },
     ],
   },

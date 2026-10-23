@@ -97,6 +97,10 @@ export async function searchDossiers(filters: DossierSearchFilters, options: Dos
         commune: { select: { id: true, nom: true } },
         natureDossier: { select: { id: true, libelle: true } },
         operateur: { select: { id: true, nom: true, prenoms: true } },
+        anomalies: {
+          where: { statut: { in: ["OUVERTE", "EN_COURS"] } },
+          select: { id: true, gravite: true },
+        },
       },
     }),
     prisma.dossier.count({ where }),
@@ -123,6 +127,17 @@ export async function getDossierDetail(id: number) {
       lotissement: true,
       natureDossier: true,
       typesPieces: true,
+      preparationPieceLines: {
+        orderBy: { typePiece: { libelle: "asc" } },
+        select: {
+          id: true,
+          typePieceId: true,
+          nombrePieces: true,
+          nombrePages: true,
+          typePiece: { select: { libelle: true } },
+          preparedBy: { select: { id: true, name: true } },
+        },
+      },
       operateur: true,
       preparateur: { select: { id: true, name: true } },
       history: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } },

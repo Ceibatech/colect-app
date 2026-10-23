@@ -1,4 +1,4 @@
-# Architecture — GeoArchives-MULCV
+# Architecture — GeoArchives
 
 ## 1. Architecture fonctionnelle
 
@@ -435,15 +435,15 @@ jamais soumis à cette restriction de périmètre.
 
 **Registre de transferts et chaîne de garde** : `/transferts` couvre la constitution d'un
 lot depuis les cartons préparés, son autorisation, les sorties partielles, la réception
-chez CEIBAC et le retour au ministère. La composition du carton n'étant pas matérialisée
+chez CEIBA et le retour au ministère. La composition du carton n'étant pas matérialisée
 par une table historique dédiée, elle est figée au moment de la constitution à partir du
 triplet site + entrepôt + code-barres ; les références des dossiers sont ensuite
 conservées dans le dossier de garde. Les transitions de stock sont atomiques en base et
 produisent un bordereau imprimable avec deux visas. Le gestionnaire constitue le lot et
-le soumet à CEIBAC (`BROUILLON` → `SOUMIS`). Le responsable CEIBAC le signe
+le soumet à CEIBA (`BROUILLON` → `SOUMIS`). Le responsable CEIBA le signe
 (`VALIDE_CEIBAC`), puis le ministère autorise le départ (`AUTORISE`). Chaque signature
 et sa transition sont enregistrées dans une même transaction avec l'audit. Les lots
-autorisés avant l'introduction du visa CEIBAC conservent leur autorisation historique.
+autorisés avant l'introduction du visa CEIBA conservent leur autorisation historique.
 Matrice d'accès : GESTIONNAIRE_TRANSFERT constitue et enregistre les mouvements ;
 VALIDATEUR_CEIBAC valide les lots et les constats d'arrivée ; VALIDATEUR_MINISTERE
 autorise les lots et contre-signe les réceptions. SUPERVISEUR conserve ses visas

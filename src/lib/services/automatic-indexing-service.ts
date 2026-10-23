@@ -27,6 +27,7 @@ import {
 } from "@/lib/indexing/indexing-policy";
 import type { z } from "zod";
 import type { indexingWorkerFailureSchema, indexingWorkerResultSchema } from "@/lib/validation/indexing-worker";
+import { reconcileDossierIndexation } from "@/lib/services/workflow-automation-service";
 
 type WorkerResult = z.infer<typeof indexingWorkerResultSchema>;
 type WorkerFailure = z.infer<typeof indexingWorkerFailureSchema>;
@@ -553,11 +554,16 @@ export async function completeIndexingJob(jobId: number, result: WorkerResult) {
       },
     });
   });
+  await reconcileDossierIndexation(document.dossierId, job.requestedBy);
   return { documentId: document.id, status: decision, fields: extracted.length, confidence, issues };
 }
 
 export async function failIndexingJob(jobId: number, failure: WorkerFailure) {
   const job = await getActiveWorkerJob(jobId, failure.workerId);
+  const document = await prisma.document.findUnique({
+    where: { id: job.documentId },
+    select: { dossierId: true },
+  });
   const terminal = job.attempts >= job.maxAttempts;
   const delaySeconds = Math.min(15 * 60, 30 * (2 ** Math.max(0, job.attempts - 1)));
   await prisma.$transaction([
@@ -590,6 +596,9 @@ export async function failIndexingJob(jobId: number, failure: WorkerFailure) {
       },
     }),
   ]);
+  if (terminal && document) {
+    await reconcileDossierIndexation(document.dossierId, job.requestedBy);
+  }
   return { retrying: !terminal, attempts: job.attempts, maxAttempts: job.maxAttempts };
 }
 

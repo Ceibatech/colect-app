@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { Check, ClipboardSignature, Loader2, Send, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import {
-  approveReceptionByCeibac,
-  approveReceptionByMinistry,
   approveTransferLotByCeibac,
+  approveReceptionByCeiba,
+  approveTransferMovementByMinistry,
   authorizeTransferLot,
   recordTransferMovement,
   submitTransferLot,
@@ -54,7 +54,7 @@ export function SubmitTransferButton({ lotId }: { lotId: number }) {
     });
   }
 
-  return <Button onClick={submit} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />} Soumettre à CEIBAC</Button>;
+  return <Button onClick={submit} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />} Soumettre à CEIBA</Button>;
 }
 
 export function ApproveTransferLotByCeibacButton({ lotId }: { lotId: number }) {
@@ -64,11 +64,11 @@ export function ApproveTransferLotByCeibacButton({ lotId }: { lotId: number }) {
   );
   return (
     <SignatureApprovalDialog
-      title="Validation du lot par CEIBAC"
+      title="Validation du lot par CEIBA"
       description="Vérifiez la composition du lot avant de signer. Le lot sera ensuite transmis au ministère pour autorisation de sortie."
-      triggerLabel="Valider le lot pour CEIBAC"
+      triggerLabel="Valider le lot pour CEIBA"
       submitLabel="Signer et transmettre au ministère"
-      signatureLabel="Responsable CEIBAC"
+      signatureLabel="Responsable CEIBA"
       action={action}
     />
   );
@@ -82,7 +82,7 @@ export function AuthorizeTransferButton({ lotId }: { lotId: number }) {
   return (
     <SignatureApprovalDialog
       title="Visa ministériel de sortie"
-      description="Cette signature autorise la sortie du lot et rend disponible le bordereau contractuel partagé entre le ministère et CEIBAC."
+      description="Cette signature autorise la sortie du lot et rend disponible le bordereau contractuel partagé entre le ministère et CEIBA."
       triggerLabel="Signer l'autorisation"
       submitLabel="Signer et autoriser la sortie"
       signatureLabel="Responsable ministère"
@@ -91,25 +91,44 @@ export function AuthorizeTransferButton({ lotId }: { lotId: number }) {
   );
 }
 
-export function ReceptionApprovalDialog({ movementId, stage }: { movementId: number; stage: "CEIBAC" | "MINISTERE" }) {
+export function ReceptionApprovalDialog({
+  movementId,
+  movementType,
+  stage,
+}: {
+  movementId: number;
+  movementType: TransferMovementTypeCode;
+  stage: "CEIBA" | "MINISTERE";
+}) {
   const action = useCallback(
-    (previous: TransferActionState, formData: FormData) => stage === "CEIBAC"
-      ? approveReceptionByCeibac(movementId, previous, formData)
-      : approveReceptionByMinistry(movementId, previous, formData),
+    (previous: TransferActionState, formData: FormData) => stage === "CEIBA"
+      ? approveReceptionByCeiba(movementId, previous, formData)
+      : approveTransferMovementByMinistry(movementId, previous, formData),
     [movementId, stage],
   );
-  const ceibac = stage === "CEIBAC";
+  const ceiba = stage === "CEIBA";
+  const ministryDescription = movementType === "RECEPTION"
+    ? "Le responsable du ministère clôt la réception. Cette signature déclenche l'entrée des dossiers dans le stock du site B."
+    : movementType === "SORTIE"
+      ? "Le responsable du ministère confirme la remise du lot. Cette signature autorise la sortie du stock du site A."
+      : "Le responsable du ministère confirme la restitution. Cette signature réintègre les dossiers dans le stock du site A.";
+  const ministryTrigger = movementType === "RECEPTION" ? "Valider la réception" : "Signer le bordereau F02";
+  const ministrySubmit = movementType === "RECEPTION"
+    ? "Signer et mettre à jour le stock"
+    : movementType === "SORTIE"
+      ? "Signer et autoriser la sortie"
+      : "Signer et confirmer la restitution";
   return (
     <SignatureApprovalDialog
-      title={ceibac ? "Contrôle du constat par CEIBAC" : "Contre-signature du ministère"}
-      description={ceibac
-        ? "Le validateur CEIBAC confirme le constat d'arrivée avant sa transmission au ministère."
-        : "Le responsable du ministère clôt la réception. Cette signature déclenche l'entrée des dossiers dans le stock du site B."}
-      triggerLabel={ceibac ? "Viser pour CEIBAC" : "Valider la réception"}
-      submitLabel={ceibac ? "Signer et transmettre" : "Signer et mettre à jour le stock"}
-      signatureLabel={ceibac ? "Validateur CEIBAC" : "Responsable ministère"}
+      title={ceiba ? "Contrôle du constat par CEIBA" : "Contre-signature du ministère"}
+      description={ceiba
+        ? "Le validateur CEIBA confirme le constat d'arrivée avant sa transmission au ministère."
+        : ministryDescription}
+      triggerLabel={ceiba ? "Viser pour CEIBA" : ministryTrigger}
+      submitLabel={ceiba ? "Signer et transmettre" : ministrySubmit}
+      signatureLabel={ceiba ? "Validateur CEIBA" : "Responsable ministère"}
       action={action}
-      variant={ceibac ? "outline" : "default"}
+      variant={ceiba ? "outline" : "default"}
     />
   );
 }
@@ -204,11 +223,6 @@ export function TransferMovementDialog({
   }
 
   const allSelected = items.length > 0 && selected.length === items.length;
-  const siteSignatureTitle = `Visa du site A · ${sourceLabel}`;
-  const siteSignatureHelp = type === "SORTIE"
-    ? "Le responsable du site d'origine confirme la remise physique des dossiers."
-    : "Le responsable du site d'origine confirme le retour des dossiers dans son stock.";
-
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant={type === "SORTIE" ? "default" : "outline"} />} disabled={items.length === 0}>
@@ -219,8 +233,8 @@ export function TransferMovementDialog({
           <DialogTitle>{isReception ? "Constat d'arrivée et de déchargement" : label}</DialogTitle>
           <DialogDescription>
             {isReception
-              ? `L'agent CEIBAC au site B (${destinationLabel}) décrit l'état du chargement et signe le constat. Le stock restera en transit jusqu'aux visas CEIBAC puis ministère.`
-              : "Sélectionnez les dossiers réellement concernés. Le mouvement et les deux signatures seront enregistrés dans une seule opération."}
+              ? `L'agent CEIBA au site de destination (${destinationLabel}) décrit l'état du chargement et signe le constat. Le stock restera en transit jusqu'aux visas CEIBA puis ministère.`
+              : `Sélectionnez les dossiers réellement concernés. CEIBA signe le F02 puis le transmet au ministère. Le stock de ${sourceLabel} ne changera qu'après la contre-signature ministérielle.`}
           </DialogDescription>
         </DialogHeader>
         <form key={formVersion} action={formAction} className="space-y-5">
@@ -248,23 +262,15 @@ export function TransferMovementDialog({
             <div className={isReception ? "space-y-2 sm:col-span-2" : "space-y-2"}><Label htmlFor={`${type}-observations`}>{isReception ? "État des lieux et observations" : "Observations"}</Label><Textarea id={`${type}-observations`} name="observations" rows={3} maxLength={2000} disabled={pending} /></div>
           </div>
 
-          <div className={`grid gap-5 border-t pt-5 ${isReception ? "" : "lg:grid-cols-2"}`}>
-            {!isReception ? (
-              <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
-                <div><h3 className="font-semibold">{siteSignatureTitle}</h3><p className="text-xs text-muted-foreground">{siteSignatureHelp}</p></div>
-                <div className="space-y-2"><Label htmlFor={`${type}-ministryName`}>Nom complet</Label><Input id={`${type}-ministryName`} name="ministryName" required maxLength={120} disabled={pending} /></div>
-                <div className="space-y-2"><Label htmlFor={`${type}-ministryTitle`}>Fonction habilitée</Label><Input id={`${type}-ministryTitle`} name="ministryTitle" required maxLength={120} disabled={pending} /></div>
-                <SignaturePad name="ministrySignature" label="Site A" disabled={pending} />
-              </section>
-            ) : null}
+          <div className="grid gap-5 border-t pt-5">
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
-              <div><h3 className="font-semibold">{isReception ? "Signature de l'agent CEIBAC au déchargement" : "Visa du gestionnaire CEIBAC"}</h3><p className="text-xs text-muted-foreground">L&apos;agent confirme la prise en charge, la remise ou le constat physique du chargement.</p></div>
+              <div><h3 className="font-semibold">{isReception ? "Signature de l'agent CEIBA au déchargement" : "Visa du gestionnaire CEIBA"}</h3><p className="text-xs text-muted-foreground">L&apos;agent confirme la prise en charge, la remise ou le constat physique du chargement. Le ministère apposera son visa dans l&apos;étape suivante.</p></div>
               <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor={`${type}-ceibacName`}>Nom complet</Label><Input id={`${type}-ceibacName`} name="ceibacName" required maxLength={120} disabled={pending} /></div><div className="space-y-2"><Label htmlFor={`${type}-ceibacTitle`}>Fonction habilitée</Label><Input id={`${type}-ceibacTitle`} name="ceibacTitle" required maxLength={120} disabled={pending} /></div></div>
-              <SignaturePad name="ceibacSignature" label="CEIBAC" disabled={pending} />
+              <SignaturePad name="ceibacSignature" label="CEIBA" disabled={pending} />
             </section>
           </div>
 
-          <DialogFooter><Button type="submit" disabled={pending || selected.length === 0}>{pending ? <Loader2 className="animate-spin" /> : <ClipboardSignature />} {isReception ? "Signer et soumettre le constat" : "Signer et enregistrer le bordereau"}</Button></DialogFooter>
+          <DialogFooter><Button type="submit" disabled={pending || selected.length === 0}>{pending ? <Loader2 className="animate-spin" /> : <ClipboardSignature />} {isReception ? "Signer et soumettre le constat" : "Signer et transmettre le F02 au ministère"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

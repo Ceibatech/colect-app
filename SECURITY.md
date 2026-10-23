@@ -1,4 +1,4 @@
-# Sécurité — GeoArchives-MULCV
+# Sécurité — GeoArchives
 
 ## 1. Authentification
 
@@ -63,10 +63,10 @@ implémentation (Phase 12 — Audit).
 
 ### Chaîne de garde des transferts
 
-- La constitution, le visa CEIBAC, l'autorisation ministère et chaque mouvement sont
+- La constitution, le visa CEIBA, l'autorisation ministère et chaque mouvement sont
   contrôlés par des permissions serveur distinctes (`TRANSFER_CREATE`,
   `TRANSFER_CEIBAC_APPROVE`, `TRANSFER_AUTHORIZE`, `TRANSFER_OPERATE`). Un lot soumis
-  ne peut pas sauter le visa CEIBAC, et un lot validé par CEIBAC ne peut pas sortir
+  ne peut pas sauter le visa CEIBA, et un lot validé par CEIBA ne peut pas sortir
   avant le visa ministère. Les actions contrôlent l'état courant en base.
 - `VALIDATEUR_MINISTERE` reçoit seulement `DASHBOARD_VIEW`, `TRANSFER_VIEW` et
   `TRANSFER_AUTHORIZE`. Il ne peut ni constituer un lot, ni enregistrer un mouvement,

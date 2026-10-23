@@ -121,7 +121,7 @@ export function DocumentsPanel({
 
       if (successes.length > 0) {
         toast.success(
-          `${successes.length} document(s) chargé(s)${activeStorageProvider === "SHAREPOINT" ? " dans SharePoint" : ""}.`,
+          `${successes.length} document(s) chargé(s)${activeStorageProvider === "SHAREPOINT" ? " dans SharePoint" : ""} et envoyé(s) à l'indexation automatique.`,
         );
         router.refresh();
       }
@@ -180,7 +180,7 @@ export function DocumentsPanel({
             ) : null}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Les fichiers sont qualifiés ici avant la soumission de l&apos;indexation.
+            Chaque nouveau fichier rejoint automatiquement l&apos;indexation, y compris lorsqu&apos;il complète un dossier déjà traité.
           </p>
         </div>
         {canManage || (canRetryDigitalArchive && archiveErrorCount > 0) ? (

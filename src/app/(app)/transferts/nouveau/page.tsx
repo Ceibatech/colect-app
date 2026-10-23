@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { getTransferCreateData } from "@/lib/services/transfer-service";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Nouveau lot de transfert - GeoArchives-MULCV" };
+export const metadata = { title: "Nouveau lot de transfert - GeoArchives" };
 
 export default async function NewTransferPage() {
   const data = await getTransferCreateData();
@@ -17,7 +17,7 @@ export default async function NewTransferPage() {
         eyebrow="Préparation du transfert"
         icon={PackagePlus}
         title="Identifier un lot à transférer"
-        description="Sélectionnez les dossiers présents au site A. Leur composition est figée dans le lot avant validation, sortie et réception au site B."
+        description="Sélectionnez les dossiers inventoriés au site du ministère, puis choisissez le site CEIBA qui les recevra pour traitement."
         actions={(
           <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}>
             <ArrowLeft /> Retour au registre

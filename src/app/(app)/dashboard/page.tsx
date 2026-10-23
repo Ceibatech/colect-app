@@ -24,7 +24,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export const metadata = { title: "Tableau de bord - GeoArchives-MULCV" };
+export const metadata = { title: "Tableau de bord - GeoArchives" };
 
 const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; description: string; progress: string }> = {
   ADMIN: {
@@ -52,7 +52,7 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     progress: "Stock tracé",
   },
   VALIDATEUR_CEIBAC: {
-    eyebrow: "Contrôle CEIBAC",
+    eyebrow: "Contrôle CEIBA",
     title: "Validation des transferts",
     description: "Validez les lots soumis avant leur transmission au ministère et contrôlez les constats d'arrivée.",
     progress: "Transferts contrôlés",
@@ -60,7 +60,7 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
   VALIDATEUR_MINISTERE: {
     eyebrow: "Visa ministère",
     title: "Validation des transferts",
-    description: "Autorisez les lots soumis et contre-signez les réceptions déjà visées par CEIBAC.",
+    description: "Autorisez les lots soumis et contre-signez les réceptions déjà visées par CEIBA.",
     progress: "Transferts validés",
   },
   FINANCE: {
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
   const highlights = isOperator
     ? [
         { label: "Brouillons", value: drafts, icon: FilePlus2, tone: "default" as const },
-        { label: "En contrôle", value: kpis.enControle, icon: ShieldQuestion, tone: "default" as const },
+        { label: "Anomalies à contrôler", value: kpis.enControle, icon: ShieldQuestion, tone: "default" as const },
         { label: "À reprendre", value: kpis.rejetes, icon: ShieldX, tone: "destructive" as const },
       ]
     : [
@@ -198,7 +198,7 @@ export default async function DashboardPage() {
           <KpiCard icon={FolderKanban} label="Total dossiers" value={kpis.total} />
           <KpiCard icon={FilePlus2} label="Collectés" value={kpis.collectes} hint={`${kpis.tauxCollecte}%`} />
           <KpiCard icon={Send} label="Soumis" value={kpis.soumis} />
-          <KpiCard icon={ShieldQuestion} label="En contrôle" value={kpis.enControle} />
+          <KpiCard icon={ShieldQuestion} label="Anomalies à contrôler" value={kpis.enControle} />
           <KpiCard icon={ShieldCheck} label="Validés" value={kpis.valides} hint={`${kpis.tauxValidation}%`} tone="success" />
           <KpiCard icon={ShieldX} label="Rejetés" value={kpis.rejetes} tone="destructive" />
           <KpiCard icon={ScanLine} label="Numérisés" value={kpis.numerises} hint={`${kpis.tauxNumerisation}%`} />
@@ -254,7 +254,7 @@ export default async function DashboardPage() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <CardTitle>Statuts de validation</CardTitle>
-                  <CardDescription>Volumes en attente, en contrôle, validés ou rejetés.</CardDescription>
+                  <CardDescription>Volumes validés automatiquement, en exception ou rejetés.</CardDescription>
                 </div>
                 <Badge variant={kpis.rejetes > 0 ? "destructive" : "outline"} className="w-fit rounded-md">
                   {kpis.rejetes > 0 ? "Rejets à traiter" : "Flux maîtrisé"}

@@ -11,6 +11,7 @@ import {
   expectedCommuneForLotissement,
   localityMatchKey,
 } from "@/lib/utils/locality-normalization";
+import { evaluateInventorySubmission } from "@/lib/workflow/automatic-validation";
 
 const MAX_REFERENCE_ATTEMPTS = 5;
 
@@ -262,6 +263,8 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
 export interface SubmitResult {
   id: number;
   reference: string;
+  autoValidated: boolean;
+  anomalyCount: number;
 }
 
 export async function submitDossier(values: DossierFormValues, draftId?: number | null): Promise<SubmitResult> {
@@ -276,18 +279,80 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
   // directement sans être passé par "Enregistrer brouillon").
   const draft = await saveDraft(values, draftId ?? undefined);
 
-  const now = new Date();
-  const updated = await prisma.dossier.update({
+  const dossier = await prisma.dossier.findUnique({
     where: { id: draft.id },
-    data: {
-      statutCollecte: "SOUMIS",
-      statutValidation: "EN_CONTROLE",
-      dateSoumission: now,
+    select: {
+      id: true,
+      codeBarres: true,
+      siteId: true,
+      entrepotId: true,
+      entrepot: { select: { siteId: true } },
+      etatCarton: true,
+      etatCartonDescription: true,
+      etatDossier: true,
+      etatDossierDescription: true,
     },
   });
+  if (!dossier) throw new Error("Brouillon introuvable.");
 
-  await prisma.$transaction([
-    prisma.dossierHistory.create({
+  const duplicateBarcode = dossier.codeBarres
+    ? (await prisma.dossier.count({
+        where: { id: { not: dossier.id }, codeBarres: dossier.codeBarres },
+      })) > 0
+    : false;
+  const decision = evaluateInventorySubmission({
+    codeBarres: dossier.codeBarres,
+    duplicateBarcode,
+    siteId: dossier.siteId,
+    entrepotId: dossier.entrepotId,
+    entrepotSiteId: dossier.entrepot?.siteId ?? null,
+    etatCarton: dossier.etatCarton,
+    etatCartonDescription: dossier.etatCartonDescription,
+    etatDossier: dossier.etatDossier,
+    etatDossierDescription: dossier.etatDossierDescription,
+  });
+
+  const now = new Date();
+  const validationStatus = decision.autoValidated ? "VALIDE" : "EN_CONTROLE";
+  const ipAddress = await getClientIp();
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.dossier.update({
+      where: { id: draft.id },
+      data: {
+        statutCollecte: "SOUMIS",
+        statutValidation: validationStatus,
+        dateSoumission: now,
+        dateValidation: decision.autoValidated ? now : null,
+      },
+    });
+    await tx.qualityCheck.create({
+      data: {
+        dossierId: draft.id,
+        userId: null,
+        typeControle: "CONTROLE_AUTOMATIQUE_SOUMISSION",
+        score: decision.score,
+        statut: decision.autoValidated ? "CONFORME" : "A_CORRIGER",
+        nombreAnomalies: decision.issues.length,
+        commentaire: decision.autoValidated
+          ? "Fiche conforme aux règles bloquantes : validation automatique."
+          : "Fiche orientée vers le superviseur : anomalie bloquante détectée.",
+        ...(decision.issues.length > 0
+          ? {
+              anomalies: {
+                create: decision.issues.map((issue) => ({
+                  dossierId: draft.id,
+                  type: issue.type,
+                  champ: issue.champ,
+                  description: issue.description,
+                  gravite: issue.gravite,
+                })),
+              },
+            }
+          : {}),
+      },
+    });
+    await tx.dossierHistory.create({
       data: {
         dossierId: draft.id,
         userId: session.userId,
@@ -295,8 +360,8 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
         ancienStatut: "BROUILLON",
         nouveauStatut: "SOUMIS",
       },
-    }),
-    prisma.workflowTransition.create({
+    });
+    await tx.workflowTransition.create({
       data: {
         dossierId: draft.id,
         workflowType: "COLLECTE",
@@ -304,28 +369,51 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
         toStatus: "SOUMIS",
         userId: session.userId,
       },
-    }),
-    prisma.workflowTransition.create({
+    });
+    await tx.workflowTransition.create({
       data: {
         dossierId: draft.id,
         workflowType: "VALIDATION",
         fromStatus: "EN_ATTENTE",
-        toStatus: "EN_CONTROLE",
-        userId: session.userId,
+        toStatus: validationStatus,
+        userId: decision.autoValidated ? null : session.userId,
+        commentaire: decision.autoValidated
+          ? "Validation automatique : aucune anomalie bloquante."
+          : `${decision.issues.length} anomalie(s) à examiner.`,
       },
-    }),
-    prisma.auditLog.create({
+    });
+    await tx.dossierHistory.create({
+      data: {
+        dossierId: draft.id,
+        userId: decision.autoValidated ? null : session.userId,
+        action: decision.autoValidated ? "VALIDATION_AUTOMATIQUE" : "ANOMALIE_DETECTEE",
+        ancienStatut: "EN_ATTENTE",
+        nouveauStatut: validationStatus,
+        commentaire: decision.autoValidated
+          ? "La fiche poursuit automatiquement la chaîne de traitement."
+          : `${decision.issues.length} anomalie(s) transmise(s) au superviseur.`,
+        metadata: { score: decision.score, anomalies: decision.issues.length },
+      },
+    });
+    await tx.auditLog.create({
       data: {
         userId: session.userId,
         action: "DOSSIER_SUBMIT",
         entity: "DOSSIER",
         entityId: draft.id,
-        ipAddress: await getClientIp(),
+        newValue: { validationStatus, anomalyCount: decision.issues.length },
+        ipAddress,
       },
-    }),
-  ]);
+    });
+    return result;
+  });
 
-  return { id: updated.id, reference: updated.reference };
+  return {
+    id: updated.id,
+    reference: updated.reference,
+    autoValidated: decision.autoValidated,
+    anomalyCount: decision.issues.length,
+  };
 }
 
 export async function listMyDrafts() {

@@ -5,9 +5,10 @@ import { Archive, CheckCircle2, FileSearch, LockKeyhole, ShieldCheck } from "luc
 import { getSession } from "@/lib/auth/current-user";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Badge } from "@/components/ui/badge";
+import { BRAND } from "@/config/branding";
 
 export const metadata = {
-  title: "Connexion - GeoArchives-MULCV",
+  title: `Connexion - ${BRAND.productName}`,
 };
 
 const capabilities = [
@@ -58,12 +59,12 @@ export default async function LoginPage() {
           </div>
 
           <div className="max-w-xl space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4fd1b5]">MULCV &amp; CEIBA Analytics</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#4fd1b5]">{BRAND.companyName}</p>
             <h1 className="text-3xl font-semibold leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
-              GeoArchives-MULCV
+              {BRAND.productName}
             </h1>
             <p className="max-w-lg text-sm leading-6 text-white/70 sm:text-base sm:leading-7">
-              Le poste de travail unifié pour inventorier, contrôler, numériser et archiver les dossiers fonciers.
+              Le SAE interne de CEIBA Analytics pour inventorier, contrôler, numériser, indexer et retrouver les archives.
             </p>
           </div>
 
@@ -122,7 +123,7 @@ export default async function LoginPage() {
           <div className="mt-8 border-t border-border/70 pt-5">
             <p className="flex items-center justify-center gap-2 text-center text-xs leading-5 text-muted-foreground">
               <ShieldCheck className="h-3.5 w-3.5 text-brand-green" />
-              GeoArchives-MULCV protège chaque opération par contrôle d&apos;accès.
+              {BRAND.productName} protège chaque opération par contrôle d&apos;accès.
             </p>
           </div>
         </div>

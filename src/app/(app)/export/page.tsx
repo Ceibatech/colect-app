@@ -6,7 +6,7 @@ import { ExportFilterForm } from "@/components/export/ExportFilterForm";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 
-export const metadata = { title: "Export - GeoArchives-MULCV" };
+export const metadata = { title: "Export - GeoArchives" };
 
 export default async function ExportPage() {
   const session = await requirePermission("EXPORT_DATA");

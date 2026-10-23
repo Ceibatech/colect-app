@@ -15,6 +15,7 @@ export default async function AdminSitesPage() {
     code: s.code,
     nom: s.nom,
     typeSite: s.typeSite,
+    organisation: s.organisation,
     description: s.description,
     isActive: s.isActive,
     dateMiseEnService: s.dateMiseEnService ? s.dateMiseEnService.toISOString().slice(0, 10) : null,

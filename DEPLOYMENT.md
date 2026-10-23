@@ -1,4 +1,4 @@
-# Déploiement — GeoArchives-MULCV (Phase 15, §95/§96)
+# Déploiement — GeoArchives (Phase 15, §95/§96)
 
 Cible : **GitHub → Render (application Next.js) → MySQL/MariaDB sur cPanel**,
 avec un service **Aiven** maintenu en repli déjà éprouvé (§1)
@@ -169,7 +169,7 @@ Voir [.env.example](.env.example) pour la liste commentée. En production :
 | `SHAREPOINT_FOLDER_ITEM_ID` | identifiant du dossier racine cible (mode recommandé) |
 | `SHAREPOINT_SHARED_FOLDER_URL` | lien partagé utilisé seulement pour découvrir le dossier si les deux identifiants précédents sont absents |
 | `RESEND_API_KEY` | clé serveur Resend active, jamais commitée ni préfixée par `NEXT_PUBLIC_` |
-| `EMAIL_FROM` | `GeoArchives-MULCV <no-reply@ceiba-analytics.com>` après vérification du domaine dans Resend |
+| `EMAIL_FROM` | `GeoArchives <no-reply@ceiba-analytics.com>` après vérification du domaine dans Resend |
 | `APP_URL` | `https://geoarchives.ceiba-analytics.com` — origine utilisée dans les liens de réinitialisation |
 
 **E-mails transactionnels** : vérifier `ceiba-analytics.com` (SPF + DKIM) dans Resend avant d'utiliser l'adresse `no-reply@ceiba-analytics.com`. La clé saisie dans Render doit être une clé serveur renouvelée ; ne jamais reprendre une clé publiée dans un ticket, une conversation ou l'historique Git.

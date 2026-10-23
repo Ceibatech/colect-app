@@ -1,5 +1,5 @@
 // ================================================================
-// PRISMA SCHEMA — GeoArchives-MULCV : collecte, numérisation, indexation
+// PRISMA SCHEMA — GeoArchives : collecte, numérisation, indexation
 // et archivage
 //
 // Base cible : MySQL / MariaDB (port 3306)
@@ -112,6 +112,7 @@ model User {
   transferSignaturesCaptured         TransferSignature[]     @relation("TransferSignatureCapturedBy")
   transferTrackingPoints             TransferTrackingPoint[] @relation("TransferTrackingCapturedBy")
   dossiersPrepared                   Dossier[]               @relation("DossierPreparateur")
+  preparationPieceLines              PreparationPieceLine[]  @relation("PreparationPieceLinePreparedBy")
 
   @@index([roleId])
   @@map("users")
@@ -486,6 +487,12 @@ model NatureDossier {
   @@map("natures_dossier")
 }
 
+enum SiteOrganisation {
+  MINISTERE
+  CEIBA
+  AUTRE
+}
+
 // Type de pièce jointe au dossier (CNI, Carte résident, Extrait topo...) —
 // liste fermée mais extensible : la Collecte (StepDossier.tsx) permet de
 // sélectionner plusieurs types existants ET d'en ajouter un nouveau à la
@@ -502,8 +509,9 @@ model TypePiece {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  dossiers  Dossier[]  @relation("DossierTypesPieces")
-  documents Document[]
+  dossiers         Dossier[]              @relation("DossierTypesPieces")
+  documents        Document[]
+  preparationLines PreparationPieceLine[]
 
   @@map("types_piece")
 }
@@ -522,6 +530,7 @@ model Site {
   code              String    @unique
   nom               String
   typeSite          String?   @map("type_site")
+  organisation      SiteOrganisation @default(MINISTERE)
   description       String?   @db.Text
   isActive          Boolean   @default(true) @map("is_active")
   dateMiseEnService DateTime? @map("date_mise_en_service")
@@ -787,14 +796,11 @@ enum StatutValidation {
   REJETE
 }
 
-// Phase 19+ : validation superviseur à chaque étape (pas seulement à la
-// Collecte). Flux par étape : EN_ATTENTE/EN_COURS -> (opérateur agit) ->
-// A_VALIDER -> (superviseur valide) -> TERMINE, ou -> (superviseur rejette)
-// -> REJETE -> (opérateur relance l'action) -> A_VALIDER à nouveau. TERMINE
-// garde exactement sa sémantique actuelle ("étape effectivement terminée,
-// donc l'étape suivante est débloquée") — il n'est simplement plus atteint
-// directement par l'opérateur, ce qui ne casse aucune des vérifications déjà
-// en place ailleurs (dashboard, export, gate de l'étape suivante...).
+// Validation par exception : les contrôles automatiques cohérents atteignent
+// directement TERMINE ; A_VALIDER est réservé aux anomalies qui nécessitent
+// une décision du superviseur. REJETE permet une correction puis une nouvelle
+// exécution automatique. TERMINE garde sa sémantique d'étape effectivement
+// terminée et débloque immédiatement la suivante.
 //
 // Phase 20+ : nouvelle étape "Préparation", intercalée entre Validation et
 // Numérisation (cycle complet désormais Collecte -> Validation ->
@@ -926,6 +932,7 @@ model Dossier {
   // Agent ayant renseigné la dernière préparation. Il est volontairement
   // distinct de `operateurId`, qui reste l'auteur de l'inventaire initial.
   preparateurId             Int?      @map("preparateur_id")
+  preparationClaimedAt      DateTime? @map("preparation_claimed_at")
   dateSoumissionPreparation DateTime? @map("date_soumission_preparation")
   observationsPreparation   String?   @map("observations_preparation") @db.Text
   dateNumerisation          DateTime? @map("date_numerisation")
@@ -938,14 +945,15 @@ model Dossier {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  operateur     Operateur      @relation(fields: [operateurId], references: [id])
-  preparateur   User?          @relation("DossierPreparateur", fields: [preparateurId], references: [id], onDelete: SetNull)
-  site          Site?          @relation(fields: [siteId], references: [id])
-  entrepot      Entrepot?      @relation(fields: [entrepotId], references: [id])
-  commune       Commune?       @relation(fields: [communeId], references: [id])
-  lotissement   Lotissement?   @relation(fields: [lotissementId], references: [id])
-  natureDossier NatureDossier? @relation(fields: [natureDossierId], references: [id])
-  typesPieces   TypePiece[]    @relation("DossierTypesPieces")
+  operateur             Operateur              @relation(fields: [operateurId], references: [id])
+  preparateur           User?                  @relation("DossierPreparateur", fields: [preparateurId], references: [id], onDelete: SetNull)
+  site                  Site?                  @relation(fields: [siteId], references: [id])
+  entrepot              Entrepot?              @relation(fields: [entrepotId], references: [id])
+  commune               Commune?               @relation(fields: [communeId], references: [id])
+  lotissement           Lotissement?           @relation(fields: [lotissementId], references: [id])
+  natureDossier         NatureDossier?         @relation(fields: [natureDossierId], references: [id])
+  typesPieces           TypePiece[]            @relation("DossierTypesPieces")
+  preparationPieceLines PreparationPieceLine[]
 
   documents           Document[]
   numerisations       Numerisation[]
@@ -982,6 +990,30 @@ model Dossier {
   @@index([communeId, statutArchivage])
   @@index([operateurId, statutValidation])
   @@map("dossiers")
+}
+
+// Ventilation contrôlée de la préparation. Les totaux du dossier sont
+// dérivés de ces lignes : chaque type indique combien de pièces physiques
+// et combien de pages ont été constatées. Le préparateur est conservé sur
+// chaque ligne pour que les corrections ultérieures restent auditables.
+model PreparationPieceLine {
+  id           Int      @id @default(autoincrement())
+  dossierId    Int      @map("dossier_id")
+  typePieceId  Int      @map("type_piece_id")
+  nombrePieces Int      @map("nombre_pieces")
+  nombrePages  Int      @map("nombre_pages")
+  preparedById Int      @map("prepared_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  dossier    Dossier   @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  typePiece  TypePiece @relation(fields: [typePieceId], references: [id])
+  preparedBy User      @relation("PreparationPieceLinePreparedBy", fields: [preparedById], references: [id])
+
+  @@unique([dossierId, typePieceId])
+  @@index([typePieceId])
+  @@index([preparedById])
+  @@map("preparation_piece_lines")
 }
 
 // ================================================================

@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { ImportWizard } from "@/components/import/ImportWizard";
 import { PageHeader } from "@/components/layout/PageHeader";
 
-export const metadata = { title: "Import — GeoArchives-MULCV" };
+export const metadata = { title: "Import — GeoArchives" };
 
 export default async function ImportPage() {
   await requirePermission("IMPORT_DATA");

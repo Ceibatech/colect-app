@@ -37,11 +37,11 @@ describe("document indexing utilities", () => {
   it("builds a stable safe classification path", () => {
     expect(buildClassificationPath({
       reference: "DOS-2026-000003",
-      site: "MULCV / Plateau",
+      site: "Ministère / Plateau",
       entrepot: "Tour D",
       commune: "Marcory",
       natureDossier: "Dossier ACD",
-    })).toBe("MULCV - Plateau/Tour D/Marcory/Dossier ACD/DOS-2026-000003");
+    })).toBe("Ministère - Plateau/Tour D/Marcory/Dossier ACD/DOS-2026-000003");
   });
 
   it("builds a searchable corpus from OCR and controlled metadata", () => {

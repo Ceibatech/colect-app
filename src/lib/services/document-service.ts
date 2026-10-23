@@ -11,6 +11,11 @@ import { ApiError } from "@/lib/utils/api-error";
 import { isOperateurInScope } from "@/lib/services/access-scope";
 import { documentPreindexSchema } from "@/lib/validation/document-preindex";
 import { rebuildDocumentSearchText } from "@/lib/services/automatic-indexing-service";
+import {
+  advanceDossierAfterDocumentAvailable,
+  reconcileDossierIndexation,
+} from "@/lib/services/workflow-automation-service";
+import type { Document } from "@prisma/client";
 
 const MAX_SIZE_BYTES = 20 * 1024 * 1024; // 20 Mo
 const ALLOWED_MIME_TYPES = new Set([
@@ -94,9 +99,10 @@ export async function uploadDocument(dossierId: number, file: File) {
     throwStorageApiError(error);
   }
 
+  let createdDocument: Document;
   try {
     const ipAddress = await getClientIp();
-    return await prisma.$transaction(async (tx) => {
+    createdDocument = await prisma.$transaction(async (tx) => {
       const document = await tx.document.create({
         data: {
           dossierId,
@@ -139,7 +145,7 @@ export async function uploadDocument(dossierId: number, file: File) {
           ipAddress,
         },
       });
-      return { ...document, automaticIndexStatus: "EN_FILE" as const };
+      return document;
     });
   } catch (error) {
     try {
@@ -153,6 +159,9 @@ export async function uploadDocument(dossierId: number, file: File) {
     }
     throw error;
   }
+
+  await advanceDossierAfterDocumentAvailable(dossierId, session.userId, "AJOUT_DOCUMENT");
+  return { ...createdDocument, automaticIndexStatus: "EN_FILE" as const };
 }
 
 export async function listDocuments(dossierId: number) {
@@ -366,5 +375,8 @@ export async function preindexDocument(documentId: number, values: unknown) {
     return updated;
   });
   await rebuildDocumentSearchText(documentId);
+  if (parsed.data.ready) {
+    await reconcileDossierIndexation(document.dossierId, session.userId);
+  }
   return updated;
 }

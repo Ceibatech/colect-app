@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PERMISSIONS, ROLE_CODES, ROLE_PERMISSIONS, ROLE_ONLY_ROUTE_PREFIXES } from "@/lib/permissions/constants";
+import { getRoleLabel, PERMISSIONS, ROLE_CODES, ROLE_LABELS, ROLE_PERMISSIONS, ROLE_ONLY_ROUTE_PREFIXES } from "@/lib/permissions/constants";
 
 /**
  * Vérifie l'intégrité de la matrice RBAC (§11/§12) — source unique de vérité
@@ -10,6 +10,11 @@ import { PERMISSIONS, ROLE_CODES, ROLE_PERMISSIONS, ROLE_ONLY_ROUTE_PREFIXES } f
  * les tests API/E2E (Playwright) qui frappent de vraies routes protégées.
  */
 describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
+  it("utilise CEIBA dans tous les libellés de rôle affichés", () => {
+    expect(getRoleLabel("VALIDATEUR_CEIBAC")).toBe("Validateur CEIBA");
+    expect(Object.values(ROLE_LABELS).join(" ")).not.toMatch(/CEIBAC/i);
+  });
+
   it("définit une entrée pour chacun des rôles", () => {
     for (const role of ROLE_CODES) {
       expect(ROLE_PERMISSIONS[role]).toBeDefined();
@@ -103,7 +108,7 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
 });
 
 describe("ROLE_ONLY_ROUTE_PREFIXES (garde-fou grossier middleware/proxy)", () => {
-  it("distingue l'espace CEIBAC du préfixe ministère et réserve son visa", () => {
+  it("distingue l'espace CEIBA du préfixe ministère et réserve son visa", () => {
     const validation = ROLE_ONLY_ROUTE_PREFIXES.find((entry) => "/transferts/validation-ceibac".startsWith(entry.prefix));
     expect(validation?.roles).toEqual(["ADMIN", "VALIDATEUR_CEIBAC"]);
     expect(ROLE_PERMISSIONS.VALIDATEUR_CEIBAC).not.toContain("TRANSFER_AUTHORIZE");

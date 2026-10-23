@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MapPinned } from "lucide-react";
 
-export const metadata = { title: "Répartition territoriale - GeoArchives-MULCV" };
+export const metadata = { title: "Répartition territoriale - GeoArchives" };
 
 export default async function DashboardGeographiePage() {
   const session = await requireRole("ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR", "CONSULTATION");

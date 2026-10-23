@@ -64,8 +64,8 @@ export const recordTransferMovementSchema = z.object({
   ministryName: optionalShortText,
   ministryTitle: optionalShortText,
   ministrySignature: optionalSignature,
-  ceibacName: z.string().trim().min(2, "Le nom du signataire CEIBAC est requis.").max(120),
-  ceibacTitle: z.string().trim().min(2, "La fonction du signataire CEIBAC est requise.").max(120),
+  ceibacName: z.string().trim().min(2, "Le nom du signataire CEIBA est requis.").max(120),
+  ceibacTitle: z.string().trim().min(2, "La fonction du signataire CEIBA est requise.").max(120),
   ceibacSignature: signatureData,
 }).superRefine((value, context) => {
   if (value.type === "RECEPTION") {
@@ -73,11 +73,7 @@ export const recordTransferMovementSchema = z.object({
     if (value.conditionStatus !== "CONFORME" && !value.observations) {
       context.addIssue({ code: "custom", path: ["observations"], message: "Décrivez les réserves ou la non-conformité constatée." });
     }
-    return;
   }
-  if (!value.ministryName) context.addIssue({ code: "custom", path: ["ministryName"], message: "Le nom du signataire Ministère est requis." });
-  if (!value.ministryTitle) context.addIssue({ code: "custom", path: ["ministryTitle"], message: "La fonction du signataire Ministère est requise." });
-  if (!value.ministrySignature) context.addIssue({ code: "custom", path: ["ministrySignature"], message: "La signature Ministère est requise." });
 });
 
 export type CreateTransferLotInput = z.infer<typeof createTransferLotSchema>;

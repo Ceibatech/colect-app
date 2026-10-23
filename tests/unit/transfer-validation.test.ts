@@ -12,22 +12,19 @@ describe("transfer validation", () => {
       destinationEntrepotId: "",
       includeUnlocated: "true",
       plannedAt: "2026-10-22T08:30",
-      motif: "Numérisation CEIBAC",
+      motif: "Numérisation CEIBA",
       dossierIds: [11, 12],
     });
     expect(result.success).toBe(true);
   });
 
-  it("requires both drawn signatures for a movement", () => {
+  it("requires the CEIBA signature before a movement is sent to the ministry", () => {
     const base = {
       type: "SORTIE",
       itemIds: [1],
       occurredAt: "2026-10-22T08:30",
       observations: "",
-      ministryName: "A. Ministère",
-      ministryTitle: "Chef de service",
-      ministrySignature: signature,
-      ceibacName: "B. CEIBAC",
+      ceibacName: "B. CEIBA",
       ceibacTitle: "Responsable transfert",
       ceibacSignature: signature,
     };
@@ -35,7 +32,7 @@ describe("transfer validation", () => {
     expect(recordTransferMovementSchema.safeParse({ ...base, ceibacSignature: "" }).success).toBe(false);
   });
 
-  it("accepts an arrival report with the CEIBAC field signature only", () => {
+  it("accepts an arrival report with the CEIBA field signature only", () => {
     const result = recordTransferMovementSchema.safeParse({
       type: "RECEPTION",
       itemIds: [1],
@@ -43,7 +40,7 @@ describe("transfer validation", () => {
       conditionStatus: "AVEC_RESERVES",
       observations: "Un carton présente un coin humide.",
       ceibacName: "Agent destination",
-      ceibacTitle: "Convoyeur CEIBAC",
+      ceibacTitle: "Convoyeur CEIBA",
       ceibacSignature: signature,
     });
     expect(result.success).toBe(true);
@@ -57,7 +54,7 @@ describe("transfer validation", () => {
       conditionStatus: "NON_CONFORME",
       observations: "",
       ceibacName: "Agent destination",
-      ceibacTitle: "Convoyeur CEIBAC",
+      ceibacTitle: "Convoyeur CEIBA",
       ceibacSignature: signature,
     });
     expect(result.success).toBe(false);

@@ -1,4 +1,4 @@
-# GeoArchives-MULCV : Numérisation & Indexation
+# GeoArchives : Numérisation & Indexation
 
 Application métier de collecte, contrôle, numérisation, indexation et archivage de
 dossiers fonciers, avec dashboard analytique de reporting.

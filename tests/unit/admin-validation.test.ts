@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { communeSchema, entrepotSchema, lotissementSchema, natureDossierSchema } from "@/lib/validation/referentiels";
+import { communeSchema, entrepotSchema, lotissementSchema, natureDossierSchema, siteSchema } from "@/lib/validation/referentiels";
 import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/validation/user-admin";
 
 describe("communeSchema (CRUD administration, Phase 15+)", () => {
@@ -48,11 +48,22 @@ describe("natureDossierSchema", () => {
   });
 });
 
+describe("siteSchema", () => {
+  it("identifie explicitement un site du ministère ou un site CEIBA", () => {
+    expect(siteSchema.safeParse({ code: "MIN-PLATEAU", nom: "Site ministère - Plateau", organisation: "MINISTERE" }).success).toBe(true);
+    expect(siteSchema.safeParse({ code: "SITE-CEIBA", nom: "Site CEIBA", organisation: "CEIBA" }).success).toBe(true);
+  });
+
+  it("rejette un site sans organisation propriétaire", () => {
+    expect(siteSchema.safeParse({ code: "SITE-01", nom: "Site sans propriétaire" }).success).toBe(false);
+  });
+});
+
 describe("entrepotSchema (salles et espaces d'archives)", () => {
   it("accepte une salle rattachée à un site avec sa localisation", () => {
     const result = entrepotSchema.safeParse({
       siteId: "2",
-      code: "MULCV-S01",
+      code: "MIN-S01",
       nom: "Salle 1",
       localisation: "Mezzanine, Tour D",
       typeEntrepot: "Salle d'archives",
@@ -65,7 +76,7 @@ describe("entrepotSchema (salles et espaces d'archives)", () => {
   it("rejette une localisation dépassant la taille de la colonne", () => {
     expect(entrepotSchema.safeParse({
       siteId: 2,
-      code: "MULCV-S01",
+      code: "MIN-S01",
       nom: "Salle 1",
       localisation: "x".repeat(192),
     }).success).toBe(false);

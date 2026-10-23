@@ -63,7 +63,7 @@ const tx = {
 let lot: MemoryLot;
 let audits: AuditEntry[];
 
-function approvalForm(name = "Responsable CEIBAC", signature = drawnSignature) {
+function approvalForm(name = "Responsable CEIBA", signature = drawnSignature) {
   const form = new FormData();
   form.set("signatoryName", name);
   form.set("signatoryTitle", "Directeur des archives");
@@ -80,7 +80,7 @@ function departureForm() {
   form.set("ministryName", "Responsable Ministère");
   form.set("ministryTitle", "Directeur des archives");
   form.set("ministrySignature", drawnSignature);
-  form.set("ceibacName", "Responsable CEIBAC");
+  form.set("ceibacName", "Responsable CEIBA");
   form.set("ceibacTitle", "Directeur logistique");
   form.set("ceibacSignature", drawnSignature);
   return form;
@@ -130,14 +130,14 @@ describe("pre-departure transfer approvals", () => {
     vi.restoreAllMocks();
   });
 
-  it("records submission, CEIBAC visa and ministry authorization in that order", async () => {
+  it("records submission, CEIBA visa and ministry authorization in that order", async () => {
     expect(await submitTransferLot(12)).toMatchObject({ success: true });
     expect(lot).toMatchObject({ status: "SOUMIS", submittedAt: now });
 
     expect(await approveTransferLotByCeibac(12, {}, approvalForm())).toMatchObject({ success: true });
     expect(lot).toMatchObject({
       status: "VALIDE_CEIBAC", ceibacValidatedAt: now, ceibacValidatedById: 27,
-      ceibacSignatoryName: "Responsable CEIBAC", ceibacSignatureData: drawnSignature,
+      ceibacSignatoryName: "Responsable CEIBA", ceibacSignatureData: drawnSignature,
     });
     expect(lot.authorizedAt).toBeUndefined();
 
@@ -146,7 +146,7 @@ describe("pre-departure transfer approvals", () => {
     expect(lot).toMatchObject({
       status: "AUTORISE", authorizedAt: now, authorizedById: 31,
       approvalSignatoryName: "Responsable Ministère", approvalSignatureData: drawnSignature,
-      ceibacSignatoryName: "Responsable CEIBAC", ceibacValidatedById: 27,
+      ceibacSignatoryName: "Responsable CEIBA", ceibacValidatedById: 27,
     });
     expect(audits.map(({ action, userId, entityId }) => ({ action, userId, entityId }))).toEqual([
       { action: "TRANSFER_LOT_SUBMIT", userId: 27, entityId: 12 },
@@ -157,25 +157,25 @@ describe("pre-departure transfer approvals", () => {
       .toEqual(["TRANSFER_SUBMIT", "TRANSFER_CEIBAC_APPROVE", "TRANSFER_AUTHORIZE"]);
   });
 
-  it.each(["BROUILLON", "SOUMIS"])("refuses ministry approval from %s without a CEIBAC visa", async (status) => {
+  it.each(["BROUILLON", "SOUMIS"])("refuses ministry approval from %s without a CEIBA visa", async (status) => {
     lot.status = status;
     const result = await authorizeTransferLot(12, {}, approvalForm("Responsable Ministère"));
     expect(result.success).not.toBe(true);
-    expect(result.error).toContain("validé par CEIBAC");
+    expect(result.error).toContain("validé par CEIBA");
     expect(lot.status).toBe(status);
     expect(lot.approvalSignatureData).toBeUndefined();
     expect(audits).toEqual([]);
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("requires evidence of the CEIBAC visa even if the lot carries its status", async () => {
+  it("requires evidence of the CEIBA visa even if the lot carries its status", async () => {
     lot.status = "VALIDE_CEIBAC";
     expect(await authorizeTransferLot(12, {}, approvalForm())).toHaveProperty("error");
     expect(audits).toEqual([]);
     expect(lot.status).toBe("VALIDE_CEIBAC");
   });
 
-  it.each(["BROUILLON", "AUTORISE", "ANNULE", "CLOTURE"])("refuses CEIBAC approval from %s", async (status) => {
+  it.each(["BROUILLON", "AUTORISE", "ANNULE", "CLOTURE"])("refuses CEIBA approval from %s", async (status) => {
     lot.status = status;
     expect(await approveTransferLotByCeibac(12, {}, approvalForm())).toHaveProperty("error");
     expect(lot.status).toBe(status);
@@ -183,7 +183,7 @@ describe("pre-departure transfer approvals", () => {
     expect(audits).toEqual([]);
   });
 
-  it("does not replace an existing CEIBAC signature when an approval is retried", async () => {
+  it("does not replace an existing CEIBA signature when an approval is retried", async () => {
     lot.status = "SOUMIS";
     await approveTransferLotByCeibac(12, {}, approvalForm());
     const signedLot = structuredClone(lot);
@@ -211,7 +211,7 @@ describe("pre-departure transfer approvals", () => {
   });
 
   it.each([
-    ["CEIBAC", approveTransferLotByCeibac],
+    ["CEIBA", approveTransferLotByCeibac],
     ["Ministère", authorizeTransferLot],
   ] as const)("rejects malformed %s signatures before opening a transaction", async (_label, approve) => {
     const result = await approve(12, {}, approvalForm("Responsable", "data:text/plain;base64," + "A".repeat(120)));
@@ -233,7 +233,7 @@ describe("pre-departure transfer approvals", () => {
     expect(audits).toEqual([]);
   });
 
-  it("blocks physical departure while the CEIBAC-approved lot awaits ministry authorization", async () => {
+  it("blocks physical departure while the CEIBA-approved lot awaits ministry authorization", async () => {
     lot.status = "VALIDE_CEIBAC";
     lot.ceibacValidatedAt = now;
     const result = await recordTransferMovement(12, {}, departureForm());
@@ -246,7 +246,7 @@ describe("pre-departure transfer approvals", () => {
     expect(audits).toEqual([]);
   });
 
-  it("rolls back the CEIBAC visa when its audit record cannot be written", async () => {
+  it("rolls back the CEIBA visa when its audit record cannot be written", async () => {
     lot.status = "SOUMIS";
     const previousLot = structuredClone(lot);
     mocks.auditCreate.mockRejectedValue(new Error("audit storage unavailable"));
