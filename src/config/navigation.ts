@@ -41,7 +41,10 @@ export interface NavItem {
   permission: PermissionCode;
   roles?: readonly RoleCode[];
   children?: NavItem[];
+  tone?: ActivityTone;
 }
+
+export type ActivityTone = "dashboard" | "collecte" | "dossiers" | "preparation" | "numerisation" | "conditionnement" | "indexation" | "archivage" | "transfer" | "quality" | "admin";
 
 export function isNavItemVisible(item: NavItem, permissions: readonly PermissionCode[], roleCode: RoleCode) {
   return permissions.includes(item.permission) && (!item.roles || item.roles.includes(roleCode));
@@ -52,6 +55,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: "Tableau de bord",
     href: "/dashboard",
     icon: LayoutDashboard,
+    tone: "dashboard",
     permission: "DASHBOARD_VIEW",
     roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "PREPARATEUR", "NUMERISATEUR", "CONDITIONNEUR", "INDEXEUR", "ARCHIVISTE", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"],
     children: [
@@ -63,30 +67,31 @@ export const NAV_ITEMS: NavItem[] = [
       { title: "PMO", href: "/dashboard/pmo", icon: BriefcaseBusiness, permission: "PMO_VIEW", roles: ["ADMIN", "PMO"] },
     ],
   },
-  { title: "Collecte", href: "/collecte", icon: FilePlus2, permission: "DOSSIER_CREATE" },
-  { title: "Dossiers", href: "/dossiers", icon: FolderOpen, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "CONSULTATION"] },
-  { title: "Recherche documentaire", href: "/recherche", icon: Search, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "EXECUTIF", "PMO", "CONSULTATION"] },
-  { title: "Préparation", href: "/preparation", icon: ClipboardCheck, permission: "PREPARATION_VIEW" },
-  { title: "Numérisation", href: "/numerisation", icon: ScanLine, permission: "NUMERISATION_VIEW" },
-  { title: "Reconditionnement", href: "/conditionnement", icon: PackageCheck, permission: "CONDITIONNEMENT_VIEW" },
-  { title: "Indexation", href: "/indexation", icon: ScanSearch, permission: "INDEXATION_VIEW" },
-  { title: "Archivage", href: "/archivage", icon: Archive, permission: "ARCHIVAGE_VIEW" },
+  { title: "Collecte", href: "/collecte", icon: FilePlus2, permission: "DOSSIER_CREATE", tone: "collecte" },
+  { title: "Dossiers", href: "/dossiers", icon: FolderOpen, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "CONSULTATION"], tone: "dossiers" },
+  { title: "Recherche documentaire", href: "/recherche", icon: Search, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "EXECUTIF", "PMO", "CONSULTATION"], tone: "dossiers" },
+  { title: "Préparation", href: "/preparation", icon: ClipboardCheck, permission: "PREPARATION_VIEW", tone: "preparation" },
+  { title: "Numérisation", href: "/numerisation", icon: ScanLine, permission: "NUMERISATION_VIEW", tone: "numerisation" },
+  { title: "Reconditionnement", href: "/conditionnement", icon: PackageCheck, permission: "CONDITIONNEMENT_VIEW", tone: "conditionnement" },
+  { title: "Indexation", href: "/indexation", icon: ScanSearch, permission: "INDEXATION_VIEW", tone: "indexation" },
+  { title: "Archivage", href: "/archivage", icon: Archive, permission: "ARCHIVAGE_VIEW", tone: "archivage" },
   {
-    title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW",
+    title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW", tone: "transfer",
     children: [
       { title: "Registre et bordereaux", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW" },
-      { title: "Validation CEIBA", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
-      { title: "Validation ministère", href: "/transferts/validation", icon: ShieldCheck, permission: "TRANSFER_AUTHORIZE" },
+      { title: "Validation interne", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
+      { title: "Validation SDA", href: "/transferts/validation", icon: ShieldCheck, permission: "TRANSFER_AUTHORIZE" },
     ],
   },
-  { title: "Qualité", href: "/qualite", icon: ShieldCheck, permission: "QUALITY_VIEW" },
-  { title: "Import", href: "/import", icon: Upload, permission: "IMPORT_DATA" },
-  { title: "Export", href: "/export", icon: Download, permission: "EXPORT_DATA" },
+  { title: "Qualité", href: "/qualite", icon: ShieldCheck, permission: "QUALITY_VIEW", tone: "quality" },
+  { title: "Import", href: "/import", icon: Upload, permission: "IMPORT_DATA", tone: "admin" },
+  { title: "Export", href: "/export", icon: Download, permission: "EXPORT_DATA", tone: "admin" },
   {
     title: "Administration",
     href: "/administration",
     icon: Settings,
     permission: "USER_MANAGE",
+    tone: "admin",
     children: [
       { title: "Utilisateurs", href: "/administration/utilisateurs", icon: Users, permission: "USER_MANAGE" },
       { title: "Rôles", href: "/administration/roles", icon: Shield, permission: "ROLE_MANAGE" },

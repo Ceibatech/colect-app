@@ -29,10 +29,10 @@ export default async function NumerisationPage({ searchParams }: { searchParams:
 
   return (
     <div className="space-y-5">
-      <section className="border-b border-border/70 pb-5">
+      <section className="border-b-2 border-activity-numerisation/45 pb-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div><Badge variant="secondary" className="rounded-md uppercase tracking-[0.16em]">Chaîne numérique</Badge><h1 className="mt-3 text-2xl font-semibold">Numérisation par carton</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">Tous les cartons préparés arrivent dans cette file. Le poste scanner associe chaque versement au bon dossier et trace l’agent connecté.</p></div>
-          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary"><ScanLine /></span>
+          <div><Badge variant="secondary" className="rounded-md border-activity-numerisation/25 bg-activity-numerisation/10 text-activity-numerisation uppercase tracking-[0.16em]">Chaîne numérique</Badge><h1 className="mt-3 text-2xl font-semibold">Numérisation par carton</h1><p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">Tous les cartons préparés arrivent dans cette file. Le poste scanner associe chaque versement au bon dossier et trace l’agent connecté.</p></div>
+          <span className="flex h-10 w-10 items-center justify-center rounded-md bg-activity-numerisation/10 text-activity-numerisation ring-1 ring-activity-numerisation/25"><ScanLine /></span>
         </div>
       </section>
       <section className="grid grid-cols-3 gap-px overflow-hidden rounded-md border bg-border">

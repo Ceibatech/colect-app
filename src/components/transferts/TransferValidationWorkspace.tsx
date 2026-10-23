@@ -14,8 +14,8 @@ import { getTransferMovementLabel, getTransferMovementStatusLabel } from "@/lib/
 type WorkspaceData = Awaited<ReturnType<typeof getTransferValidationWorkspace>>;
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 const FILTERS = [
-  { value: "A_VALIDER", label: "À signer par le ministère" },
-  { value: "ATTENTE_CEIBAC", label: "En attente du visa CEIBA" },
+  { value: "A_VALIDER", label: "À signer par le SDA" },
+  { value: "ATTENTE_CEIBAC", label: "En attente de validation interne" },
   { value: "VALIDES", label: "Validés" },
   { value: "TOUS", label: "Tous les bordereaux" },
 ] as const;
@@ -35,23 +35,24 @@ export function TransferValidationWorkspace({ data, filters, stage }: {
       <PageHeader
         eyebrow="Transferts d’archives"
         icon={ShieldCheck}
-        title={ministry ? "Validation ministère" : "Validation CEIBA"}
+        title={ministry ? "Validation SDA" : "Validation interne"}
         description={ministry
-          ? "Examinez les lots validés par CEIBA, autorisez leur sortie et consultez les bordereaux de réception à contre-signer."
-          : "Contrôlez les lots soumis par le gestionnaire avant leur transmission au ministère, puis les constats d’arrivée."}
+          ? "Examinez les opérations validées en interne, autorisez leur sortie et consultez les bordereaux de réception à contre-signer."
+          : "Contrôlez les opérations soumises par le gestionnaire avant leur transmission au SDA, puis les constats d’arrivée."}
         actions={<Link href="/transferts" className={buttonVariants({ variant: "outline" })}><ArrowLeft /> Registre et suivi</Link>}
         stats={[
           { label: ministry ? "Lots à autoriser" : "Lots à valider", value: data.summary.pendingLots },
           { label: "Réceptions à signer", value: pendingReceptions },
         ]}
+        tone="transfer"
       />
 
       <Card>
         <CardHeader>
           <CardTitle>{ministry ? "Autorisation de sortie des lots" : "Validation des lots avant départ"}</CardTitle>
           <CardDescription>{ministry
-            ? "Ces lots ont reçu le visa CEIBA. La sortie reste bloquée jusqu’à votre autorisation."
-            : "Ces lots attendent le visa du responsable CEIBA. Votre signature les transmet au ministère."}</CardDescription>
+            ? "Ces opérations ont reçu la validation interne. La sortie reste bloquée jusqu’à l’autorisation du SDA."
+            : "Ces opérations attendent la validation interne. Votre signature les transmet au SDA."}</CardDescription>
         </CardHeader>
         {data.lots.length === 0 ? <CardContent><p className="text-sm text-muted-foreground">Aucun lot en attente à cette étape.</p></CardContent> : (
           <div className="divide-y border-t">

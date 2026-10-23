@@ -2,9 +2,10 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChevronLeft, ChevronRight, FileBox, Loader2, PackageCheck, Search } from "lucide-react";
+import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ListChecks, Loader2, PackageCheck, Search } from "lucide-react";
 import { toast } from "sonner";
 import { createTransferLot, type TransferActionState } from "@/lib/services/transfer-actions";
+import { MAX_TRANSFER_CARTONS, type TransferCartonItem } from "@/lib/transfers/carton-selection";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,35 +24,24 @@ interface SiteOption {
   entrepots: Array<{ id: number; code: string; nom: string; localisation: string | null }>;
 }
 
-function warehouseLabel(warehouse: SiteOption["entrepots"][number]) {
-  return [warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ");
-}
-
-interface TransferDossierItem {
-  id: number;
-  reference: string;
-  siteId: number | null;
-  codeBarres: string | null;
-  libelleCarton: string | null;
-  nom: string | null;
-  prenoms: string | null;
-  statutPreparation: string;
-  commune: { nom: string } | null;
-  natureDossier: { libelle: string } | null;
-  operateur: { matricule: string; nom: string; prenoms: string | null };
-}
-
-interface TransferDossierPage {
-  items: TransferDossierItem[];
+interface TransferCartonPage {
+  items: TransferCartonItem[];
   total: number;
+  totalDossiers: number;
+  unidentifiedDossierCount: number;
   page: number;
   pageSize: number;
   totalPages: number;
 }
 
 const initialState: TransferActionState = {};
-const emptyPage: TransferDossierPage = { items: [], total: 0, page: 1, pageSize: 40, totalPages: 1 };
-const MAX_DOSSIERS = 500;
+const emptyPage: TransferCartonPage = {
+  items: [], total: 0, totalDossiers: 0, unidentifiedDossierCount: 0, page: 1, pageSize: 40, totalPages: 1,
+};
+
+function warehouseLabel(warehouse: SiteOption["entrepots"][number]) {
+  return [warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ");
+}
 
 export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
   const router = useRouter();
@@ -63,16 +53,17 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
   const [destinationSiteId, setDestinationSiteId] = useState(() => ceibaSites.length === 1 ? String(ceibaSites[0].id) : "");
   const [destinationEntrepotId, setDestinationEntrepotId] = useState("none");
   const [includeUnlocated, setIncludeUnlocated] = useState(true);
-  const [selected, setSelected] = useState<Map<number, TransferDossierItem>>(new Map());
+  const [selected, setSelected] = useState<Map<string, TransferCartonItem>>(new Map());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [results, setResults] = useState<TransferDossierPage>(emptyPage);
+  const [results, setResults] = useState<TransferCartonPage>(emptyPage);
   const [loading, setLoading] = useState(false);
+  const [proposing, setProposing] = useState(false);
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (!state.success || !state.lotId) return;
-    toast.success(state.message ?? "Lot créé.");
+    toast.success(state.message ?? "Opération créée.");
     router.push(`/transferts/${state.lotId}`);
   }, [state, router]);
 
@@ -82,18 +73,12 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       setLoadError("");
-      const params = new URLSearchParams({ site: sourceSiteId, entrepot: sourceEntrepotId, page: String(page) });
-      if (includeUnlocated) params.set("unlocated", "1");
-      if (search.trim()) params.set("q", search.trim());
       try {
-        const response = await fetch(`/api/transferts/dossiers?${params}`, { signal: controller.signal });
-        const payload = await response.json() as TransferDossierPage | { error?: string };
-        if (!response.ok || !("items" in payload)) throw new Error("error" in payload ? payload.error : "Chargement impossible.");
-        setResults(payload);
+        setResults(await fetchCartons({ sourceSiteId, sourceEntrepotId, includeUnlocated, search, page, signal: controller.signal }));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         setResults(emptyPage);
-        setLoadError(error instanceof Error ? error.message : "Le stock n'a pas pu être chargé.");
+        setLoadError(error instanceof Error ? error.message : "Le stock de cartons n'a pas pu être chargé.");
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -106,8 +91,9 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
 
   const sourceSite = ministrySites.find((site) => String(site.id) === sourceSiteId);
   const destinationSite = ceibaSites.find((site) => String(site.id) === destinationSiteId);
-  const selectedIds = useMemo(() => [...selected.keys()], [selected]);
-  const allPageSelected = results.items.length > 0 && results.items.every((item) => selected.has(item.id));
+  const selectedTokens = useMemo(() => [...selected.keys()], [selected]);
+  const selectedDossierCount = useMemo(() => [...selected.values()].reduce((sum, item) => sum + item.dossierCount, 0), [selected]);
+  const allPageSelected = results.items.length > 0 && results.items.every((item) => selected.has(item.token));
 
   function resetSourceSelection() {
     setSelected(new Map());
@@ -130,23 +116,21 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
 
   function changeIncludeUnlocated(checked: boolean) {
     setIncludeUnlocated(checked);
+    setSelected(new Map());
     setPage(1);
-    if (!checked) {
-      setSelected((current) => new Map([...current].filter(([, item]) => item.siteId !== null)));
-    }
   }
 
-  function toggleDossier(item: TransferDossierItem, checked: boolean) {
+  function toggleCarton(item: TransferCartonItem, checked: boolean) {
     setSelected((current) => {
       const next = new Map(current);
       if (checked) {
-        if (next.size >= MAX_DOSSIERS && !next.has(item.id)) {
-          toast.error(`Un lot est limité à ${MAX_DOSSIERS} dossiers.`);
+        if (next.size >= MAX_TRANSFER_CARTONS && !next.has(item.token)) {
+          toast.error(`Une opération est limitée à ${MAX_TRANSFER_CARTONS} cartons.`);
           return current;
         }
-        next.set(item.id, item);
+        next.set(item.token, item);
       } else {
-        next.delete(item.id);
+        next.delete(item.token);
       }
       return next;
     });
@@ -156,59 +140,54 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
     setSelected((current) => {
       const next = new Map(current);
       if (allPageSelected) {
-        results.items.forEach((item) => next.delete(item.id));
+        results.items.forEach((item) => next.delete(item.token));
       } else {
         for (const item of results.items) {
-          if (next.size >= MAX_DOSSIERS) break;
-          next.set(item.id, item);
-        }
-        if (current.size + results.items.filter((item) => !current.has(item.id)).length > MAX_DOSSIERS) {
-          toast.warning(`Les ${MAX_DOSSIERS} premiers dossiers ont été sélectionnés.`);
+          if (next.size >= MAX_TRANSFER_CARTONS) break;
+          next.set(item.token, item);
         }
       }
       return next;
     });
   }
 
+  async function proposeBatch() {
+    if (!sourceSiteId) return;
+    setProposing(true);
+    setLoadError("");
+    try {
+      const proposal = await fetchCartons({ sourceSiteId, sourceEntrepotId, includeUnlocated, search, page: 1, proposal: true });
+      setSelected(new Map(proposal.items.map((item) => [item.token, item])));
+      const dossiers = proposal.items.reduce((sum, item) => sum + item.dossierCount, 0);
+      toast.success(`${proposal.items.length} carton${proposal.items.length > 1 ? "s" : ""} proposé${proposal.items.length > 1 ? "s" : ""}, soit ${dossiers} dossiers.`);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "La proposition n'a pas pu être générée.");
+    } finally {
+      setProposing(false);
+    }
+  }
+
   return (
     <form action={formAction} className="space-y-6">
-      <input type="hidden" name="dossierIds" value={selectedIds.join(",")} />
+      <input type="hidden" name="cartonTokens" value={JSON.stringify(selectedTokens)} />
       <input type="hidden" name="includeUnlocated" value={String(includeUnlocated)} />
       {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
 
       <section className="grid gap-5 rounded-lg border bg-card p-4 shadow-sm lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:p-5">
         <div className="space-y-4">
-          <div><h2 className="font-semibold">Site du ministère · origine</h2><p className="text-sm text-muted-foreground">Site d&apos;inventaire qui détient actuellement les dossiers.</p></div>
+          <div><h2 className="font-semibold">Site du ministère · origine</h2><p className="text-sm text-muted-foreground">Site d&apos;inventaire qui détient actuellement les cartons.</p></div>
           <div className="space-y-2">
             <Label>Site du ministère</Label>
-            <Select
-              name="sourceSiteId"
-              items={ministrySites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
-              value={sourceSiteId}
-              onValueChange={changeSourceSite}
-              disabled={pending}
-            >
+            <Select name="sourceSiteId" items={ministrySites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={sourceSiteId} onValueChange={changeSourceSite} disabled={pending}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site du ministère" /></SelectTrigger>
               <SelectContent>{ministrySites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label>Entrepôt / salle d&apos;origine</Label>
-            <Select
-              name="sourceEntrepotId"
-              items={[
-                { label: "Sans entrepôt précisé", value: "none" },
-                ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) })),
-              ]}
-              value={sourceEntrepotId}
-              onValueChange={changeSourceWarehouse}
-              disabled={pending || !sourceSite}
-            >
+            <Select name="sourceEntrepotId" items={[{ label: "Sans entrepôt précisé", value: "none" }, ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) }))]} value={sourceEntrepotId} onValueChange={changeSourceWarehouse} disabled={pending || !sourceSite}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sans entrepôt précisé</SelectItem>
-                {sourceSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}
-              </SelectContent>
+              <SelectContent><SelectItem value="none">Sans entrepôt précisé</SelectItem>{sourceSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>
@@ -219,34 +198,16 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
           <div><h2 className="font-semibold">Site CEIBA · destination</h2><p className="text-sm text-muted-foreground">Site de traitement qui intégrera le stock après réception signée.</p></div>
           <div className="space-y-2">
             <Label>Site CEIBA</Label>
-            <Select
-              name="destinationSiteId"
-              items={ceibaSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))}
-              value={destinationSiteId}
-              onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }}
-              disabled={pending}
-            >
+            <Select name="destinationSiteId" items={ceibaSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={destinationSiteId} onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }} disabled={pending}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site CEIBA" /></SelectTrigger>
               <SelectContent>{ceibaSites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label>Entrepôt / salle de destination</Label>
-            <Select
-              name="destinationEntrepotId"
-              items={[
-                { label: "Sans entrepôt précisé", value: "none" },
-                ...(destinationSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) })),
-              ]}
-              value={destinationEntrepotId}
-              onValueChange={(value) => setDestinationEntrepotId(value ?? "none")}
-              disabled={pending || !destinationSite}
-            >
+            <Select name="destinationEntrepotId" items={[{ label: "Sans entrepôt précisé", value: "none" }, ...(destinationSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) }))]} value={destinationEntrepotId} onValueChange={(value) => setDestinationEntrepotId(value ?? "none")} disabled={pending || !destinationSite}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Sans entrepôt précisé</SelectItem>
-                {destinationSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}
-              </SelectContent>
+              <SelectContent><SelectItem value="none">Sans entrepôt précisé</SelectItem>{destinationSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>
@@ -254,72 +215,64 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
 
       <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-end lg:justify-between lg:p-5">
-          <div><h2 className="font-semibold">Dossiers disponibles au site du ministère</h2><p className="text-sm text-muted-foreground">Sélectionnez les dossiers inventoriés à remettre au gestionnaire de transfert CEIBA.</p></div>
-          <div className="relative w-full lg:w-96"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Référence, titulaire, carton..." className="pl-9" disabled={!sourceSiteId} /></div>
+          <div><h2 className="font-semibold">Cartons disponibles au site du ministère</h2><p className="text-sm text-muted-foreground">Un carton sélectionné inclut automatiquement tous les dossiers qu&apos;il contient.</p></div>
+          <div className="relative w-full lg:w-96"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Code-barres ou libellé du carton" className="pl-9" disabled={!sourceSiteId} /></div>
         </div>
 
-        <div className="flex flex-col gap-3 border-b bg-muted/20 px-4 py-3 lg:px-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-3 border-b bg-muted/20 px-4 py-3 lg:px-5">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant="secondary" className="rounded-md">{selected.size} sélectionné{selected.size > 1 ? "s" : ""}</Badge>
-              <span className="text-muted-foreground">{sourceSiteId ? `${results.total} dossier${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site du ministère pour charger l'inventaire"}</span>
+              <Badge variant="secondary" className="rounded-md">{selected.size}/{MAX_TRANSFER_CARTONS} cartons</Badge>
+              <Badge variant="outline" className="rounded-md">{selectedDossierCount} dossiers inclus</Badge>
+              <span className="text-muted-foreground">{sourceSiteId ? `${results.total} carton${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site du ministère pour charger le stock"}</span>
             </div>
-            {results.items.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={toggleCurrentPage}>{allPageSelected ? "Retirer cette page" : "Sélectionner cette page"}</Button> : null}
+            <div className="flex flex-wrap gap-2">
+              {results.items.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={toggleCurrentPage}>{allPageSelected ? "Retirer cette page" : "Sélectionner cette page"}</Button> : null}
+              <Button type="button" size="sm" onClick={proposeBatch} disabled={!sourceSiteId || proposing || pending}>
+                {proposing ? <Loader2 className="animate-spin" /> : <ListChecks />}
+                Proposer jusqu&apos;à 200 cartons
+              </Button>
+            </div>
           </div>
           <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-border/70 bg-background/70 p-3 text-sm">
             <Checkbox checked={includeUnlocated} onCheckedChange={(value) => changeIncludeUnlocated(value === true)} disabled={pending} />
-            <span><span className="block font-medium">Inclure le stock historique sans emplacement</span><span className="mt-0.5 block text-xs text-muted-foreground">Les dossiers importés sans site seront rattachés au site A uniquement s&apos;ils sont sélectionnés dans ce lot.</span></span>
+            <span><span className="block font-medium">Inclure le stock historique sans emplacement</span><span className="mt-0.5 block text-xs text-muted-foreground">Ces dossiers ne sont retenus que s&apos;ils appartiennent à un carton identifié; ils seront rattachés au site d&apos;origine à la validation.</span></span>
           </label>
         </div>
 
+        {results.unidentifiedDossierCount > 0 ? <Alert className="m-4 lg:m-5"><AlertDescription>{results.unidentifiedDossierCount} dossier(s) sans code-barres ni libellé de carton sont exclus. Leur contenant doit être identifié avant transfert.</AlertDescription></Alert> : null}
         {loadError ? <Alert variant="destructive" className="m-4 lg:m-5"><AlertDescription>{loadError}</AlertDescription></Alert> : null}
         {!sourceSiteId ? (
-          <div className="px-5 py-14 text-center"><FileBox className="mx-auto h-9 w-9 text-muted-foreground/50" /><p className="mt-3 font-medium">Point de départ requis</p><p className="mt-1 text-sm text-muted-foreground">Le stock affiché dépend du site et de l&apos;entrepôt d&apos;origine.</p></div>
+          <EmptyState title="Point de départ requis" description="Le stock affiché dépend du site et de la salle d'origine." />
         ) : loading ? (
-          <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="animate-spin" /> Chargement du stock...</div>
+          <div className="flex min-h-64 items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="animate-spin" /> Chargement des cartons...</div>
         ) : results.items.length === 0 && !loadError ? (
-          <div className="px-5 py-14 text-center"><FileBox className="mx-auto h-9 w-9 text-muted-foreground/50" /><p className="mt-3 font-medium">Aucun dossier disponible</p><p className="mt-1 text-sm text-muted-foreground">Modifiez la recherche ou vérifiez l&apos;emplacement sélectionné.</p></div>
+          <EmptyState title="Aucun carton disponible" description="Modifiez la recherche ou vérifiez l'emplacement sélectionné." />
         ) : (
           <>
-            <div className="divide-y lg:hidden">
-              {results.items.map((item) => <DossierMobileRow key={item.id} item={item} checked={selected.has(item.id)} disabled={pending} onToggle={toggleDossier} />)}
-            </div>
+            <div className="divide-y lg:hidden">{results.items.map((item) => <CartonMobileRow key={item.token} item={item} checked={selected.has(item.token)} disabled={pending} onToggle={toggleCarton} />)}</div>
             <div className="hidden overflow-x-auto lg:block">
-              <Table className="min-w-[980px]">
-                <TableHeader><TableRow className="bg-muted/35 hover:bg-muted/35"><TableHead className="w-12 pl-5" /><TableHead>Dossier</TableHead><TableHead>Titulaire</TableHead><TableHead>Contenant physique</TableHead><TableHead>Classement</TableHead><TableHead className="pr-5">Opérateur</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {results.items.map((item) => (
-                    <TableRow key={item.id} className="hover:bg-accent/25">
-                      <TableCell className="pl-5"><Checkbox checked={selected.has(item.id)} onCheckedChange={(value) => toggleDossier(item, value === true)} disabled={pending} aria-label={`Sélectionner ${item.reference}`} /></TableCell>
-                      <TableCell><p className="font-mono font-semibold">{item.reference}</p><p className="mt-1 text-xs text-muted-foreground">{item.siteId === null ? "Emplacement à confirmer" : `Préparation ${formatStatus(item.statutPreparation)}`}</p></TableCell>
-                      <TableCell><p className="font-medium">{personLabel(item)}</p><p className="mt-1 text-xs text-muted-foreground">{item.commune?.nom ?? "Commune non renseignée"}</p></TableCell>
-                      <TableCell><p className="font-mono text-sm">{item.codeBarres ?? "Sans code-barres"}</p><p className="mt-1 max-w-60 truncate text-xs text-muted-foreground">{item.libelleCarton ?? "Sans libellé de carton"}</p></TableCell>
-                      <TableCell>{item.natureDossier?.libelle ?? <span className="text-muted-foreground">Non renseignée</span>}</TableCell>
-                      <TableCell className="pr-5"><p>{item.operateur.prenoms} {item.operateur.nom}</p><p className="mt-1 text-xs text-muted-foreground">{item.operateur.matricule}</p></TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
+              <Table className="min-w-[760px]">
+                <TableHeader><TableRow className="bg-muted/35 hover:bg-muted/35"><TableHead className="w-12 pl-5" /><TableHead>Identifiant carton</TableHead><TableHead>Libellé</TableHead><TableHead className="text-center">Dossiers inclus</TableHead><TableHead className="pr-5">Localisation</TableHead></TableRow></TableHeader>
+                <TableBody>{results.items.map((item) => (
+                  <TableRow key={item.token} className="hover:bg-accent/25">
+                    <TableCell className="pl-5"><Checkbox checked={selected.has(item.token)} onCheckedChange={(value) => toggleCarton(item, value === true)} disabled={pending} aria-label={`Sélectionner le carton ${item.code}`} /></TableCell>
+                    <TableCell><p className="font-mono font-semibold">{item.code}</p><p className="mt-1 text-xs text-muted-foreground">Contenant physique identifié</p></TableCell>
+                    <TableCell>{item.label ?? <span className="text-muted-foreground">Sans libellé distinct</span>}</TableCell>
+                    <TableCell className="text-center"><span className="font-semibold tabular-nums">{item.dossierCount}</span><span className="text-muted-foreground"> dossier{item.dossierCount > 1 ? "s" : ""}</span></TableCell>
+                    <TableCell className="pr-5">{item.unlocatedDossierCount > 0 ? <Badge variant="outline" className="rounded-md">{item.unlocatedDossierCount} à rattacher</Badge> : <span className="text-sm text-muted-foreground">Site et salle sélectionnés</span>}</TableCell>
+                  </TableRow>
+                ))}</TableBody>
               </Table>
             </div>
           </>
         )}
 
-        {sourceSiteId && !loadError ? (
-          <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5">
-            <p className="text-sm text-muted-foreground">Page <strong className="text-foreground">{results.page}</strong> sur <strong className="text-foreground">{results.totalPages}</strong></p>
-            <div className="flex items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={loading || results.page <= 1}><ChevronLeft /> Précédent</Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setPage((value) => Math.min(results.totalPages, value + 1))} disabled={loading || results.page >= results.totalPages}>Suivant <ChevronRight /></Button>
-            </div>
-          </div>
-        ) : null}
+        {sourceSiteId && !loadError ? <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:px-5"><p className="text-sm text-muted-foreground">Page <strong className="text-foreground">{results.page}</strong> sur <strong className="text-foreground">{results.totalPages}</strong> · {results.totalDossiers} dossiers répartis dans les cartons filtrés</p><div className="flex items-center gap-2"><Button type="button" size="sm" variant="outline" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={loading || results.page <= 1}><ChevronLeft /> Précédent</Button><Button type="button" size="sm" variant="outline" onClick={() => setPage((value) => Math.min(results.totalPages, value + 1))} disabled={loading || results.page >= results.totalPages}>Suivant <ChevronRight /></Button></div></div> : null}
       </section>
 
       <section className="space-y-5 rounded-lg border bg-card p-4 shadow-sm lg:p-5">
-        <div>
-          <h2 className="font-semibold">Planification et sécurisation</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Renseignez les dispositions validées avec le SDA avant de soumettre l&apos;opération.</p>
-        </div>
+        <div><h2 className="font-semibold">Planification et sécurisation</h2><p className="mt-1 text-sm text-muted-foreground">Renseignez les dispositions validées avec le SDA avant de soumettre l&apos;opération.</p></div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required disabled={pending} /></div>
           <div className="space-y-2"><Label htmlFor="archiveSupport">Support des archives</Label><select id="archiveSupport" name="archiveSupport" defaultValue="PHYSIQUE" required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="PHYSIQUE">Physique</option><option value="ELECTRONIQUE">Électronique</option><option value="HYBRIDE">Hybride</option></select></div>
@@ -331,36 +284,29 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
           <div className="space-y-2"><Label htmlFor="riskAssessment">Risques identifiés</Label><Textarea id="riskAssessment" name="riskAssessment" required rows={3} maxLength={2000} placeholder="Perte, vol, détérioration, intempéries..." disabled={pending} /></div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="securityMeasures">Mesures de sécurisation</Label><Textarea id="securityMeasures" name="securityMeasures" required rows={3} maxLength={2000} placeholder="Conditionnement, fermeture, scellés, surveillance et protection des supports" disabled={pending} /></div>
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">Après création, soumettez l&apos;opération au responsable CEIBA. Sa validation la transmet au SDA ou au responsable ministériel habilité. Le stock du site d&apos;inventaire ne diminue qu&apos;après le bon de sortie contre-signé ; le stock du site CEIBA augmente après l&apos;attestation de réception validée.</p>
+        <p className="text-xs leading-5 text-muted-foreground">Après création, l&apos;opération est soumise à la validation interne, puis transmise à la validation SDA. Le stock du site d&apos;inventaire diminue uniquement après le bon de sortie contre-signé; le stock du site CEIBA augmente après l&apos;attestation de réception validée.</p>
       </section>
 
-      <div className="flex justify-end">
-        <Button type="submit" disabled={pending || selected.size === 0 || !sourceSiteId || !destinationSiteId}>
-          {pending ? <Loader2 className="animate-spin" /> : <PackageCheck />}
-          Constituer l&apos;opération · {selected.size} dossier{selected.size > 1 ? "s" : ""}
-        </Button>
-      </div>
+      <div className="flex justify-end"><Button type="submit" disabled={pending || selected.size === 0 || !sourceSiteId || !destinationSiteId}>{pending ? <Loader2 className="animate-spin" /> : <PackageCheck />}Valider la sélection · {selected.size} carton{selected.size > 1 ? "s" : ""} / {selectedDossierCount} dossiers</Button></div>
     </form>
   );
 }
 
-function DossierMobileRow({ item, checked, disabled, onToggle }: { item: TransferDossierItem; checked: boolean; disabled: boolean; onToggle: (item: TransferDossierItem, checked: boolean) => void }) {
-  return (
-    <label className="flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/35">
-      <Checkbox checked={checked} onCheckedChange={(value) => onToggle(item, value === true)} disabled={disabled} />
-      <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-center justify-between gap-2"><strong className="font-mono">{item.reference}</strong><span className="text-xs text-muted-foreground">{item.codeBarres ?? "Sans code-barres"}</span></span>
-        <span className="mt-1 block font-medium">{personLabel(item)}</span>
-        <span className="mt-1 block text-xs text-muted-foreground">{item.siteId === null ? "Emplacement à confirmer" : item.commune?.nom ?? "Commune non renseignée"} · {item.natureDossier?.libelle ?? "Nature non renseignée"}</span>
-      </span>
-    </label>
-  );
+async function fetchCartons(options: { sourceSiteId: string; sourceEntrepotId: string; includeUnlocated: boolean; search: string; page: number; proposal?: boolean; signal?: AbortSignal }) {
+  const params = new URLSearchParams({ site: options.sourceSiteId, entrepot: options.sourceEntrepotId, page: String(options.page) });
+  if (options.includeUnlocated) params.set("unlocated", "1");
+  if (options.search.trim()) params.set("q", options.search.trim());
+  if (options.proposal) params.set("proposal", "1");
+  const response = await fetch(`/api/transferts/cartons?${params}`, { signal: options.signal });
+  const payload = await response.json() as TransferCartonPage | { error?: string };
+  if (!response.ok || !("items" in payload)) throw new Error("error" in payload ? payload.error : "Chargement impossible.");
+  return payload;
 }
 
-function personLabel(item: Pick<TransferDossierItem, "nom" | "prenoms">) {
-  return [item.nom, item.prenoms].filter(Boolean).join(" ") || "Titulaire non renseigné";
+function EmptyState({ title, description }: { title: string; description: string }) {
+  return <div className="px-5 py-14 text-center"><Boxes className="mx-auto h-9 w-9 text-muted-foreground/50" /><p className="mt-3 font-medium">{title}</p><p className="mt-1 text-sm text-muted-foreground">{description}</p></div>;
 }
 
-function formatStatus(value: string) {
-  return value.toLocaleLowerCase("fr").replaceAll("_", " ");
+function CartonMobileRow({ item, checked, disabled, onToggle }: { item: TransferCartonItem; checked: boolean; disabled: boolean; onToggle: (item: TransferCartonItem, checked: boolean) => void }) {
+  return <label className="flex cursor-pointer items-start gap-3 p-4 hover:bg-muted/35"><Checkbox checked={checked} onCheckedChange={(value) => onToggle(item, value === true)} disabled={disabled} /><span className="min-w-0 flex-1"><span className="flex flex-wrap items-center justify-between gap-2"><strong className="font-mono">{item.code}</strong><Badge variant="outline" className="rounded-md">{item.dossierCount} dossier{item.dossierCount > 1 ? "s" : ""}</Badge></span><span className="mt-1 block text-sm text-muted-foreground">{item.label ?? "Sans libellé distinct"}</span>{item.unlocatedDossierCount > 0 ? <span className="mt-1 block text-xs text-brand-gold">{item.unlocatedDossierCount} dossier(s) historique(s) à rattacher</span> : null}</span></label>;
 }

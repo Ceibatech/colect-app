@@ -79,8 +79,8 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Registre</Link>
             <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> Fiche du lot</Link>
             {lot.authorizedAt ? <Link href="/transferts#documents" className={cn(buttonVariants({ variant: "outline" }))}><Download /> F01 consolidée</Link> : null}
-            {canValidateMinistry ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
-            {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBA</Link> : null}
+            {canValidateMinistry ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation SDA</Link> : null}
+            {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation interne</Link> : null}
             {canSubmit ? <SubmitTransferButton lotId={lot.id} /> : null}
             {canApproveCeibac ? <ApproveTransferLotByCeibacButton lotId={lot.id} /> : null}
             {canAuthorize ? <AuthorizeTransferButton lotId={lot.id} /> : null}
@@ -92,6 +92,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           { label: "En circulation", value: stock.outsideOrigin, tone: stock.outsideOrigin > 0 ? "warning" : "success" },
           { label: "Retournés au ministère", value: stock.returned, tone: "success" },
         ]}
+        tone="transfer"
       />
 
       <TransferWorkflow submitted={!!lot.submittedAt} ceibacApproved={!!lot.ceibacValidatedAt} authorized={!!lot.authorizedAt} hasDeparture={lot.items.some((item) => item.status !== "PREVU")} hasArrival={lot.items.some((item) => item.status === "RECU" || item.status === "RETOURNE")} />
@@ -102,7 +103,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Situation du stock</CardTitle>
-                <CardDescription>Le stock du site CEIBA n&apos;augmente qu&apos;après les visas CEIBA et ministère du constat de réception.</CardDescription>
+                <CardDescription>Le stock du site CEIBA n&apos;augmente qu&apos;après les validations interne et SDA du constat de réception.</CardDescription>
               </div>
               <TransferLotStatusBadge status={lot.status as TransferLotStatusCode} />
             </div>
@@ -119,7 +120,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           <CardHeader><CardTitle>Traçabilité</CardTitle><CardDescription>Responsables et jalons du dossier.</CardDescription></CardHeader>
           <CardContent className="space-y-4 text-sm">
             <TraceRow icon={CalendarClock} label="Créé" value={`${dateTimeFormatter.format(lot.createdAt)} par ${lot.createdBy.name}`} />
-            <TraceRow icon={ShieldCheck} label="Validation CEIBA" value={lot.ceibacValidatedAt ? `${dateTimeFormatter.format(lot.ceibacValidatedAt)} par ${lot.ceibacSignatoryName ?? "CEIBA"}` : lot.authorizedAt ? "Ancien circuit : visa CEIBA non enregistré" : "En attente"} />
+            <TraceRow icon={ShieldCheck} label="Validation interne" value={lot.ceibacValidatedAt ? `${dateTimeFormatter.format(lot.ceibacValidatedAt)} par ${lot.ceibacSignatoryName ?? "Responsable interne"}` : lot.authorizedAt ? "Ancien circuit : validation interne non enregistrée" : "En attente"} />
             <TraceRow icon={ShieldCheck} label="Autorisation" value={lot.authorizedAt && lot.authorizedBy ? `${dateTimeFormatter.format(lot.authorizedAt)} par ${lot.authorizedBy.name}` : "En attente"} />
             <TraceRow icon={Route} label="Transfert prévu" value={lot.plannedAt ? dateFormatter.format(lot.plannedAt) : "Non planifié"} />
           </CardContent>
@@ -211,10 +212,10 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
 function TransferWorkflow({ submitted, ceibacApproved, authorized, hasDeparture, hasArrival }: { submitted: boolean; ceibacApproved: boolean; authorized: boolean; hasDeparture: boolean; hasArrival: boolean }) {
   const steps = [
     { label: "Lot soumis", detail: "Gestionnaire", complete: submitted },
-    { label: "Lot validé", detail: "Responsable CEIBA", complete: ceibacApproved },
-    { label: "Sortie autorisée", detail: "Visa ministère", complete: authorized },
+    { label: "Validation interne", detail: "Responsable interne", complete: ceibacApproved },
+    { label: "Sortie autorisée", detail: "Validation SDA", complete: authorized },
     { label: "Acheminement", detail: "Bordereau + GPS", complete: hasDeparture },
-    { label: "Réception validée", detail: "CEIBA + ministère", complete: hasArrival },
+    { label: "Réception validée", detail: "Validation interne + SDA", complete: hasArrival },
   ];
   return (
     <Card className="bg-card/95">

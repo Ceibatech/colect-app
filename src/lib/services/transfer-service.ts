@@ -7,8 +7,12 @@ import {
   getTransferDossierStockSummary,
   type TransferItemStatusCode,
 } from "@/lib/utils/transfer-stock";
+import {
+  filterTransferCartons,
+  groupAvailableTransferCartons,
+} from "@/lib/transfers/carton-selection";
 
-export interface TransferDossierSearchOptions {
+export interface TransferCartonSearchOptions {
   sourceSiteId: number;
   sourceEntrepotId: number | null;
   includeUnlocated?: boolean;
@@ -41,10 +45,9 @@ export async function getTransferCreateData() {
   return { sites, totalDossiers };
 }
 
-export async function searchTransferDossiers(options: TransferDossierSearchOptions) {
-  const pageSize = Math.min(Math.max(options.pageSize ?? 40, 1), 100);
+export async function searchTransferCartons(options: TransferCartonSearchOptions) {
+  const pageSize = Math.min(Math.max(options.pageSize ?? 40, 1), 200);
   const page = Math.max(options.page, 1);
-  const query = options.q?.trim();
   const locationWhere: Prisma.DossierWhereInput = options.includeUnlocated
     ? {
         OR: [
@@ -53,62 +56,48 @@ export async function searchTransferDossiers(options: TransferDossierSearchOptio
         ],
       }
     : { siteId: options.sourceSiteId, entrepotId: options.sourceEntrepotId };
-  const where: Prisma.DossierWhereInput = {
+  const rows = await prisma.dossier.findMany({
+    where: {
     AND: [
       locationWhere,
       {
-        transferLotDossiers: {
-          none: {
-            transferLotItem: {
-              status: { in: ["PREVU", "SORTI"] },
-              transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
-            },
+        OR: [
+          { codeBarres: { not: null } },
+          { libelleCarton: { not: null } },
+        ],
+      },
+    ],
+    },
+    select: {
+      id: true,
+      siteId: true,
+      codeBarres: true,
+      libelleCarton: true,
+      transferLotDossiers: {
+        where: {
+          transferLotItem: {
+            status: { in: ["PREVU", "SORTI"] },
+            transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
           },
         },
+        select: { id: true },
+        take: 1,
       },
-      ...(query ? [{
-        OR: [
-          { reference: { contains: query } },
-          { codeBarres: { contains: query } },
-          { libelleCarton: { contains: query } },
-          { nom: { contains: query } },
-          { prenoms: { contains: query } },
-          { numeroDdu: { contains: query } },
-          { referenceClassement: { contains: query } },
-        ],
-      }] : []),
-    ],
-  };
+    },
+  });
 
-  const [items, total] = await Promise.all([
-    prisma.dossier.findMany({
-      where,
-      orderBy: [{ reference: "asc" }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
-      select: {
-        id: true,
-        reference: true,
-        siteId: true,
-        codeBarres: true,
-        libelleCarton: true,
-        nom: true,
-        prenoms: true,
-        statutPreparation: true,
-        commune: { select: { nom: true } },
-        natureDossier: { select: { libelle: true } },
-        operateur: { select: { matricule: true, nom: true, prenoms: true } },
-      },
-    }),
-    prisma.dossier.count({ where }),
-  ]);
+  const grouped = groupAvailableTransferCartons(rows);
+  const filtered = filterTransferCartons(grouped.items, options.q);
+  const items = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   return {
     items,
-    total,
+    total: filtered.length,
+    totalDossiers: filtered.reduce((sum, item) => sum + item.dossierCount, 0),
+    unidentifiedDossierCount: grouped.unidentifiedDossierCount,
     page,
     pageSize,
-    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)),
   };
 }
 

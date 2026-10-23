@@ -11,7 +11,7 @@ import { getRoleLabel, PERMISSIONS, ROLE_CODES, ROLE_LABELS, ROLE_PERMISSIONS, R
  */
 describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
   it("utilise CEIBA dans tous les libellés de rôle affichés", () => {
-    expect(getRoleLabel("VALIDATEUR_CEIBAC")).toBe("Validateur CEIBA");
+    expect(getRoleLabel("VALIDATEUR_CEIBAC")).toBe("Validateur interne");
     expect(Object.values(ROLE_LABELS).join(" ")).not.toMatch(/CEIBAC/i);
   });
 

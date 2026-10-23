@@ -55,7 +55,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     ceibaSignatures: lot.ceibacValidatedAt ? [{
       reference: lot.reference,
       party: "CEIBAC_VALIDATOR",
-      label: "Visa CEIBA",
+      label: "Validation interne",
       name: lot.ceibacSignatoryName,
       title: lot.ceibacSignatoryTitle,
       signedAt: lot.ceibacValidatedAt,

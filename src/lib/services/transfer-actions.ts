@@ -15,6 +15,8 @@ import {
   type TransferLotStatusCode,
 } from "@/lib/utils/transfer-stock";
 import { getClientIp } from "@/lib/utils/server-request";
+import { buildTransferCartonToken, MAX_TRANSFER_CARTONS } from "@/lib/transfers/carton-selection";
+import { cartonWhereFromToken, parseCartonToken } from "@/lib/workflow/carton-identity";
 
 export interface TransferActionState {
   success?: boolean;
@@ -25,9 +27,14 @@ export interface TransferActionState {
 
 class TransferRuleError extends Error {}
 
-function parseIdList(value: FormDataEntryValue | null) {
+function parseStringList(value: FormDataEntryValue | null) {
   if (typeof value !== "string") return [];
-  return value.split(",").map((entry) => entry.trim()).filter(Boolean);
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 type TransferNotificationInput = Parameters<typeof notifyTransferWorkflow>[0];
@@ -194,7 +201,7 @@ export async function createTransferLot(
     riskAssessment: formData.get("riskAssessment"),
     securityMeasures: formData.get("securityMeasures"),
     motif: formData.get("motif"),
-    dossierIds: parseIdList(formData.get("dossierIds")),
+    cartonTokens: parseStringList(formData.get("cartonTokens")),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Lot de transfert invalide." };
 
@@ -205,8 +212,19 @@ export async function createTransferLot(
     return { error: "Le point de départ et le point de destination doivent être différents." };
   }
 
-  const dossierIds = [...new Set(parsed.data.dossierIds)];
-  if (dossierIds.length !== parsed.data.dossierIds.length) return { error: "Un dossier a été sélectionné plusieurs fois." };
+  const cartonTokens = [...new Set(parsed.data.cartonTokens)];
+  if (cartonTokens.length !== parsed.data.cartonTokens.length) return { error: "Un carton a été sélectionné plusieurs fois." };
+  if (cartonTokens.length > MAX_TRANSFER_CARTONS) return { error: `Une opération est limitée à ${MAX_TRANSFER_CARTONS} cartons.` };
+
+  const cartonFilters: Prisma.DossierWhereInput[] = [];
+  for (const token of cartonTokens) {
+    const identity = parseCartonToken(token);
+    const where = cartonWhereFromToken(token);
+    if (!identity || identity.siteId !== undefined || !where) {
+      return { error: "Un identifiant de carton est invalide. Actualisez la proposition." };
+    }
+    cartonFilters.push(where);
+  }
 
   const [sourceSite, destinationSite, sourceEntrepot, destinationEntrepot] = await Promise.all([
     prisma.site.findFirst({ where: { id: parsed.data.sourceSiteId, isActive: true, organisation: "MINISTERE" }, select: { id: true } }),
@@ -246,19 +264,46 @@ export async function createTransferLot(
         throw new TransferRuleError(`L'opération de cette date est déjà en cours de signature (${signedOperation.reference}). Planifiez une nouvelle date pour ajouter d'autres cartons.`);
       }
 
+      const locationWhere: Prisma.DossierWhereInput = parsed.data.includeUnlocated
+        ? {
+            OR: [
+              { siteId: parsed.data.sourceSiteId, entrepotId: parsed.data.sourceEntrepotId ?? null },
+              { siteId: null },
+            ],
+          }
+        : { siteId: parsed.data.sourceSiteId, entrepotId: parsed.data.sourceEntrepotId ?? null };
       const dossiers = await tx.dossier.findMany({
         where: {
-          id: { in: dossierIds },
-          OR: [
-            { siteId: parsed.data.sourceSiteId, entrepotId: parsed.data.sourceEntrepotId ?? null },
-            ...(parsed.data.includeUnlocated ? [{ siteId: null }] : []),
-          ],
+          AND: [locationWhere, { OR: cartonFilters }],
         },
         select: { id: true, reference: true, siteId: true, codeBarres: true, libelleCarton: true },
       });
-      if (dossiers.length !== dossierIds.length) {
-        throw new TransferRuleError("Un dossier sélectionné n'est plus disponible au point de départ. Actualisez la liste.");
+
+      const selectedTokenSet = new Set(cartonTokens);
+      const grouped = new Map<string, { token: string; code: string; label: string | null; dossiers: typeof dossiers }>();
+      for (const dossier of dossiers) {
+        const token = buildTransferCartonToken(dossier);
+        if (!token || !selectedTokenSet.has(token)) continue;
+        const code = dossier.codeBarres?.trim() || dossier.libelleCarton?.trim();
+        if (!code) continue;
+        const group = grouped.get(token) ?? {
+          token,
+          code,
+          label: dossier.codeBarres?.trim() ? dossier.libelleCarton?.trim() || null : null,
+          dossiers: [],
+        };
+        group.dossiers.push(dossier);
+        grouped.set(token, group);
       }
+      if (grouped.size !== cartonTokens.length) {
+        throw new TransferRuleError("Un carton sélectionné n'est plus disponible au point de départ. Actualisez la proposition.");
+      }
+
+      const groups = cartonTokens.map((token) => grouped.get(token)!);
+      if (new Set(groups.map((group) => group.code)).size !== groups.length) {
+        throw new TransferRuleError("Deux cartons portent le même identifiant. Harmonisez les codes avant de constituer l'opération.");
+      }
+      const dossierIds = groups.flatMap((group) => group.dossiers.map((dossier) => dossier.id));
 
       const conflict = await tx.transferLotDossier.findFirst({
         where: {
@@ -274,21 +319,8 @@ export async function createTransferLot(
         },
       });
       if (conflict) {
-        throw new TransferRuleError(`Le dossier ${conflict.dossier.reference} appartient déjà au lot ouvert ${conflict.transferLotItem.transferLot.reference}.`);
+        throw new TransferRuleError(`Le carton contenant le dossier ${conflict.dossier.reference} appartient déjà au lot ouvert ${conflict.transferLotItem.transferLot.reference}.`);
       }
-
-      const grouped = new Map<string, { code: string; label: string | null; dossiers: typeof dossiers }>();
-      for (const dossier of dossiers) {
-        const key = dossier.codeBarres ? `CARTON:${dossier.codeBarres}` : `DOSSIER:${dossier.id}`;
-        const group = grouped.get(key) ?? {
-          code: dossier.codeBarres ?? `DOSSIER-${dossier.id}`,
-          label: dossier.libelleCarton ?? (dossier.codeBarres ? null : `Dossier ${dossier.reference}`),
-          dossiers: [],
-        };
-        group.dossiers.push(dossier);
-        grouped.set(key, group);
-      }
-      const groups = [...grouped.values()];
       const unlocatedIds = dossiers.filter((dossier) => dossier.siteId === null).map((dossier) => dossier.id);
 
       const temporaryReference = `TMP-${randomUUID()}`;
@@ -351,7 +383,7 @@ export async function createTransferLot(
           action: "TRANSFER_LOT_CREATE",
           entity: "TRANSFER_LOT",
           entityId: lot.id,
-          newValue: { reference, dossierCount: dossierIds.length, attachedToSourceCount: unlocatedIds.length, groupCount: groups.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId },
+          newValue: { reference, dossierCount: dossierIds.length, attachedToSourceCount: unlocatedIds.length, cartonCount: groups.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId },
           ipAddress: ip,
         },
       });
@@ -361,7 +393,7 @@ export async function createTransferLot(
     revalidatePath("/transferts");
     revalidatePath("/transferts/validation");
     revalidatePath("/transferts/validation-ceibac");
-    return { success: true, lotId: result.id, message: `Le lot ${result.reference} a été créé.` };
+    return { success: true, lotId: result.id, message: `L'opération ${result.reference} a été créée avec ${cartonTokens.length} carton${cartonTokens.length > 1 ? "s" : ""}.` };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
@@ -401,15 +433,15 @@ export async function submitTransferLot(id: number): Promise<TransferActionState
         entityId: id,
         recipientRoleCodes: ["VALIDATEUR_CEIBAC"],
         title: `Lot ${lot.reference} à valider`,
-        message: "Le gestionnaire des transferts a soumis ce lot. Votre visa CEIBA est requis avant sa transmission au ministère.",
+        message: "Le gestionnaire des transferts a soumis cette opération. Votre validation interne est requise avant sa transmission au SDA.",
         reference: lot.reference,
-        statusLabel: "En attente du visa CEIBA",
+        statusLabel: "En attente de validation interne",
         actionPath: `/transferts/${id}`,
         actionLabel: "Examiner le lot",
         details: lotNotificationDetails(lot),
       });
     });
-    return { success: true, message: "Le lot a été transmis au responsable CEIBA pour validation." };
+    return { success: true, message: "L'opération a été transmise à la validation interne." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
     console.error("Transfer lot submission failed.", error);
@@ -445,7 +477,7 @@ export async function approveTransferLotByCeibac(
           ceibacSignatureData: parsed.data.signature,
         },
       });
-      if (updated.count !== 1) throw new TransferRuleError("Ce lot n'attend plus la validation CEIBA.");
+      if (updated.count !== 1) throw new TransferRuleError("Cette opération n'attend plus la validation interne.");
       await tx.auditLog.create({
         data: {
           userId: session.userId,
@@ -470,7 +502,7 @@ export async function approveTransferLotByCeibac(
         entityId: id,
         recipientRoleCodes: ["VALIDATEUR_MINISTERE"],
         title: `Autorisation requise pour ${lot.reference}`,
-        message: "Le lot a reçu le visa CEIBA. Le responsable habilité du ministère doit maintenant autoriser sa sortie.",
+        message: "L'opération a reçu la validation interne. Le responsable habilité du SDA doit maintenant autoriser sa sortie.",
         reference: lot.reference,
         statusLabel: "En attente de l'autorisation du ministère",
         actionPath: `/transferts/${id}`,
@@ -478,11 +510,11 @@ export async function approveTransferLotByCeibac(
         details: lotNotificationDetails(lot),
       });
     });
-    return { success: true, message: "Le lot est validé par CEIBA et transmis au ministère pour autorisation." };
+    return { success: true, message: "L'opération est validée en interne et transmise au SDA pour autorisation." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
     console.error("CEIBA lot approval failed.", error);
-    return { error: "La validation CEIBA du lot a échoué." };
+    return { error: "La validation interne de l'opération a échoué." };
   }
 }
 
@@ -514,7 +546,7 @@ export async function authorizeTransferLot(
           approvalSignatureData: parsed.data.signature,
         },
       });
-      if (updated.count !== 1) throw new TransferRuleError("Ce lot doit être validé par CEIBA avant l'autorisation du ministère, ou a déjà été autorisé.");
+      if (updated.count !== 1) throw new TransferRuleError("Cette opération doit recevoir la validation interne avant l'autorisation du SDA, ou a déjà été autorisée.");
       await tx.auditLog.create({
         data: {
           userId: session.userId,
@@ -619,7 +651,7 @@ export async function recordTransferMovement(
       });
       if (!lot) throw new TransferRuleError("Lot introuvable.");
       if (["BROUILLON", "SOUMIS", "VALIDE_CEIBAC", "ANNULE", "CLOTURE"].includes(lot.status)) {
-        throw new TransferRuleError(["BROUILLON", "SOUMIS", "VALIDE_CEIBAC"].includes(lot.status) ? "Le lot doit être autorisé par le ministère avant toute sortie." : "Ce lot ne peut plus recevoir de mouvement.");
+        throw new TransferRuleError(["BROUILLON", "SOUMIS", "VALIDE_CEIBAC"].includes(lot.status) ? "L'opération doit être autorisée par le SDA avant toute sortie." : "Cette opération ne peut plus recevoir de mouvement.");
       }
 
       const type = parsed.data.type as TransferMovementType;
@@ -752,13 +784,13 @@ export async function recordTransferMovement(
         message: incident
           ? "Un incident a été déclaré pendant ce mouvement. Consultez immédiatement le dossier sécurisé pour examiner le constat et décider de la suite."
           : movement.type === "RECEPTION"
-            ? "Le constat d'arrivée a été soumis. Le responsable CEIBA doit contrôler la réception avant transmission au ministère."
-            : "Le bordereau de mouvement a été signé par CEIBA. La contre-signature du ministère est requise avant la mise à jour du stock.",
+            ? "Le constat d'arrivée a été soumis. Le responsable interne doit contrôler la réception avant transmission au SDA."
+            : "Le bordereau de mouvement a été signé par CEIBA. La contre-signature du SDA est requise avant la mise à jour du stock.",
         reference: movement.reference,
         statusLabel: incident
           ? "Incident à traiter"
           : movement.type === "RECEPTION"
-            ? "En attente du visa CEIBA"
+            ? "En attente de validation interne"
             : "En attente du visa du ministère",
         actionPath: `/transferts/${movement.transferLot.id}`,
         actionLabel: incident ? "Examiner l'incident" : "Examiner le bordereau",
@@ -771,7 +803,7 @@ export async function recordTransferMovement(
     return {
       success: true,
       message: result.nextValidator === "CEIBA"
-        ? `Le constat ${result.reference} est soumis au validateur CEIBA. Le stock reste en transit.`
+        ? `Le constat ${result.reference} est soumis à la validation interne. Le stock reste en transit.`
         : `Le bordereau F02 ${result.reference} est transmis au ministère. Le stock reste inchangé jusqu'à sa contre-signature.`,
     };
   } catch (error) {
@@ -805,7 +837,7 @@ export async function approveReceptionByCeiba(
         where: { id: movementId, type: "RECEPTION", status: "SOUMIS_CEIBAC" },
         select: { id: true, transferLotId: true, reference: true },
       });
-      if (!current) throw new TransferRuleError("Ce constat n'attend plus le visa CEIBA.");
+      if (!current) throw new TransferRuleError("Ce constat n'attend plus la validation interne.");
       await tx.transferSignature.create({
         data: {
           movementId,
@@ -840,7 +872,7 @@ export async function approveReceptionByCeiba(
         entityId: summary.id,
         recipientRoleCodes: ["VALIDATEUR_MINISTERE"],
         title: `Constat ${summary.reference} à contre-signer`,
-        message: "Le constat de réception a reçu le visa CEIBA. Le ministère doit effectuer le contrôle final et contre-signer le document.",
+        message: "Le constat de réception a reçu la validation interne. Le SDA doit effectuer le contrôle final et contre-signer le document.",
         reference: summary.reference,
         statusLabel: "En attente du visa final du ministère",
         actionPath: `/transferts/${summary.transferLot.id}`,
@@ -850,11 +882,11 @@ export async function approveReceptionByCeiba(
         details: movementNotificationDetails(summary),
       });
     });
-    return { success: true, message: `Le constat ${movement.reference} est visé par CEIBA et transmis au ministère.` };
+    return { success: true, message: `Le constat ${movement.reference} est validé en interne et transmis au SDA.` };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
     console.error("CEIBA reception approval failed.", error);
-    return { error: "Le visa CEIBA n'a pas pu être enregistré." };
+    return { error: "La validation interne n'a pas pu être enregistrée." };
   }
 }
 
@@ -952,7 +984,7 @@ export async function approveTransferMovementByMinistry(
           action: `TRANSFER_${movement.type}`,
           ancienStatut: flow.ancienStatut,
           nouveauStatut: flow.nouveauStatut,
-          commentaire: `Mouvement finalisé après les visas CEIBA et ministère par le bordereau ${movement.reference}.`,
+          commentaire: `Mouvement finalisé après les validations interne et SDA par le bordereau ${movement.reference}.`,
           metadata: {
             transferLotId: movement.transferLotId,
             transferMovementId: movement.id,

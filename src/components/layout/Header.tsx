@@ -22,7 +22,7 @@ export function Header({ name, email, roleCode }: { name: string; email: string;
   const pathname = usePathname();
   const crumbs = buildBreadcrumb(pathname).map((crumb) =>
     roleCode === "VALIDATEUR_CEIBAC" && crumb.href === "/transferts"
-      ? { ...crumb, title: "Validation CEIBA" }
+      ? { ...crumb, title: "Validation interne" }
       : crumb
   );
 

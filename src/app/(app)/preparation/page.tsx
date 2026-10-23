@@ -37,10 +37,10 @@ export default async function PreparationPage({
 
   return (
     <div className="space-y-5">
-      <section className="border-b border-border/70 pb-5">
+      <section className="border-b-2 border-activity-preparation/45 pb-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <Badge variant="secondary" className="rounded-md uppercase tracking-[0.16em]">
+            <Badge variant="secondary" className="rounded-md border-activity-preparation/25 bg-activity-preparation/10 text-activity-preparation uppercase tracking-[0.16em]">
               Atelier documentaire
             </Badge>
             <h1 className="mt-3 text-2xl font-semibold">Préparation des dossiers</h1>
@@ -49,7 +49,7 @@ export default async function PreparationPage({
             </p>
           </div>
           <div className="flex items-center gap-3 text-right">
-            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <span className="flex h-10 w-10 items-center justify-center rounded-md bg-activity-preparation/10 text-activity-preparation ring-1 ring-activity-preparation/25">
               <ClipboardCheck className="h-5 w-5" />
             </span>
             <div>

@@ -43,6 +43,17 @@
   --color-brand-green: var(--brand-green);
   --color-brand-gray: var(--brand-gray);
   --color-brand-gold: var(--brand-gold);
+  --color-activity-dashboard: var(--activity-dashboard);
+  --color-activity-collecte: var(--activity-collecte);
+  --color-activity-dossiers: var(--activity-dossiers);
+  --color-activity-preparation: var(--activity-preparation);
+  --color-activity-numerisation: var(--activity-numerisation);
+  --color-activity-conditionnement: var(--activity-conditionnement);
+  --color-activity-indexation: var(--activity-indexation);
+  --color-activity-archivage: var(--activity-archivage);
+  --color-activity-transfer: var(--activity-transfer);
+  --color-activity-quality: var(--activity-quality);
+  --color-activity-admin: var(--activity-admin);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -63,6 +74,17 @@
   --brand-green: #068c78;
   --brand-gray: #8f8d8e;
   --brand-gold: #c7942f;
+  --activity-dashboard: #4f6fad;
+  --activity-collecte: #2d73c9;
+  --activity-dossiers: #4967a8;
+  --activity-preparation: #b7791f;
+  --activity-numerisation: #0b84a5;
+  --activity-conditionnement: #c35f35;
+  --activity-indexation: #14806c;
+  --activity-archivage: #7558a6;
+  --activity-transfer: #078c78;
+  --activity-quality: #b23a48;
+  --activity-admin: #667085;
 
   --background: oklch(0.975 0.008 247);
   --foreground: oklch(0.18 0.035 257);
@@ -110,6 +132,17 @@
   --brand-green: #2fb39d;
   --brand-gray: #a8a6a7;
   --brand-gold: #d9b35d;
+  --activity-dashboard: #86a6df;
+  --activity-collecte: #6fa8ed;
+  --activity-dossiers: #829bd1;
+  --activity-preparation: #e0aa4f;
+  --activity-numerisation: #4ab5cf;
+  --activity-conditionnement: #e28a65;
+  --activity-indexation: #42b69c;
+  --activity-archivage: #a895d3;
+  --activity-transfer: #36b39e;
+  --activity-quality: #df7c87;
+  --activity-admin: #a1a8b3;
 
   --background: oklch(0.165 0.012 257);
   --foreground: oklch(0.965 0.006 247);

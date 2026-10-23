@@ -168,7 +168,7 @@ describe("pre-departure transfer approvals", () => {
     lot.status = status;
     const result = await authorizeTransferLot(12, {}, approvalForm("Responsable Ministère"));
     expect(result.success).not.toBe(true);
-    expect(result.error).toContain("validé par CEIBA");
+    expect(result.error).toContain("validation interne");
     expect(lot.status).toBe(status);
     expect(lot.approvalSignatureData).toBeUndefined();
     expect(audits).toEqual([]);
@@ -244,7 +244,7 @@ describe("pre-departure transfer approvals", () => {
     lot.status = "VALIDE_CEIBAC";
     lot.ceibacValidatedAt = now;
     const result = await recordTransferMovement(12, {}, departureForm());
-    expect(result.error).toContain("autorisé par le ministère");
+    expect(result.error).toContain("autorisée par le SDA");
     expect(lot.status).toBe("VALIDE_CEIBAC");
     expect(lot.items[0].status).toBe("PREVU");
     expect(mocks.movementCreate).not.toHaveBeenCalled();

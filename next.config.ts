@@ -21,6 +21,9 @@ const contentSecurityPolicy = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: {
+    cpus: 2,
+  },
   async headers() {
     return [
       {

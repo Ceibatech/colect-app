@@ -20,7 +20,7 @@ describe("transfer validation", () => {
       riskAssessment: "Perte, vol et détérioration",
       securityMeasures: "Cartons fermés, scellés et suivis",
       motif: "Numérisation CEIBA",
-      dossierIds: [11, 12],
+      cartonTokens: ["site:any|code:CARTON-001", "site:any|code:CARTON-002"],
     });
     expect(result.success).toBe(true);
   });
@@ -41,7 +41,28 @@ describe("transfer validation", () => {
       riskAssessment: "Perte et vol",
       securityMeasures: "Scellés et suivi",
       motif: "Transfert",
-      dossierIds: [11],
+      cartonTokens: ["site:any|code:CARTON-001"],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("limits one transfer operation to 200 cartons", () => {
+    const result = createTransferLotSchema.safeParse({
+      sourceSiteId: "1",
+      sourceEntrepotId: "",
+      destinationSiteId: "2",
+      destinationEntrepotId: "",
+      includeUnlocated: "false",
+      plannedAt: "2026-10-22T08:30",
+      archiveSupport: "PHYSIQUE",
+      plannedRoute: "Tour D vers site CEIBA",
+      transportMethod: "Véhicule fermé dédié",
+      ceibaParticipants: "Responsable CEIBA",
+      sdaParticipants: "Responsable SDA",
+      riskAssessment: "Perte et vol",
+      securityMeasures: "Scellés et suivi",
+      motif: "Transfert",
+      cartonTokens: Array.from({ length: 201 }, (_, index) => `site:any|code:CARTON-${index}`),
     });
     expect(result.success).toBe(false);
   });

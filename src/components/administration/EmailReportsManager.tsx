@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { getRoleLabel, ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { sendEmailReportNowAction, updateEmailReportConfiguration, type EmailReportActionResult } from "@/lib/services/email-report-actions";
 
@@ -59,6 +60,10 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Africa/Abidjan" }).format(new Date(value));
 }
 
+function displayRoleName(role: RecipientRow["role"]) {
+  return ROLE_CODES.includes(role.code as RoleCode) ? getRoleLabel(role.code as RoleCode) : role.name;
+}
+
 function RecipientConfiguration({ recipient }: { recipient: RecipientRow }) {
   const [frequency, setFrequency] = useState(recipient.subscription?.frequency ?? "WEEKLY");
   const [saveState, saveAction, saving] = useActionState(updateEmailReportConfiguration, initialState);
@@ -79,7 +84,7 @@ function RecipientConfiguration({ recipient }: { recipient: RecipientRow }) {
         <p className="font-semibold uppercase">{recipient.name}</p>
         <p className="mt-1 text-xs text-muted-foreground">{recipient.email.toLowerCase()}</p>
         <div className="mt-2 flex flex-wrap gap-1.5">
-          <Badge variant="outline" className="rounded-md">{recipient.role.name}</Badge>
+          <Badge variant="outline" className="rounded-md">{displayRoleName(recipient.role)}</Badge>
           {recipient.role.code === "SUPERVISEUR" ? <Badge variant="secondary" className="rounded-md">{recipient.supervisedCount} opérateur{recipient.supervisedCount > 1 ? "s" : ""}</Badge> : null}
           {!recipient.isActive ? <Badge variant="destructive" className="rounded-md">Compte inactif</Badge> : null}
         </div>

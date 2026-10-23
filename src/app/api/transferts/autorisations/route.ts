@@ -56,7 +56,7 @@ export async function GET(request: Request) {
     ceibaSignatures: operation.ceibaSignatures.map((signature) => ({
       ...signature,
       party: "CEIBAC_VALIDATOR",
-      label: "Visa CEIBA",
+      label: "Validation interne",
     })),
     ministrySignatures: operation.ministrySignatures.map((signature) => ({
       ...signature,

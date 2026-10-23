@@ -110,8 +110,8 @@ describe("transfer lot print rendering", () => {
     expect(html).toContain("Fiche de lot à valider");
     expect(html).toContain("PROJET — SORTIE NON AUTORISÉE");
     expect(html).toContain("Composition à contrôler");
-    expect(html).toContain("En attente de validation CEIBA.");
-    expect(html).toContain("En attente d’autorisation du ministère.");
+    expect(html).toContain("En attente de validation interne.");
+    expect(html).toContain("En attente d’autorisation du SDA.");
     expect(html).not.toContain("Autorisation enregistrée et traçable");
     expect(html).not.toContain("Composition autorisée");
     expect(html).not.toContain("Signé le");
@@ -125,8 +125,8 @@ describe("transfer lot print rendering", () => {
     const html = renderToStaticMarkup(await TransferAuthorizationPage({ params: Promise.resolve({ id: "12" }) }));
     expect(html).toContain("Fiche de composition du lot");
     expect(html).toContain("Lot autorisé et traçable dans la F01 consolidée");
-    expect(html).toContain("Ancien circuit : visa CEIBA non enregistré.");
-    const ceibacVisa = html.match(/Visa du responsable CEIBA([\s\S]*?)Visa du responsable ministère/)?.[1];
+    expect(html).toContain("Ancien circuit : validation interne non enregistrée.");
+    const ceibacVisa = html.match(/Validation interne([\s\S]*?)Validation SDA/)?.[1];
     expect(ceibacVisa).toBeDefined();
     expect(ceibacVisa).not.toContain("Signé le");
     expect(ceibacVisa).not.toContain("Responsable historique");

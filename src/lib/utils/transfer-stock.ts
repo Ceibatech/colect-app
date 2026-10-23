@@ -109,8 +109,8 @@ export function getTransferDossierStockSummary(
 export function getTransferLotStatusLabel(status: TransferLotStatusCode) {
   return {
     BROUILLON: "Brouillon",
-    SOUMIS: "À valider par CEIBA",
-    VALIDE_CEIBAC: "Visa ministère requis",
+    SOUMIS: "Validation interne requise",
+    VALIDE_CEIBAC: "Validation SDA requise",
     AUTORISE: "Autorisé",
     PARTIELLEMENT_SORTI: "Sortie partielle",
     EN_TRANSIT: "En transit",
@@ -126,8 +126,8 @@ export type TransferMovementStatusCode = "SOUMIS_CEIBAC" | "VALIDE_CEIBAC" | "VA
 
 export function getTransferMovementStatusLabel(status: TransferMovementStatusCode) {
   return {
-    SOUMIS_CEIBAC: "Visa CEIBA requis",
-    VALIDE_CEIBAC: "Visa ministère requis",
+    SOUMIS_CEIBAC: "Validation interne requise",
+    VALIDE_CEIBAC: "Validation SDA requise",
     VALIDE_MINISTERE: "Validé",
     REJETE: "Rejeté",
   }[status];

@@ -58,15 +58,15 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     progress: "Stock tracé",
   },
   VALIDATEUR_CEIBAC: {
-    eyebrow: "Contrôle CEIBA",
+    eyebrow: "Contrôle interne",
     title: "Validation des transferts",
-    description: "Validez les lots soumis avant leur transmission au ministère et contrôlez les constats d'arrivée.",
+    description: "Validez les opérations soumises avant leur transmission au SDA et contrôlez les constats d'arrivée.",
     progress: "Transferts contrôlés",
   },
   VALIDATEUR_MINISTERE: {
-    eyebrow: "Visa ministère",
+    eyebrow: "Validation SDA",
     title: "Validation des transferts",
-    description: "Autorisez les lots soumis et contre-signez les réceptions déjà visées par CEIBA.",
+    description: "Autorisez les opérations soumises et contre-signez les réceptions déjà validées en interne.",
     progress: "Transferts validés",
   },
   FINANCE: {

@@ -295,7 +295,7 @@ export function CollecteWizard({
 
   return (
     <section className="space-y-5">
-      <div className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-border/70 bg-card/95 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_16px_44px_rgba(16,24,40,0.06)] sm:flex-row sm:items-end sm:justify-between">
+      <div className="relative flex flex-col gap-4 overflow-hidden rounded-lg border border-border/70 border-t-4 border-t-activity-collecte bg-card/95 p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04),0_16px_44px_rgba(16,24,40,0.06)] sm:flex-row sm:items-end sm:justify-between">
         <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-brand-green to-brand-gold" aria-hidden="true" />
         <div className="space-y-3">
           <Badge variant="secondary" className="w-fit rounded-md border border-border/60 bg-muted/70 uppercase tracking-[0.16em]">

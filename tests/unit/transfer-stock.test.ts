@@ -11,8 +11,8 @@ import {
 
 describe("transfer stock", () => {
   it("distinguishes CEIBA review from ministry authorization before departure", () => {
-    expect(getTransferLotStatusLabel("SOUMIS")).toBe("À valider par CEIBA");
-    expect(getTransferLotStatusLabel("VALIDE_CEIBAC")).toBe("Visa ministère requis");
+    expect(getTransferLotStatusLabel("SOUMIS")).toBe("Validation interne requise");
+    expect(getTransferLotStatusLabel("VALIDE_CEIBAC")).toBe("Validation SDA requise");
     expect(deriveTransferLotStatus(["PREVU", "PREVU"], "VALIDE_CEIBAC")).toBe("VALIDE_CEIBAC");
   });
   it("keeps an arrival out of stock until the final ministry visa", () => {

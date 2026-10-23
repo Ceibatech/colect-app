@@ -73,7 +73,7 @@ function siteAddress(site: { adresse: string | null; adresseGps: string | null; 
 
 function signatureLabel(party: "MINISTERE" | "CEIBAC" | "CEIBAC_VALIDATOR", type: "SORTIE" | "RECEPTION" | "RETOUR") {
   if (party === "MINISTERE") return type === "RECEPTION" ? "Visa final du ministère" : "Remis ou réceptionné par le ministère";
-  if (party === "CEIBAC_VALIDATOR") return "Visa du responsable CEIBA";
+  if (party === "CEIBAC_VALIDATOR") return "Validation interne";
   return type === "RECEPTION" ? "Constat de l'agent CEIBA à l'arrivée" : "Pris en charge par CEIBA Analytics";
 }
 

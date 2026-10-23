@@ -54,7 +54,7 @@ export function SubmitTransferButton({ lotId }: { lotId: number }) {
     });
   }
 
-  return <Button onClick={submit} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />} Soumettre à CEIBA</Button>;
+  return <Button onClick={submit} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />} Soumettre à la validation interne</Button>;
 }
 
 export function ApproveTransferLotByCeibacButton({ lotId }: { lotId: number }) {
@@ -64,11 +64,11 @@ export function ApproveTransferLotByCeibacButton({ lotId }: { lotId: number }) {
   );
   return (
     <SignatureApprovalDialog
-      title="Validation du lot par CEIBA"
-      description="Vérifiez la composition du lot avant de signer. Le lot sera ensuite transmis au ministère pour autorisation de sortie."
-      triggerLabel="Valider le lot pour CEIBA"
-      submitLabel="Signer et transmettre au ministère"
-      signatureLabel="Responsable CEIBA"
+      title="Validation interne de l'opération"
+      description="Vérifiez la composition de l'opération avant de signer. Elle sera ensuite transmise au SDA pour autorisation de sortie."
+      triggerLabel="Valider en interne"
+      submitLabel="Signer et transmettre au SDA"
+      signatureLabel="Responsable interne"
       action={action}
     />
   );
@@ -81,11 +81,11 @@ export function AuthorizeTransferButton({ lotId }: { lotId: number }) {
   );
   return (
     <SignatureApprovalDialog
-      title="Visa ministériel de sortie"
-      description="Cette signature autorise ce lot. La F01 contractuelle regroupera ensuite tous les cartons autorisés pour la même date et le même trajet."
+      title="Validation SDA de la sortie"
+      description="Cette signature autorise l'opération. La F01 contractuelle regroupera ensuite tous les cartons autorisés pour la même date et le même trajet."
       triggerLabel="Signer l'autorisation"
       submitLabel="Signer et autoriser la sortie"
-      signatureLabel="Responsable ministère"
+      signatureLabel="Responsable SDA"
       action={action}
     />
   );
@@ -108,10 +108,10 @@ export function ReceptionApprovalDialog({
   );
   const ceiba = stage === "CEIBA";
   const ministryDescription = movementType === "RECEPTION"
-    ? "Le responsable du ministère clôt la réception. Cette signature déclenche l'entrée des dossiers dans le stock du site B."
+    ? "Le responsable du SDA clôt la réception. Cette signature déclenche l'entrée des dossiers dans le stock du site B."
     : movementType === "SORTIE"
-      ? "Le responsable du ministère confirme la remise du lot. Cette signature autorise la sortie du stock du site A."
-      : "Le responsable du ministère confirme la restitution. Cette signature réintègre les dossiers dans le stock du site A.";
+      ? "Le responsable du SDA confirme la remise de l'opération. Cette signature autorise la sortie du stock du site A."
+      : "Le responsable du SDA confirme la restitution. Cette signature réintègre les dossiers dans le stock du site A.";
   const ministryTrigger = movementType === "RECEPTION" ? "Valider la réception" : "Signer le bordereau F02";
   const ministrySubmit = movementType === "RECEPTION"
     ? "Signer et mettre à jour le stock"
@@ -120,13 +120,13 @@ export function ReceptionApprovalDialog({
       : "Signer et confirmer la restitution";
   return (
     <SignatureApprovalDialog
-      title={ceiba ? "Contrôle du constat par CEIBA" : "Contre-signature du ministère"}
+      title={ceiba ? "Contrôle interne du constat" : "Contre-signature du SDA"}
       description={ceiba
-        ? "Le validateur CEIBA confirme le constat d'arrivée avant sa transmission au ministère."
+        ? "Le validateur interne confirme le constat d'arrivée avant sa transmission au SDA."
         : ministryDescription}
-      triggerLabel={ceiba ? "Viser pour CEIBA" : ministryTrigger}
+      triggerLabel={ceiba ? "Valider en interne" : ministryTrigger}
       submitLabel={ceiba ? "Signer et transmettre" : ministrySubmit}
-      signatureLabel={ceiba ? "Validateur CEIBA" : "Responsable ministère"}
+      signatureLabel={ceiba ? "Validateur interne" : "Responsable SDA"}
       action={action}
       variant={ceiba ? "outline" : "default"}
     />
@@ -233,8 +233,8 @@ export function TransferMovementDialog({
           <DialogTitle>{isReception ? "Constat d'arrivée et de déchargement" : label}</DialogTitle>
           <DialogDescription>
             {isReception
-              ? `L'agent CEIBA au site de destination (${destinationLabel}) décrit l'état du chargement et signe le constat. Le stock restera en transit jusqu'aux visas CEIBA puis ministère.`
-              : `Sélectionnez les dossiers réellement concernés. CEIBA signe le F02 puis le transmet au ministère. Le stock de ${sourceLabel} ne changera qu'après la contre-signature ministérielle.`}
+              ? `L'agent CEIBA au site de destination (${destinationLabel}) décrit l'état du chargement et signe le constat. Le stock restera en transit jusqu'aux validations interne puis SDA.`
+              : `Sélectionnez les cartons réellement concernés. CEIBA signe le F02 puis le transmet au SDA. Le stock de ${sourceLabel} ne changera qu'après la contre-signature du SDA.`}
           </DialogDescription>
         </DialogHeader>
         <form key={formVersion} action={formAction} className="space-y-5">
@@ -294,7 +294,7 @@ export function TransferMovementDialog({
 
           <div className="grid gap-5 border-t pt-5">
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
-              <div><h3 className="font-semibold">{isReception ? "Signature de l'agent CEIBA au déchargement" : "Visa du gestionnaire CEIBA"}</h3><p className="text-xs text-muted-foreground">L&apos;agent confirme la prise en charge, la remise ou le constat physique du chargement. Le ministère apposera son visa dans l&apos;étape suivante.</p></div>
+              <div><h3 className="font-semibold">{isReception ? "Signature de l'agent CEIBA au déchargement" : "Signature du gestionnaire CEIBA"}</h3><p className="text-xs text-muted-foreground">L&apos;agent confirme la prise en charge, la remise ou le constat physique du chargement. Le SDA apposera sa validation dans l&apos;étape suivante.</p></div>
               <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor={`${type}-ceibacName`}>Nom complet</Label><Input id={`${type}-ceibacName`} name="ceibacName" required maxLength={120} disabled={pending} /></div><div className="space-y-2"><Label htmlFor={`${type}-ceibacTitle`}>Fonction habilitée</Label><Input id={`${type}-ceibacTitle`} name="ceibacTitle" required maxLength={120} disabled={pending} /></div></div>
               <SignaturePad name="ceibacSignature" label="CEIBA" disabled={pending} />
             </section>

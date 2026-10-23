@@ -31,6 +31,7 @@ export default async function TransferProcedurePage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        tone="transfer"
         eyebrow="Référentiel opérationnel"
         icon={BookOpenCheck}
         title="Procédure de transfert et de sécurisation"

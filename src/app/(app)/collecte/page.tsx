@@ -86,7 +86,7 @@ export default async function CollectePage({
   if (drafts.length > 0) {
     return (
       <div className="space-y-5">
-        <section className="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/95 p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
+        <section className="flex flex-col gap-4 rounded-lg border border-border/70 border-t-4 border-t-activity-collecte bg-card/95 p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-3">
             <Badge variant="secondary" className="w-fit rounded-md border border-border/60 bg-muted/70 uppercase tracking-[0.16em]">
               Collecte

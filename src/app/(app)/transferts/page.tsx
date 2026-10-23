@@ -37,8 +37,8 @@ export default async function TransfersPage() {
         key: `F01-CEIBA-${row.id}`,
         code: "F01",
         title: `Lot ${row.reference} à contrôler`,
-        detail: "Le lot attend le visa du responsable CEIBA avant sa transmission au ministère.",
-        status: "Visa CEIBA requis",
+        detail: "L'opération attend la validation interne avant sa transmission au SDA.",
+        status: "Validation interne requise",
         state: "CEIBA_ACTION",
         actionHref: `/transferts/${row.id}`,
         downloadHref: null,
@@ -49,8 +49,8 @@ export default async function TransfersPage() {
         key: `F01-MINISTRY-${row.id}`,
         code: "F01",
         title: `Autorisation ${row.reference} à signer`,
-        detail: "Le lot validé par CEIBA attend le visa du responsable du ministère.",
-        status: "Visa ministère requis",
+        detail: "L'opération validée en interne attend l'autorisation du SDA.",
+        status: "Validation SDA requise",
         state: "MINISTRY_ACTION",
         actionHref: `/transferts/${row.id}`,
         downloadHref: null,
@@ -61,8 +61,8 @@ export default async function TransfersPage() {
         key: `F02-MINISTRY-${movement.id}`,
         code: movement.type === "RECEPTION" ? "F03" : "F02",
         title: `${movement.reference} à contre-signer`,
-        detail: `${row.reference} · bordereau préparé et signé par CEIBA`,
-        status: "Visa ministère requis",
+        detail: `${row.reference} · bordereau préparé et validé en interne`,
+        status: "Validation SDA requise",
         state: "MINISTRY_ACTION",
         actionHref: `/transferts/${row.id}#bordereaux`,
         downloadHref: `/api/transferts/${row.id}/bordereaux/${movement.id}`,
@@ -74,7 +74,7 @@ export default async function TransfersPage() {
         code: "F03",
         title: `${movement.reference} à contrôler`,
         detail: `${row.reference} · constat d'arrivée soumis par l'agent CEIBA`,
-        status: "Visa CEIBA requis",
+        status: "Validation interne requise",
         state: "CEIBA_ACTION",
         actionHref: `/transferts/${row.id}#bordereaux`,
         downloadHref: `/api/transferts/${row.id}/bordereaux/${movement.id}`,
@@ -110,15 +110,15 @@ export default async function TransfersPage() {
       <PageHeader
         eyebrow={isCeibaValidator ? "Transferts d'archives" : "Chaîne de garde"}
         icon={Truck}
-        title={isCeibaValidator ? "Validation CEIBA" : "Registre des transferts"}
+        title={isCeibaValidator ? "Validation interne" : "Registre des transferts"}
         description={isCeibaValidator
-          ? "Contrôlez les lots soumis au responsable CEIBA et les constats d'arrivée avant leur transmission au ministère."
+          ? "Contrôlez les opérations soumises et les constats d'arrivée avant leur transmission au SDA."
           : "Vue consolidée du stock documentaire entre les sites d'inventaire du ministère et les sites de traitement CEIBA."}
         actions={(
           <>
             <Link href="/transferts/procedure" className={buttonVariants({ variant: "outline" })}><BookOpenCheck /> Procédure</Link>
-            {canApproveCeiba ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBA</Link> : null}
-            {canAuthorize ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
+            {canApproveCeiba ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation interne</Link> : null}
+            {canAuthorize ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation SDA</Link> : null}
             {canCreate ? (
               <Link href="/transferts/nouveau" className={buttonVariants()}>
                 <Plus /> Identifier un lot
@@ -132,6 +132,7 @@ export default async function TransfersPage() {
           { label: "En transit", value: data.summary.inTransit, tone: data.summary.inTransit > 0 ? "warning" : "success" },
           { label: "Sans emplacement", value: data.summary.unlocated, tone: data.summary.unlocated > 0 ? "warning" : "success" },
         ]}
+        tone="transfer"
       />
 
       <TransferDocumentRegistry documents={documentTasks} />
@@ -179,7 +180,7 @@ export default async function TransfersPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <CardTitle>Lots et mouvements de stock</CardTitle>
-              <CardDescription>Chaque lot conserve la liste exacte des dossiers sélectionnés et tous les bordereaux signés.</CardDescription>
+              <CardDescription>Chaque opération conserve la liste exacte des cartons sélectionnés, leur contenu figé et tous les bordereaux signés.</CardDescription>
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline" className="w-fit rounded-md">{data.summary.totalDossiers} dossiers inventoriés</Badge>

@@ -27,7 +27,7 @@ type Filter = "ALL" | TransferDocumentState;
 const FILTERS: Array<{ value: Filter; label: string }> = [
   { value: "ALL", label: "Tous" },
   { value: "MINISTRY_ACTION", label: "À signer par le ministère" },
-  { value: "CEIBA_ACTION", label: "En attente CEIBA" },
+  { value: "CEIBA_ACTION", label: "Validation interne" },
   { value: "SIGNED", label: "Validés" },
 ];
 

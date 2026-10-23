@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ export function PageHeader({
   actions,
   stats,
   className,
+  tone,
 }: {
   eyebrow?: string;
   title: ReactNode;
@@ -34,16 +35,19 @@ export function PageHeader({
   actions?: ReactNode;
   stats?: PageHeaderStat[];
   className?: string;
+  tone?: "dashboard" | "collecte" | "dossiers" | "preparation" | "numerisation" | "conditionnement" | "indexation" | "archivage" | "transfer" | "quality" | "admin";
 }) {
+  const toneColor = tone ? `var(--activity-${tone})` : null;
+  const toneStyle = toneColor ? { "--page-tone": toneColor } as CSSProperties : undefined;
   return (
-    <section className={cn("relative min-w-0 overflow-hidden rounded-lg border border-border/70 bg-card/95 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.05),0_18px_48px_rgba(16,24,40,0.07)] sm:p-5 lg:p-6", className)}>
-      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-brand-green to-brand-gold" aria-hidden="true" />
+    <section style={toneStyle} className={cn("relative min-w-0 overflow-hidden rounded-lg border border-border/70 bg-card/95 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.05),0_18px_48px_rgba(16,24,40,0.07)] sm:p-5 lg:p-6", className)}>
+      <div style={toneColor ? { backgroundColor: toneColor } : undefined} className={cn("absolute inset-x-0 top-0 h-1", !toneColor && "bg-gradient-to-r from-primary via-brand-green to-brand-gold")} aria-hidden="true" />
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/8 to-transparent" aria-hidden="true" />
       <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             {Icon ? (
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+              <span style={toneColor ? { color: toneColor, backgroundColor: `color-mix(in oklch, ${toneColor} 12%, transparent)`, borderColor: `color-mix(in oklch, ${toneColor} 28%, transparent)` } : undefined} className={cn("flex h-9 w-9 items-center justify-center rounded-lg border", toneColor ? "border-transparent" : "border-primary/20 bg-primary/10 text-primary")}>
                 <Icon className="h-4 w-4" />
               </span>
             ) : null}

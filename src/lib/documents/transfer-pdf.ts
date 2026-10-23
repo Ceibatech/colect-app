@@ -132,7 +132,7 @@ export async function createTransferAuthorizationPdf(input: TransferAuthorizatio
   const ceibaSignatures = input.ceibaSignatures ?? [];
   const ministrySignatures = input.ministrySignatures ?? (input.ministrySignature ? [input.ministrySignature] : []);
   for (const signature of ceibaSignatures) {
-    await writer.signature({ ...signature, label: signature.reference ? `Visa CEIBA - ${signature.reference}` : signature.label });
+    await writer.signature({ ...signature, label: signature.reference ? `Validation interne - ${signature.reference}` : signature.label });
   }
   for (const signature of ministrySignatures) {
     await writer.signature({ ...signature, label: signature.reference ? `Autorisation ministère - ${signature.reference}` : signature.label });
@@ -228,7 +228,7 @@ export async function createTransferMovementPdf(input: TransferMovementPdfInput)
 
   writer.section("Statut du document");
   writer.field("Workflow GeoArchives", input.statusLabel);
-  writer.footerNote("Une copie du F02 signé est conservée dans l'espace ministère et dans l'espace CEIBA. Le stock n'est modifié qu'après le visa final requis.");
+  writer.footerNote("Une copie du F02 signé est conservée dans l'espace SDA et dans l'espace CEIBA. Le stock n'est modifié qu'après la validation finale requise.");
   return writer.save();
 }
 

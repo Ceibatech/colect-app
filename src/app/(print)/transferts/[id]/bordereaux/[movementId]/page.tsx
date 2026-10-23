@@ -98,7 +98,7 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
 
         <section className={cn("grid border-t border-slate-300", movement.type === "RECEPTION" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
           {movement.type === "RECEPTION" ? <SignatureBlock title="Constat de l'agent CEIBA" signature={ceibaSignature} /> : <SignatureBlock title={siteVisaTitle} signature={ministrySignature} />}
-          {movement.type === "RECEPTION" ? <SignatureBlock title="Visa du validateur CEIBA" signature={ceibaValidatorSignature} /> : <SignatureBlock title="Visa du gestionnaire CEIBA" signature={ceibaSignature} />}
+          {movement.type === "RECEPTION" ? <SignatureBlock title="Validation interne" signature={ceibaValidatorSignature} /> : <SignatureBlock title="Signature du gestionnaire CEIBA" signature={ceibaSignature} />}
           {movement.type === "RECEPTION" ? <SignatureBlock title={`Visa final du ministère · ${destination}`} signature={ministrySignature} /> : null}
         </section>
 

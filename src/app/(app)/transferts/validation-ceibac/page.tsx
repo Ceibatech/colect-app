@@ -2,7 +2,7 @@ import { TransferValidationWorkspace } from "@/components/transferts/TransferVal
 import { getCeibacTransferValidationWorkspace } from "@/lib/services/transfer-validation-service";
 import { parseTransferValidationSearch } from "@/lib/validation/transfer-validation-search";
 
-export const metadata = { title: "Validation CEIBA - GeoArchives" };
+export const metadata = { title: "Validation interne - GeoArchives" };
 
 export default async function CeibacTransferValidationPage({ searchParams }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

@@ -42,7 +42,9 @@ export const createTransferLotSchema = z.object({
   riskAssessment: requiredPlanningText("L'évaluation des risques"),
   securityMeasures: requiredPlanningText("Les mesures de sécurisation"),
   motif: z.string().trim().max(2_000, "Le motif est trop long.").optional().or(z.literal("")),
-  dossierIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un dossier.").max(500, "Un lot peut contenir au maximum 500 dossiers."),
+  cartonTokens: z.array(z.string().trim().min(1).max(500))
+    .min(1, "Sélectionnez au moins un carton.")
+    .max(200, "Une opération peut contenir au maximum 200 cartons."),
 });
 
 export const authorizeTransferLotSchema = z.object({

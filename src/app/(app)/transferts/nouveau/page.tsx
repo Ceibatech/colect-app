@@ -17,14 +17,15 @@ export default async function NewTransferPage() {
         eyebrow="Préparation du transfert"
         icon={PackagePlus}
         title="Identifier un lot à transférer"
-        description="Sélectionnez les dossiers inventoriés au site du ministère, puis choisissez le site CEIBA qui les recevra pour traitement."
+        description="Choisissez le site d’origine, laissez GeoArchives proposer jusqu’à 200 cartons identifiés, puis ajustez et validez l’opération. Tous les dossiers de chaque carton sont inclus automatiquement."
+        tone="transfer"
         actions={(
           <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}>
             <ArrowLeft /> Retour au registre
           </Link>
         )}
         stats={[
-          { label: "Dossiers en base", value: data.totalDossiers },
+          { label: "Dossiers inventoriés", value: data.totalDossiers },
           { label: "Sites actifs", value: data.sites.length },
           { label: "Chaîne de garde", value: "Traçabilité active", tone: "success" },
         ]}
