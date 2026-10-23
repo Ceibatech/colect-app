@@ -28,6 +28,9 @@ import {
   Search,
   ScanSearch,
   MailCheck,
+  ScanLine,
+  PackageCheck,
+  Archive,
 } from "lucide-react";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
@@ -50,7 +53,7 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
     permission: "DASHBOARD_VIEW",
-    roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"],
+    roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "PREPARATEUR", "NUMERISATEUR", "CONDITIONNEUR", "INDEXEUR", "ARCHIVISTE", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"],
     children: [
       { title: "Vue d'ensemble", href: "/dashboard", icon: LayoutDashboard, permission: "DASHBOARD_VIEW" },
       { title: "Direction", href: "/dashboard/direction", icon: TrendingUp, permission: "DASHBOARD_VIEW", roles: ["ADMIN", "EXECUTIF", "PMO", "CONSULTATION"] },
@@ -61,9 +64,13 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   { title: "Collecte", href: "/collecte", icon: FilePlus2, permission: "DOSSIER_CREATE" },
-  { title: "Dossiers", href: "/dossiers", icon: FolderOpen, permission: "DOSSIER_READ" },
-  { title: "Recherche documentaire", href: "/recherche", icon: Search, permission: "DOSSIER_READ" },
+  { title: "Dossiers", href: "/dossiers", icon: FolderOpen, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "CONSULTATION"] },
+  { title: "Recherche documentaire", href: "/recherche", icon: Search, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "EXECUTIF", "PMO", "CONSULTATION"] },
   { title: "Préparation", href: "/preparation", icon: ClipboardCheck, permission: "PREPARATION_VIEW" },
+  { title: "Numérisation", href: "/numerisation", icon: ScanLine, permission: "NUMERISATION_VIEW" },
+  { title: "Reconditionnement", href: "/conditionnement", icon: PackageCheck, permission: "CONDITIONNEMENT_VIEW" },
+  { title: "Indexation", href: "/indexation", icon: ScanSearch, permission: "INDEXATION_VIEW" },
+  { title: "Archivage", href: "/archivage", icon: Archive, permission: "ARCHIVAGE_VIEW" },
   {
     title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW",
     children: [

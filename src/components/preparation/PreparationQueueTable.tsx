@@ -88,17 +88,7 @@ export function PreparationQueueTable({
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {canClaim ? (
-                    <PreparationClaimButton dossierId={item.id} />
-                  ) : (
-                    <Link
-                      href={`/dossiers/${item.id}?tab=preparation&from=preparation`}
-                      className={cn(buttonVariants({ size: "sm", variant: canContinue || canValidate ? "default" : "outline" }), "whitespace-nowrap")}
-                    >
-                      {canContinue || canValidate ? <ClipboardCheck className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}
-                      {actionLabel}
-                    </Link>
-                  )}
+                  {canClaim ? <PreparationClaimButton dossierId={item.id} /> : <Link href={`/dossiers/${item.id}?tab=preparation&from=preparation`} className={cn(buttonVariants({ size: "sm", variant: canContinue || canValidate ? "default" : "outline" }), "whitespace-nowrap")}>{canContinue || canValidate ? <ClipboardCheck className="mr-1 h-4 w-4" /> : <Eye className="mr-1 h-4 w-4" />}{actionLabel}</Link>}
                 </TableCell>
               </TableRow>
             );

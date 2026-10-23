@@ -97,6 +97,10 @@ async function nextOperateurMatricule(): Promise<string> {
   throw new Error("Impossible de générer une matricule opérateur unique.");
 }
 
+function needsOperateurProfile(roleCode: string) {
+  return roleCode === "OPERATEUR" || roleCode === "AGENT_INVENTAIRE";
+}
+
 export async function createUser(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
   const session = await requirePermission("USER_MANAGE");
   const parsed = createUserSchema.safeParse({
@@ -131,7 +135,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
   // personne concernée de définir son propre mot de passe.
   const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
   const ip = await getClientIp();
-  const matricule = role.code === "OPERATEUR" ? await nextOperateurMatricule() : null;
+  const matricule = needsOperateurProfile(role.code) ? await nextOperateurMatricule() : null;
   const supervisorIds = [...new Set(parsed.data.supervisorIds)];
 
   const user = await prisma.$transaction(async (tx) => {
@@ -139,7 +143,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
       data: { name: parsed.data.name, email, passwordHash, roleId: role.id },
     });
 
-    if (role.code === "OPERATEUR" && matricule) {
+    if (needsOperateurProfile(role.code) && matricule) {
       await tx.operateur.create({
         data: {
           userId: created.id,
@@ -255,14 +259,14 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
       },
     });
 
-    if (newRole.code === "OPERATEUR" && !before.operateur) {
+    if (needsOperateurProfile(newRole.code) && !before.operateur) {
       const matricule = await nextOperateurMatricule();
       await tx.operateur.create({
         data: { userId: id, matricule, nom: parsed.data.name, email: before.email, isActive: true },
       });
-    } else if (newRole.code === "OPERATEUR" && before.operateur) {
+    } else if (needsOperateurProfile(newRole.code) && before.operateur) {
       await tx.operateur.update({ where: { id: before.operateur.id }, data: { nom: parsed.data.name, isActive: parsed.data.isActive } });
-    } else if (newRole.code !== "OPERATEUR" && before.operateur?.isActive) {
+    } else if (!needsOperateurProfile(newRole.code) && before.operateur?.isActive) {
       // Rôle changé hors OPERATEUR : désactive la fiche opérateur (jamais de
       // suppression — les dossiers déjà traités par cette fiche restent valides).
       await tx.operateur.update({ where: { id: before.operateur.id }, data: { isActive: false } });

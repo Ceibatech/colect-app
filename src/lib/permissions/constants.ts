@@ -4,13 +4,19 @@
  * par l'application (contrôles serveur, middleware, UI conditionnelle).
  */
 
-export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
+export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "PREPARATEUR", "NUMERISATEUR", "CONDITIONNEUR", "INDEXEUR", "ARCHIVISTE", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
   ADMIN: "Administrateur",
   SUPERVISEUR: "Superviseur",
-  OPERATEUR: "Opérateur",
+  OPERATEUR: "Opérateur polyvalent",
+  AGENT_INVENTAIRE: "Agent d’inventaire",
+  PREPARATEUR: "Préparateur documentaire",
+  NUMERISATEUR: "Agent de numérisation",
+  CONDITIONNEUR: "Agent de reconditionnement",
+  INDEXEUR: "Agent d’indexation",
+  ARCHIVISTE: "Archiviste",
   GESTIONNAIRE_TRANSFERT: "Gestionnaire des transferts",
   VALIDATEUR_CEIBAC: "Validateur CEIBA",
   VALIDATEUR_MINISTERE: "Validateur ministère",
@@ -40,6 +46,8 @@ export const PERMISSIONS = [
   "NUMERISATION_UPDATE",
   "NUMERISATION_VALIDATE",
   "NUMERISATION_REJECT",
+  "CONDITIONNEMENT_VIEW",
+  "CONDITIONNEMENT_UPDATE",
   "INDEXATION_VIEW",
   "INDEXATION_UPDATE",
   "INDEXATION_VALIDATE",
@@ -85,6 +93,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "NUMERISATION_VIEW",
     "NUMERISATION_VALIDATE",
     "NUMERISATION_REJECT",
+    "CONDITIONNEMENT_VIEW",
     "INDEXATION_VIEW",
     "INDEXATION_VALIDATE",
     "INDEXATION_REJECT",
@@ -107,12 +116,20 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "PREPARATION_UPDATE",
     "NUMERISATION_VIEW",
     "NUMERISATION_UPDATE",
+    "CONDITIONNEMENT_VIEW",
+    "CONDITIONNEMENT_UPDATE",
     "INDEXATION_VIEW",
     "INDEXATION_UPDATE",
     "ARCHIVAGE_VIEW",
     "ARCHIVAGE_UPDATE",
     "IMPORT_DATA",
   ],
+  AGENT_INVENTAIRE: ["DASHBOARD_VIEW", "DOSSIER_CREATE", "DOSSIER_READ", "DOSSIER_UPDATE", "IMPORT_DATA"],
+  PREPARATEUR: ["DASHBOARD_VIEW", "DOSSIER_READ", "PREPARATION_VIEW", "PREPARATION_UPDATE"],
+  NUMERISATEUR: ["DASHBOARD_VIEW", "DOSSIER_READ", "NUMERISATION_VIEW", "NUMERISATION_UPDATE"],
+  CONDITIONNEUR: ["DASHBOARD_VIEW", "DOSSIER_READ", "CONDITIONNEMENT_VIEW", "CONDITIONNEMENT_UPDATE"],
+  INDEXEUR: ["DASHBOARD_VIEW", "DOSSIER_READ", "INDEXATION_VIEW", "INDEXATION_UPDATE"],
+  ARCHIVISTE: ["DASHBOARD_VIEW", "DOSSIER_READ", "ARCHIVAGE_VIEW", "ARCHIVAGE_UPDATE"],
   GESTIONNAIRE_TRANSFERT: [
     "DASHBOARD_VIEW",
     "TRANSFER_VIEW",
@@ -131,6 +148,7 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "DOSSIER_READ",
     "PREPARATION_VIEW",
     "NUMERISATION_VIEW",
+    "CONDITIONNEMENT_VIEW",
     "INDEXATION_VIEW",
     "ARCHIVAGE_VIEW",
   ],
@@ -157,7 +175,7 @@ export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly R
   { prefix: "/dashboard/finance", roles: ["ADMIN", "FINANCE"] },
   { prefix: "/dashboard/pmo", roles: ["ADMIN", "PMO"] },
   { prefix: "/qualite", roles: ["ADMIN", "SUPERVISEUR"] },
-  { prefix: "/import", roles: ["ADMIN", "OPERATEUR"] },
+  { prefix: "/import", roles: ["ADMIN", "OPERATEUR", "AGENT_INVENTAIRE"] },
   { prefix: "/transferts/validation-ceibac", roles: ["ADMIN", "VALIDATEUR_CEIBAC"] },
   { prefix: "/transferts/validation", roles: ["ADMIN", "SUPERVISEUR", "VALIDATEUR_MINISTERE"] },
   { prefix: "/transferts", roles: ["ADMIN", "SUPERVISEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE"] },

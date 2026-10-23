@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma/client";
 import { requireApiPermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
+import { cartonWhereFromToken } from "@/lib/workflow/carton-identity";
 import { ApiError } from "@/lib/utils/api-error";
 import { isOperateurInScope } from "@/lib/services/access-scope";
 import { isAlfrescoDigitalArchiveEnabled } from "@/lib/archive/alfresco-client";
@@ -23,7 +24,6 @@ async function getDossierOr404(id: number) {
 }
 
 async function resolveOperateurId(session: SessionPayload): Promise<number | null> {
-  if (session.roleCode !== "OPERATEUR") return null;
   const operateur = await prisma.operateur.findUnique({ where: { userId: session.userId } });
   return operateur?.id ?? null;
 }
@@ -246,6 +246,21 @@ export async function claimPreparation(id: number) {
   if (dossier.statutPreparation === "EN_COURS" && dossier.preparateurId === session.userId && claimIsFresh) {
     return dossier;
   }
+  const activeClaim = await prisma.dossier.findFirst({
+    where: {
+      id: { not: id },
+      preparateurId: session.userId,
+      statutPreparation: "EN_COURS",
+      preparationClaimedAt: { gte: cutoff },
+    },
+    select: { reference: true, codeBarres: true, libelleCarton: true },
+  });
+  if (activeClaim) {
+    throw new ApiError(
+      `Terminez d'abord ${activeClaim.reference} dans le carton ${activeClaim.codeBarres ?? activeClaim.libelleCarton ?? "non identifié"}. Un préparateur ne peut réserver qu'un dossier à la fois.`,
+      409,
+    );
+  }
 
   const ipAddress = await getClientIp();
   const updated = await prisma.$transaction(async (tx) => {
@@ -355,6 +370,17 @@ export async function prepareDossier(
       preparateur?.name
         ? `Ce dossier est déjà pris en charge par ${preparateur.name}.`
         : "Ce dossier est déjà pris en charge par un autre agent.",
+      409,
+    );
+  }
+  if (
+    dossier.statutPreparation !== "EN_COURS" ||
+    dossier.preparateurId !== session.userId ||
+    !dossier.preparationClaimedAt ||
+    dossier.preparationClaimedAt < cutoff
+  ) {
+    throw new ApiError(
+      "Prenez d'abord ce dossier en charge depuis la file de préparation.",
       409,
     );
   }
@@ -489,6 +515,161 @@ export async function rejectPreparation(id: number, commentaire: string) {
   ]);
 
   return updated;
+}
+
+export async function claimConditionnementCartons(tokens: string[]) {
+  const session = await requireApiPermission("CONDITIONNEMENT_UPDATE");
+  const uniqueTokens = Array.from(new Set(tokens.map((token) => token.trim()).filter(Boolean)));
+  if (uniqueTokens.length === 0) throw new ApiError("Sélectionnez au moins un carton.");
+  if (uniqueTokens.length > 25) throw new ApiError("Vous pouvez prendre en charge 25 cartons à la fois au maximum.");
+  const cartonWheres = uniqueTokens.map((token) => {
+    const where = cartonWhereFromToken(token);
+    if (!where) throw new ApiError("Un identifiant de carton est invalide.");
+    return { token, where };
+  });
+  const cutoff = new Date(Date.now() - PREPARATION_CLAIM_TTL_MS);
+  const claimedAt = new Date();
+  const ipAddress = await getClientIp();
+
+  return prisma.$transaction(async (tx) => {
+    const claimed: Array<{ token: string; dossierIds: number[] }> = [];
+    for (const carton of cartonWheres) {
+      const dossiers = await tx.dossier.findMany({
+        where: {
+          statutNumerisation: "TERMINE",
+          statutConditionnement: { in: ["EN_ATTENTE", "EN_COURS", "REJETE"] },
+          AND: [carton.where],
+        },
+        select: {
+          id: true,
+          codeBarres: true,
+          libelleCarton: true,
+          statutConditionnement: true,
+          conditionneurId: true,
+          conditionnementClaimedAt: true,
+          conditionneur: { select: { name: true } },
+        },
+      });
+      if (dossiers.length === 0) throw new ApiError("Ce carton ne contient plus de dossier à conditionner.", 409);
+      const locked = dossiers.find((dossier) =>
+        dossier.statutConditionnement === "EN_COURS" &&
+        dossier.conditionneurId !== session.userId &&
+        dossier.conditionnementClaimedAt &&
+        dossier.conditionnementClaimedAt >= cutoff,
+      );
+      if (locked) {
+        throw new ApiError(
+          locked.conditionneur?.name
+            ? `Le carton ${locked.codeBarres ?? locked.libelleCarton ?? "sélectionné"} est déjà pris en charge par ${locked.conditionneur.name}.`
+            : "Un carton sélectionné est déjà pris en charge.",
+          409,
+        );
+      }
+      const dossierIds = dossiers.map((dossier) => dossier.id);
+      const result = await tx.dossier.updateMany({
+        where: {
+          id: { in: dossierIds },
+          OR: [
+            { statutConditionnement: { in: ["EN_ATTENTE", "REJETE"] } },
+            {
+              statutConditionnement: "EN_COURS",
+              OR: [
+                { conditionneurId: session.userId },
+                { conditionnementClaimedAt: null },
+                { conditionnementClaimedAt: { lt: cutoff } },
+              ],
+            },
+          ],
+        },
+        data: {
+          statutConditionnement: "EN_COURS",
+          conditionneurId: session.userId,
+          conditionnementClaimedAt: claimedAt,
+        },
+      });
+      if (result.count !== dossierIds.length) throw new ApiError("La prise en charge du carton a changé. Rechargez la file.", 409);
+      await tx.dossierHistory.createMany({
+        data: dossiers.map((dossier) => ({
+          dossierId: dossier.id,
+          userId: session.userId,
+          action: "CONDITIONNEMENT_CARTON_PRISE_EN_CHARGE",
+          ancienStatut: dossier.statutConditionnement,
+          nouveauStatut: "EN_COURS",
+          commentaire: `Carton réservé en totalité (${dossiers.length} dossier(s)).`,
+        })),
+      });
+      await tx.auditLog.create({
+        data: { userId: session.userId, action: "CONDITIONNEMENT_CARTON_CLAIM", entity: "CARTON", newValue: { token: carton.token, dossierIds }, ipAddress },
+      });
+      claimed.push({ token: carton.token, dossierIds });
+    }
+    return { cartons: claimed, dossierCount: claimed.reduce((sum, carton) => sum + carton.dossierIds.length, 0) };
+  });
+}
+
+export async function completeConditionnementCartons(tokens: string[], observations?: string) {
+  const session = await requireApiPermission("CONDITIONNEMENT_UPDATE");
+  const uniqueTokens = Array.from(new Set(tokens.map((token) => token.trim()).filter(Boolean)));
+  if (uniqueTokens.length === 0) throw new ApiError("Sélectionnez au moins un carton.");
+  if (uniqueTokens.length > 25) throw new ApiError("Vous pouvez terminer 25 cartons à la fois au maximum.");
+  const cartonWheres = uniqueTokens.map((token) => {
+    const where = cartonWhereFromToken(token);
+    if (!where) throw new ApiError("Un identifiant de carton est invalide.");
+    return { token, where };
+  });
+  const now = new Date();
+  const ipAddress = await getClientIp();
+  const completedIds = await prisma.$transaction(async (tx) => {
+    const ids: number[] = [];
+    for (const carton of cartonWheres) {
+      const dossiers = await tx.dossier.findMany({
+        where: { statutNumerisation: "TERMINE", AND: [carton.where] },
+        select: { id: true, statutConditionnement: true, conditionneurId: true },
+      });
+      const pending = dossiers.filter((dossier) => dossier.statutConditionnement !== "TERMINE");
+      if (pending.length === 0) continue;
+      const notOwned = pending.find((dossier) => dossier.statutConditionnement !== "EN_COURS" || dossier.conditionneurId !== session.userId);
+      if (notOwned) throw new ApiError("Prenez d'abord le carton complet en charge avant de terminer son conditionnement.", 409);
+      const dossierIds = pending.map((dossier) => dossier.id);
+      await tx.dossier.updateMany({
+        where: { id: { in: dossierIds }, statutConditionnement: "EN_COURS", conditionneurId: session.userId },
+        data: {
+          statutConditionnement: "TERMINE",
+          conditionnementClaimedAt: null,
+          dateConditionnement: now,
+          observationsConditionnement: observations?.trim() || null,
+        },
+      });
+      await tx.dossierHistory.createMany({
+        data: pending.map((dossier) => ({
+          dossierId: dossier.id,
+          userId: session.userId,
+          action: "CONDITIONNEMENT_CARTON_TERMINE",
+          ancienStatut: dossier.statutConditionnement,
+          nouveauStatut: "TERMINE",
+          commentaire: observations?.trim() || "Reconditionnement du carton terminé.",
+        })),
+      });
+      await tx.workflowTransition.createMany({
+        data: pending.map((dossier) => ({
+          dossierId: dossier.id,
+          workflowType: "CONDITIONNEMENT",
+          fromStatus: dossier.statutConditionnement,
+          toStatus: "TERMINE",
+          userId: session.userId,
+          commentaire: observations?.trim() || undefined,
+        })),
+      });
+      await tx.auditLog.create({
+        data: { userId: session.userId, action: "CONDITIONNEMENT_CARTON_COMPLETE", entity: "CARTON", newValue: { token: carton.token, dossierIds }, ipAddress },
+      });
+      ids.push(...dossierIds);
+    }
+    return ids;
+  });
+
+  await Promise.all(completedIds.map((dossierId) => reconcileDossierIndexation(dossierId, session.userId)));
+  return { dossierCount: completedIds.length };
 }
 
 export async function numerizeDossier(id: number, nombrePages?: number) {
@@ -667,6 +848,11 @@ export async function indexDossier(id: number, scoreQualite?: number) {
   if (dossier.statutNumerisation !== "TERMINE") {
     throw new ApiError(
       `Impossible d'indexer : le dossier doit être "Numérisé" (statut actuel : ${dossier.statutNumerisation}).`
+    );
+  }
+  if (dossier.statutConditionnement !== "TERMINE") {
+    throw new ApiError(
+      `Impossible d'indexer : le dossier doit être reconditionné (statut actuel : ${dossier.statutConditionnement}).`
     );
   }
   if (dossier.statutIndexation === "A_VALIDER") {

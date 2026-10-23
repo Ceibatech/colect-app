@@ -113,6 +113,7 @@ model User {
   transferSignaturesCaptured         TransferSignature[]       @relation("TransferSignatureCapturedBy")
   transferTrackingPoints             TransferTrackingPoint[]   @relation("TransferTrackingCapturedBy")
   dossiersPrepared                   Dossier[]                 @relation("DossierPreparateur")
+  dossiersConditioned                Dossier[]                 @relation("DossierConditionneur")
   preparationPieceLines              PreparationPieceLine[]    @relation("PreparationPieceLinePreparedBy")
   emailReportSubscription            EmailReportSubscription?  @relation("EmailReportRecipient")
   emailReportSubscriptionsCreated    EmailReportSubscription[] @relation("EmailReportCreatedBy")
@@ -752,6 +753,7 @@ enum WorkflowType {
   VALIDATION
   PREPARATION
   NUMERISATION
+  CONDITIONNEMENT
   INDEXATION
   ARCHIVAGE
 }
@@ -856,6 +858,13 @@ enum StatutNumerisation {
   REJETE
 }
 
+enum StatutConditionnement {
+  EN_ATTENTE
+  EN_COURS
+  TERMINE
+  REJETE
+}
+
 enum StatutIndexation {
   EN_ATTENTE
   EN_COURS
@@ -951,6 +960,7 @@ model Dossier {
   // Numérisation — voir le commentaire sur l'enum StatutPreparation.
   statutPreparation  StatutPreparation  @default(EN_ATTENTE) @map("statut_preparation")
   statutNumerisation StatutNumerisation @default(EN_ATTENTE) @map("statut_numerisation")
+  statutConditionnement StatutConditionnement @default(EN_ATTENTE) @map("statut_conditionnement")
   statutIndexation   StatutIndexation   @default(EN_ATTENTE) @map("statut_indexation")
   statutArchivage    StatutArchivage    @default(EN_ATTENTE) @map("statut_archivage")
 
@@ -964,6 +974,10 @@ model Dossier {
   dateSoumissionPreparation DateTime? @map("date_soumission_preparation")
   observationsPreparation   String?   @map("observations_preparation") @db.Text
   dateNumerisation          DateTime? @map("date_numerisation")
+  conditionneurId           Int?      @map("conditionneur_id")
+  conditionnementClaimedAt  DateTime? @map("conditionnement_claimed_at")
+  dateConditionnement       DateTime? @map("date_conditionnement")
+  observationsConditionnement String? @map("observations_conditionnement") @db.Text
   dateIndexation            DateTime? @map("date_indexation")
   dateArchivage             DateTime? @map("date_archivage")
 
@@ -975,6 +989,7 @@ model Dossier {
 
   operateur             Operateur              @relation(fields: [operateurId], references: [id])
   preparateur           User?                  @relation("DossierPreparateur", fields: [preparateurId], references: [id], onDelete: SetNull)
+  conditionneur         User?                  @relation("DossierConditionneur", fields: [conditionneurId], references: [id], onDelete: SetNull)
   site                  Site?                  @relation(fields: [siteId], references: [id])
   entrepot              Entrepot?              @relation(fields: [entrepotId], references: [id])
   commune               Commune?               @relation(fields: [communeId], references: [id])
@@ -1008,10 +1023,12 @@ model Dossier {
   @@index([natureDossierId])
   @@index([operateurId])
   @@index([preparateurId])
+  @@index([conditionneurId])
   @@index([statutCollecte])
   @@index([statutValidation])
   @@index([statutPreparation])
   @@index([statutNumerisation])
+  @@index([statutConditionnement])
   @@index([statutIndexation])
   @@index([statutArchivage])
   @@index([createdAt])

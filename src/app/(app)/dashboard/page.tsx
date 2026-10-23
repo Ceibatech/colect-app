@@ -45,6 +45,12 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     description: "Retrouvez vos dossiers en cours, les retours à traiter et votre progression.",
     progress: "Mon avancement",
   },
+  AGENT_INVENTAIRE: { eyebrow: "Poste inventaire", title: "Mon activité", description: "Inventoriez les dossiers et suivez vos soumissions.", progress: "Mon avancement" },
+  PREPARATEUR: { eyebrow: "Atelier documentaire", title: "Préparation", description: "Accédez aux cartons prêts et aux dossiers disponibles.", progress: "Préparations terminées" },
+  NUMERISATEUR: { eyebrow: "Poste scanner", title: "Numérisation", description: "Accédez aux cartons préparés et versez les fichiers numérisés.", progress: "Numérisations terminées" },
+  CONDITIONNEUR: { eyebrow: "Chaîne physique", title: "Reconditionnement", description: "Remettez en ordre les cartons déjà numérisés.", progress: "Cartons reconditionnés" },
+  INDEXEUR: { eyebrow: "Chaîne numérique", title: "Indexation", description: "Traitez les dossiers et exceptions prêts pour l’indexation.", progress: "Indexations terminées" },
+  ARCHIVISTE: { eyebrow: "Conservation", title: "Archivage", description: "Classez les dossiers indexés et finalisez leur archivage.", progress: "Archivages terminés" },
   GESTIONNAIRE_TRANSFERT: {
     eyebrow: "Chaîne de garde",
     title: "Gestion des transferts",
@@ -97,7 +103,12 @@ export default async function DashboardPage() {
     redirect(session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? "/transferts/validation-ceibac" : "/transferts");
   }
   if (session.roleCode === "GESTIONNAIRE_TRANSFERT") redirect("/transferts");
-  const isOperator = session.roleCode === "OPERATEUR";
+  if (session.roleCode === "PREPARATEUR") redirect("/preparation");
+  if (session.roleCode === "NUMERISATEUR") redirect("/numerisation");
+  if (session.roleCode === "CONDITIONNEUR") redirect("/conditionnement");
+  if (session.roleCode === "INDEXEUR") redirect("/indexation");
+  if (session.roleCode === "ARCHIVISTE") redirect("/archivage");
+  const isOperator = session.roleCode === "OPERATEUR" || session.roleCode === "AGENT_INVENTAIRE";
   const isExecutive = session.roleCode === "EXECUTIF";
   const dashboardScopeLabel = session.roleCode === "PMO" ? "Lecture seule · Périmètre PMO" : session.roleCode === "FINANCE" ? "Lecture globale · Données financières protégées" : null;
   const copy = DASHBOARD_COPY[session.roleCode];

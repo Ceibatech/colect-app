@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/auth/current-user";
 import { getPreparationWorkspace } from "@/lib/services/preparation-service";
 import { parsePreparationSearch } from "@/lib/validation/preparation";
 import { PreparationQueueTable } from "@/components/preparation/PreparationQueueTable";
+import { PreparationCartonQueue } from "@/components/preparation/PreparationCartonQueue";
 import { DataPagination } from "@/components/shared/DataPagination";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -44,7 +45,7 @@ export default async function PreparationPage({
             </Badge>
             <h1 className="mt-3 text-2xl font-semibold">Préparation des dossiers</h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-              File partagée des dossiers validés. L’agent préparateur peut traiter un dossier quel que soit l’auteur de l’inventaire initial.
+              Le carton est l’espace de travail partagé. Chaque agent réserve un seul dossier; les autres agents peuvent avancer sur les autres dossiers du même carton.
             </p>
           </div>
           <div className="flex items-center gap-3 text-right">
@@ -66,36 +67,17 @@ export default async function PreparationPage({
         <Metric label="Rejetés" value={data.summary.rejetes} alert={data.summary.rejetes > 0} />
       </section>
 
-      <section className="border-y border-border/70 py-4">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="text-base font-semibold">Travail partagé par carton</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Plusieurs agents peuvent traiter le même carton, chacun sur un dossier réservé distinct.
-            </p>
+      {data.selectedCartonSummary ? (
+        <section className="border-y border-border/70 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold">Dossiers du carton sélectionné</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Chaque dossier en cours est verrouillé pour son préparateur, sans bloquer le reste du carton.</p>
+            </div>
+            <Link href="/preparation?statut=A_TRAITER" className={buttonVariants({ size: "sm", variant: "outline" })}>
+              Retour aux cartons
+            </Link>
           </div>
-          <form className="flex min-w-0 flex-1 flex-wrap items-end justify-end gap-2" action="/preparation" method="get">
-            <input type="hidden" name="statut" value={filters.statut} />
-            <label className="min-w-56 flex-1 sm:max-w-md">
-              <span className="mb-1 block text-xs font-medium text-muted-foreground">Carton actif</span>
-              <select
-                name="carton"
-                defaultValue={filters.carton ?? ""}
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-              >
-                <option value="">Tous les cartons</option>
-                {data.cartonChoices.map((carton) => (
-                  <option key={carton.key} value={carton.key}>
-                    {carton.label}{carton.description ? ` — ${carton.description}` : ""} ({carton.dossierCount} dossier{carton.dossierCount > 1 ? "s" : ""})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <Button type="submit">Ouvrir</Button>
-          </form>
-        </div>
-
-        {data.selectedCartonSummary ? (
           <div className="mt-4 grid gap-px overflow-hidden rounded-md border bg-border sm:grid-cols-3 lg:grid-cols-6">
             <Metric label="Dossiers du carton" value={data.selectedCartonSummary.totalDossiers} />
             <Metric label="Renseignés" value={data.selectedCartonSummary.renseignes} />
@@ -113,8 +95,11 @@ export default async function PreparationPage({
               </p>
             </div>
           </div>
-        ) : null}
-      </section>
+          <div className="mt-4 overflow-hidden rounded-lg border bg-card">
+            <PreparationQueueTable items={data.selectedCartonItems} permissions={session.permissions} currentUserId={session.userId} />
+          </div>
+        </section>
+      ) : null}
 
       <section className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm">
         <div className="space-y-4 p-4">
@@ -146,8 +131,14 @@ export default async function PreparationPage({
           </form>
         </div>
 
-        <PreparationQueueTable items={data.items} permissions={session.permissions} currentUserId={session.userId} />
+        <PreparationCartonQueue cartons={data.cartons} />
       </section>
+
+      {data.unidentifiedCount > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {data.unidentifiedCount} dossier(s) validé(s) ne sont pas encore rattachés à un carton et restent exclus de la prise en charge collective.
+        </p>
+      ) : null}
 
       <DataPagination
         basePath="/preparation"

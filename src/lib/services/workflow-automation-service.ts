@@ -26,6 +26,7 @@ export async function advanceDossierAfterDocumentAvailable(
       id: true,
       statutPreparation: true,
       statutNumerisation: true,
+      statutConditionnement: true,
       statutIndexation: true,
       statutArchivage: true,
       nombrePages: true,
@@ -36,7 +37,7 @@ export async function advanceDossierAfterDocumentAvailable(
 
   const now = new Date();
   const numerisationChanged = dossier.statutNumerisation !== "TERMINE";
-  const indexationChanged = dossier.statutIndexation !== "EN_COURS";
+  const indexationChanged = dossier.statutConditionnement === "TERMINE" && dossier.statutIndexation !== "EN_COURS";
   const archivageReopened = dossier.statutArchivage === "A_VALIDER";
   const documentPages = dossier.documents.reduce((sum, document) => sum + (document.nombrePages ?? 0), 0);
   const operateurId = numerisationChanged ? await resolveOperateurForUser(actorUserId) : null;
@@ -153,6 +154,7 @@ export async function reconcileDossierIndexation(dossierId: number, actorUserId:
     select: {
       id: true,
       statutNumerisation: true,
+      statutConditionnement: true,
       statutIndexation: true,
       documents: {
         orderBy: { id: "asc" },
@@ -173,7 +175,12 @@ export async function reconcileDossierIndexation(dossierId: number, actorUserId:
       },
     },
   });
-  if (!dossier || dossier.statutNumerisation !== "TERMINE" || dossier.documents.length === 0) return;
+  if (
+    !dossier ||
+    dossier.statutNumerisation !== "TERMINE" ||
+    dossier.statutConditionnement !== "TERMINE" ||
+    dossier.documents.length === 0
+  ) return;
 
   const activeDocuments = dossier.documents.filter((document) =>
     ["A_TRAITER", "EN_FILE", "EN_COURS", "DEUXIEME_LECTURE"].includes(document.automaticIndexStatus),

@@ -69,9 +69,37 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     expect(new Set(rolesWithAudit)).toEqual(new Set(["ADMIN", "SUPERVISEUR"]));
   });
 
-  it("seuls ADMIN et OPERATEUR ont DOSSIER_CREATE (SUPERVISEUR et CONSULTATION ne créent pas de dossier)", () => {
+  it("réserve la création des dossiers aux administrateurs et agents d'inventaire", () => {
     const rolesWithCreate = ROLE_CODES.filter((r) => ROLE_PERMISSIONS[r].includes("DOSSIER_CREATE"));
-    expect(new Set(rolesWithCreate)).toEqual(new Set(["ADMIN", "OPERATEUR"]));
+    expect(new Set(rolesWithCreate)).toEqual(new Set(["ADMIN", "OPERATEUR", "AGENT_INVENTAIRE"]));
+  });
+
+  it("cloisonne chaque rôle de production à son activité", () => {
+    const expectedActivityPermissions = {
+      PREPARATEUR: ["PREPARATION_VIEW", "PREPARATION_UPDATE"],
+      NUMERISATEUR: ["NUMERISATION_VIEW", "NUMERISATION_UPDATE"],
+      CONDITIONNEUR: ["CONDITIONNEMENT_VIEW", "CONDITIONNEMENT_UPDATE"],
+      INDEXEUR: ["INDEXATION_VIEW", "INDEXATION_UPDATE"],
+      ARCHIVISTE: ["ARCHIVAGE_VIEW", "ARCHIVAGE_UPDATE"],
+    } as const;
+
+    const activityPrefixes = ["PREPARATION_", "NUMERISATION_", "CONDITIONNEMENT_", "INDEXATION_", "ARCHIVAGE_"];
+    for (const [role, expected] of Object.entries(expectedActivityPermissions)) {
+      const actual = ROLE_PERMISSIONS[role as keyof typeof expectedActivityPermissions]
+        .filter((permission) => activityPrefixes.some((prefix) => permission.startsWith(prefix)));
+      expect(actual).toEqual(expected);
+    }
+  });
+
+  it("conserve l'opérateur polyvalent pour les comptes cumulant plusieurs activités", () => {
+    expect(ROLE_PERMISSIONS.OPERATEUR).toEqual(expect.arrayContaining([
+      "DOSSIER_CREATE",
+      "PREPARATION_UPDATE",
+      "NUMERISATION_UPDATE",
+      "CONDITIONNEMENT_UPDATE",
+      "INDEXATION_UPDATE",
+      "ARCHIVAGE_UPDATE",
+    ]));
   });
 
   it("seuls ADMIN et SUPERVISEUR peuvent valider/rejeter un dossier", () => {
@@ -136,5 +164,10 @@ describe("ROLE_ONLY_ROUTE_PREFIXES (garde-fou grossier middleware/proxy)", () =>
         expect(ROLE_CODES).toContain(role);
       }
     }
+  });
+
+  it("autorise l'import aux agents d'inventaire", () => {
+    const restriction = ROLE_ONLY_ROUTE_PREFIXES.find((entry) => entry.prefix === "/import");
+    expect(restriction?.roles).toEqual(["ADMIN", "OPERATEUR", "AGENT_INVENTAIRE"]);
   });
 });

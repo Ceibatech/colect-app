@@ -15,6 +15,7 @@ describe("finance point attribution", () => {
 
   it("does not credit submissions, pending work, or rejected operator work", () => {
     expect(getAcceptedOperatorActivity({ workflowType: "COLLECTE", toStatus: "SOUMIS" })).toBeNull();
+    expect(getAcceptedOperatorActivity({ workflowType: "CONDITIONNEMENT", toStatus: "TERMINE" })).toBeNull();
     expect(getAcceptedOperatorActivity({ workflowType: "NUMERISATION", toStatus: "A_VALIDER" })).toBeNull();
     expect(getAcceptedOperatorActivity({ workflowType: "INDEXATION", toStatus: "REJETE" })).toBeNull();
   });

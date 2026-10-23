@@ -10,6 +10,12 @@ describe("role-aware dashboard navigation", () => {
     ["ADMIN", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie", "/dashboard/finance", "/dashboard/pmo"]],
     ["SUPERVISEUR", ["/dashboard", "/dashboard/operateurs", "/dashboard/geographie"]],
     ["OPERATEUR", ["/dashboard"]],
+    ["AGENT_INVENTAIRE", ["/dashboard"]],
+    ["PREPARATEUR", ["/dashboard"]],
+    ["NUMERISATEUR", ["/dashboard"]],
+    ["CONDITIONNEUR", ["/dashboard"]],
+    ["INDEXEUR", ["/dashboard"]],
+    ["ARCHIVISTE", ["/dashboard"]],
     ["GESTIONNAIRE_TRANSFERT", ["/dashboard"]],
     ["VALIDATEUR_CEIBAC", ["/dashboard"]],
     ["VALIDATEUR_MINISTERE", ["/dashboard"]],
@@ -57,6 +63,21 @@ describe("role-aware dashboard navigation", () => {
     expect(visibleForManager).toEqual(["/transferts"]);
     expect(visibleForValidator).toEqual(["/transferts"]);
     expect(visibleForOperator).not.toContain("/transferts");
+  });
+
+  it.each([
+    ["AGENT_INVENTAIRE", ["/dashboard", "/collecte", "/dossiers", "/recherche", "/import"]],
+    ["PREPARATEUR", ["/dashboard", "/preparation"]],
+    ["NUMERISATEUR", ["/dashboard", "/numerisation"]],
+    ["CONDITIONNEUR", ["/dashboard", "/conditionnement"]],
+    ["INDEXEUR", ["/dashboard", "/indexation"]],
+    ["ARCHIVISTE", ["/dashboard", "/archivage"]],
+  ] satisfies Array<[RoleCode, string[]]>)
+  ("limits %s to its assigned activity", (role, expected) => {
+    const visible = NAV_ITEMS
+      .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS[role], role))
+      .map((item) => item.href);
+    expect(visible).toEqual(expected);
   });
 
   it("keeps route restrictions aligned with navigation roles", () => {
