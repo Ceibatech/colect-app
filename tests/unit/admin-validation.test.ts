@@ -87,7 +87,15 @@ describe("createUserSchema (administration utilisateurs)", () => {
   const valid = { name: "Jean Dupont", email: "jean.dupont@example.com", password: "MotDePasse1", roleId: 1 };
 
   it("accepte une création valide", () => {
-    expect(createUserSchema.safeParse(valid).success).toBe(true);
+    const result = createUserSchema.safeParse(valid);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBe("JEAN DUPONT");
+  });
+
+  it("harmonise les espaces, les accents et la casse du nom", () => {
+    const result = createUserSchema.safeParse({ ...valid, name: "  Élise   N'Guessan  " });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBe("ÉLISE N'GUESSAN");
   });
 
   it("rejette un mot de passe de moins de 8 caractères", () => {
@@ -112,7 +120,9 @@ describe("createUserSchema (administration utilisateurs)", () => {
 
 describe("updateUserSchema", () => {
   it("accepte une mise à jour valide", () => {
-    expect(updateUserSchema.safeParse({ name: "Jean Dupont", roleId: 2, isActive: true }).success).toBe(true);
+    const result = updateUserSchema.safeParse({ name: "Jean Dupont", roleId: 2, isActive: true });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.name).toBe("JEAN DUPONT");
   });
 
   it("rejette un nom vide", () => {

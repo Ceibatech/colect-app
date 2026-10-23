@@ -17,6 +17,7 @@ import { createUser, updateUser, resetUserPassword, type ActionResult } from "@/
 import { cn } from "@/lib/utils";
 import { SendPendingUsersAccessDialog, SendUserAccessButton } from "@/components/administration/UserAccessEmailControls";
 import { getRoleLabel, ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
+import { normalizePersonName, personInitials } from "@/lib/utils/person-name";
 
 export interface UserRow {
   id: number;
@@ -58,6 +59,14 @@ const initialState: ActionResult = {};
 function displayRoleName(role: Pick<RoleOption, "code" | "name">) {
   if (ROLE_CODES.includes(role.code as RoleCode)) return getRoleLabel(role.code as RoleCode);
   return role.name.replace(/CEIBAC/gi, "CEIBA");
+}
+
+function roleBadgeClass(code: string) {
+  if (["ADMIN", "SUPERVISEUR"].includes(code)) return "border-primary/25 bg-primary/8 text-primary";
+  if (["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE"].includes(code)) return "border-brand-green/30 bg-brand-green/10 text-brand-green";
+  if (code === "FINANCE") return "border-brand-gold/35 bg-brand-gold/10 text-brand-gold";
+  if (["EXECUTIF", "PMO", "CONSULTATION"].includes(code)) return "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-300";
+  return "border-border bg-muted/60 text-foreground";
 }
 
 function RoleSelect({
@@ -160,7 +169,7 @@ function OperateurAssignmentField({
                   htmlFor={`op-assign-${o.id}`}
                   className={cn("flex-1 font-normal", assignedElsewhere ? "cursor-not-allowed" : "cursor-pointer")}
                 >
-                  {o.nom} {o.prenoms ?? ""} <span className="text-xs text-muted-foreground">{o.matricule}</span>
+                  {normalizePersonName(`${o.nom} ${o.prenoms ?? ""}`)} <span className="text-xs text-muted-foreground">{o.matricule}</span>
                 </Label>
                 {assignedElsewhere ? (
                   <span className="text-xs text-muted-foreground whitespace-nowrap">
@@ -210,7 +219,7 @@ function PmoSupervisorAssignmentField({
               disabled={disabled}
             />
             <Label htmlFor={`pmo-supervisor-${supervisor.id}`} className="min-w-0 flex-1 cursor-pointer font-normal">
-              <span className="block truncate">{supervisor.name}</span>
+              <span className="block truncate font-medium">{normalizePersonName(supervisor.name)}</span>
               <span className="block truncate text-xs text-muted-foreground">{supervisor.operatorCount} opérateur{supervisor.operatorCount > 1 ? "s" : ""} · {supervisor.email}</span>
             </Label>
           </div>
@@ -245,7 +254,8 @@ function CreateUserForm({ roles, supervisors, onSuccess }: { roles: RoleOption[]
       ) : null}
       <div className="space-y-2">
         <Label htmlFor="name">Nom complet</Label>
-        <Input id="name" name="name" maxLength={150} required disabled={isPending} />
+        <Input id="name" name="name" maxLength={150} required disabled={isPending} className="uppercase" />
+        <p className="text-xs text-muted-foreground">Le nom est automatiquement harmonisé en majuscules.</p>
       </div>
       <div className="space-y-2">
         <Label htmlFor="email">E-mail</Label>
@@ -338,7 +348,7 @@ function EditUserForm({
       ) : null}
       <div className="space-y-2">
         <Label htmlFor="edit-name">Nom complet</Label>
-        <Input id="edit-name" name="name" defaultValue={user.name} maxLength={150} required disabled={isPending} />
+        <Input id="edit-name" name="name" defaultValue={normalizePersonName(user.name)} maxLength={150} required disabled={isPending} className="uppercase" />
       </div>
       <div className="space-y-2">
         <Label>E-mail</Label>
@@ -475,53 +485,68 @@ export function UsersManager({
         </Dialog>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nom</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Rôle</TableHead>
-              <TableHead>Statut</TableHead>
-              <TableHead>Dernière connexion</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+      <div className="overflow-hidden rounded-lg border bg-card shadow-sm">
+        <div className="overflow-x-auto">
+        <Table className="min-w-[1040px]">
+          <TableHeader className="bg-muted/45">
+            <TableRow className="hover:bg-muted/45">
+              <TableHead className="h-11 w-[28%] text-[11px] font-semibold uppercase">Identité</TableHead>
+              <TableHead className="h-11 w-[24%] text-[11px] font-semibold uppercase">E-mail professionnel</TableHead>
+              <TableHead className="h-11 w-[22%] text-[11px] font-semibold uppercase">Rôle et périmètre</TableHead>
+              <TableHead className="h-11 w-[10%] text-[11px] font-semibold uppercase">Statut</TableHead>
+              <TableHead className="h-11 w-[12%] text-[11px] font-semibold uppercase">Dernier accès</TableHead>
+              <TableHead className="h-11 w-[4%] text-right text-[11px] font-semibold uppercase">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.map((u) => (
-              <TableRow key={u.id}>
-                <TableCell className="font-medium whitespace-nowrap">
-                  {u.name} {u.id === currentUserId ? <span className="text-muted-foreground">(vous)</span> : null}
+              <TableRow key={u.id} className="h-[58px] hover:bg-primary/[0.035]">
+                <TableCell className="whitespace-nowrap py-2.5">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-primary/15 bg-primary/8 text-xs font-bold text-primary">
+                      {personInitials(u.name)}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{normalizePersonName(u.name)}</p>
+                      {u.id === currentUserId ? <span className="mt-0.5 inline-block text-[11px] font-medium text-primary">VOTRE COMPTE</span> : <span className="mt-0.5 block text-[11px] text-muted-foreground">ID {String(u.id).padStart(4, "0")}</span>}
+                    </div>
+                  </div>
                 </TableCell>
-                <TableCell className="whitespace-nowrap">{u.email}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{displayRoleName(u.role)}</Badge>
-                  {u.operateur ? (
-                    <span className="ml-1 text-xs text-muted-foreground">{u.operateur.matricule}</span>
-                  ) : null}
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">{u.email.toLowerCase()}</TableCell>
+                <TableCell className="py-2.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className={cn("rounded-md font-medium", roleBadgeClass(u.role.code))}>{displayRoleName(u.role)}</Badge>
+                    {u.operateur ? <span className="rounded border bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{u.operateur.matricule}</span> : null}
+                  </div>
                   {u.role.code === "SUPERVISEUR" ? (
-                    <span className="ml-1 text-xs text-muted-foreground">
+                    <span className="mt-1 block text-[11px] text-muted-foreground">
                       {u.supervisedCount} opérateur{u.supervisedCount > 1 ? "s" : ""}
                     </span>
                   ) : u.role.code === "PMO" ? (
-                    <span className="ml-1 text-xs text-muted-foreground">
+                    <span className="mt-1 block text-[11px] text-muted-foreground">
                       {u.pmoSupervisorIds.length} superviseur{u.pmoSupervisorIds.length > 1 ? "s" : ""}
                     </span>
                   ) : null}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={u.isActive ? "default" : "destructive"}>{u.isActive ? "Actif" : "Désactivé"}</Badge>
+                  <span className={cn(
+                    "inline-flex min-w-[78px] items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-semibold uppercase",
+                    u.isActive ? "border-brand-green/25 bg-brand-green/10 text-brand-green" : "border-destructive/25 bg-destructive/10 text-destructive"
+                  )}>
+                    <span className={cn("h-1.5 w-1.5 rounded-full", u.isActive ? "bg-brand-green" : "bg-destructive")} />
+                    {u.isActive ? "Actif" : "Désactivé"}
+                  </span>
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                  {u.lastLoginAt ? dateFmt.format(new Date(u.lastLoginAt)) : "Jamais"}
+                <TableCell className="whitespace-nowrap text-xs">
+                  {u.lastLoginAt ? <span className="text-muted-foreground">{dateFmt.format(new Date(u.lastLoginAt))}</span> : <span className="font-medium text-brand-gold">Jamais connecté</span>}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button size="icon-sm" variant="ghost" aria-label="Modifier" onClick={() => setEditId(u.id)}>
+                    <Button size="icon-sm" variant="ghost" aria-label="Modifier" title="Modifier le compte" onClick={() => setEditId(u.id)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <SendUserAccessButton userId={u.id} email={u.email} disabled={!u.isActive} />
-                    <Button size="icon-sm" variant="ghost" aria-label="Réinitialiser le mot de passe manuellement" onClick={() => setResetId(u.id)}>
+                    <Button size="icon-sm" variant="ghost" aria-label="Réinitialiser le mot de passe manuellement" title="Réinitialiser le mot de passe" onClick={() => setResetId(u.id)}>
                       <KeyRound className="h-4 w-4" />
                     </Button>
                   </div>
@@ -530,6 +555,7 @@ export function UsersManager({
             ))}
           </TableBody>
         </Table>
+        </div>
       </div>
 
       <Dialog open={editId !== null} onOpenChange={(open) => !open && setEditId(null)}>
