@@ -13,6 +13,7 @@ const BORDER = rgb(0.78, 0.81, 0.85);
 const SURFACE = rgb(0.95, 0.96, 0.97);
 
 export interface TransferPdfItem {
+  lotReference?: string;
   cartonCode: string;
   cartonLabel: string | null;
   dossierCount: number;
@@ -20,6 +21,7 @@ export interface TransferPdfItem {
 }
 
 export interface TransferPdfSignature {
+  reference?: string;
   party?: "MINISTERE" | "CEIBAC" | "CEIBAC_VALIDATOR";
   label: string;
   name: string | null;
@@ -30,6 +32,7 @@ export interface TransferPdfSignature {
 
 export interface TransferAuthorizationPdfInput {
   reference: string;
+  lotReferences?: string[];
   authorizedAt: Date;
   plannedAt: Date | null;
   motif: string | null;
@@ -40,7 +43,9 @@ export interface TransferAuthorizationPdfInput {
   ministryContact: string;
   ceibaContact: string;
   items: TransferPdfItem[];
-  ministrySignature: TransferPdfSignature;
+  ministrySignature?: TransferPdfSignature;
+  ministrySignatures?: TransferPdfSignature[];
+  ceibaSignatures?: TransferPdfSignature[];
 }
 
 export interface TransferMovementPdfInput {
@@ -78,8 +83,8 @@ export async function createTransferAuthorizationPdf(input: TransferAuthorizatio
   ]);
 
   writer.section("Périmètre autorisé");
-  writer.field("Lots ou références concernés", input.reference);
-  writer.field("Volume autorisé", `${input.items.length} boîte${input.items.length > 1 ? "s" : ""} - ${sumDossiers(input.items)} dossier${sumDossiers(input.items) > 1 ? "s" : ""}`);
+  writer.field("Lots internes regroupés", (input.lotReferences ?? [input.reference]).join(", "));
+  writer.field("Volume autorisé", `${input.items.length} carton${input.items.length > 1 ? "s" : ""} - ${sumDossiers(input.items)} dossier${sumDossiers(input.items) > 1 ? "s" : ""}`);
   writer.field("Prestations autorisées", input.motif || "Transfert, préparation, numérisation, indexation et garde temporaire.");
   writer.field("Documents exclus", "Tout document non repris dans l'inventaire annexé à cette autorisation.");
 
@@ -98,14 +103,23 @@ export async function createTransferAuthorizationPdf(input: TransferAuthorizatio
   writer.paragraph("Les boîtes sont identifiées, fermées et transportées dans un véhicule fermé dédié. Les anomalies sont signalées sans délai. Les boîtes sont rangées hors sol en zone réservée avec leur localisation enregistrée dans GeoArchives.");
 
   writer.section("Approbation et engagement");
-  await writer.signature(input.ministrySignature);
-  await writer.signature({
-    label: "Responsable CEIBA Analytics - prise en charge",
-    name: input.ceibaContact,
-    title: "Gestionnaire du transfert",
-    signedAt: null,
-    data: null,
-  });
+  const ceibaSignatures = input.ceibaSignatures ?? [];
+  const ministrySignatures = input.ministrySignatures ?? (input.ministrySignature ? [input.ministrySignature] : []);
+  for (const signature of ceibaSignatures) {
+    await writer.signature({ ...signature, label: signature.reference ? `Visa CEIBA - ${signature.reference}` : signature.label });
+  }
+  for (const signature of ministrySignatures) {
+    await writer.signature({ ...signature, label: signature.reference ? `Autorisation ministère - ${signature.reference}` : signature.label });
+  }
+  if (ceibaSignatures.length === 0) {
+    await writer.signature({
+      label: "Responsable CEIBA Analytics - prise en charge",
+      name: input.ceibaContact,
+      title: "Gestionnaire du transfert",
+      signedAt: null,
+      data: null,
+    });
+  }
 
   writer.footerNote("F01 conservée par le ministère et CEIBA Analytics. Toute sortie physique doit ensuite être couverte par un bordereau F02.");
   return writer.save();
@@ -251,7 +265,8 @@ class PdfWriter {
   inventory(items: TransferPdfItem[]) {
     items.forEach((item, index) => {
       const references = item.dossierReferences.join(", ") || "Aucune référence";
-      const value = `${index + 1}. ${item.cartonCode} - ${item.cartonLabel || "Sans libellé"} - ${item.dossierCount} dossier${item.dossierCount > 1 ? "s" : ""} - ${references}`;
+      const lot = item.lotReference ? ` [${item.lotReference}]` : "";
+      const value = `${index + 1}. ${item.cartonCode}${lot} - ${item.cartonLabel || "Sans libellé"} - ${item.dossierCount} dossier${item.dossierCount > 1 ? "s" : ""} - ${references}`;
       const lines = wrap(clean(value), this.regular, 8.5, CONTENT_WIDTH - 16);
       this.ensureSpace(lines.length * 11 + 12);
       if (index % 2 === 0) this.page.drawRectangle({ x: MARGIN, y: this.y - lines.length * 11 - 3, width: CONTENT_WIDTH, height: lines.length * 11 + 8, color: SURFACE });

@@ -77,8 +77,8 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         actions={(
           <>
             <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Registre</Link>
-            <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> {lot.authorizedAt ? "Prévisualiser F01" : "Fiche du lot"}</Link>
-            {lot.authorizedAt ? <a href={`/api/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><Download /> Télécharger F01</a> : null}
+            <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> Fiche du lot</Link>
+            {lot.authorizedAt ? <Link href="/transferts#documents" className={cn(buttonVariants({ variant: "outline" }))}><Download /> F01 consolidée</Link> : null}
             {canValidateMinistry ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
             {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBA</Link> : null}
             {canSubmit ? <SubmitTransferButton lotId={lot.id} /> : null}

@@ -82,7 +82,7 @@ export function AuthorizeTransferButton({ lotId }: { lotId: number }) {
   return (
     <SignatureApprovalDialog
       title="Visa ministériel de sortie"
-      description="Cette signature autorise la sortie du lot et rend disponible le bordereau contractuel partagé entre le ministère et CEIBA."
+      description="Cette signature autorise ce lot. La F01 contractuelle regroupera ensuite tous les cartons autorisés pour la même date et le même trajet."
       triggerLabel="Signer l'autorisation"
       submitLabel="Signer et autoriser la sortie"
       signatureLabel="Responsable ministère"

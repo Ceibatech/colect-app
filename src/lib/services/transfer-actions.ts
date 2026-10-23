@@ -24,10 +24,6 @@ export interface TransferActionState {
 
 class TransferRuleError extends Error {}
 
-function parseDate(value: string | undefined) {
-  return value ? new Date(value) : null;
-}
-
 function parseIdList(value: FormDataEntryValue | null) {
   if (typeof value !== "string") return [];
   return value.split(",").map((entry) => entry.trim()).filter(Boolean);
@@ -77,7 +73,27 @@ export async function createTransferLot(
 
   try {
     const ip = await getClientIp();
+    const plannedAt = new Date(parsed.data.plannedAt);
     const result = await prisma.$transaction(async (tx) => {
+      const operationStart = new Date(Date.UTC(plannedAt.getUTCFullYear(), plannedAt.getUTCMonth(), plannedAt.getUTCDate()));
+      const operationEnd = new Date(operationStart);
+      operationEnd.setUTCDate(operationEnd.getUTCDate() + 1);
+      const signedOperation = await tx.transferLot.findFirst({
+        where: {
+          plannedAt: { gte: operationStart, lt: operationEnd },
+          sourceSiteId: parsed.data.sourceSiteId,
+          sourceEntrepotId: parsed.data.sourceEntrepotId ?? null,
+          destinationSiteId: parsed.data.destinationSiteId,
+          destinationEntrepotId: parsed.data.destinationEntrepotId ?? null,
+          authorizedAt: { not: null },
+          status: { not: "ANNULE" },
+        },
+        select: { reference: true },
+      });
+      if (signedOperation) {
+        throw new TransferRuleError(`L'opération de cette date est déjà en cours de signature (${signedOperation.reference}). Planifiez une nouvelle date pour ajouter d'autres cartons.`);
+      }
+
       const dossiers = await tx.dossier.findMany({
         where: {
           id: { in: dossierIds },
@@ -131,7 +147,7 @@ export async function createTransferLot(
           sourceEntrepotId: parsed.data.sourceEntrepotId ?? null,
           destinationSiteId: parsed.data.destinationSiteId,
           destinationEntrepotId: parsed.data.destinationEntrepotId ?? null,
-          plannedAt: parseDate(parsed.data.plannedAt),
+          plannedAt,
           motif: parsed.data.motif || null,
           createdById: session.userId,
         },
@@ -321,7 +337,7 @@ export async function authorizeTransferLot(
     revalidatePath("/transferts");
     revalidatePath("/transferts/validation");
     revalidatePath("/transferts/validation-ceibac");
-    return { success: true, message: "Le lot est autorisé. Le F01 signé est maintenant disponible dans l'espace du gestionnaire CEIBA." };
+    return { success: true, message: "Le lot est autorisé. La F01 consolidée sera disponible lorsque tous les lots de cette date et de ce trajet seront autorisés." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
     console.error("Transfer lot authorization failed.", error);

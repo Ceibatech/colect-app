@@ -160,6 +160,10 @@ export async function getTransferDashboardData() {
     id: lot.id,
     reference: lot.reference,
     status: lot.status,
+    sourceSiteId: lot.sourceSiteId,
+    sourceEntrepotId: lot.sourceEntrepotId,
+    destinationSiteId: lot.destinationSiteId,
+    destinationEntrepotId: lot.destinationEntrepotId,
     source: lot.sourceEntrepot ? [lot.sourceSite.nom, lot.sourceEntrepot.nom, lot.sourceEntrepot.localisation].filter(Boolean).join(" · ") : lot.sourceSite.nom,
     destination: lot.destinationEntrepot ? [lot.destinationSite.nom, lot.destinationEntrepot.nom, lot.destinationEntrepot.localisation].filter(Boolean).join(" · ") : lot.destinationSite.nom,
     plannedAt: lot.plannedAt,
@@ -168,6 +172,7 @@ export async function getTransferDashboardData() {
     createdBy: lot.createdBy.name,
     movementCount: lot.movements.length,
     movements: lot.movements,
+    cartonCount: lot.items.length,
     dossierCount: lot.items.reduce((sum, item) => sum + item.dossierCountSnapshot, 0),
     stock: getTransferDossierStockSummary(lot.items.map((item) => ({
       status: item.status as TransferItemStatusCode,
@@ -228,6 +233,84 @@ export async function getTransferAuthorization(lotId: number) {
       },
     },
   });
+}
+
+export interface TransferAuthorizationGroupQuery {
+  date: string;
+  sourceSiteId: number;
+  sourceEntrepotId: number | null;
+  destinationSiteId: number;
+  destinationEntrepotId: number | null;
+}
+
+export async function getTransferAuthorizationGroup(input: TransferAuthorizationGroupQuery) {
+  await requirePermission("TRANSFER_VIEW");
+  const start = new Date(`${input.date}T00:00:00.000Z`);
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+
+  const lots = await prisma.transferLot.findMany({
+    where: {
+      plannedAt: { gte: start, lt: end },
+      sourceSiteId: input.sourceSiteId,
+      sourceEntrepotId: input.sourceEntrepotId,
+      destinationSiteId: input.destinationSiteId,
+      destinationEntrepotId: input.destinationEntrepotId,
+      status: { not: "ANNULE" },
+    },
+    orderBy: { reference: "asc" },
+    include: {
+      sourceSite: true,
+      sourceEntrepot: true,
+      destinationSite: true,
+      destinationEntrepot: true,
+      createdBy: { select: { name: true } },
+      authorizedBy: { select: { name: true } },
+      items: {
+        orderBy: { cartonCode: "asc" },
+        include: { dossiers: { include: { dossier: { select: { reference: true } } } } },
+      },
+    },
+  });
+
+  if (lots.length === 0) return null;
+  return {
+    ready: lots.every((lot) => Boolean(lot.authorizedAt)),
+    reference: buildOperationReference(input.date, lots[0].sourceSite.code, lots[0].destinationSite.code),
+    plannedAt: start,
+    authorizedAt: latestDate(lots.flatMap((lot) => lot.authorizedAt ? [lot.authorizedAt] : [])),
+    motif: Array.from(new Set(lots.map((lot) => lot.motif?.trim()).filter((value): value is string => Boolean(value)))).join(" / ") || null,
+    sourceSite: lots[0].sourceSite,
+    sourceEntrepot: lots[0].sourceEntrepot,
+    destinationSite: lots[0].destinationSite,
+    destinationEntrepot: lots[0].destinationEntrepot,
+    lotReferences: lots.map((lot) => lot.reference),
+    ceibaContacts: Array.from(new Set(lots.map((lot) => lot.createdBy.name))),
+    items: lots.flatMap((lot) => lot.items.map((item) => ({ ...item, lotReference: lot.reference }))),
+    ceibaSignatures: lots.map((lot) => ({
+      reference: lot.reference,
+      name: lot.ceibacSignatoryName,
+      title: lot.ceibacSignatoryTitle,
+      signedAt: lot.ceibacValidatedAt,
+      data: lot.ceibacSignatureData,
+    })),
+    ministrySignatures: lots.map((lot) => ({
+      reference: lot.reference,
+      name: lot.approvalSignatoryName ?? lot.authorizedBy?.name ?? null,
+      title: lot.approvalSignatoryTitle,
+      signedAt: lot.authorizedAt,
+      data: lot.approvalSignatureData,
+    })),
+  };
+}
+
+function buildOperationReference(date: string, sourceCode: string, destinationCode: string) {
+  const clean = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toUpperCase();
+  return `TRF-${date.replaceAll("-", "")}-${clean(sourceCode)}-${clean(destinationCode)}`;
+}
+
+function latestDate(values: Date[]) {
+  return values.length > 0 ? new Date(Math.max(...values.map((value) => value.getTime()))) : null;
 }
 
 export async function getTransferLotDetail(id: number) {

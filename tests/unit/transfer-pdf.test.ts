@@ -12,7 +12,8 @@ const items = [{
 describe("transfer PDF documents", () => {
   it("generates a readable F01 authorization PDF", async () => {
     const bytes = await createTransferAuthorizationPdf({
-      reference: "LOT-2026-000001",
+      reference: "TRF-20261024-MIN-CEIBA",
+      lotReferences: ["LOT-2026-000001", "LOT-2026-000002"],
       authorizedAt: new Date("2026-10-23T08:00:00Z"),
       plannedAt: new Date("2026-10-24T08:00:00Z"),
       motif: "Numérisation et indexation",
@@ -23,14 +24,24 @@ describe("transfer PDF documents", () => {
       ministryContact: "Responsable du ministère",
       ceibaContact: "Responsable CEIBA",
       items,
-      ministrySignature: {
+      ceibaSignatures: [{
+        reference: "LOT-2026-000001",
+        party: "CEIBAC_VALIDATOR",
+        label: "Visa CEIBA",
+        name: "Responsable CEIBA",
+        title: "Responsable transfert",
+        signedAt: new Date("2026-10-23T07:30:00Z"),
+        data: null,
+      }],
+      ministrySignatures: [{
+        reference: "LOT-2026-000001",
         party: "MINISTERE",
         label: "Autorité habilitée du ministère",
         name: "Responsable du ministère",
         title: "Chef de service",
         signedAt: new Date("2026-10-23T08:00:00Z"),
         data: null,
-      },
+      }],
     });
 
     expect(Buffer.from(bytes).subarray(0, 5).toString()).toBe("%PDF-");

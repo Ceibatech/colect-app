@@ -13,10 +13,16 @@
    Le validateur CEIBA le vise, puis le ministère le contre-signe. Le stock est alors
    affecté au site de destination. Les points GPS déjà reçus restent consultables.
 
-La fiche du lot est disponible avant le départ : tant que le ministère n'a pas signé,
-elle porte la mention **PROJET — SORTIE NON AUTORISÉE**. Le nombre « 0 bordereau » dans
-le registre indique qu'aucun mouvement physique n'a été enregistré ; il n'empêche pas
-de consulter cette fiche et de valider le lot.
+La fiche individuelle sert à contrôler chaque lot : tant que le ministère n'a pas
+signé, elle porte la mention **PROJET — SORTIE NON AUTORISÉE**. La **F01 finale**
+n'est pas créée par lot. GeoArchives regroupe tous les lots ayant la même date et le
+même trajet, puis produit une autorisation unique avec le nombre total de cartons,
+le nombre de dossiers et l'inventaire complet. Elle devient téléchargeable seulement
+lorsque tous les lots de l'opération ont reçu les visas CEIBA et ministère. Une fois
+la signature commencée, aucun nouveau carton ne peut être ajouté à cette opération.
+
+Le nombre « 0 bordereau » dans le registre indique qu'aucun mouvement physique n'a
+été enregistré ; il n'empêche pas de consulter la fiche et de valider le lot.
 
 L'espace ministère propose les réceptions à signer, celles encore en attente de
 CEIBA, les bordereaux validés et l'ensemble des bordereaux, avec recherche par référence

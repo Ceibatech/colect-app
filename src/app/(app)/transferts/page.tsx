@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getTransferDashboardData } from "@/lib/services/transfer-service";
+import { getTransferAuthorizationGroupDownloadHref, groupTransferAuthorizationRows } from "@/lib/transfers/authorization-groups";
 import type { TransferLotStatusCode } from "@/lib/utils/transfer-stock";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export default async function TransfersPage() {
   const canValidateCeiba = session.permissions.includes("TRANSFER_CEIBAC_VALIDATE");
   const isCeibaValidator = session.roleCode === "VALIDATEUR_CEIBAC";
   const canAccessSignedDocuments = canAuthorize || canOperate || canApproveCeiba || canValidateCeiba;
+  const authorizationGroups = groupTransferAuthorizationRows(data.rows);
   const documentTasks: TransferDocumentItem[] = [
     ...(canApproveCeiba ? data.rows
       .filter((row) => row.status === "SOUMIS")
@@ -77,17 +79,17 @@ export default async function TransfersPage() {
         actionHref: `/transferts/${row.id}#bordereaux`,
         downloadHref: `/api/transferts/${row.id}/bordereaux/${movement.id}`,
       } satisfies TransferDocumentItem))) : []),
-    ...(canAccessSignedDocuments ? data.rows
-      .filter((row) => row.authorizedAt && !["ANNULE", "CLOTURE"].includes(row.status))
-      .map((row) => ({
-        key: `F01-CEIBA-${row.id}`,
+    ...(canAccessSignedDocuments ? authorizationGroups
+      .filter((group) => group.fullyAuthorized)
+      .map((group) => ({
+        key: `F01-OPERATION-${group.key}`,
         code: "F01",
-        title: `Autorisation ${row.reference} disponible`,
-        detail: "Copie ministérielle signée, prête pour la préparation du transfert.",
+        title: `Autorisation du ${dateFormatter.format(group.plannedAt)} disponible`,
+        detail: `${group.lotCount} lot${group.lotCount > 1 ? "s" : ""} · ${group.cartonCount} carton${group.cartonCount > 1 ? "s" : ""} · ${group.dossierCount} dossier${group.dossierCount > 1 ? "s" : ""} · ${group.source} vers ${group.destination}`,
         status: "Document signé",
         state: "SIGNED",
-        actionHref: `/transferts/${row.id}`,
-        downloadHref: `/api/transferts/${row.id}/autorisation`,
+        actionHref: `/transferts/${group.rows[0].id}`,
+        downloadHref: getTransferAuthorizationGroupDownloadHref(group),
       } satisfies TransferDocumentItem)) : []),
     ...(canAccessSignedDocuments ? data.rows.flatMap((row) => row.movements
       .filter((movement) => movement.status === "VALIDE_MINISTERE")

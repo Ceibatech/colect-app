@@ -3,12 +3,22 @@ import { getTransferAuthorization } from "@/lib/services/transfer-service";
 
 export const runtime = "nodejs";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const lotId = Number((await params).id);
   if (!Number.isInteger(lotId) || lotId <= 0) return new Response("Lot invalide.", { status: 400 });
 
   const lot = await getTransferAuthorization(lotId);
   if (!lot || !lot.authorizedAt) return new Response("Autorisation introuvable.", { status: 404 });
+  if (lot.plannedAt) {
+    const query = new URLSearchParams({
+      date: lot.plannedAt.toISOString().slice(0, 10),
+      sourceSiteId: String(lot.sourceSiteId),
+      sourceEntrepotId: lot.sourceEntrepotId === null ? "none" : String(lot.sourceEntrepotId),
+      destinationSiteId: String(lot.destinationSiteId),
+      destinationEntrepotId: lot.destinationEntrepotId === null ? "none" : String(lot.destinationEntrepotId),
+    });
+    return Response.redirect(new URL(`/api/transferts/autorisations?${query.toString()}`, request.url), 307);
+  }
 
   const pdf = await createTransferAuthorizationPdf({
     reference: lot.reference,

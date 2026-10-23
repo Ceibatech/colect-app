@@ -6,10 +6,9 @@ const optionalPositiveInt = z.preprocess(
   z.coerce.number().int().positive().optional(),
 );
 
-const optionalDateTime = z.preprocess(
-  (value) => (value === "" || value === null || value === undefined ? undefined : value),
-  z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), "La date est invalide.").optional(),
-);
+const requiredDateTime = z.string({ message: "La date de transfert est requise." })
+  .min(1, "La date de transfert est requise.")
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), "La date est invalide.");
 
 const signatureData = z
   .string()
@@ -29,7 +28,7 @@ export const createTransferLotSchema = z.object({
   destinationSiteId: z.coerce.number().int().positive("Le site de destination est requis."),
   destinationEntrepotId: optionalPositiveInt,
   includeUnlocated: z.preprocess((value) => value === "true" || value === "1" || value === "on", z.boolean()),
-  plannedAt: optionalDateTime,
+  plannedAt: requiredDateTime,
   motif: z.string().trim().max(2_000, "Le motif est trop long.").optional().or(z.literal("")),
   dossierIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un dossier.").max(500, "Un lot peut contenir au maximum 500 dossiers."),
 });

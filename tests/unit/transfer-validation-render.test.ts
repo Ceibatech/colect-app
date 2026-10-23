@@ -123,8 +123,8 @@ describe("transfer lot print rendering", () => {
       ...printLot(), authorizedAt: date, authorizedBy: { name: "Responsable historique" },
     });
     const html = renderToStaticMarkup(await TransferAuthorizationPage({ params: Promise.resolve({ id: "12" }) }));
-    expect(html).toContain("Autorisation de sortie et de transfert");
-    expect(html).toContain("Autorisation enregistrée et traçable");
+    expect(html).toContain("Fiche de composition du lot");
+    expect(html).toContain("Lot autorisé et traçable dans la F01 consolidée");
     expect(html).toContain("Ancien circuit : visa CEIBA non enregistré.");
     const ceibacVisa = html.match(/Visa du responsable CEIBA([\s\S]*?)Visa du responsable ministère/)?.[1];
     expect(ceibacVisa).toBeDefined();

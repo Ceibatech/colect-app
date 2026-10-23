@@ -18,6 +18,20 @@ describe("transfer validation", () => {
     expect(result.success).toBe(true);
   });
 
+  it("requires a planned date so the F01 can aggregate the operation", () => {
+    const result = createTransferLotSchema.safeParse({
+      sourceSiteId: "1",
+      sourceEntrepotId: "",
+      destinationSiteId: "2",
+      destinationEntrepotId: "",
+      includeUnlocated: "false",
+      plannedAt: "",
+      motif: "Transfert",
+      dossierIds: [11],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("requires the CEIBA signature before a movement is sent to the ministry", () => {
     const base = {
       type: "SORTIE",

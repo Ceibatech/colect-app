@@ -316,7 +316,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
       </section>
 
       <section className="grid gap-4 rounded-lg border bg-card p-4 shadow-sm sm:grid-cols-2 lg:p-5">
-        <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" disabled={pending} /></div>
+        <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required disabled={pending} /></div>
         <div className="space-y-2 sm:row-span-2"><Label htmlFor="motif">Objet / contexte</Label><Textarea id="motif" name="motif" rows={4} maxLength={2000} placeholder="Ex. prise en charge pour numérisation et indexation" disabled={pending} /></div>
         <p className="text-xs leading-5 text-muted-foreground">Après création, soumettez le lot au responsable CEIBA. Sa validation transmet le lot au ministère pour autorisation. Le stock du site d&apos;inventaire ne diminue qu&apos;après le F02 signé ; le stock du site CEIBA augmente après la réception validée.</p>
       </section>

@@ -46,7 +46,7 @@ export function TransferDocumentRegistry({ documents }: { documents: TransferDoc
   }
 
   return (
-    <Card className="bg-card/95">
+    <Card id="documents" className="scroll-mt-20 bg-card/95">
       <CardHeader className="border-b border-border/60 pb-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
@@ -58,7 +58,7 @@ export function TransferDocumentRegistry({ documents }: { documents: TransferDoc
           </div>
           <div className="relative w-full lg:w-96">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Référence du bordereau ou du lot" className="pl-9" />
+              <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Date, bordereau, lot ou trajet" className="pl-9" />
           </div>
         </div>
         <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Filtrer les bordereaux">
