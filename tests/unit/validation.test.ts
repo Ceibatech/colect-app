@@ -35,8 +35,8 @@ describe("password reset validation", () => {
   it("accepte un jeton et deux mots de passe identiques", () => {
     const result = resetPasswordWithTokenSchema.safeParse({
       token: "a".repeat(43),
-      newPassword: "NouveauMdp1",
-      confirmPassword: "NouveauMdp1",
+      newPassword: "NouveauMotDePasse1!",
+      confirmPassword: "NouveauMotDePasse1!",
     });
     expect(result.success).toBe(true);
   });
@@ -44,31 +44,31 @@ describe("password reset validation", () => {
   it("rejette un jeton trop court ou une confirmation différente", () => {
     expect(resetPasswordWithTokenSchema.safeParse({
       token: "court",
-      newPassword: "NouveauMdp1",
-      confirmPassword: "NouveauMdp1",
+      newPassword: "NouveauMotDePasse1!",
+      confirmPassword: "NouveauMotDePasse1!",
     }).success).toBe(false);
     expect(resetPasswordWithTokenSchema.safeParse({
       token: "a".repeat(43),
-      newPassword: "NouveauMdp1",
+      newPassword: "NouveauMotDePasse1!",
       confirmPassword: "Different1",
     }).success).toBe(false);
   });
   it("rejette un jeton qui n'est pas encodé en base64url", () => {
     expect(resetPasswordWithTokenSchema.safeParse({
       token: "!".repeat(43),
-      newPassword: "NouveauMdp1",
-      confirmPassword: "NouveauMdp1",
+      newPassword: "NouveauMotDePasse1!",
+      confirmPassword: "NouveauMotDePasse1!",
     }).success).toBe(false);
   });
 });
 describe("changePasswordSchema (self-service, Phase 15)", () => {
-  const valid = { currentPassword: "AncienMdp1", newPassword: "NouveauMdp1", confirmPassword: "NouveauMdp1" };
+  const valid = { currentPassword: "AncienMotDePasse1!", newPassword: "NouveauMotDePasse1!", confirmPassword: "NouveauMotDePasse1!" };
 
-  it("accepte un changement valide (nouveau ≥ 8 caractères, confirmation identique, différent de l'actuel)", () => {
+  it("accepte un changement valide (nouveau ≥ 15 caractères, confirmation identique, différent de l'actuel)", () => {
     expect(changePasswordSchema.safeParse(valid).success).toBe(true);
   });
 
-  it("rejette un nouveau mot de passe de moins de 8 caractères", () => {
+  it("rejette un nouveau mot de passe de moins de 15 caractères", () => {
     const result = changePasswordSchema.safeParse({ ...valid, newPassword: "Court1", confirmPassword: "Court1" });
     expect(result.success).toBe(false);
   });
@@ -83,9 +83,9 @@ describe("changePasswordSchema (self-service, Phase 15)", () => {
 
   it("rejette si le nouveau mot de passe est identique à l'actuel", () => {
     const result = changePasswordSchema.safeParse({
-      currentPassword: "MemeMdp123",
-      newPassword: "MemeMdp123",
-      confirmPassword: "MemeMdp123",
+      currentPassword: "MemeMotDePasse123!",
+      newPassword: "MemeMotDePasse123!",
+      confirmPassword: "MemeMotDePasse123!",
     });
     expect(result.success).toBe(false);
     if (!result.success) {

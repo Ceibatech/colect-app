@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { COOKIE_NAME, verifySessionToken, type SessionPayload } from "@/lib/auth/session";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 import { ApiError } from "@/lib/utils/api-error";
+import { prisma } from "@/lib/prisma/client";
 
 /**
  * Lit et vérifie la session depuis le cookie httpOnly. `cache()` évite de
@@ -15,7 +16,40 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  return verifySessionToken(token);
+  const tokenSession = await verifySessionToken(token);
+  if (!tokenSession) return null;
+
+  // Le JWT prouve l'origine de la session, mais l'état courant du compte et
+  // les autorisations restent ceux de la base. Cela révoque immédiatement une
+  // session après désactivation, changement de rôle ou rotation du mot de passe.
+  const user = await prisma.user.findUnique({
+    where: { id: tokenSession.userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      isActive: true,
+      sessionVersion: true,
+      role: {
+        select: {
+          code: true,
+          rolePermissions: { select: { permission: { select: { code: true } } } },
+        },
+      },
+    },
+  });
+
+  if (!user?.isActive || user.sessionVersion !== tokenSession.sessionVersion) return null;
+
+  return {
+    ...tokenSession,
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    roleCode: user.role.code as RoleCode,
+    permissions: user.role.rolePermissions.map((entry) => entry.permission.code) as PermissionCode[],
+    sessionVersion: user.sessionVersion,
+  };
 });
 
 /** Redirige vers /login si aucune session valide. À utiliser en haut des pages protégées. */

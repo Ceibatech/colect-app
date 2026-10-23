@@ -70,7 +70,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           name="confirmPassword"
           type={showPassword ? "text" : "password"}
           autoComplete="new-password"
-          minLength={8}
+          minLength={15}
           required
           disabled={isPending}
           className="h-11"
@@ -103,7 +103,7 @@ function PasswordInput({ id, name, label, visible, disabled }: { id: string; nam
           name={name}
           type={visible ? "text" : "password"}
           autoComplete="new-password"
-          minLength={8}
+          minLength={15}
           required
           disabled={disabled}
           className="h-11 pr-10"
@@ -112,7 +112,7 @@ function PasswordInput({ id, name, label, visible, disabled }: { id: string; nam
           {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
         </span>
       </div>
-      <p className="text-xs text-muted-foreground">Utilisez au moins 8 caractères et évitez un mot de passe déjà employé ailleurs.</p>
+      <p className="text-xs text-muted-foreground">Utilisez au moins 15 caractères et un mot de passe unique à GeoArchives.</p>
     </div>
   );
 }

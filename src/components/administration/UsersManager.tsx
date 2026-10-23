@@ -3,7 +3,7 @@
 import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Pencil, KeyRound, Loader2 } from "lucide-react";
+import { Plus, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { createUser, updateUser, resetUserPassword, type ActionResult } from "@/lib/services/user-admin-service";
+import { createUser, updateUser, type ActionResult } from "@/lib/services/user-admin-service";
 import { cn } from "@/lib/utils";
 import { SendPendingUsersAccessDialog, SendUserAccessButton } from "@/components/administration/UserAccessEmailControls";
 import { getRoleLabel, ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
@@ -261,16 +261,11 @@ function CreateUserForm({ roles, supervisors, onSuccess }: { roles: RoleOption[]
         <Label htmlFor="email">E-mail</Label>
         <Input id="email" name="email" type="email" maxLength={150} required disabled={isPending} autoComplete="off" />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="password">Mot de passe initial</Label>
-        <Input id="password" name="password" type="password" minLength={8} required disabled={isPending} autoComplete="new-password" />
-        <p className="text-xs text-muted-foreground">Au moins 8 caractères. L&apos;invitation permettra à la personne de le remplacer avant sa première connexion.</p>
-      </div>
       <div className="flex items-start gap-3 rounded-md border bg-muted/30 p-3">
         <Checkbox id="sendInvitation" name="sendInvitation" defaultChecked disabled={isPending} />
         <div className="space-y-1">
           <Label htmlFor="sendInvitation" className="cursor-pointer font-medium">Envoyer l&apos;invitation par e-mail</Label>
-          <p className="text-xs leading-5 text-muted-foreground">Un lien personnel valable 60 minutes permettra de définir un nouveau mot de passe.</p>
+          <p className="text-xs leading-5 text-muted-foreground">Un lien personnel valable 60 minutes permettra à l&apos;utilisateur de définir lui-même son mot de passe. L&apos;administrateur n&apos;y aura jamais accès.</p>
         </div>
       </div>
       <div className="space-y-2">
@@ -392,41 +387,6 @@ function EditUserForm({
   );
 }
 
-function ResetPasswordForm({ userId, onSuccess }: { userId: number; onSuccess: () => void }) {
-  const boundAction = resetUserPassword.bind(null, userId);
-  const [state, formAction, isPending] = useActionState(boundAction, initialState);
-
-  // `onSuccess` doit être mémoïsé (useCallback) côté appelant — voir
-  // CommunesManager.tsx pour le détail.
-  useEffect(() => {
-    if (state.success) onSuccess();
-  }, [state.success, onSuccess]);
-
-  return (
-    <form action={formAction} className="space-y-4">
-      {state.error ? (
-        <Alert variant="destructive">
-          <AlertDescription>{state.error}</AlertDescription>
-        </Alert>
-      ) : null}
-      <div className="space-y-2">
-        <Label htmlFor="newPassword">Nouveau mot de passe</Label>
-        <Input id="newPassword" name="newPassword" type="password" minLength={8} required disabled={isPending} autoComplete="new-password" />
-      </div>
-      <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirmer</Label>
-        <Input id="confirmPassword" name="confirmPassword" type="password" minLength={8} required disabled={isPending} autoComplete="new-password" />
-      </div>
-      <DialogFooter>
-        <Button type="submit" disabled={isPending}>
-          {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-          Réinitialiser le mot de passe
-        </Button>
-      </DialogFooter>
-    </form>
-  );
-}
-
 export function UsersManager({
   users,
   roles,
@@ -443,7 +403,6 @@ export function UsersManager({
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
-  const [resetId, setResetId] = useState<number | null>(null);
 
   const onSuccessCreate = useCallback((message?: string, warning?: string) => {
     setCreateOpen(false);
@@ -456,12 +415,6 @@ export function UsersManager({
     toast.success("Utilisateur mis à jour.");
     router.refresh();
   }, [router]);
-  const onSuccessReset = useCallback(() => {
-    setResetId(null);
-    toast.success("Mot de passe réinitialisé.");
-    router.refresh();
-  }, [router]);
-
   const editing = users.find((u) => u.id === editId);
   const pendingAccessCount = users.filter((user) => user.isActive && !user.lastLoginAt).length;
 
@@ -546,9 +499,6 @@ export function UsersManager({
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <SendUserAccessButton userId={u.id} email={u.email} disabled={!u.isActive} />
-                    <Button size="icon-sm" variant="ghost" aria-label="Réinitialiser le mot de passe manuellement" title="Réinitialiser le mot de passe" onClick={() => setResetId(u.id)}>
-                      <KeyRound className="h-4 w-4" />
-                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
@@ -562,7 +512,7 @@ export function UsersManager({
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Modifier l&apos;utilisateur</DialogTitle>
-            <DialogDescription>Le changement de rôle prendra effet à la prochaine connexion de l&apos;utilisateur.</DialogDescription>
+            <DialogDescription>Une désactivation ou un changement de rôle révoque immédiatement les sessions déjà ouvertes.</DialogDescription>
           </DialogHeader>
           {editing ? (
             <EditUserForm
@@ -577,15 +527,6 @@ export function UsersManager({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={resetId !== null} onOpenChange={(open) => !open && setResetId(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Réinitialiser le mot de passe</DialogTitle>
-            <DialogDescription>Utilisez cette option uniquement si l&apos;envoi sécurisé par e-mail n&apos;est pas disponible.</DialogDescription>
-          </DialogHeader>
-          {resetId !== null ? <ResetPasswordForm userId={resetId} onSuccess={onSuccessReset} /> : null}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

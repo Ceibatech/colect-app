@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { communeSchema, entrepotSchema, lotissementSchema, natureDossierSchema, siteSchema } from "@/lib/validation/referentiels";
-import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/validation/user-admin";
+import { createUserSchema, updateUserSchema } from "@/lib/validation/user-admin";
 
 describe("communeSchema (CRUD administration, Phase 15+)", () => {
   it("accepte une commune valide", () => {
@@ -84,7 +84,7 @@ describe("entrepotSchema (salles et espaces d'archives)", () => {
 });
 
 describe("createUserSchema (administration utilisateurs)", () => {
-  const valid = { name: "Jean Dupont", email: "jean.dupont@example.com", password: "MotDePasse1", roleId: 1 };
+  const valid = { name: "Jean Dupont", email: "jean.dupont@example.com", roleId: 1 };
 
   it("accepte une création valide", () => {
     const result = createUserSchema.safeParse(valid);
@@ -98,8 +98,10 @@ describe("createUserSchema (administration utilisateurs)", () => {
     if (result.success) expect(result.data.name).toBe("ÉLISE N'GUESSAN");
   });
 
-  it("rejette un mot de passe de moins de 8 caractères", () => {
-    expect(createUserSchema.safeParse({ ...valid, password: "short1" }).success).toBe(false);
+  it("ne demande jamais à l'administrateur de choisir le mot de passe", () => {
+    const result = createUserSchema.safeParse({ ...valid, password: "ne-doit-pas-etre-utilise" });
+    expect(result.success).toBe(true);
+    if (result.success) expect("password" in result.data).toBe(false);
   });
 
   it("rejette un e-mail invalide", () => {
@@ -142,20 +144,5 @@ describe("updateUserSchema", () => {
       expect(result.data.operateurIds).toEqual([2]);
       expect(result.data.supervisorIds).toEqual([7, 8]);
     }
-  });
-});
-
-describe("resetPasswordSchema (réinitialisation par un administrateur)", () => {
-  it("accepte un mot de passe et sa confirmation identiques", () => {
-    expect(resetPasswordSchema.safeParse({ newPassword: "NouveauMdp1", confirmPassword: "NouveauMdp1" }).success).toBe(true);
-  });
-
-  it("rejette une confirmation différente", () => {
-    const result = resetPasswordSchema.safeParse({ newPassword: "NouveauMdp1", confirmPassword: "Different1" });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejette un mot de passe trop court", () => {
-    expect(resetPasswordSchema.safeParse({ newPassword: "short1", confirmPassword: "short1" }).success).toBe(false);
   });
 });

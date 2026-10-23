@@ -117,6 +117,7 @@ export async function loginAction(_prevState: LoginFormState, formData: FormData
       name: user.name,
       roleCode: user.role.code as RoleCode,
       permissions,
+      sessionVersion: user.sessionVersion,
     });
   } catch (error) {
     const setupError = getAuthenticationSetupError(error);
@@ -199,13 +200,30 @@ export async function changePasswordAction(
   const passwordHash = await hashPassword(parsed.data.newPassword);
   const ip = await getClientIp();
 
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
-    prisma.passwordResetToken.deleteMany({ where: { userId: user.id } }),
-    prisma.auditLog.create({
+  const updated = await prisma.$transaction(async (tx) => {
+    const securedUser = await tx.user.update({
+      where: { id: user.id },
+      data: { passwordHash, sessionVersion: { increment: 1 } },
+      select: { sessionVersion: true },
+    });
+    await tx.passwordResetToken.deleteMany({ where: { userId: user.id } });
+    await tx.auditLog.create({
       data: { userId: user.id, action: "PASSWORD_CHANGE", entity: "USER", entityId: user.id, ipAddress: ip },
-    }),
-  ]);
+    });
+    return securedUser;
+  });
+
+  // Toutes les autres sessions deviennent invalides. La session courante est
+  // renouvelée avec la nouvelle version pour ne pas interrompre l'utilisateur.
+  const token = await signSession({ ...session, sessionVersion: updated.sessionVersion });
+  const store = await cookies();
+  store.set(COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_DURATION_SECONDS,
+  });
 
   return { success: true };
 }

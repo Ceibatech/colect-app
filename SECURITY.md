@@ -5,18 +5,27 @@
 - Identifiants : e-mail + mot de passe (table `users`).
 - Mots de passe hashés avec **bcrypt** (`bcryptjs`, 10 rounds) — jamais stockés en clair.
   Voir [`src/lib/auth/password.ts`](src/lib/auth/password.ts).
+- Les nouveaux mots de passe doivent contenir au moins 15 caractères (72 octets maximum,
+  limite explicite de bcrypt). Aucun critère artificiel de composition n'est imposé.
 - Session : JWT signé (HS256, bibliothèque `jose`) stocké dans un cookie **httpOnly**,
   `sameSite=lax`, `secure` en production, durée de vie 8h. Voir
   [`src/lib/auth/session.ts`](src/lib/auth/session.ts).
+- Chaque JWT porte un émetteur, une audience, un sujet et une `sessionVersion`. À chaque
+  requête protégée, l'application relit en base l'état actif du compte, la version de
+  session, le rôle et les permissions. Une désactivation, une modification de rôle ou une
+  rotation du mot de passe révoque donc immédiatement les anciennes sessions.
 - Récupération de mot de passe : lien aléatoire de 256 bits envoyé par Resend, seule son empreinte SHA-256 est stockée dans `password_reset_tokens`. Le lien expire après 60 minutes, est invalidé par tout nouvel envoi et ne peut être consommé qu'une seule fois.
 - Les réponses de `/mot-de-passe-oublie` restent identiques qu'un compte existe ou non, afin d'éviter l'énumération des utilisateurs. Les invitations administratives utilisent le même mécanisme et n'envoient jamais de mot de passe en clair.
+- Lors de la création d'un compte, GeoArchives génère un secret aléatoire inaccessible à
+  l'administrateur. L'utilisateur définit lui-même son mot de passe via le lien d'activation
+  à usage unique. La réinitialisation manuelle par un administrateur a été supprimée.
 - Le secret de signature vient de `AUTH_SECRET` (variable d'environnement obligatoire —
   l'application refuse de démarrer une vérification de session si la valeur par défaut du
   `.env.example` est encore présente).
-- **Choix technique documenté** : session JWT maison (via `jose`) plutôt que NextAuth/Auth.js
-  v5 (encore en beta au moment du développement). Ce choix évite une dépendance majeure
-  instable pour une application de production, au prix d'une implémentation plus explicite
-  (assumée et documentée ici).
+- **Transition d'identité documentée** : le mécanisme JWT actuel est durci et reste la
+  solution active. La cible est Keycloak via OpenID Connect, sans bascule brutale. Le plan
+  d'intégration et de retour arrière est décrit dans
+  [`docs/SECURITE-KEYCLOAK.md`](docs/SECURITE-KEYCLOAK.md).
 - Message d'erreur de connexion volontairement **générique** (« Identifiants incorrects »)
   pour ne pas révéler si un e-mail existe en base.
 - Anti-bruteforce basique : 5 tentatives échouées / 15 min par couple (e-mail, IP), en
@@ -30,14 +39,12 @@
   granulaires, stockés en base (`roles`, `permissions`, `role_permissions`) — voir
   [`src/lib/permissions/constants.ts`](src/lib/permissions/constants.ts) (source unique,
   utilisée par le seed **et** l'application).
-- Les permissions de l'utilisateur sont embarquées dans le JWT de session au moment du
-  login. `EXECUTIF` consulte les vues globales sans accès opérationnel. `PMO` consulte
+- Le JWT contient un instantané utile au proxy, mais le serveur relit le rôle et les
+  permissions en base à chaque requête protégée. `EXECUTIF` consulte les vues globales sans accès opérationnel. `PMO` consulte
   uniquement les tableaux de bord des superviseurs qui lui sont affectés. `FINANCE`
   accède aux points, barèmes et projections budgétaires, sans accès aux dossiers ni aux
   formulaires. Les données de rémunération ne sont jamais exposées à PMO ou Exécutif.
-  **Conséquence documentée** : un changement de permissions d'un rôle ne prend effet
-  qu'à la prochaine connexion de l'utilisateur concerné (acceptable en V1 ; une invalidation
-  active pourra être ajoutée plus tard si nécessaire).
+  Toute modification des permissions d'un rôle prend effet dès la requête suivante.
 - Contrôle en 2 niveaux :
   1. **Proxy** (`src/proxy.ts`, ex-middleware) : protection grossière — redirige les
      utilisateurs non authentifiés vers `/login`, et restreint certains préfixes de route
@@ -112,6 +119,10 @@ implémentation (Phase 12 — Audit).
   côté client (qui n'est qu'un confort UX, jamais une garantie de sécurité).
 - Pas de rendu de contenu utilisateur non échappé (React échappe par défaut — aucun
   `dangerouslySetInnerHTML` utilisé).
+- Les réponses portent une politique CSP, HSTS en production, `nosniff`, une protection
+  anti-framing, une politique de référent stricte et une `Permissions-Policy`. La
+  géolocalisation reste autorisée uniquement pour l'origine GeoArchives, car elle est
+  requise par le suivi des convois.
 
 ## 6. Gestion des erreurs
 
@@ -158,6 +169,7 @@ stack trace, ni de détail interne exposé. Voir [API.md](API.md).
 
 - Étendre la journalisation d'audit à toutes les actions sensibles listées au §57 du
   cahier des charges.
-- Ajouter des en-têtes de sécurité HTTP (CSP, etc.) au niveau de `next.config.ts` lors de
-  la Phase 14 (optimisation) / 15 (production).
-- Réévaluer le anti-bruteforce en mémoire si un déploiement multi-instances est prévu.
+- Remplacer l'anti-bruteforce en mémoire par le mécanisme centralisé Keycloak avant tout
+  déploiement multi-instance.
+- Déployer Keycloak sur une base et un sous-domaine dédiés, puis activer la MFA en priorité
+  pour les administrateurs et validateurs selon le plan de migration documenté.

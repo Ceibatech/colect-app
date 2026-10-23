@@ -1,10 +1,11 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
 import { hashPassword } from "@/lib/auth/password";
-import { createUserSchema, updateUserSchema, resetPasswordSchema } from "@/lib/validation/user-admin";
+import { createUserSchema, updateUserSchema } from "@/lib/validation/user-admin";
 import { issuePasswordAccessEmail } from "@/lib/services/password-reset-service";
 
 /**
@@ -101,7 +102,6 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
   const parsed = createUserSchema.safeParse({
     name: formData.get("name"),
     email: formData.get("email"),
-    password: formData.get("password"),
     roleId: formData.get("roleId"),
     telephone: formData.get("telephone"),
     supervisorIds: formData.getAll("supervisorIds"),
@@ -126,7 +126,10 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
     }
   }
 
-  const passwordHash = await hashPassword(parsed.data.password);
+  // Le compte est créé avec un secret aléatoire jamais montré à
+  // l'administrateur. Seul le lien d'activation à usage unique permet à la
+  // personne concernée de définir son propre mot de passe.
+  const passwordHash = await hashPassword(randomBytes(32).toString("base64url"));
   const ip = await getClientIp();
   const matricule = role.code === "OPERATEUR" ? await nextOperateurMatricule() : null;
   const supervisorIds = [...new Set(parsed.data.supervisorIds)];
@@ -242,7 +245,14 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id },
-      data: { name: parsed.data.name, roleId: newRole.id, isActive: parsed.data.isActive },
+      data: {
+        name: parsed.data.name,
+        roleId: newRole.id,
+        isActive: parsed.data.isActive,
+        ...(before.roleId !== newRole.id || before.isActive !== parsed.data.isActive
+          ? { sessionVersion: { increment: 1 } }
+          : {}),
+      },
     });
 
     if (newRole.code === "OPERATEUR" && !before.operateur) {
@@ -312,31 +322,6 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
       },
     });
   });
-
-  return { success: true };
-}
-
-export async function resetUserPassword(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
-  const session = await requirePermission("USER_MANAGE");
-  const parsed = resetPasswordSchema.safeParse({
-    newPassword: formData.get("newPassword"),
-    confirmPassword: formData.get("confirmPassword"),
-  });
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
-
-  const user = await prisma.user.findUnique({ where: { id } });
-  if (!user) return { error: "Utilisateur introuvable." };
-
-  const passwordHash = await hashPassword(parsed.data.newPassword);
-  const ip = await getClientIp();
-
-  await prisma.$transaction([
-    prisma.user.update({ where: { id }, data: { passwordHash } }),
-    prisma.passwordResetToken.deleteMany({ where: { userId: id } }),
-    prisma.auditLog.create({
-      data: { userId: session.userId, action: "PASSWORD_RESET_ADMIN", entity: "USER", entityId: id, ipAddress: ip },
-    }),
-  ]);
 
   return { success: true };
 }

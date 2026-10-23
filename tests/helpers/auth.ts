@@ -28,6 +28,7 @@ export interface TestSessionUser {
   name: string;
   roleCode: string;
   permissions: string[];
+  sessionVersion: number;
 }
 
 const cache = new Map<string, TestSessionUser>();
@@ -50,6 +51,7 @@ export async function loadTestUser(email: string): Promise<TestSessionUser> {
     name: user.name,
     roleCode: user.role.code,
     permissions: user.role.rolePermissions.map((rp) => rp.permission.code),
+    sessionVersion: user.sessionVersion,
   };
   cache.set(email, result);
   return result;
@@ -63,8 +65,12 @@ export async function mintSessionToken(email: string): Promise<string> {
     name: user.name,
     roleCode: user.roleCode,
     permissions: user.permissions,
+    sessionVersion: user.sessionVersion,
   })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer("geoarchives")
+    .setAudience("geoarchives-web")
+    .setSubject(String(user.userId))
     .setIssuedAt()
     .setExpirationTime("2h")
     .sign(getSecretKey());

@@ -32,8 +32,8 @@ export function ChangePasswordForm() {
       ) : null}
 
       <PasswordField id="currentPassword" name="currentPassword" label="Mot de passe actuel" autoComplete="current-password" disabled={isPending} />
-      <PasswordField id="newPassword" name="newPassword" label="Nouveau mot de passe" autoComplete="new-password" disabled={isPending} minLength={8} hint="Utilisez au moins 8 caractères, difficiles à deviner." />
-      <PasswordField id="confirmPassword" name="confirmPassword" label="Confirmer le nouveau mot de passe" autoComplete="new-password" disabled={isPending} minLength={8} />
+      <PasswordField id="newPassword" name="newPassword" label="Nouveau mot de passe" autoComplete="new-password" disabled={isPending} minLength={15} hint="Utilisez au moins 15 caractères et un mot de passe unique à GeoArchives." />
+      <PasswordField id="confirmPassword" name="confirmPassword" label="Confirmer le nouveau mot de passe" autoComplete="new-password" disabled={isPending} minLength={15} />
 
       <Button type="submit" size="lg" className="h-11 w-full shadow-sm sm:w-auto" disabled={isPending}>
         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}

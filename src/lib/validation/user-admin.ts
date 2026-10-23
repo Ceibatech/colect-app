@@ -10,7 +10,6 @@ const personNameSchema = z.string()
 export const createUserSchema = z.object({
   name: personNameSchema,
   email: z.string().min(1, "L'e-mail est requis").email("Format d'e-mail invalide").max(150),
-  password: z.string().min(8, "Le mot de passe doit contenir au moins 8 caractères"),
   roleId: z.coerce.number({ message: "Le rôle est requis" }).int().positive("Le rôle est requis"),
   telephone: z.string().max(30).optional().or(z.literal("")),
   supervisorIds: z.array(z.coerce.number().int().positive()).default([]),
@@ -28,14 +27,3 @@ export const updateUserSchema = z.object({
   supervisorIds: z.array(z.coerce.number().int().positive()).default([]),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
-
-export const resetPasswordSchema = z
-  .object({
-    newPassword: z.string().min(8, "Le nouveau mot de passe doit contenir au moins 8 caractères"),
-    confirmPassword: z.string().min(1, "La confirmation est requise"),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Les deux mots de passe ne correspondent pas",
-    path: ["confirmPassword"],
-  });
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

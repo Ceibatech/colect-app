@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { securePasswordSchema } from "@/lib/validation/password";
 
 export const loginSchema = z.object({
   email: z.string().min(1, "L'e-mail est requis").email("Format d'e-mail invalide"),
@@ -16,7 +17,7 @@ export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchem
 export const resetPasswordWithTokenSchema = z
   .object({
     token: z.string().length(43, "Le lien de réinitialisation est invalide.").regex(/^[A-Za-z0-9_-]+$/, "Le lien de réinitialisation est invalide."),
-    newPassword: z.string().min(8, "Le nouveau mot de passe doit contenir au moins 8 caractères").max(128, "Le nouveau mot de passe est trop long"),
+    newPassword: securePasswordSchema,
     confirmPassword: z.string().min(1, "La confirmation est requise"),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
@@ -30,7 +31,7 @@ export type ResetPasswordWithTokenInput = z.infer<typeof resetPasswordWithTokenS
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Le mot de passe actuel est requis"),
-    newPassword: z.string().min(8, "Le nouveau mot de passe doit contenir au moins 8 caractères").max(128, "Le nouveau mot de passe est trop long"),
+    newPassword: securePasswordSchema,
     confirmPassword: z.string().min(1, "La confirmation est requise"),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {

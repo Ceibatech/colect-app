@@ -27,10 +27,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authentifié qui retourne sur /login -> /dashboard
-  if (session && isPublicPath) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  // La page de connexion relit elle-même le compte en base avant de rediriger.
+  // Le proxy ne valide que la signature du JWT : rediriger ici créerait une
+  // boucle pour une session signée mais révoquée ou un compte désactivé.
 
   // Contrôle grossier par rôle sur certains préfixes de route.
   // Rappel : ceci ne remplace pas le contrôle fin par permission fait dans
