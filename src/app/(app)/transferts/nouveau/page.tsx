@@ -17,7 +17,7 @@ export default async function NewTransferPage() {
         eyebrow="Préparation du transfert"
         icon={PackagePlus}
         title="Identifier un lot à transférer"
-        description="Choisissez le site d’origine, laissez GeoArchives proposer jusqu’à 200 cartons identifiés, puis ajustez et validez l’opération. Tous les dossiers de chaque carton sont inclus automatiquement."
+        description="Une boîte correspond à un carton inventorié. Choisissez son emplacement actuel, puis sélectionnez jusqu’à 200 cartons. Tous leurs dossiers sont inclus, quelle que soit leur étape de traitement."
         tone="transfer"
         actions={(
           <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}>
@@ -30,7 +30,7 @@ export default async function NewTransferPage() {
           { label: "Chaîne de garde", value: "Traçabilité active", tone: "success" },
         ]}
       />
-      <NewTransferForm sites={data.sites} />
+      <NewTransferForm sites={data.sites} inventory={data.inventory} />
     </div>
   );
 }
