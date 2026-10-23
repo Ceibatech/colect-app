@@ -5,6 +5,7 @@ import { Prisma, type TransferItemStatus, type TransferLotStatus, type TransferM
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma/client";
+import { notifyTransferWorkflow } from "@/lib/services/transfer-notification-service";
 import { authorizeTransferLotSchema, createTransferLotSchema, recordTransferMovementSchema, transferApprovalSchema } from "@/lib/validation/transfer";
 import {
   deriveTransferLotStatus,
@@ -27,6 +28,150 @@ class TransferRuleError extends Error {}
 function parseIdList(value: FormDataEntryValue | null) {
   if (typeof value !== "string") return [];
   return value.split(",").map((entry) => entry.trim()).filter(Boolean);
+}
+
+type TransferNotificationInput = Parameters<typeof notifyTransferWorkflow>[0];
+
+function formatTransferDate(value: Date | null): string {
+  if (!value) return "À planifier";
+  return new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Africa/Abidjan" }).format(value);
+}
+
+function cleanReferencePart(value: string): string {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "").toUpperCase();
+}
+
+async function notifyAfterTransferCommit(input: TransferNotificationInput): Promise<void> {
+  try {
+    const result = await notifyTransferWorkflow(input);
+    if (result.failed > 0) {
+      console.error("One or more transfer notifications failed.", { event: input.event, entityId: input.entityId, ...result });
+    }
+  } catch (error) {
+    // Le jalon métier est déjà validé. Une panne de messagerie ne doit jamais
+    // annuler ni masquer l'opération de transfert enregistrée en base.
+    console.error("Transfer workflow notification failed after commit.", { event: input.event, entityId: input.entityId, error });
+  }
+}
+
+async function runAfterTransferCommit(task: () => Promise<void>): Promise<void> {
+  try {
+    await task();
+  } catch (error) {
+    console.error("Transfer post-commit task failed.", error);
+  }
+}
+
+async function getTransferLotNotificationSummary(id: number) {
+  const lot = await prisma.transferLot.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      reference: true,
+      plannedAt: true,
+      createdById: true,
+      sourceSite: { select: { nom: true } },
+      destinationSite: { select: { nom: true } },
+      items: { select: { dossierCountSnapshot: true } },
+    },
+  });
+  if (!lot) return null;
+  return {
+    ...lot,
+    cartonCount: lot.items.length,
+    dossierCount: lot.items.reduce((total, item) => total + item.dossierCountSnapshot, 0),
+  };
+}
+
+async function getTransferMovementNotificationSummary(id: number) {
+  const movement = await prisma.transferMovement.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      reference: true,
+      type: true,
+      incidentReported: true,
+      transferLot: {
+        select: {
+          id: true,
+          reference: true,
+          createdById: true,
+          sourceSite: { select: { nom: true } },
+          destinationSite: { select: { nom: true } },
+        },
+      },
+      items: { select: { transferLotItem: { select: { dossierCountSnapshot: true } } } },
+    },
+  });
+  if (!movement) return null;
+  return {
+    ...movement,
+    cartonCount: movement.items.length,
+    dossierCount: movement.items.reduce((total, item) => total + item.transferLotItem.dossierCountSnapshot, 0),
+  };
+}
+
+async function getReadyTransferOperationSummary(lotId: number) {
+  const selected = await prisma.transferLot.findUnique({
+    where: { id: lotId },
+    select: {
+      plannedAt: true,
+      sourceSiteId: true,
+      sourceEntrepotId: true,
+      destinationSiteId: true,
+      destinationEntrepotId: true,
+      sourceSite: { select: { code: true, nom: true } },
+      destinationSite: { select: { code: true, nom: true } },
+    },
+  });
+  if (!selected?.plannedAt) return null;
+
+  const start = new Date(Date.UTC(selected.plannedAt.getUTCFullYear(), selected.plannedAt.getUTCMonth(), selected.plannedAt.getUTCDate()));
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+  const lots = await prisma.transferLot.findMany({
+    where: {
+      plannedAt: { gte: start, lt: end },
+      sourceSiteId: selected.sourceSiteId,
+      sourceEntrepotId: selected.sourceEntrepotId,
+      destinationSiteId: selected.destinationSiteId,
+      destinationEntrepotId: selected.destinationEntrepotId,
+      status: { not: "ANNULE" },
+    },
+    select: { authorizedAt: true, createdById: true, items: { select: { dossierCountSnapshot: true } } },
+  });
+  if (lots.length === 0 || lots.some((lot) => !lot.authorizedAt)) return null;
+
+  const date = start.toISOString().slice(0, 10);
+  return {
+    reference: `TRF-${date.replaceAll("-", "")}-${cleanReferencePart(selected.sourceSite.code)}-${cleanReferencePart(selected.destinationSite.code)}`,
+    plannedAt: start,
+    sourceName: selected.sourceSite.nom,
+    destinationName: selected.destinationSite.nom,
+    lotCount: lots.length,
+    cartonCount: lots.reduce((total, lot) => total + lot.items.length, 0),
+    dossierCount: lots.reduce((total, lot) => total + lot.items.reduce((subtotal, item) => subtotal + item.dossierCountSnapshot, 0), 0),
+    createdByIds: [...new Set(lots.map((lot) => lot.createdById))],
+  };
+}
+
+function lotNotificationDetails(lot: NonNullable<Awaited<ReturnType<typeof getTransferLotNotificationSummary>>>) {
+  return [
+    { label: "Date prévue", value: formatTransferDate(lot.plannedAt) },
+    { label: "Trajet", value: `${lot.sourceSite.nom} → ${lot.destinationSite.nom}` },
+    { label: "Cartons", value: String(lot.cartonCount) },
+    { label: "Dossiers", value: String(lot.dossierCount) },
+  ];
+}
+
+function movementNotificationDetails(movement: NonNullable<Awaited<ReturnType<typeof getTransferMovementNotificationSummary>>>) {
+  return [
+    { label: "Opération", value: movement.transferLot.reference },
+    { label: "Mouvement", value: movement.type === "SORTIE" ? "Sortie" : movement.type === "RECEPTION" ? "Réception" : "Retour" },
+    { label: "Trajet", value: `${movement.transferLot.sourceSite.nom} → ${movement.transferLot.destinationSite.nom}` },
+    { label: "Cartons", value: String(movement.cartonCount) },
+    { label: "Dossiers", value: String(movement.dossierCount) },
+  ];
 }
 
 export async function createTransferLot(
@@ -247,6 +392,23 @@ export async function submitTransferLot(id: number): Promise<TransferActionState
     revalidatePath("/transferts");
     revalidatePath("/transferts/validation");
     revalidatePath("/transferts/validation-ceibac");
+    await runAfterTransferCommit(async () => {
+      const lot = await getTransferLotNotificationSummary(id);
+      if (!lot) return;
+      await notifyAfterTransferCommit({
+        event: "LOT_SUBMITTED",
+        entityType: "TRANSFER_LOT",
+        entityId: id,
+        recipientRoleCodes: ["VALIDATEUR_CEIBAC"],
+        title: `Lot ${lot.reference} à valider`,
+        message: "Le gestionnaire des transferts a soumis ce lot. Votre visa CEIBA est requis avant sa transmission au ministère.",
+        reference: lot.reference,
+        statusLabel: "En attente du visa CEIBA",
+        actionPath: `/transferts/${id}`,
+        actionLabel: "Examiner le lot",
+        details: lotNotificationDetails(lot),
+      });
+    });
     return { success: true, message: "Le lot a été transmis au responsable CEIBA pour validation." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
@@ -299,6 +461,23 @@ export async function approveTransferLotByCeibac(
     revalidatePath("/transferts");
     revalidatePath("/transferts/validation");
     revalidatePath("/transferts/validation-ceibac");
+    await runAfterTransferCommit(async () => {
+      const lot = await getTransferLotNotificationSummary(id);
+      if (!lot) return;
+      await notifyAfterTransferCommit({
+        event: "LOT_CEIBA_VALIDATED",
+        entityType: "TRANSFER_LOT",
+        entityId: id,
+        recipientRoleCodes: ["VALIDATEUR_MINISTERE"],
+        title: `Autorisation requise pour ${lot.reference}`,
+        message: "Le lot a reçu le visa CEIBA. Le responsable habilité du ministère doit maintenant autoriser sa sortie.",
+        reference: lot.reference,
+        statusLabel: "En attente de l'autorisation du ministère",
+        actionPath: `/transferts/${id}`,
+        actionLabel: "Autoriser le transfert",
+        details: lotNotificationDetails(lot),
+      });
+    });
     return { success: true, message: "Le lot est validé par CEIBA et transmis au ministère pour autorisation." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
@@ -351,6 +530,32 @@ export async function authorizeTransferLot(
     revalidatePath("/transferts");
     revalidatePath("/transferts/validation");
     revalidatePath("/transferts/validation-ceibac");
+    await runAfterTransferCommit(async () => {
+      const operation = await getReadyTransferOperationSummary(id);
+      if (!operation) return;
+      await notifyAfterTransferCommit({
+        event: "AUTHORIZATION_F01_READY",
+        entityType: "TRANSFER_OPERATION",
+        entityId: id,
+        recipientRoleCodes: ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC"],
+        recipientUserIds: operation.createdByIds,
+        title: `Autorisation ${operation.reference} disponible`,
+        message: "Tous les lots prévus pour cette date et ce trajet sont autorisés. La F01 consolidée est signée et prête pour la préparation du transfert.",
+        reference: operation.reference,
+        statusLabel: "Document F01 signé disponible",
+        actionPath: `/transferts/${id}`,
+        actionLabel: "Consulter l'opération",
+        documentPath: `/api/transferts/${id}/autorisation`,
+        documentLabel: "Télécharger l'autorisation F01",
+        details: [
+          { label: "Date prévue", value: formatTransferDate(operation.plannedAt) },
+          { label: "Trajet", value: `${operation.sourceName} → ${operation.destinationName}` },
+          { label: "Lots", value: String(operation.lotCount) },
+          { label: "Cartons", value: String(operation.cartonCount) },
+          { label: "Dossiers", value: String(operation.dossierCount) },
+        ],
+      });
+    });
     return { success: true, message: "Le lot est autorisé. La F01 consolidée sera disponible lorsque tous les lots de cette date et de ce trajet seront autorisés." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
@@ -510,7 +715,7 @@ export async function recordTransferMovement(
           ipAddress: ip,
         },
       });
-      return { reference, nextValidator: type === "RECEPTION" ? "CEIBA" : "MINISTERE" };
+      return { movementId: movement.id, reference, nextValidator: type === "RECEPTION" ? "CEIBA" : "MINISTERE" };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     revalidatePath(`/transferts/${lotId}`);
@@ -519,6 +724,50 @@ export async function recordTransferMovement(
     revalidatePath("/transferts/validation-ceibac");
     revalidatePath("/dossiers");
     revalidatePath("/dashboard/geographie");
+    await runAfterTransferCommit(async () => {
+      const movement = await getTransferMovementNotificationSummary(result.movementId);
+      if (!movement) return;
+      const incident = movement.incidentReported;
+      const recipientRoleCodes = incident
+        ? ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE"] as const
+        : movement.type === "RECEPTION"
+          ? ["VALIDATEUR_CEIBAC"] as const
+          : ["VALIDATEUR_MINISTERE"] as const;
+      const documentCode = movement.type === "RECEPTION" ? "F03" : "F02";
+      await notifyAfterTransferCommit({
+        event: incident
+          ? "MOVEMENT_INCIDENT_REPORTED"
+          : movement.type === "RECEPTION"
+            ? "MOVEMENT_SUBMITTED_CEIBA"
+            : "MOVEMENT_SUBMITTED_MINISTRY",
+        entityType: "TRANSFER_MOVEMENT",
+        entityId: movement.id,
+        recipientRoleCodes: [...recipientRoleCodes],
+        recipientUserIds: incident ? [movement.transferLot.createdById] : [],
+        title: incident
+          ? `Incident déclaré sur ${movement.reference}`
+          : movement.type === "RECEPTION"
+            ? `Constat ${movement.reference} à viser`
+            : `Bordereau ${movement.reference} à contre-signer`,
+        message: incident
+          ? "Un incident a été déclaré pendant ce mouvement. Consultez immédiatement le dossier sécurisé pour examiner le constat et décider de la suite."
+          : movement.type === "RECEPTION"
+            ? "Le constat d'arrivée a été soumis. Le responsable CEIBA doit contrôler la réception avant transmission au ministère."
+            : "Le bordereau de mouvement a été signé par CEIBA. La contre-signature du ministère est requise avant la mise à jour du stock.",
+        reference: movement.reference,
+        statusLabel: incident
+          ? "Incident à traiter"
+          : movement.type === "RECEPTION"
+            ? "En attente du visa CEIBA"
+            : "En attente du visa du ministère",
+        actionPath: `/transferts/${movement.transferLot.id}`,
+        actionLabel: incident ? "Examiner l'incident" : "Examiner le bordereau",
+        documentPath: `/api/transferts/${movement.transferLot.id}/bordereaux/${movement.id}`,
+        documentLabel: `Télécharger le bordereau ${documentCode}`,
+        details: movementNotificationDetails(movement),
+        alert: incident,
+      });
+    });
     return {
       success: true,
       message: result.nextValidator === "CEIBA"
@@ -582,6 +831,25 @@ export async function approveReceptionByCeiba(
     revalidatePath("/transferts");
     revalidatePath("/transferts/validation");
     revalidatePath("/transferts/validation-ceibac");
+    await runAfterTransferCommit(async () => {
+      const summary = await getTransferMovementNotificationSummary(movement.id);
+      if (!summary) return;
+      await notifyAfterTransferCommit({
+        event: "MOVEMENT_CEIBA_VALIDATED",
+        entityType: "TRANSFER_MOVEMENT",
+        entityId: summary.id,
+        recipientRoleCodes: ["VALIDATEUR_MINISTERE"],
+        title: `Constat ${summary.reference} à contre-signer`,
+        message: "Le constat de réception a reçu le visa CEIBA. Le ministère doit effectuer le contrôle final et contre-signer le document.",
+        reference: summary.reference,
+        statusLabel: "En attente du visa final du ministère",
+        actionPath: `/transferts/${summary.transferLot.id}`,
+        actionLabel: "Contrôler la réception",
+        documentPath: `/api/transferts/${summary.transferLot.id}/bordereaux/${summary.id}`,
+        documentLabel: "Télécharger le constat F03",
+        details: movementNotificationDetails(summary),
+      });
+    });
     return { success: true, message: `Le constat ${movement.reference} est visé par CEIBA et transmis au ministère.` };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
@@ -725,6 +993,27 @@ export async function approveTransferMovementByMinistry(
     revalidatePath("/transferts/validation-ceibac");
     revalidatePath("/dossiers");
     revalidatePath("/dashboard/geographie");
+    await runAfterTransferCommit(async () => {
+      const movement = await getTransferMovementNotificationSummary(movementId);
+      if (!movement) return;
+      const documentCode = movement.type === "RECEPTION" ? "F03" : "F02";
+      await notifyAfterTransferCommit({
+        event: "MOVEMENT_SIGNED",
+        entityType: "TRANSFER_MOVEMENT",
+        entityId: movement.id,
+        recipientRoleCodes: ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC"],
+        recipientUserIds: [movement.transferLot.createdById],
+        title: `Bordereau ${movement.reference} signé`,
+        message: "Le visa final du ministère est enregistré. Le bordereau signé est disponible et le stock documentaire a été mis à jour.",
+        reference: movement.reference,
+        statusLabel: `Document ${documentCode} signé disponible`,
+        actionPath: `/transferts/${movement.transferLot.id}`,
+        actionLabel: "Consulter le transfert",
+        documentPath: `/api/transferts/${movement.transferLot.id}/bordereaux/${movement.id}`,
+        documentLabel: `Télécharger le bordereau ${documentCode}`,
+        details: movementNotificationDetails(movement),
+      });
+    });
     const stockMessage = result.type === "SORTIE"
       ? "Le stock du site A est décrémenté et le lot passe en transit."
       : result.type === "RECEPTION"

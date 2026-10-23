@@ -118,6 +118,7 @@ model User {
   emailReportSubscriptionsCreated    EmailReportSubscription[] @relation("EmailReportCreatedBy")
   emailReportDeliveries              EmailReportDelivery[]     @relation("EmailReportDeliveryRecipient")
   emailReportDeliveriesTriggered     EmailReportDelivery[]     @relation("EmailReportDeliveryTriggeredBy")
+  transferEmailDeliveries            TransferEmailDelivery[]   @relation("TransferEmailDeliveryRecipient")
 
   @@index([roleId])
   @@map("users")
@@ -1595,4 +1596,32 @@ model EmailReportDelivery {
   @@index([recipientUserId, createdAt])
   @@index([status, createdAt])
   @@map("email_report_deliveries")
+}
+
+// Journal des alertes transactionnelles du circuit de transfert. Une cle
+// d'idempotence unique empeche qu'une reprise d'action envoie deux fois le
+// meme jalon au meme destinataire.
+model TransferEmailDelivery {
+  id                Int       @id @default(autoincrement())
+  recipientUserId   Int       @map("recipient_user_id")
+  eventType         String    @map("event_type") @db.VarChar(48)
+  entityType        String    @map("entity_type") @db.VarChar(32)
+  entityId          Int       @map("entity_id")
+  idempotencyKey    String    @unique @map("idempotency_key") @db.VarChar(191)
+  payload           Json
+  status            String    @default("PENDING") @db.VarChar(16)
+  attemptCount      Int       @default(0) @map("attempt_count")
+  nextAttemptAt     DateTime? @default(now()) @map("next_attempt_at")
+  lastAttemptAt     DateTime? @map("last_attempt_at")
+  providerMessageId String?   @map("provider_message_id") @db.VarChar(191)
+  errorMessage      String?   @map("error_message") @db.Text
+  sentAt            DateTime? @map("sent_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  recipient User @relation("TransferEmailDeliveryRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+
+  @@index([recipientUserId, createdAt])
+  @@index([eventType, entityType, entityId])
+  @@index([status, nextAttemptAt])
+  @@map("transfer_email_deliveries")
 }

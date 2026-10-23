@@ -21,8 +21,12 @@ async function runOnce() {
   });
   if (!response.ok) throw new Error(`Email report scheduler returned HTTP ${response.status}.`);
   const result = await response.json();
-  if (result.due > 0 || result.failed > 0) {
-    console.log(JSON.stringify({ event: "email_reports_processed", due: result.due, sent: result.sent, failed: result.failed, skipped: result.skipped }));
+  if (result.due > 0 || result.failed > 0 || result.transferAlerts?.due > 0) {
+    console.log(JSON.stringify({
+      event: "email_deliveries_processed",
+      reports: { due: result.due, sent: result.sent, failed: result.failed, skipped: result.skipped },
+      transferAlerts: result.transferAlerts,
+    }));
   }
 }
 
