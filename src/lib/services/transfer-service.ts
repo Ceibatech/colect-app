@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
+import { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import {
   getTransferDossierStockSummary,
   type TransferItemStatusCode,
@@ -23,9 +24,9 @@ export interface TransferCartonSearchOptions {
 
 export async function getTransferCreateData() {
   await requirePermission("TRANSFER_CREATE");
-  const [sites, totalDossiers] = await Promise.all([
+  const [sites, totalDossiers, inventoryGroups] = await Promise.all([
     prisma.site.findMany({
-      where: { isActive: true, organisation: { in: ["MINISTERE", "CEIBA"] } },
+      where: { isActive: true },
       orderBy: { nom: "asc" },
       select: {
         id: true,
@@ -40,9 +41,14 @@ export async function getTransferCreateData() {
       },
     }),
     prisma.dossier.count(),
+    prisma.dossier.groupBy({
+      by: ["siteId", "entrepotId", "codeBarres", "libelleCarton"],
+      _count: { _all: true },
+    }),
   ]);
 
-  return { sites, totalDossiers };
+  const inventory = summarizeInventoryLocations(inventoryGroups);
+  return { sites, totalDossiers, inventory };
 }
 
 export async function searchTransferCartons(options: TransferCartonSearchOptions) {
@@ -57,17 +63,9 @@ export async function searchTransferCartons(options: TransferCartonSearchOptions
       }
     : { siteId: options.sourceSiteId, entrepotId: options.sourceEntrepotId };
   const rows = await prisma.dossier.findMany({
-    where: {
-    AND: [
-      locationWhere,
-      {
-        OR: [
-          { codeBarres: { not: null } },
-          { libelleCarton: { not: null } },
-        ],
-      },
-    ],
-    },
+    // All inventoried dossiers, including drafts: transport is independent of production.
+    // Unidentified cartons are counted explicitly instead of disappearing before grouping.
+    where: locationWhere,
     select: {
       id: true,
       siteId: true,
@@ -95,6 +93,7 @@ export async function searchTransferCartons(options: TransferCartonSearchOptions
     total: filtered.length,
     totalDossiers: filtered.reduce((sum, item) => sum + item.dossierCount, 0),
     unidentifiedDossierCount: grouped.unidentifiedDossierCount,
+    engagedCartonCount: grouped.engagedCartonCount,
     page,
     pageSize,
     totalPages: Math.max(1, Math.ceil(filtered.length / pageSize)),

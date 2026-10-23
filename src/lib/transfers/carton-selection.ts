@@ -71,7 +71,7 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
     }))
     .sort((left, right) => left.code.localeCompare(right.code, "fr", { numeric: true, sensitivity: "base" }));
 
-  return { items, unidentifiedDossierCount };
+  return { items, unidentifiedDossierCount, engagedCartonCount: [...grouped.values()].filter((item) => item.hasConflict).length };
 }
 
 export function filterTransferCartons(items: TransferCartonItem[], query?: string) {

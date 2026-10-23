@@ -6,6 +6,7 @@ import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ListChecks, Loader2, Pack
 import { toast } from "sonner";
 import { createTransferLot, type TransferActionState } from "@/lib/services/transfer-actions";
 import { MAX_TRANSFER_CARTONS, type TransferCartonItem } from "@/lib/transfers/carton-selection";
+import type { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ interface TransferCartonPage {
   total: number;
   totalDossiers: number;
   unidentifiedDossierCount: number;
+  engagedCartonCount: number;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -36,14 +38,14 @@ interface TransferCartonPage {
 
 const initialState: TransferActionState = {};
 const emptyPage: TransferCartonPage = {
-  items: [], total: 0, totalDossiers: 0, unidentifiedDossierCount: 0, page: 1, pageSize: 40, totalPages: 1,
+  items: [], total: 0, totalDossiers: 0, unidentifiedDossierCount: 0, engagedCartonCount: 0, page: 1, pageSize: 40, totalPages: 1,
 };
 
 function warehouseLabel(warehouse: SiteOption["entrepots"][number]) {
   return [warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ");
 }
 
-export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
+export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inventory: ReturnType<typeof summarizeInventoryLocations> }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createTransferLot, initialState);
   const ministrySites = useMemo(() => sites.filter((site) => site.organisation === "MINISTERE"), [sites]);
@@ -52,7 +54,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
   const [sourceEntrepotId, setSourceEntrepotId] = useState("none");
   const [destinationSiteId, setDestinationSiteId] = useState(() => ceibaSites.length === 1 ? String(ceibaSites[0].id) : "");
   const [destinationEntrepotId, setDestinationEntrepotId] = useState("none");
-  const [includeUnlocated, setIncludeUnlocated] = useState(true);
+  const [includeUnlocated, setIncludeUnlocated] = useState(false);
   const [selected, setSelected] = useState<Map<string, TransferCartonItem>>(new Map());
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -114,6 +116,23 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
     resetSourceSelection();
   }
 
+  function selectInventoryLocation(siteId: number, entrepotId: number | null) {
+    if (sourceSiteId === String(siteId) && sourceEntrepotId === String(entrepotId ?? "none")) return;
+    setSourceSiteId(String(siteId));
+    setSourceEntrepotId(entrepotId === null ? "none" : String(entrepotId));
+    resetSourceSelection();
+  }
+
+  function siteLabel(site: SiteOption) {
+    const count = inventory.filter((location) => location.siteId === site.id).reduce((sum, location) => sum + location.dossiers, 0);
+    return `${site.nom} · ${site.code} · ${count.toLocaleString("fr-FR")} dossiers`;
+  }
+
+  function sourceWarehouseLabel(warehouse: SiteOption["entrepots"][number]) {
+    const location = inventory.find((item) => item.siteId === Number(sourceSiteId) && item.entrepotId === warehouse.id);
+    return `${warehouseLabel(warehouse)} · ${(location?.dossiers ?? 0).toLocaleString("fr-FR")} dossiers`;
+  }
+
   function changeIncludeUnlocated(checked: boolean) {
     setIncludeUnlocated(checked);
     setSelected(new Map());
@@ -173,21 +192,46 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
       <input type="hidden" name="includeUnlocated" value={String(includeUnlocated)} />
       {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
 
+      <section className="space-y-4 rounded-lg border bg-card p-4 lg:p-5">
+        <div>
+          <h2 className="font-semibold">Où se trouvent les cartons inventoriés ?</h2>
+          <p className="text-sm text-muted-foreground">Tous les dossiers de l’inventaire sont comptés, sans condition de préparation, numérisation ou indexation. Choisissez une salle pour retrouver ses cartons.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {sites.map((site) => {
+            const locations = inventory.filter((location) => location.siteId === site.id);
+            return <div key={site.id} className="space-y-2 rounded-md border p-3">
+              <h3 className="text-sm font-semibold">{siteLabel(site)}</h3>
+              {locations.length === 0 ? <p className="text-xs text-muted-foreground">Aucun dossier à cet emplacement.</p> : locations.map((location) => {
+                const warehouse = site.entrepots.find((item) => item.id === location.entrepotId);
+                const label = location.entrepotId === null ? "Sans salle renseignée" : warehouse ? warehouseLabel(warehouse) : "Salle inactive ou non disponible";
+                return <Button key={location.entrepotId ?? "none"} type="button" variant={sourceSiteId === String(site.id) && sourceEntrepotId === String(location.entrepotId ?? "none") ? "secondary" : "outline"} className="h-auto w-full justify-between whitespace-normal py-2 text-left" disabled={pending || site.organisation !== "MINISTERE" || (location.entrepotId !== null && !warehouse)} onClick={() => selectInventoryLocation(site.id, location.entrepotId)}>
+                  <span>{label}</span>
+                  <span className="ml-2 text-xs">{location.cartons.toLocaleString("fr-FR")} cartons · {location.dossiers.toLocaleString("fr-FR")} dossiers</span>
+                </Button>;
+              })}
+              {site.organisation !== "MINISTERE" && locations.length > 0 ? <p className="text-xs text-muted-foreground">Stock visible. Cette opération de sortie part d’un site du ministère ; les retours se font depuis le lot reçu.</p> : null}
+            </div>;
+          })}
+        </div>
+        <p className="text-xs text-muted-foreground">Les cartons sont identifiés par code-barres, ou par libellé en l’absence de code, dans chaque emplacement. Les cartons déjà engagés dans un transfert sont comptés dans l’inventaire mais ne peuvent pas être engagés une seconde fois.</p>
+      </section>
+
       <section className="grid gap-5 rounded-lg border bg-card p-4 shadow-sm lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:p-5">
         <div className="space-y-4">
           <div><h2 className="font-semibold">Site du ministère · origine</h2><p className="text-sm text-muted-foreground">Site d&apos;inventaire qui détient actuellement les cartons.</p></div>
           <div className="space-y-2">
             <Label>Site du ministère</Label>
-            <Select name="sourceSiteId" items={ministrySites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={sourceSiteId} onValueChange={changeSourceSite} disabled={pending}>
+            <Select name="sourceSiteId" items={ministrySites.map((site) => ({ label: siteLabel(site), value: String(site.id) }))} value={sourceSiteId} onValueChange={changeSourceSite} disabled={pending}>
               <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site du ministère" /></SelectTrigger>
-              <SelectContent>{ministrySites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
+              <SelectContent>{ministrySites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{siteLabel(site)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label>Entrepôt / salle d&apos;origine</Label>
-            <Select name="sourceEntrepotId" items={[{ label: "Sans entrepôt précisé", value: "none" }, ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) }))]} value={sourceEntrepotId} onValueChange={changeSourceWarehouse} disabled={pending || !sourceSite}>
+            <Select name="sourceEntrepotId" items={[{ label: "Uniquement les dossiers sans salle renseignée", value: "none" }, ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: sourceWarehouseLabel(warehouse), value: String(warehouse.id) }))]} value={sourceEntrepotId} onValueChange={changeSourceWarehouse} disabled={pending || !sourceSite}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="none">Sans entrepôt précisé</SelectItem>{sourceSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}</SelectContent>
+              <SelectContent><SelectItem value="none">Uniquement les dossiers sans salle renseignée</SelectItem>{sourceSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{sourceWarehouseLabel(warehouse)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
         </div>
@@ -241,6 +285,7 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
         </div>
 
         {results.unidentifiedDossierCount > 0 ? <Alert className="m-4 lg:m-5"><AlertDescription>{results.unidentifiedDossierCount} dossier(s) sans code-barres ni libellé de carton sont exclus. Leur contenant doit être identifié avant transfert.</AlertDescription></Alert> : null}
+        {results.engagedCartonCount > 0 ? <Alert className="m-4 lg:m-5"><AlertDescription>{results.engagedCartonCount} carton(s) de cet emplacement sont déjà engagés dans un transfert ouvert. Retrouvez-les dans le registre des transferts.</AlertDescription></Alert> : null}
         {loadError ? <Alert variant="destructive" className="m-4 lg:m-5"><AlertDescription>{loadError}</AlertDescription></Alert> : null}
         {!sourceSiteId ? (
           <EmptyState title="Point de départ requis" description="Le stock affiché dépend du site et de la salle d'origine." />
