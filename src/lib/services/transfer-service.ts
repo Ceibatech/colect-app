@@ -196,7 +196,7 @@ export async function getTransferDashboardData() {
     siteStock,
     summary: {
       lots: rows.length,
-      open: rows.filter((row) => ["BROUILLON", "SOUMIS", "AUTORISE", "PARTIELLEMENT_SORTI", "EN_TRANSIT", "RECU_PARTIEL", "RETOUR_PARTIEL"].includes(row.status)).length,
+      open: rows.filter((row) => ["BROUILLON", "SOUMIS", "VALIDE_CEIBAC", "AUTORISE", "PARTIELLEMENT_SORTI", "EN_TRANSIT", "RECU_PARTIEL", "RETOUR_PARTIEL"].includes(row.status)).length,
       totalDossiers,
       onSite,
       inTransit,
@@ -208,7 +208,7 @@ export async function getTransferDashboardData() {
 export async function getTransferAuthorization(lotId: number) {
   await requirePermission("TRANSFER_VIEW");
   return prisma.transferLot.findFirst({
-    where: { id: lotId, authorizedAt: { not: null } },
+    where: { id: lotId },
     include: {
       sourceSite: true,
       sourceEntrepot: true,

@@ -81,18 +81,45 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     const rolesWithOperate = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_OPERATE"));
     const rolesWithAuthorize = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_AUTHORIZE"));
     const rolesWithCeibacValidation = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_CEIBAC_VALIDATE"));
+    const rolesWithCeibacApproval = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_CEIBAC_APPROVE"));
     const rolesWithTracking = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_TRACK"));
 
     expect(new Set(rolesWithCreate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
     expect(new Set(rolesWithOperate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
-    expect(new Set(rolesWithAuthorize)).toEqual(new Set(["ADMIN", "SUPERVISEUR"]));
+    expect(new Set(rolesWithAuthorize)).toEqual(new Set(["ADMIN", "SUPERVISEUR", "VALIDATEUR_MINISTERE"]));
     expect(new Set(rolesWithCeibacValidation)).toEqual(new Set(["ADMIN", "VALIDATEUR_CEIBAC"]));
+    expect(new Set(rolesWithCeibacApproval)).toEqual(new Set(["ADMIN", "VALIDATEUR_CEIBAC"]));
     expect(new Set(rolesWithTracking)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
     expect(ROLE_PERMISSIONS.OPERATEUR).not.toContain("TRANSFER_VIEW");
+  });
+
+  it("limite le validateur ministère aux visas et à la consultation des transferts", () => {
+    expect(ROLE_PERMISSIONS.VALIDATEUR_MINISTERE).toEqual(["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_AUTHORIZE"]);
+    expect(ROLE_PERMISSIONS.VALIDATEUR_MINISTERE).not.toContain("TRANSFER_CEIBAC_VALIDATE");
+    expect(ROLE_PERMISSIONS.VALIDATEUR_MINISTERE).not.toContain("TRANSFER_CEIBAC_APPROVE");
+    expect(ROLE_PERMISSIONS.VALIDATEUR_MINISTERE).not.toContain("TRANSFER_OPERATE");
+    expect(ROLE_PERMISSIONS.VALIDATEUR_MINISTERE).not.toContain("DOSSIER_READ");
   });
 });
 
 describe("ROLE_ONLY_ROUTE_PREFIXES (garde-fou grossier middleware/proxy)", () => {
+  it("distingue l'espace CEIBAC du préfixe ministère et réserve son visa", () => {
+    const validation = ROLE_ONLY_ROUTE_PREFIXES.find((entry) => "/transferts/validation-ceibac".startsWith(entry.prefix));
+    expect(validation?.roles).toEqual(["ADMIN", "VALIDATEUR_CEIBAC"]);
+    expect(ROLE_PERMISSIONS.VALIDATEUR_CEIBAC).not.toContain("TRANSFER_AUTHORIZE");
+    expect(ROLE_PERMISSIONS.GESTIONNAIRE_TRANSFERT).not.toContain("TRANSFER_CEIBAC_APPROVE");
+  });
+
+  it("réserve l'espace ministère aux acteurs autorisés et préserve l'accès aux bordereaux", () => {
+    const validation = ROLE_ONLY_ROUTE_PREFIXES.find((entry) => "/transferts/validation".startsWith(entry.prefix));
+    expect(validation?.roles).toEqual(["ADMIN", "SUPERVISEUR", "VALIDATEUR_MINISTERE"]);
+    const bordereau = ROLE_ONLY_ROUTE_PREFIXES.find((entry) => "/transferts/12/bordereaux/34".startsWith(entry.prefix));
+    expect(bordereau?.roles).toContain("VALIDATEUR_MINISTERE");
+    expect(bordereau?.roles).toContain("VALIDATEUR_CEIBAC");
+    expect(bordereau?.roles).toContain("GESTIONNAIRE_TRANSFERT");
+    expect(bordereau?.roles).not.toContain("OPERATEUR");
+  });
+
   it("ne bloque jamais /administration au niveau préfixe (bug corrigé Phase 12 — non-régression)", () => {
     const blocksAdministration = ROLE_ONLY_ROUTE_PREFIXES.some((entry) => entry.prefix === "/administration");
     expect(blocksAdministration).toBe(false);

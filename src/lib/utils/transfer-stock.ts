@@ -7,6 +7,7 @@ export type TransferMovementTypeCode = (typeof TRANSFER_MOVEMENT_TYPES)[number];
 export type TransferLotStatusCode =
   | "BROUILLON"
   | "SOUMIS"
+  | "VALIDE_CEIBAC"
   | "AUTORISE"
   | "PARTIELLEMENT_SORTI"
   | "EN_TRANSIT"
@@ -108,7 +109,8 @@ export function getTransferDossierStockSummary(
 export function getTransferLotStatusLabel(status: TransferLotStatusCode) {
   return {
     BROUILLON: "Brouillon",
-    SOUMIS: "Soumis au ministère",
+    SOUMIS: "À valider par CEIBAC",
+    VALIDE_CEIBAC: "Visa ministère requis",
     AUTORISE: "Autorisé",
     PARTIELLEMENT_SORTI: "Sortie partielle",
     EN_TRANSIT: "En transit",

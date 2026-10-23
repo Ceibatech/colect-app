@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, FileText, PackageCheck, Route, ShieldCheck, Truck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { AuthorizeTransferButton, ReceptionApprovalDialog, SubmitTransferButton, TransferMovementDialog, type TransferMovementItemOption } from "@/components/transferts/TransferActions";
+import { ApproveTransferLotByCeibacButton, AuthorizeTransferButton, ReceptionApprovalDialog, SubmitTransferButton, TransferMovementDialog, type TransferMovementItemOption } from "@/components/transferts/TransferActions";
 import { ConvoyTrackingPanel } from "@/components/transferts/ConvoyTrackingPanel";
 import { TransferItemStatusBadge, TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +48,9 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
     dossierCountSnapshot: item.dossierCountSnapshot,
   })));
   const canSubmit = session.permissions.includes("TRANSFER_SUBMIT") && lot.status === "BROUILLON";
-  const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE") && lot.status === "SOUMIS";
-  const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "SOUMIS", "ANNULE", "CLOTURE"].includes(lot.status);
+  const canApproveCeibac = session.permissions.includes("TRANSFER_CEIBAC_APPROVE") && lot.status === "SOUMIS";
+  const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE") && lot.status === "VALIDE_CEIBAC";
+  const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "SOUMIS", "VALIDE_CEIBAC", "ANNULE", "CLOTURE"].includes(lot.status);
   const canTrack = session.permissions.includes("TRANSFER_TRACK");
   const canValidateCeibac = session.permissions.includes("TRANSFER_CEIBAC_VALIDATE");
   const canValidateMinistry = session.permissions.includes("TRANSFER_AUTHORIZE");
@@ -76,8 +77,11 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         actions={(
           <>
             <Link href="/transferts" className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Registre</Link>
-            {lot.authorizedAt ? <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> Autorisation</Link> : null}
+            <Link href={`/transferts/${lot.id}/autorisation`} className={cn(buttonVariants({ variant: "outline" }))}><FileText /> {lot.authorizedAt ? "Autorisation" : "Fiche du lot"}</Link>
+            {canValidateMinistry ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
+            {session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBAC</Link> : null}
             {canSubmit ? <SubmitTransferButton lotId={lot.id} /> : null}
+            {canApproveCeibac ? <ApproveTransferLotByCeibacButton lotId={lot.id} /> : null}
             {canAuthorize ? <AuthorizeTransferButton lotId={lot.id} /> : null}
           </>
         )}
@@ -89,7 +93,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         ]}
       />
 
-      <TransferWorkflow status={lot.status as TransferLotStatusCode} hasDeparture={lot.items.some((item) => item.status !== "PREVU")} hasArrival={lot.items.some((item) => item.status === "RECU" || item.status === "RETOURNE")} />
+      <TransferWorkflow submitted={!!lot.submittedAt} ceibacApproved={!!lot.ceibacValidatedAt} authorized={!!lot.authorizedAt} hasDeparture={lot.items.some((item) => item.status !== "PREVU")} hasArrival={lot.items.some((item) => item.status === "RECU" || item.status === "RETOURNE")} />
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <Card className="bg-card/95">
@@ -114,6 +118,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           <CardHeader><CardTitle>Traçabilité</CardTitle><CardDescription>Responsables et jalons du dossier.</CardDescription></CardHeader>
           <CardContent className="space-y-4 text-sm">
             <TraceRow icon={CalendarClock} label="Créé" value={`${dateTimeFormatter.format(lot.createdAt)} par ${lot.createdBy.name}`} />
+            <TraceRow icon={ShieldCheck} label="Validation CEIBAC" value={lot.ceibacValidatedAt ? `${dateTimeFormatter.format(lot.ceibacValidatedAt)} par ${lot.ceibacSignatoryName ?? "CEIBAC"}` : lot.authorizedAt ? "Ancien circuit : visa CEIBAC non enregistré" : "En attente"} />
             <TraceRow icon={ShieldCheck} label="Autorisation" value={lot.authorizedAt && lot.authorizedBy ? `${dateTimeFormatter.format(lot.authorizedAt)} par ${lot.authorizedBy.name}` : "En attente"} />
             <TraceRow icon={Route} label="Transfert prévu" value={lot.plannedAt ? dateFormatter.format(lot.plannedAt) : "Non planifié"} />
           </CardContent>
@@ -134,7 +139,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         </Card>
       ) : null}
 
-      {stock.inTransit > 0 ? <ConvoyTrackingPanel lotId={lot.id} canTrack={canTrack} /> : null}
+      {lot.items.some((item) => item.departedAt !== null) ? <ConvoyTrackingPanel lotId={lot.id} canTrack={canTrack && stock.inTransit > 0} /> : null}
 
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">
@@ -201,18 +206,17 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   );
 }
 
-function TransferWorkflow({ status, hasDeparture, hasArrival }: { status: TransferLotStatusCode; hasDeparture: boolean; hasArrival: boolean }) {
-  const submitted = status !== "BROUILLON";
-  const authorized = !["BROUILLON", "SOUMIS"].includes(status);
+function TransferWorkflow({ submitted, ceibacApproved, authorized, hasDeparture, hasArrival }: { submitted: boolean; ceibacApproved: boolean; authorized: boolean; hasDeparture: boolean; hasArrival: boolean }) {
   const steps = [
-    { label: "Lot soumis", detail: "CEIBAC", complete: submitted },
+    { label: "Lot soumis", detail: "Gestionnaire", complete: submitted },
+    { label: "Lot validé", detail: "Responsable CEIBAC", complete: ceibacApproved },
     { label: "Sortie autorisée", detail: "Visa ministère", complete: authorized },
     { label: "Acheminement", detail: "Bordereau + GPS", complete: hasDeparture },
     { label: "Réception validée", detail: "CEIBAC + ministère", complete: hasArrival },
   ];
   return (
     <Card className="bg-card/95">
-      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         {steps.map((step, index) => <div key={step.label} className="flex min-h-20 items-center gap-3 rounded-md border bg-muted/15 p-3"><span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm font-semibold", step.complete ? "border-brand-green/30 bg-brand-green/10 text-brand-green" : "border-border bg-background text-muted-foreground")}>{step.complete ? <CheckCircle2 className="h-4 w-4" /> : index + 1}</span><div><p className="font-medium">{step.label}</p><p className="text-xs text-muted-foreground">{step.detail}</p></div></div>)}
       </CardContent>
     </Card>

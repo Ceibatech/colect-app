@@ -27,7 +27,7 @@ datasource db {
 
 model Role {
   id          Int      @id @default(autoincrement())
-  code        String   @unique // ADMIN | SUPERVISEUR | OPERATEUR | GESTIONNAIRE_TRANSFERT | VALIDATEUR_CEIBAC | FINANCE | PMO | EXECUTIF | CONSULTATION
+  code        String   @unique // ADMIN | SUPERVISEUR | OPERATEUR | GESTIONNAIRE_TRANSFERT | VALIDATEUR_CEIBAC | VALIDATEUR_MINISTERE | FINANCE | PMO | EXECUTIF | CONSULTATION
   name        String
   description String?  @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
@@ -105,6 +105,7 @@ model User {
   financeRatesCreated                FinanceRate[]           @relation("FinanceRateCreatedBy")
   transferLotsCreated                TransferLot[]           @relation("TransferLotCreatedBy")
   transferLotsAuthorized             TransferLot[]           @relation("TransferLotAuthorizedBy")
+  transferLotsCeibacValidated         TransferLot[]           @relation("TransferLotCeibacValidatedBy")
   transferMovementsCreated           TransferMovement[]      @relation("TransferMovementCreatedBy")
   transferMovementsCeibacValidated   TransferMovement[]      @relation("TransferMovementCeibacValidatedBy")
   transferMovementsMinistryValidated TransferMovement[]      @relation("TransferMovementMinistryValidatedBy")
@@ -170,6 +171,7 @@ model FinanceRate {
 enum TransferLotStatus {
   BROUILLON
   SOUMIS
+  VALIDE_CEIBAC
   AUTORISE
   PARTIELLEMENT_SORTI
   EN_TRANSIT
@@ -226,6 +228,11 @@ model TransferLot {
   motif                  String?           @db.Text
   plannedAt              DateTime?         @map("planned_at")
   submittedAt            DateTime?         @map("submitted_at")
+  ceibacValidatedAt      DateTime?         @map("ceibac_validated_at")
+  ceibacValidatedById    Int?              @map("ceibac_validated_by_id")
+  ceibacSignatoryName    String?           @map("ceibac_signatory_name") @db.VarChar(120)
+  ceibacSignatoryTitle   String?           @map("ceibac_signatory_title") @db.VarChar(120)
+  ceibacSignatureData    String?           @map("ceibac_signature_data") @db.LongText
   authorizedAt           DateTime?         @map("authorized_at")
   approvalSignatoryName  String?           @map("approval_signatory_name")
   approvalSignatoryTitle String?           @map("approval_signatory_title")
@@ -241,6 +248,7 @@ model TransferLot {
   destinationEntrepot Entrepot?               @relation("TransferDestinationEntrepot", fields: [destinationEntrepotId], references: [id])
   createdBy           User                    @relation("TransferLotCreatedBy", fields: [createdById], references: [id])
   authorizedBy        User?                   @relation("TransferLotAuthorizedBy", fields: [authorizedById], references: [id])
+  ceibacValidatedBy   User?                   @relation("TransferLotCeibacValidatedBy", fields: [ceibacValidatedById], references: [id], onDelete: SetNull)
   items               TransferLotItem[]
   movements           TransferMovement[]
   trackingPoints      TransferTrackingPoint[]
@@ -249,6 +257,7 @@ model TransferLot {
   @@index([destinationSiteId, destinationEntrepotId])
   @@index([status])
   @@index([createdById])
+  @@index([ceibacValidatedById])
   @@map("transfer_lots")
 }
 

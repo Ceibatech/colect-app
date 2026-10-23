@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import {
   approveReceptionByCeibac,
   approveReceptionByMinistry,
+  approveTransferLotByCeibac,
   authorizeTransferLot,
   recordTransferMovement,
   submitTransferLot,
@@ -53,7 +54,24 @@ export function SubmitTransferButton({ lotId }: { lotId: number }) {
     });
   }
 
-  return <Button onClick={submit} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />} Soumettre au ministère</Button>;
+  return <Button onClick={submit} disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <Send />} Soumettre à CEIBAC</Button>;
+}
+
+export function ApproveTransferLotByCeibacButton({ lotId }: { lotId: number }) {
+  const action = useCallback(
+    (previous: TransferActionState, formData: FormData) => approveTransferLotByCeibac(lotId, previous, formData),
+    [lotId],
+  );
+  return (
+    <SignatureApprovalDialog
+      title="Validation du lot par CEIBAC"
+      description="Vérifiez la composition du lot avant de signer. Le lot sera ensuite transmis au ministère pour autorisation de sortie."
+      triggerLabel="Valider le lot pour CEIBAC"
+      submitLabel="Signer et transmettre au ministère"
+      signatureLabel="Responsable CEIBAC"
+      action={action}
+    />
+  );
 }
 
 export function AuthorizeTransferButton({ lotId }: { lotId: number }) {

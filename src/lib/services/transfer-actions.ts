@@ -183,6 +183,8 @@ export async function createTransferLot(
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     revalidatePath("/transferts");
+    revalidatePath("/transferts/validation");
+    revalidatePath("/transferts/validation-ceibac");
     return { success: true, lotId: result.id, message: `Le lot ${result.reference} a été créé.` };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
@@ -212,11 +214,65 @@ export async function submitTransferLot(id: number): Promise<TransferActionState
     });
     revalidatePath(`/transferts/${id}`);
     revalidatePath("/transferts");
-    return { success: true, message: "Le lot a été transmis au responsable du ministère pour visa." };
+    revalidatePath("/transferts/validation");
+    revalidatePath("/transferts/validation-ceibac");
+    return { success: true, message: "Le lot a été transmis au responsable CEIBAC pour validation." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
     console.error("Transfer lot submission failed.", error);
     return { error: "La soumission du lot a échoué." };
+  }
+}
+
+export async function approveTransferLotByCeibac(
+  id: number,
+  _previous: TransferActionState,
+  formData: FormData,
+): Promise<TransferActionState> {
+  const session = await requirePermission("TRANSFER_CEIBAC_APPROVE");
+  if (!Number.isInteger(id) || id <= 0) return { error: "Lot invalide." };
+  const parsed = transferApprovalSchema.safeParse({
+    signatoryName: formData.get("signatoryName"),
+    signatoryTitle: formData.get("signatoryTitle"),
+    signature: formData.get("signature"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };
+
+  try {
+    const ip = await getClientIp();
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.transferLot.updateMany({
+        where: { id, status: "SOUMIS", items: { some: {} } },
+        data: {
+          status: "VALIDE_CEIBAC",
+          ceibacValidatedAt: new Date(),
+          ceibacValidatedById: session.userId,
+          ceibacSignatoryName: parsed.data.signatoryName,
+          ceibacSignatoryTitle: parsed.data.signatoryTitle,
+          ceibacSignatureData: parsed.data.signature,
+        },
+      });
+      if (updated.count !== 1) throw new TransferRuleError("Ce lot n'attend plus la validation CEIBAC.");
+      await tx.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: "TRANSFER_LOT_CEIBAC_APPROVE",
+          entity: "TRANSFER_LOT",
+          entityId: id,
+          newValue: { signatoryName: parsed.data.signatoryName, signatoryTitle: parsed.data.signatoryTitle },
+          ipAddress: ip,
+        },
+      });
+    });
+    revalidatePath(`/transferts/${id}`);
+    revalidatePath("/transferts");
+    revalidatePath("/transferts/validation");
+    revalidatePath("/transferts/validation-ceibac");
+    return { success: true, message: "Le lot est validé par CEIBAC et transmis au ministère pour autorisation." };
+  } catch (error) {
+    if (error instanceof TransferRuleError) return { error: error.message };
+    console.error("CEIBAC lot approval failed.", error);
+    return { error: "La validation CEIBAC du lot a échoué." };
   }
 }
 
@@ -238,7 +294,7 @@ export async function authorizeTransferLot(
     const ip = await getClientIp();
     await prisma.$transaction(async (tx) => {
       const updated = await tx.transferLot.updateMany({
-        where: { id, status: "SOUMIS", items: { some: {} } },
+        where: { id, status: "VALIDE_CEIBAC", ceibacValidatedAt: { not: null }, items: { some: {} } },
         data: {
           status: "AUTORISE",
           authorizedAt: new Date(),
@@ -248,7 +304,7 @@ export async function authorizeTransferLot(
           approvalSignatureData: parsed.data.signature,
         },
       });
-      if (updated.count !== 1) throw new TransferRuleError("Ce lot n'est plus en attente d'autorisation.");
+      if (updated.count !== 1) throw new TransferRuleError("Ce lot doit être validé par CEIBAC avant l'autorisation du ministère, ou a déjà été autorisé.");
       await tx.auditLog.create({
         data: {
           userId: session.userId,
@@ -262,6 +318,8 @@ export async function authorizeTransferLot(
     });
     revalidatePath(`/transferts/${id}`);
     revalidatePath("/transferts");
+    revalidatePath("/transferts/validation");
+    revalidatePath("/transferts/validation-ceibac");
     return { success: true, message: "Le lot est autorisé pour la sortie." };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
@@ -315,8 +373,8 @@ export async function recordTransferMovement(
         },
       });
       if (!lot) throw new TransferRuleError("Lot introuvable.");
-      if (["BROUILLON", "SOUMIS", "ANNULE", "CLOTURE"].includes(lot.status)) {
-        throw new TransferRuleError(["BROUILLON", "SOUMIS"].includes(lot.status) ? "Le lot doit être autorisé avant toute sortie." : "Ce lot ne peut plus recevoir de mouvement.");
+      if (["BROUILLON", "SOUMIS", "VALIDE_CEIBAC", "ANNULE", "CLOTURE"].includes(lot.status)) {
+        throw new TransferRuleError(["BROUILLON", "SOUMIS", "VALIDE_CEIBAC"].includes(lot.status) ? "Le lot doit être autorisé par le ministère avant toute sortie." : "Ce lot ne peut plus recevoir de mouvement.");
       }
 
       const type = parsed.data.type as TransferMovementType;
@@ -478,6 +536,8 @@ export async function recordTransferMovement(
 
     revalidatePath(`/transferts/${lotId}`);
     revalidatePath("/transferts");
+    revalidatePath("/transferts/validation");
+    revalidatePath("/transferts/validation-ceibac");
     revalidatePath("/dossiers");
     revalidatePath("/dashboard/geographie");
     return {
@@ -541,6 +601,8 @@ export async function approveReceptionByCeibac(
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     revalidatePath(`/transferts/${movement.transferLotId}`);
     revalidatePath("/transferts");
+    revalidatePath("/transferts/validation");
+    revalidatePath("/transferts/validation-ceibac");
     return { success: true, message: `Le constat ${movement.reference} est visé par CEIBAC et transmis au ministère.` };
   } catch (error) {
     if (error instanceof TransferRuleError) return { error: error.message };
@@ -649,6 +711,8 @@ export async function approveReceptionByMinistry(
 
     revalidatePath(`/transferts/${result.transferLotId}`);
     revalidatePath("/transferts");
+    revalidatePath("/transferts/validation");
+    revalidatePath("/transferts/validation-ceibac");
     revalidatePath("/dossiers");
     revalidatePath("/dashboard/geographie");
     return { success: true, message: `Le bordereau ${result.reference} est contre-signé. Le stock du site B est mis à jour.` };

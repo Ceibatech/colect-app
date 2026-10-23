@@ -63,7 +63,14 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Dossiers", href: "/dossiers", icon: FolderOpen, permission: "DOSSIER_READ" },
   { title: "Recherche documentaire", href: "/recherche", icon: Search, permission: "DOSSIER_READ" },
   { title: "Préparation", href: "/preparation", icon: ClipboardCheck, permission: "PREPARATION_VIEW" },
-  { title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW" },
+  {
+    title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW",
+    children: [
+      { title: "Registre et bordereaux", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW" },
+      { title: "Validation CEIBAC", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
+      { title: "Validation ministère", href: "/transferts/validation", icon: ShieldCheck, permission: "TRANSFER_AUTHORIZE" },
+    ],
+  },
   { title: "Qualité", href: "/qualite", icon: ShieldCheck, permission: "QUALITY_VIEW" },
   { title: "Import", href: "/import", icon: Upload, permission: "IMPORT_DATA" },
   { title: "Export", href: "/export", icon: Download, permission: "EXPORT_DATA" },

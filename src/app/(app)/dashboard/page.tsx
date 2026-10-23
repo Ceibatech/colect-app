@@ -53,9 +53,15 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
   },
   VALIDATEUR_CEIBAC: {
     eyebrow: "Contrôle CEIBAC",
-    title: "Validations de réception",
-    description: "Contrôlez les constats d'arrivée et signez les réceptions avant le visa final du ministère.",
-    progress: "Réceptions contrôlées",
+    title: "Validation des transferts",
+    description: "Validez les lots soumis avant leur transmission au ministère et contrôlez les constats d'arrivée.",
+    progress: "Transferts contrôlés",
+  },
+  VALIDATEUR_MINISTERE: {
+    eyebrow: "Visa ministère",
+    title: "Validation des transferts",
+    description: "Autorisez les lots soumis et contre-signez les réceptions déjà visées par CEIBAC.",
+    progress: "Transferts validés",
   },
   FINANCE: {
     eyebrow: "Pilotage financier",
@@ -85,7 +91,12 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
 
 export default async function DashboardPage() {
   const session = await requirePermission("DASHBOARD_VIEW");
-  if (session.roleCode === "GESTIONNAIRE_TRANSFERT" || session.roleCode === "VALIDATEUR_CEIBAC") redirect("/transferts");
+  if (session.roleCode === "VALIDATEUR_MINISTERE") redirect("/transferts/validation");
+  if (session.roleCode === "VALIDATEUR_CEIBAC") {
+    // Les sessions déjà ouvertes gardent leurs permissions jusqu'à la reconnexion.
+    redirect(session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? "/transferts/validation-ceibac" : "/transferts");
+  }
+  if (session.roleCode === "GESTIONNAIRE_TRANSFERT") redirect("/transferts");
   const isOperator = session.roleCode === "OPERATEUR";
   const isExecutive = session.roleCode === "EXECUTIF";
   const dashboardScopeLabel = session.roleCode === "PMO" ? "Lecture seule · Périmètre PMO" : session.roleCode === "FINANCE" ? "Lecture globale · Données financières protégées" : null;

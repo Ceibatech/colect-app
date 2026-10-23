@@ -439,11 +439,20 @@ chez CEIBAC et le retour au ministère. La composition du carton n'étant pas ma
 par une table historique dédiée, elle est figée au moment de la constitution à partir du
 triplet site + entrepôt + code-barres ; les références des dossiers sont ensuite
 conservées dans le dossier de garde. Les transitions de stock sont atomiques en base et
-produisent un bordereau imprimable avec deux visas. Matrice d'accès : OPERATEUR consulte,
-constitue et enregistre les mouvements ; SUPERVISEUR consulte et autorise ; ADMIN dispose
-de l'ensemble ; EXECUTIF reste limité aux tableaux de bord. Les services et actions sont
+produisent un bordereau imprimable avec deux visas. Le gestionnaire constitue le lot et
+le soumet à CEIBAC (`BROUILLON` → `SOUMIS`). Le responsable CEIBAC le signe
+(`VALIDE_CEIBAC`), puis le ministère autorise le départ (`AUTORISE`). Chaque signature
+et sa transition sont enregistrées dans une même transaction avec l'audit. Les lots
+autorisés avant l'introduction du visa CEIBAC conservent leur autorisation historique.
+Matrice d'accès : GESTIONNAIRE_TRANSFERT constitue et enregistre les mouvements ;
+VALIDATEUR_CEIBAC valide les lots et les constats d'arrivée ; VALIDATEUR_MINISTERE
+autorise les lots et contre-signe les réceptions. SUPERVISEUR conserve ses visas
+ministère existants ; ADMIN dispose de l'ensemble ; OPERATEUR et EXECUTIF n'accèdent
+pas au registre. Les files `/transferts/validation-ceibac` et `/transferts/validation`
+séparent ces deux étapes. La fiche imprimable d'un lot non autorisé porte la mention
+« PROJET — SORTIE NON AUTORISÉE ». Les services et actions sont
 centralisés dans `transfer-service.ts`/`transfer-actions.ts`, avec les règles pures de
-solde dans `transfer-stock.ts`.
+solde dans `transfer-stock.ts` et les files dans `transfer-validation-service.ts`.
 
 **Versement documentaire Alfresco** : le stockage de travail et l'archive définitive
 restent deux responsabilités distinctes. Les agents déposent et pré-indexent les scans

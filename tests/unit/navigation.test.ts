@@ -12,6 +12,7 @@ describe("role-aware dashboard navigation", () => {
     ["OPERATEUR", ["/dashboard"]],
     ["GESTIONNAIRE_TRANSFERT", ["/dashboard"]],
     ["VALIDATEUR_CEIBAC", ["/dashboard"]],
+    ["VALIDATEUR_MINISTERE", ["/dashboard"]],
     ["FINANCE", ["/dashboard", "/dashboard/finance"]],
     ["PMO", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie", "/dashboard/pmo"]],
     ["EXECUTIF", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie"]],
@@ -63,5 +64,24 @@ describe("role-aware dashboard navigation", () => {
       const restriction = ROLE_ONLY_ROUTE_PREFIXES.find((entry) => entry.prefix === item.href);
       expect(restriction?.roles).toEqual(item.roles);
     }
+  });
+
+  it("shows each validation workspace only to its authorized actors", () => {
+    const transfers = NAV_ITEMS.find((item) => item.href === "/transferts")!;
+    const cases: Array<[RoleCode, string[]]> = [
+      ["ADMIN", ["/transferts", "/transferts/validation-ceibac", "/transferts/validation"]],
+      ["VALIDATEUR_CEIBAC", ["/transferts", "/transferts/validation-ceibac"]],
+      ["VALIDATEUR_MINISTERE", ["/transferts", "/transferts/validation"]],
+      ["SUPERVISEUR", ["/transferts", "/transferts/validation"]],
+      ["GESTIONNAIRE_TRANSFERT", ["/transferts"]],
+      ["OPERATEUR", []],
+    ];
+    for (const [role, expected] of cases) {
+      expect((transfers.children ?? [])
+        .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS[role], role))
+        .map((item) => item.href)).toEqual(expected);
+    }
+    expect(NAV_ITEMS.filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.VALIDATEUR_MINISTERE, "VALIDATEUR_MINISTERE"))
+      .map((item) => item.href)).toEqual(["/transferts"]);
   });
 });
