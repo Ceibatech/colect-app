@@ -20,6 +20,7 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
 
   const movement = await getTransferBordereau(lotId, movementId);
   if (!movement) notFound();
+  const documentCode = movement.type === "RECEPTION" ? "F03" : "F02";
   const ministrySignature = movement.signatures.find((signature) => signature.party === "MINISTERE");
   const ceibaSignature = movement.signatures.find((signature) => signature.party === "CEIBAC");
   const ceibaValidatorSignature = movement.signatures.find((signature) => signature.party === "CEIBAC_VALIDATOR");
@@ -34,15 +35,15 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
     <div className="mx-auto max-w-5xl bg-white print:max-w-none">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <Link href={`/transferts/${lotId}`} className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Retour au lot</Link>
-        <div className="flex flex-wrap gap-2"><a href={`/api/transferts/${lotId}/bordereaux/${movementId}`} className={cn(buttonVariants())}><Download /> Télécharger F02</a><PrintButton /></div>
+        <div className="flex flex-wrap gap-2"><a href={`/api/transferts/${lotId}/bordereaux/${movementId}`} className={cn(buttonVariants())}><Download /> Télécharger {documentCode}</a><PrintButton /></div>
       </div>
 
       <article className="border border-slate-300 bg-white [print-color-adjust:exact]">
         <header className="border-b-4 border-[#28519f] p-6 sm:p-8">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#28519f]">F02 · GeoArchives · Chaîne de garde</p>
-              <h1 className="mt-2 text-2xl font-bold">{movement.type === "RECEPTION" ? "Bordereau de déchargement et constat d'arrivée" : "Bordereau de transfert d'archives"}</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#28519f]">{documentCode} · GeoArchives · Chaîne de garde</p>
+              <h1 className="mt-2 text-2xl font-bold">{movement.type === "RECEPTION" ? "Procès-verbal de réception et de déchargement" : "Bon de sortie et bordereau de transfert"}</h1>
               <p className="mt-2 text-sm text-slate-600">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</p>
               <p className="mt-1 text-xs font-semibold uppercase text-[#28519f]">{getTransferMovementStatusLabel(movement.status as TransferMovementStatusCode)}</p>
             </div>
@@ -58,6 +59,13 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
           <SlipField label="Date et heure" value={dateTimeFormatter.format(movement.occurredAt)} />
           <SlipField label="Point de départ" value={movementFrom} />
           <SlipField label="Point d'arrivée" value={movementTo} />
+        </section>
+
+        <section className="grid border-b border-slate-300 sm:grid-cols-2 lg:grid-cols-4">
+          <SlipField label="Itinéraire autorisé" value={movement.transferLot.plannedRoute ?? "Trajet direct entre les sites"} />
+          <SlipField label="Véhicule" value={[movement.vehicleDescription, movement.vehicleRegistration].filter(Boolean).join(" · ") || "Non renseigné"} />
+          <SlipField label="Chauffeur" value={[movement.driverName, movement.driverPhone].filter(Boolean).join(" · ") || "Non renseigné"} />
+          <SlipField label="Convoyeur CEIBA" value={movement.ceibaEscortName ?? "Non renseigné"} />
         </section>
 
         <section className="p-6 sm:p-8">
@@ -83,7 +91,9 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
           </div>
 
           {movement.conditionStatus ? <div className="mt-5 border border-slate-300 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">État du chargement à l&apos;arrivée</p><p className="mt-2 text-sm font-semibold">{conditionLabel(movement.conditionStatus)}</p></div> : null}
+          {movement.sealStatus || movement.sealReferences ? <div className="mt-5 grid gap-4 border border-slate-300 bg-slate-50 p-4 sm:grid-cols-2"><div><p className="text-xs font-semibold uppercase text-slate-500">État des scellés</p><p className="mt-2 text-sm font-semibold">{movement.sealStatus ? sealStatusLabel(movement.sealStatus) : "Non renseigné"}</p></div><div><p className="text-xs font-semibold uppercase text-slate-500">Références contrôlées</p><p className="mt-2 text-sm">{movement.sealReferences ?? "Aucune"}</p></div></div> : null}
           {movement.observations ? <div className="mt-5 border border-slate-300 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">Observations</p><p className="mt-2 whitespace-pre-wrap text-sm">{movement.observations}</p></div> : null}
+          {movement.incidentReported || movement.incidentDescription ? <div className="mt-5 border-2 border-amber-500 bg-amber-50 p-4"><p className="text-xs font-semibold uppercase text-amber-900">Constat d&apos;incident ou d&apos;anomalie</p><p className="mt-2 whitespace-pre-wrap text-sm text-amber-950">{movement.incidentDescription ?? "Incident signalé sans description complémentaire."}</p></div> : null}
         </section>
 
         <section className={cn("grid border-t border-slate-300", movement.type === "RECEPTION" ? "sm:grid-cols-3" : "sm:grid-cols-2")}>
@@ -103,6 +113,10 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
 
 function conditionLabel(status: "CONFORME" | "AVEC_RESERVES" | "NON_CONFORME") {
   return { CONFORME: "Conforme", AVEC_RESERVES: "Conforme avec réserves", NON_CONFORME: "Non conforme" }[status];
+}
+
+function sealStatusLabel(status: "INTACTS" | "ANOMALIE" | "NON_APPLICABLE") {
+  return { INTACTS: "Intacts et concordants", ANOMALIE: "Anomalie constatée", NON_APPLICABLE: "Non applicable" }[status];
 }
 
 function SlipField({ label, value }: { label: string; value: string }) {

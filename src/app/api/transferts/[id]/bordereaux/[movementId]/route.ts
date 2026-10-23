@@ -27,6 +27,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     destinationAddress: siteAddress(movement.transferLot.destinationSite),
     conditionLabel: movement.conditionStatus ? conditionLabel(movement.conditionStatus) : null,
     observations: movement.observations,
+    plannedRoute: movement.transferLot.plannedRoute,
+    vehicleRegistration: movement.vehicleRegistration,
+    vehicleDescription: movement.vehicleDescription,
+    driverName: movement.driverName,
+    driverPhone: movement.driverPhone,
+    ceibaEscortName: movement.ceibaEscortName,
+    sealReferences: movement.sealReferences,
+    sealStatusLabel: movement.sealStatus ? sealStatusLabel(movement.sealStatus) : null,
+    incidentReported: movement.incidentReported,
+    incidentDescription: movement.incidentDescription,
     items: movement.items.map((entry) => ({
       cartonCode: entry.transferLotItem.cartonCode,
       cartonLabel: entry.transferLotItem.cartonLabel,
@@ -43,10 +53,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     })),
   });
 
+  const documentCode = movement.type === "RECEPTION" ? "F03" : "F02";
   return new Response(new Uint8Array(pdf).buffer, {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="F02-${movement.reference}.pdf"`,
+      "Content-Disposition": `attachment; filename="${documentCode}-${movement.reference}.pdf"`,
       "Cache-Control": "private, no-store",
     },
   });
@@ -68,4 +79,8 @@ function signatureLabel(party: "MINISTERE" | "CEIBAC" | "CEIBAC_VALIDATOR", type
 
 function conditionLabel(status: "CONFORME" | "AVEC_RESERVES" | "NON_CONFORME") {
   return { CONFORME: "Conforme", AVEC_RESERVES: "Conforme avec réserves", NON_CONFORME: "Non conforme" }[status];
+}
+
+function sealStatusLabel(status: "INTACTS" | "ANOMALIE" | "NON_APPLICABLE") {
+  return { INTACTS: "Intacts et concordants", ANOMALIE: "Anomalie constatée", NON_APPLICABLE: "Non applicable" }[status];
 }

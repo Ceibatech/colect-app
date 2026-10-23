@@ -188,7 +188,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
                 <div className="flex min-w-0 items-start gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-4 w-4" /></span>
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2"><p className="font-mono font-semibold">{movement.reference}</p><Badge variant="secondary" className="rounded-md">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</Badge><Badge variant="outline" className="rounded-md">{getTransferMovementStatusLabel(movement.status as TransferMovementStatusCode)}</Badge>{movement.conditionStatus ? <Badge variant="outline" className="rounded-md">{conditionLabel(movement.conditionStatus)}</Badge> : null}</div>
+                    <div className="flex flex-wrap items-center gap-2"><p className="font-mono font-semibold">{movement.reference}</p><Badge variant="secondary" className="rounded-md">{getTransferMovementLabel(movement.type as TransferMovementTypeCode)}</Badge><Badge variant="outline" className="rounded-md">{getTransferMovementStatusLabel(movement.status as TransferMovementStatusCode)}</Badge>{movement.conditionStatus ? <Badge variant="outline" className="rounded-md">{conditionLabel(movement.conditionStatus)}</Badge> : null}{movement.incidentReported ? <Badge variant="destructive" className="rounded-md">Incident signalé</Badge> : null}</div>
                     <p className="mt-1 text-sm text-muted-foreground">{movementPlace(lot, movement.type as TransferMovementTypeCode, "from")} <ArrowRight className="mx-1 inline h-3.5 w-3.5" /> {movementPlace(lot, movement.type as TransferMovementTypeCode, "to")} · {movement.items.reduce((sum, item) => sum + item.transferLotItem.dossierCountSnapshot, 0)} dossier{movement.items.reduce((sum, item) => sum + item.transferLotItem.dossierCountSnapshot, 0) > 1 ? "s" : ""}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{dateTimeFormatter.format(movement.occurredAt)} · saisi par {movement.createdBy.name} · visas {movement.signatures.map((signature) => signature.signatoryName).join(" / ")}</p>
                   </div>
@@ -196,8 +196,8 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
                 <div className="flex shrink-0 flex-wrap gap-2">
                   {movement.status === "SOUMIS_CEIBAC" && canValidateCeiba ? <ReceptionApprovalDialog movementId={movement.id} movementType={movement.type as TransferMovementTypeCode} stage="CEIBA" /> : null}
                   {movement.status === "VALIDE_CEIBAC" && canValidateMinistry ? <ReceptionApprovalDialog movementId={movement.id} movementType={movement.type as TransferMovementTypeCode} stage="MINISTERE" /> : null}
-                  <Link href={`/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><FileText /> Prévisualiser F02</Link>
-                  <a href={`/api/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><Download /> Télécharger F02</a>
+                  <Link href={`/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><FileText /> Prévisualiser {movement.type === "RECEPTION" ? "F03" : "F02"}</Link>
+                  <a href={`/api/transferts/${lot.id}/bordereaux/${movement.id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}><Download /> Télécharger {movement.type === "RECEPTION" ? "F03" : "F02"}</a>
                 </div>
               </article>
             ))}

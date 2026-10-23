@@ -280,6 +280,13 @@ export async function getTransferAuthorizationGroup(input: TransferAuthorization
     plannedAt: start,
     authorizedAt: latestDate(lots.flatMap((lot) => lot.authorizedAt ? [lot.authorizedAt] : [])),
     motif: Array.from(new Set(lots.map((lot) => lot.motif?.trim()).filter((value): value is string => Boolean(value)))).join(" / ") || null,
+    archiveSupport: mergeArchiveSupports(lots.map((lot) => lot.archiveSupport)),
+    plannedRoute: uniqueJoined(lots.map((lot) => lot.plannedRoute)),
+    transportMethod: uniqueJoined(lots.map((lot) => lot.transportMethod)),
+    ceibaParticipants: uniqueJoined(lots.map((lot) => lot.ceibaParticipants)),
+    sdaParticipants: uniqueJoined(lots.map((lot) => lot.sdaParticipants)),
+    riskAssessment: uniqueJoined(lots.map((lot) => lot.riskAssessment), " / "),
+    securityMeasures: uniqueJoined(lots.map((lot) => lot.securityMeasures), " / "),
     sourceSite: lots[0].sourceSite,
     sourceEntrepot: lots[0].sourceEntrepot,
     destinationSite: lots[0].destinationSite,
@@ -311,6 +318,16 @@ function buildOperationReference(date: string, sourceCode: string, destinationCo
 
 function latestDate(values: Date[]) {
   return values.length > 0 ? new Date(Math.max(...values.map((value) => value.getTime()))) : null;
+}
+
+function uniqueJoined(values: Array<string | null>, separator = ", ") {
+  return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))).join(separator) || null;
+}
+
+function mergeArchiveSupports(values: Array<string | null>) {
+  const supports = new Set(values.filter((value): value is string => Boolean(value)));
+  if (supports.size === 0) return null;
+  return supports.size === 1 ? Array.from(supports)[0] : "HYBRIDE";
 }
 
 export async function getTransferLotDetail(id: number) {

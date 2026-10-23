@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Boxes, Building2, MapPin, Plus, Truck } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Boxes, Building2, MapPin, Plus, Truck } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
 import { TransferDocumentRegistry, type TransferDocumentItem } from "@/components/transferts/TransferDocumentRegistry";
@@ -59,7 +59,7 @@ export default async function TransfersPage() {
       .filter((movement) => movement.status === "VALIDE_CEIBAC")
       .map((movement) => ({
         key: `F02-MINISTRY-${movement.id}`,
-        code: "F02",
+        code: movement.type === "RECEPTION" ? "F03" : "F02",
         title: `${movement.reference} à contre-signer`,
         detail: `${row.reference} · bordereau préparé et signé par CEIBA`,
         status: "Visa ministère requis",
@@ -71,7 +71,7 @@ export default async function TransfersPage() {
       .filter((movement) => movement.status === "SOUMIS_CEIBAC")
       .map((movement) => ({
         key: `F02-CEIBA-${movement.id}`,
-        code: "F02",
+        code: "F03",
         title: `${movement.reference} à contrôler`,
         detail: `${row.reference} · constat d'arrivée soumis par l'agent CEIBA`,
         status: "Visa CEIBA requis",
@@ -95,7 +95,7 @@ export default async function TransfersPage() {
       .filter((movement) => movement.status === "VALIDE_MINISTERE")
       .map((movement) => ({
         key: `F02-FINAL-${movement.id}`,
-        code: "F02",
+        code: movement.type === "RECEPTION" ? "F03" : "F02",
         title: `${movement.reference} signé`,
         detail: `${row.reference} · copie finale contre-signée par le ministère`,
         status: "Document final",
@@ -116,6 +116,7 @@ export default async function TransfersPage() {
           : "Vue consolidée du stock documentaire entre les sites d'inventaire du ministère et les sites de traitement CEIBA."}
         actions={(
           <>
+            <Link href="/transferts/procedure" className={buttonVariants({ variant: "outline" })}><BookOpenCheck /> Procédure</Link>
             {canApproveCeiba ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation CEIBA</Link> : null}
             {canAuthorize ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation ministère</Link> : null}
             {canCreate ? (

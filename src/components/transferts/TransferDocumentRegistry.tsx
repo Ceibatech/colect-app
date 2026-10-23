@@ -13,7 +13,7 @@ export type TransferDocumentState = "MINISTRY_ACTION" | "CEIBA_ACTION" | "SIGNED
 
 export interface TransferDocumentItem {
   key: string;
-  code: "F01" | "F02";
+  code: "F01" | "F02" | "F03";
   title: string;
   detail: string;
   status: string;

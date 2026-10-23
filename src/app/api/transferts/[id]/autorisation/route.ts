@@ -25,6 +25,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     authorizedAt: lot.authorizedAt,
     plannedAt: lot.plannedAt,
     motif: lot.motif,
+    archiveSupport: lot.archiveSupport,
+    plannedRoute: lot.plannedRoute,
+    transportMethod: lot.transportMethod,
+    ceibaParticipants: lot.ceibaParticipants,
+    sdaParticipants: lot.sdaParticipants,
+    riskAssessment: lot.riskAssessment,
+    securityMeasures: lot.securityMeasures,
     source: placeLabel(lot.sourceSite.nom, lot.sourceEntrepot),
     sourceAddress: siteAddress(lot.sourceSite),
     destination: placeLabel(lot.destinationSite.nom, lot.destinationEntrepot),
@@ -45,6 +52,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       signedAt: lot.authorizedAt,
       data: lot.approvalSignatureData,
     },
+    ceibaSignatures: lot.ceibacValidatedAt ? [{
+      reference: lot.reference,
+      party: "CEIBAC_VALIDATOR",
+      label: "Visa CEIBA",
+      name: lot.ceibacSignatoryName,
+      title: lot.ceibacSignatoryTitle,
+      signedAt: lot.ceibacValidatedAt,
+      data: lot.ceibacSignatureData,
+    }] : [],
   });
 
   return pdfResponse(pdf, `F01-${lot.reference}.pdf`);

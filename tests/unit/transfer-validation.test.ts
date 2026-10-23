@@ -12,6 +12,13 @@ describe("transfer validation", () => {
       destinationEntrepotId: "",
       includeUnlocated: "true",
       plannedAt: "2026-10-22T08:30",
+      archiveSupport: "PHYSIQUE",
+      plannedRoute: "Tour D vers site CEIBA",
+      transportMethod: "Véhicule fermé dédié",
+      ceibaParticipants: "Responsable CEIBA",
+      sdaParticipants: "Responsable SDA",
+      riskAssessment: "Perte, vol et détérioration",
+      securityMeasures: "Cartons fermés, scellés et suivis",
       motif: "Numérisation CEIBA",
       dossierIds: [11, 12],
     });
@@ -26,6 +33,13 @@ describe("transfer validation", () => {
       destinationEntrepotId: "",
       includeUnlocated: "false",
       plannedAt: "",
+      archiveSupport: "PHYSIQUE",
+      plannedRoute: "Tour D vers site CEIBA",
+      transportMethod: "Véhicule fermé dédié",
+      ceibaParticipants: "Responsable CEIBA",
+      sdaParticipants: "Responsable SDA",
+      riskAssessment: "Perte et vol",
+      securityMeasures: "Scellés et suivi",
       motif: "Transfert",
       dossierIds: [11],
     });
@@ -38,6 +52,11 @@ describe("transfer validation", () => {
       itemIds: [1],
       occurredAt: "2026-10-22T08:30",
       observations: "",
+      vehicleRegistration: "AB-123-CD",
+      vehicleDescription: "Fourgon fermé blanc",
+      driverName: "Chauffeur Test",
+      ceibaEscortName: "Convoyeur CEIBA",
+      incidentReported: "false",
       ceibacName: "B. CEIBA",
       ceibacTitle: "Responsable transfert",
       ceibacSignature: signature,
@@ -52,12 +71,52 @@ describe("transfer validation", () => {
       itemIds: [1],
       occurredAt: "2026-10-22T10:30",
       conditionStatus: "AVEC_RESERVES",
+      sealStatus: "INTACTS",
       observations: "Un carton présente un coin humide.",
+      vehicleRegistration: "AB-123-CD",
+      vehicleDescription: "Fourgon fermé blanc",
+      driverName: "Chauffeur Test",
+      ceibaEscortName: "Convoyeur CEIBA",
+      incidentReported: "false",
       ceibacName: "Agent destination",
       ceibacTitle: "Convoyeur CEIBA",
       ceibacSignature: signature,
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects a physical departure without secured transport details", () => {
+    const result = recordTransferMovementSchema.safeParse({
+      type: "SORTIE",
+      itemIds: [1],
+      occurredAt: "2026-10-22T08:30",
+      incidentReported: "false",
+      ceibacName: "B. CEIBA",
+      ceibacTitle: "Responsable transfert",
+      ceibacSignature: signature,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("requires a written incident report when a seal anomaly is found", () => {
+    const result = recordTransferMovementSchema.safeParse({
+      type: "RECEPTION",
+      itemIds: [1],
+      occurredAt: "2026-10-22T10:30",
+      conditionStatus: "AVEC_RESERVES",
+      sealStatus: "ANOMALIE",
+      observations: "Le scelle ne correspond pas au bordereau.",
+      vehicleRegistration: "AB-123-CD",
+      vehicleDescription: "Fourgon fermé blanc",
+      driverName: "Chauffeur Test",
+      ceibaEscortName: "Convoyeur CEIBA",
+      incidentReported: "true",
+      incidentDescription: "",
+      ceibacName: "Agent destination",
+      ceibacTitle: "Convoyeur CEIBA",
+      ceibacSignature: signature,
+    });
+    expect(result.success).toBe(false);
   });
 
   it("requires observations for a non-conforming arrival report", () => {
@@ -66,7 +125,13 @@ describe("transfer validation", () => {
       itemIds: [1],
       occurredAt: "2026-10-22T10:30",
       conditionStatus: "NON_CONFORME",
+      sealStatus: "ANOMALIE",
       observations: "",
+      vehicleRegistration: "AB-123-CD",
+      vehicleDescription: "Fourgon fermé blanc",
+      driverName: "Chauffeur Test",
+      ceibaEscortName: "Convoyeur CEIBA",
+      incidentReported: "true",
       ceibacName: "Agent destination",
       ceibacTitle: "Convoyeur CEIBA",
       ceibacSignature: signature,

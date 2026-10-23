@@ -315,16 +315,29 @@ export function NewTransferForm({ sites }: { sites: SiteOption[] }) {
         ) : null}
       </section>
 
-      <section className="grid gap-4 rounded-lg border bg-card p-4 shadow-sm sm:grid-cols-2 lg:p-5">
-        <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required disabled={pending} /></div>
-        <div className="space-y-2 sm:row-span-2"><Label htmlFor="motif">Objet / contexte</Label><Textarea id="motif" name="motif" rows={4} maxLength={2000} placeholder="Ex. prise en charge pour numérisation et indexation" disabled={pending} /></div>
-        <p className="text-xs leading-5 text-muted-foreground">Après création, soumettez le lot au responsable CEIBA. Sa validation transmet le lot au ministère pour autorisation. Le stock du site d&apos;inventaire ne diminue qu&apos;après le F02 signé ; le stock du site CEIBA augmente après la réception validée.</p>
+      <section className="space-y-5 rounded-lg border bg-card p-4 shadow-sm lg:p-5">
+        <div>
+          <h2 className="font-semibold">Planification et sécurisation</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Renseignez les dispositions validées avec le SDA avant de soumettre l&apos;opération.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required disabled={pending} /></div>
+          <div className="space-y-2"><Label htmlFor="archiveSupport">Support des archives</Label><select id="archiveSupport" name="archiveSupport" defaultValue="PHYSIQUE" required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="PHYSIQUE">Physique</option><option value="ELECTRONIQUE">Électronique</option><option value="HYBRIDE">Hybride</option></select></div>
+          <div className="space-y-2"><Label htmlFor="transportMethod">Moyen de transport prévu</Label><Input id="transportMethod" name="transportMethod" required maxLength={160} placeholder="Ex. véhicule fermé dédié" disabled={pending} /></div>
+          <div className="space-y-2 sm:col-span-2"><Label htmlFor="plannedRoute">Itinéraire prévu</Label><Input id="plannedRoute" name="plannedRoute" required maxLength={2000} placeholder="Site de départ, trajet autorisé et site CEIBA" disabled={pending} /></div>
+          <div className="space-y-2"><Label htmlFor="motif">Objet / contexte</Label><Input id="motif" name="motif" maxLength={2000} placeholder="Numérisation, indexation, garde temporaire..." disabled={pending} /></div>
+          <div className="space-y-2"><Label htmlFor="ceibaParticipants">Intervenants CEIBA habilités</Label><Textarea id="ceibaParticipants" name="ceibaParticipants" required rows={3} maxLength={2000} placeholder="Noms et fonctions" disabled={pending} /></div>
+          <div className="space-y-2"><Label htmlFor="sdaParticipants">Intervenants SDA habilités</Label><Textarea id="sdaParticipants" name="sdaParticipants" required rows={3} maxLength={2000} placeholder="Noms et fonctions" disabled={pending} /></div>
+          <div className="space-y-2"><Label htmlFor="riskAssessment">Risques identifiés</Label><Textarea id="riskAssessment" name="riskAssessment" required rows={3} maxLength={2000} placeholder="Perte, vol, détérioration, intempéries..." disabled={pending} /></div>
+          <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="securityMeasures">Mesures de sécurisation</Label><Textarea id="securityMeasures" name="securityMeasures" required rows={3} maxLength={2000} placeholder="Conditionnement, fermeture, scellés, surveillance et protection des supports" disabled={pending} /></div>
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">Après création, soumettez l&apos;opération au responsable CEIBA. Sa validation la transmet au SDA ou au responsable ministériel habilité. Le stock du site d&apos;inventaire ne diminue qu&apos;après le bon de sortie contre-signé ; le stock du site CEIBA augmente après l&apos;attestation de réception validée.</p>
       </section>
 
       <div className="flex justify-end">
         <Button type="submit" disabled={pending || selected.size === 0 || !sourceSiteId || !destinationSiteId}>
           {pending ? <Loader2 className="animate-spin" /> : <PackageCheck />}
-          Constituer le lot · {selected.size} dossier{selected.size > 1 ? "s" : ""}
+          Constituer l&apos;opération · {selected.size} dossier{selected.size > 1 ? "s" : ""}
         </Button>
       </div>
     </form>

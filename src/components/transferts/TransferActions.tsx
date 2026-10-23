@@ -262,6 +262,36 @@ export function TransferMovementDialog({
             <div className={isReception ? "space-y-2 sm:col-span-2" : "space-y-2"}><Label htmlFor={`${type}-observations`}>{isReception ? "État des lieux et observations" : "Observations"}</Label><Textarea id={`${type}-observations`} name="observations" rows={3} maxLength={2000} disabled={pending} /></div>
           </div>
 
+          <section className="space-y-4 border-t pt-5">
+            <div><h3 className="font-semibold">Transport sécurisé</h3><p className="text-xs text-muted-foreground">Ces informations identifient le transport au départ et lors du contrôle à l&apos;arrivée.</p></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2"><Label htmlFor={`${type}-vehicleRegistration`}>Immatriculation</Label><Input id={`${type}-vehicleRegistration`} name="vehicleRegistration" required maxLength={80} disabled={pending} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-vehicleDescription`}>Véhicule sécurisé</Label><Input id={`${type}-vehicleDescription`} name="vehicleDescription" required maxLength={160} placeholder="Type, couleur ou identification" disabled={pending} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-driverName`}>Chauffeur</Label><Input id={`${type}-driverName`} name="driverName" required maxLength={120} disabled={pending} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-driverPhone`}>Téléphone du chauffeur</Label><Input id={`${type}-driverPhone`} name="driverPhone" type="tel" maxLength={40} disabled={pending} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-ceibaEscortName`}>Convoyeur CEIBA</Label><Input id={`${type}-ceibaEscortName`} name="ceibaEscortName" required maxLength={120} disabled={pending} /></div>
+              {!isReception ? <div className="space-y-2"><Label htmlFor={`${type}-sealReferences`}>Références des scellés</Label><Input id={`${type}-sealReferences`} name="sealReferences" maxLength={2000} placeholder="Numéros séparés par des virgules" disabled={pending} /></div> : null}
+            </div>
+          </section>
+
+          {isReception ? (
+            <section className="space-y-4 border-t pt-5">
+              <div><h3 className="font-semibold">Contrôle des colis et scellés</h3><p className="text-xs text-muted-foreground">Le responsable destinataire vérifie les contenants avant leur installation.</p></div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2"><Label htmlFor="sealStatus">État des scellés</Label><select id="sealStatus" name="sealStatus" required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="">Sélectionner</option><option value="INTACTS">Intacts et concordants</option><option value="ANOMALIE">Anomalie constatée</option><option value="NON_APPLICABLE">Non applicable</option></select></div>
+                <div className="space-y-2"><Label htmlFor="sealReferences">Références contrôlées</Label><Input id="sealReferences" name="sealReferences" maxLength={2000} placeholder="Numéros ou mention sans scellé" disabled={pending} /></div>
+              </div>
+            </section>
+          ) : null}
+
+          <section className="space-y-4 border-t pt-5">
+            <div><h3 className="font-semibold">Incident ou anomalie</h3><p className="text-xs text-muted-foreground">Toute perte, détérioration, ouverture ou discordance doit être consignée.</p></div>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="space-y-2"><Label htmlFor={`${type}-incidentReported`}>Incident signalé</Label><select id={`${type}-incidentReported`} name="incidentReported" defaultValue="false" disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="false">Non</option><option value="true">Oui</option></select></div>
+              <div className="space-y-2 sm:col-span-2"><Label htmlFor={`${type}-incidentDescription`}>Constat écrit</Label><Textarea id={`${type}-incidentDescription`} name="incidentDescription" rows={3} maxLength={2000} placeholder="Décrire l'incident, les réserves et les mesures prises" disabled={pending} /></div>
+            </div>
+          </section>
+
           <div className="grid gap-5 border-t pt-5">
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
               <div><h3 className="font-semibold">{isReception ? "Signature de l'agent CEIBA au déchargement" : "Visa du gestionnaire CEIBA"}</h3><p className="text-xs text-muted-foreground">L&apos;agent confirme la prise en charge, la remise ou le constat physique du chargement. Le ministère apposera son visa dans l&apos;étape suivante.</p></div>

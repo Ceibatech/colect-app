@@ -23,6 +23,13 @@ describe("transfer PDF documents", () => {
       destinationAddress: "Abidjan",
       ministryContact: "Responsable du ministère",
       ceibaContact: "Responsable CEIBA",
+      archiveSupport: "PHYSIQUE",
+      plannedRoute: "Tour D - Plateau - Site CEIBA",
+      transportMethod: "Fourgon fermé dédié",
+      ceibaParticipants: "Gestionnaire de transfert et convoyeur CEIBA",
+      sdaParticipants: "Responsable SDA et responsable du site de départ",
+      riskAssessment: "Perte, vol, détérioration et intempéries",
+      securityMeasures: "Cartons fermés, scellés numérotés et suivi GPS",
       items,
       ceibaSignatures: [{
         reference: "LOT-2026-000001",
@@ -61,6 +68,16 @@ describe("transfer PDF documents", () => {
       destinationAddress: "Abidjan",
       conditionLabel: null,
       observations: null,
+      plannedRoute: "Tour D - Plateau - Site CEIBA",
+      vehicleRegistration: "AB-123-CD",
+      vehicleDescription: "Fourgon fermé blanc",
+      driverName: "Chauffeur Test",
+      driverPhone: "+225 01 02 03 04 05",
+      ceibaEscortName: "Convoyeur CEIBA",
+      sealReferences: "SC-001, SC-002",
+      sealStatusLabel: null,
+      incidentReported: false,
+      incidentDescription: null,
       items,
       signatures: [{
         party: "CEIBAC",
@@ -68,6 +85,44 @@ describe("transfer PDF documents", () => {
         name: "Gestionnaire CEIBA",
         title: "Responsable transfert",
         signedAt: new Date("2026-10-23T09:00:00Z"),
+        data: null,
+      }],
+    });
+
+    expect(Buffer.from(bytes).subarray(0, 5).toString()).toBe("%PDF-");
+    expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThan(0);
+  });
+
+  it("generates a readable F03 reception report with seals and an incident", async () => {
+    const bytes = await createTransferMovementPdf({
+      reference: "REC-2026-0000001",
+      lotReference: "LOT-2026-000001",
+      type: "RECEPTION",
+      statusLabel: "Visa CEIBA requis",
+      occurredAt: new Date("2026-10-23T11:00:00Z"),
+      source: "Site ministère - Tour D",
+      sourceAddress: "Plateau, Abidjan",
+      destination: "CEIBA Analytics - Site de traitement",
+      destinationAddress: "Abidjan",
+      conditionLabel: "Avec réserves",
+      observations: "Un carton présente un coin humide.",
+      plannedRoute: "Tour D - Plateau - Site CEIBA",
+      vehicleRegistration: "AB-123-CD",
+      vehicleDescription: "Fourgon fermé blanc",
+      driverName: "Chauffeur Test",
+      driverPhone: "+225 01 02 03 04 05",
+      ceibaEscortName: "Convoyeur CEIBA",
+      sealReferences: "SC-001, SC-002",
+      sealStatusLabel: "Anomalie constatée",
+      incidentReported: true,
+      incidentDescription: "Le scellé SC-002 est arrivé rompu.",
+      items,
+      signatures: [{
+        party: "CEIBAC",
+        label: "Contrôle à destination par CEIBA Analytics",
+        name: "Gestionnaire CEIBA",
+        title: "Responsable transfert",
+        signedAt: new Date("2026-10-23T11:00:00Z"),
         data: null,
       }],
     });

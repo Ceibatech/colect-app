@@ -36,6 +36,13 @@ export interface TransferAuthorizationPdfInput {
   authorizedAt: Date;
   plannedAt: Date | null;
   motif: string | null;
+  archiveSupport?: string | null;
+  plannedRoute?: string | null;
+  transportMethod?: string | null;
+  ceibaParticipants?: string | null;
+  sdaParticipants?: string | null;
+  riskAssessment?: string | null;
+  securityMeasures?: string | null;
   source: string;
   sourceAddress: string;
   destination: string;
@@ -60,6 +67,16 @@ export interface TransferMovementPdfInput {
   destinationAddress: string;
   conditionLabel: string | null;
   observations: string | null;
+  plannedRoute?: string | null;
+  vehicleRegistration?: string | null;
+  vehicleDescription?: string | null;
+  driverName?: string | null;
+  driverPhone?: string | null;
+  ceibaEscortName?: string | null;
+  sealReferences?: string | null;
+  sealStatusLabel?: string | null;
+  incidentReported?: boolean;
+  incidentDescription?: string | null;
   items: TransferPdfItem[];
   signatures: TransferPdfSignature[];
 }
@@ -86,6 +103,9 @@ export async function createTransferAuthorizationPdf(input: TransferAuthorizatio
   writer.field("Lots internes regroupés", (input.lotReferences ?? [input.reference]).join(", "));
   writer.field("Volume autorisé", `${input.items.length} carton${input.items.length > 1 ? "s" : ""} - ${sumDossiers(input.items)} dossier${sumDossiers(input.items) > 1 ? "s" : ""}`);
   writer.field("Prestations autorisées", input.motif || "Transfert, préparation, numérisation, indexation et garde temporaire.");
+  writer.field("Support des archives", supportLabel(input.archiveSupport));
+  writer.field("Moyen de transport prévu", input.transportMethod || "À confirmer avant le départ");
+  writer.field("Itinéraire autorisé", input.plannedRoute || "Trajet direct entre les sites enregistrés");
   writer.field("Documents exclus", "Tout document non repris dans l'inventaire annexé à cette autorisation.");
 
   writer.section("Interlocuteurs habilités");
@@ -93,7 +113,13 @@ export async function createTransferAuthorizationPdf(input: TransferAuthorizatio
     ["Ministère pour les remises", input.ministryContact],
     ["CEIBA Analytics pour le transfert", input.ceibaContact],
     ["CEIBA Analytics pour la réception", input.ceibaContact],
+    ["Intervenants CEIBA habilités", input.ceibaParticipants || input.ceibaContact],
+    ["Intervenants SDA habilités", input.sdaParticipants || input.ministryContact],
   ]);
+
+  writer.section("Risques et mesures de sécurisation");
+  writer.field("Risques identifiés", input.riskAssessment || "Perte, vol, détérioration, accès non autorisé, incendie et intempéries.");
+  writer.field("Mesures validées", input.securityMeasures || "Conditionnement fermé, contrôle contradictoire, traçabilité du trajet et preuve de réception.");
 
   writer.section("Inventaire annexé");
   writer.inventory(input.items);
@@ -126,10 +152,11 @@ export async function createTransferAuthorizationPdf(input: TransferAuthorizatio
 }
 
 export async function createTransferMovementPdf(input: TransferMovementPdfInput) {
-  const writer = await PdfWriter.create(`F02 - ${input.reference}`);
+  const documentCode = input.type === "RECEPTION" ? "F03" : "F02";
+  const writer = await PdfWriter.create(`${documentCode} - ${input.reference}`);
   writer.documentHeader(
-    "F02",
-    input.type === "RECEPTION" ? "Bordereau de réception et de déchargement" : "Bordereau de transfert et de remise",
+    documentCode,
+    input.type === "RECEPTION" ? "Procès-verbal de réception et de déchargement" : "Bon de sortie et bordereau de transfert",
     `Un formulaire par déplacement - ${BRAND.documentFooter}`,
   );
 
@@ -153,10 +180,10 @@ export async function createTransferMovementPdf(input: TransferMovementPdfInput)
     ["Autorisation F01", input.lotReference],
     ["Adresse de départ", `${from} - ${fromAddress}`],
     ["Adresse d'arrivée", `${to} - ${toAddress}`],
-    ["Trajet prévu", "Trajet direct entre les deux sites enregistrés dans GeoArchives."],
-    ["Véhicule et immatriculation", "À compléter au départ"],
-    ["Chauffeur et téléphone", "À compléter au départ"],
-    ["Accompagnateur CEIBA", "À compléter au départ"],
+    ["Trajet prévu", input.plannedRoute || "Trajet direct entre les deux sites enregistrés dans GeoArchives."],
+    ["Véhicule et immatriculation", [input.vehicleDescription, input.vehicleRegistration].filter(Boolean).join(" - ") || "Non renseigné"],
+    ["Chauffeur et téléphone", [input.driverName, input.driverPhone].filter(Boolean).join(" - ") || "Non renseigné"],
+    ["Accompagnateur CEIBA", input.ceibaEscortName || "Non renseigné"],
     ["Contact à l'arrivée", "À compléter avant le déplacement"],
   ]);
 
@@ -183,12 +210,20 @@ export async function createTransferMovementPdf(input: TransferMovementPdfInput)
   writer.section(input.type === "RECEPTION" ? "C - Contrôle et validation de la réception" : "C - Réception à destination");
   writer.fields([
     ["État", input.conditionLabel ?? "À constater à l'arrivée"],
+    ["État des scellés", input.sealStatusLabel ?? "Non renseigné"],
+    ["Références des scellés", input.sealReferences || "Aucune référence enregistrée"],
     ["Écart ou réserve", input.observations || "Aucune réserve enregistrée"],
     ["Nombre reçu", input.type === "RECEPTION" ? String(input.items.length) : "À compléter à l'arrivée"],
     ["Emplacement", input.type === "RECEPTION" ? input.destination : "À compléter à l'arrivée"],
   ]);
   for (const signature of input.signatures.filter((signature) => signature !== ministrySignature && (input.type !== "RECEPTION" || signature !== ceibaSignature))) {
     await writer.signature(signature);
+  }
+
+  if (input.incidentReported || input.incidentDescription) {
+    writer.section("Constat d'incident ou d'anomalie");
+    writer.field("Incident signalé", input.incidentReported ? "Oui" : "Non - anomalie documentaire associée");
+    writer.paragraph(input.incidentDescription || "Incident signalé sans description complémentaire.");
   }
 
   writer.section("Statut du document");
@@ -352,6 +387,10 @@ function clean(value: string) {
 
 function sumDossiers(items: TransferPdfItem[]) {
   return items.reduce((sum, item) => sum + item.dossierCount, 0);
+}
+
+function supportLabel(value?: string | null) {
+  return { PHYSIQUE: "Archives physiques", ELECTRONIQUE: "Archives électroniques", HYBRIDE: "Archives hybrides" }[value ?? ""] ?? "Archives physiques";
 }
 
 function formatDate(value: Date) {

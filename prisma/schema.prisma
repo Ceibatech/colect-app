@@ -215,6 +215,12 @@ enum TransferConditionStatus {
   NON_CONFORME
 }
 
+enum TransferSealStatus {
+  INTACTS
+  ANOMALIE
+  NON_APPLICABLE
+}
+
 // Dossier de garde d'un lot archivistique. Le lotissement foncier reste un
 // référentiel distinct : un TransferLot décrit ici une opération physique de
 // remise, de transport et de restitution de cartons.
@@ -227,6 +233,13 @@ model TransferLot {
   destinationEntrepotId  Int?              @map("destination_entrepot_id")
   status                 TransferLotStatus @default(BROUILLON)
   motif                  String?           @db.Text
+  archiveSupport         String?           @map("archive_support") @db.VarChar(20)
+  plannedRoute           String?           @map("planned_route") @db.Text
+  transportMethod        String?           @map("transport_method") @db.VarChar(160)
+  ceibaParticipants      String?           @map("ceiba_participants") @db.Text
+  sdaParticipants        String?           @map("sda_participants") @db.Text
+  riskAssessment         String?           @map("risk_assessment") @db.Text
+  securityMeasures       String?           @map("security_measures") @db.Text
   plannedAt              DateTime?         @map("planned_at")
   submittedAt            DateTime?         @map("submitted_at")
   ceibacValidatedAt      DateTime?         @map("ceibac_validated_at")
@@ -312,6 +325,15 @@ model TransferMovement {
   type                  TransferMovementType
   status                TransferMovementStatus   @default(VALIDE_MINISTERE)
   conditionStatus       TransferConditionStatus? @map("condition_status")
+  vehicleRegistration   String?                  @map("vehicle_registration") @db.VarChar(80)
+  vehicleDescription    String?                  @map("vehicle_description") @db.VarChar(160)
+  driverName            String?                  @map("driver_name") @db.VarChar(120)
+  driverPhone           String?                  @map("driver_phone") @db.VarChar(40)
+  ceibaEscortName       String?                  @map("ceiba_escort_name") @db.VarChar(120)
+  sealReferences        String?                  @map("seal_references") @db.Text
+  sealStatus            TransferSealStatus?      @map("seal_status")
+  incidentReported      Boolean                   @default(false) @map("incident_reported")
+  incidentDescription   String?                  @map("incident_description") @db.Text
   occurredAt            DateTime                 @map("occurred_at")
   fromSiteId            Int                      @map("from_site_id")
   toSiteId              Int                      @map("to_site_id")

@@ -21,6 +21,11 @@ const optionalShortText = z.preprocess(
   (value) => value === "" || value === null ? undefined : value,
   z.string().trim().min(2).max(120).optional(),
 );
+const optionalLongText = z.preprocess(
+  (value) => value === "" || value === null ? undefined : value,
+  z.string().trim().min(2).max(2_000).optional(),
+);
+const requiredPlanningText = (label: string, max = 2_000) => z.string().trim().min(2, `${label} est requis.`).max(max, `${label} est trop long.`);
 
 export const createTransferLotSchema = z.object({
   sourceSiteId: z.coerce.number().int().positive("Le site de départ est requis."),
@@ -29,6 +34,13 @@ export const createTransferLotSchema = z.object({
   destinationEntrepotId: optionalPositiveInt,
   includeUnlocated: z.preprocess((value) => value === "true" || value === "1" || value === "on", z.boolean()),
   plannedAt: requiredDateTime,
+  archiveSupport: z.enum(["PHYSIQUE", "ELECTRONIQUE", "HYBRIDE"]),
+  plannedRoute: requiredPlanningText("L'itinéraire"),
+  transportMethod: requiredPlanningText("Le moyen de transport", 160),
+  ceibaParticipants: requiredPlanningText("Les intervenants CEIBA"),
+  sdaParticipants: requiredPlanningText("Les intervenants SDA"),
+  riskAssessment: requiredPlanningText("L'évaluation des risques"),
+  securityMeasures: requiredPlanningText("Les mesures de sécurisation"),
   motif: z.string().trim().max(2_000, "Le motif est trop long.").optional().or(z.literal("")),
   dossierIds: z.array(z.coerce.number().int().positive()).min(1, "Sélectionnez au moins un dossier.").max(500, "Un lot peut contenir au maximum 500 dossiers."),
 });
@@ -60,6 +72,15 @@ export const recordTransferMovementSchema = z.object({
   occurredAt: z.string().refine((value) => !Number.isNaN(new Date(value).getTime()), "La date du mouvement est invalide."),
   observations: z.string().trim().max(2_000, "Les observations sont trop longues.").optional().or(z.literal("")),
   conditionStatus: z.enum(["CONFORME", "AVEC_RESERVES", "NON_CONFORME"]).optional(),
+  vehicleRegistration: optionalShortText,
+  vehicleDescription: optionalShortText,
+  driverName: optionalShortText,
+  driverPhone: optionalShortText,
+  ceibaEscortName: optionalShortText,
+  sealReferences: optionalLongText,
+  sealStatus: z.enum(["INTACTS", "ANOMALIE", "NON_APPLICABLE"]).optional(),
+  incidentReported: z.preprocess((value) => value === "true" || value === "1" || value === "on", z.boolean()),
+  incidentDescription: optionalLongText,
   ministryName: optionalShortText,
   ministryTitle: optionalShortText,
   ministrySignature: optionalSignature,
@@ -67,11 +88,19 @@ export const recordTransferMovementSchema = z.object({
   ceibacTitle: z.string().trim().min(2, "La fonction du signataire CEIBA est requise.").max(120),
   ceibacSignature: signatureData,
 }).superRefine((value, context) => {
+  if (!value.vehicleRegistration) context.addIssue({ code: "custom", path: ["vehicleRegistration"], message: "L'immatriculation du véhicule est requise." });
+  if (!value.vehicleDescription) context.addIssue({ code: "custom", path: ["vehicleDescription"], message: "La description du véhicule sécurisé est requise." });
+  if (!value.driverName) context.addIssue({ code: "custom", path: ["driverName"], message: "Le nom du chauffeur est requis." });
+  if (!value.ceibaEscortName) context.addIssue({ code: "custom", path: ["ceibaEscortName"], message: "Le nom du convoyeur CEIBA est requis." });
   if (value.type === "RECEPTION") {
     if (!value.conditionStatus) context.addIssue({ code: "custom", path: ["conditionStatus"], message: "L'état du chargement à l'arrivée est requis." });
+    if (!value.sealStatus) context.addIssue({ code: "custom", path: ["sealStatus"], message: "L'état des scellés est requis." });
     if (value.conditionStatus !== "CONFORME" && !value.observations) {
       context.addIssue({ code: "custom", path: ["observations"], message: "Décrivez les réserves ou la non-conformité constatée." });
     }
+  }
+  if ((value.incidentReported || value.conditionStatus === "NON_CONFORME" || value.sealStatus === "ANOMALIE") && !value.incidentDescription) {
+    context.addIssue({ code: "custom", path: ["incidentDescription"], message: "Le constat d'incident ou d'anomalie est requis." });
   }
 });
 

@@ -77,6 +77,13 @@ function departureForm() {
   form.set("itemIds", "51");
   form.set("occurredAt", now.toISOString());
   form.set("observations", "");
+  form.set("vehicleRegistration", "AB-123-CD");
+  form.set("vehicleDescription", "Fourgon ferme dedie");
+  form.set("driverName", "Chauffeur Test");
+  form.set("driverPhone", "+225 01 02 03 04 05");
+  form.set("ceibaEscortName", "Convoyeur CEIBA");
+  form.set("sealReferences", "SC-001, SC-002");
+  form.set("incidentReported", "false");
   form.set("ministryName", "Responsable Ministère");
   form.set("ministryTitle", "Directeur des archives");
   form.set("ministrySignature", drawnSignature);
