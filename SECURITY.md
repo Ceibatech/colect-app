@@ -92,9 +92,14 @@ implémentation (Phase 12 — Audit).
 ## 4. Secrets & configuration
 
 - Aucun secret en dur dans le code : `DATABASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`,
-  `MICROSOFT_CLIENT_SECRET`, `EMAIL_FROM` et `APP_URL` uniquement via variables
+  `REPORTS_CRON_SECRET`, `MICROSOFT_CLIENT_SECRET`, `EMAIL_FROM` et `APP_URL` uniquement via variables
   d'environnement (`.env`, jamais commité — voir `.gitignore`). Les identifiants Graph
   sont strictement serveur et ne portent jamais le préfixe `NEXT_PUBLIC_`.
+- Les rapports statistiques sont envoyés séparément à chaque destinataire via Resend.
+  L'ordonnanceur Contabo utilise un jeton interne distinct, comparé en temps constant,
+  et chaque envoi possède une clé d'idempotence et une trace d'audit. Un superviseur
+  ne reçoit que les données de ses opérateurs affectés ; un exécutif reçoit la synthèse
+  globale. Les montants financiers ne sont jamais inclus dans ces courriels.
 - `.env.example` documente les variables requises sans valeurs réelles.
 - Utilisateur MySQL applicatif dédié (`mulcv_app`), pas de `root` en production (cahier des
   charges §7).

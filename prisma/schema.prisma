@@ -87,33 +87,37 @@ model User {
   operateur                          Operateur?
   // Phase 16+ (§ affectation superviseur) : opérateurs dont ce user
   // (rôle SUPERVISEUR) a la charge — voir Operateur.supervisorId ci-dessous.
-  supervisedOperateurs               Operateur[]             @relation("OperateurSupervisor")
+  supervisedOperateurs               Operateur[]               @relation("OperateurSupervisor")
   dossierHistory                     DossierHistory[]
   workflowTransitions                WorkflowTransition[]
-  documentsUploaded                  Document[]              @relation("DocumentUploadedBy")
-  documentsPreIndexed                Document[]              @relation("DocumentPreIndexedBy")
-  documentIndexingRuns               DocumentIndexingRun[]   @relation("DocumentIndexingRunBy")
-  documentIndexingJobs               DocumentIndexingJob[]   @relation("DocumentIndexingJobRequestedBy")
+  documentsUploaded                  Document[]                @relation("DocumentUploadedBy")
+  documentsPreIndexed                Document[]                @relation("DocumentPreIndexedBy")
+  documentIndexingRuns               DocumentIndexingRun[]     @relation("DocumentIndexingRunBy")
+  documentIndexingJobs               DocumentIndexingJob[]     @relation("DocumentIndexingJobRequestedBy")
   qualityChecks                      QualityCheck[]
-  anomaliesCorrected                 Anomalie[]              @relation("AnomalieCorrigePar")
+  anomaliesCorrected                 Anomalie[]                @relation("AnomalieCorrigePar")
   imports                            Import[]
   exports                            Export[]
   auditLogs                          AuditLog[]
   notifications                      Notification[]
   passwordResetTokens                PasswordResetToken[]
-  pmoSupervisorScopes                PmoSupervisorScope[]    @relation("PmoScopeOwner")
-  pmoScopeMemberships                PmoSupervisorScope[]    @relation("PmoScopeSupervisor")
-  financeRatesCreated                FinanceRate[]           @relation("FinanceRateCreatedBy")
-  transferLotsCreated                TransferLot[]           @relation("TransferLotCreatedBy")
-  transferLotsAuthorized             TransferLot[]           @relation("TransferLotAuthorizedBy")
-  transferLotsCeibacValidated         TransferLot[]           @relation("TransferLotCeibacValidatedBy")
-  transferMovementsCreated           TransferMovement[]      @relation("TransferMovementCreatedBy")
-  transferMovementsCeibacValidated   TransferMovement[]      @relation("TransferMovementCeibacValidatedBy")
-  transferMovementsMinistryValidated TransferMovement[]      @relation("TransferMovementMinistryValidatedBy")
-  transferSignaturesCaptured         TransferSignature[]     @relation("TransferSignatureCapturedBy")
-  transferTrackingPoints             TransferTrackingPoint[] @relation("TransferTrackingCapturedBy")
-  dossiersPrepared                   Dossier[]               @relation("DossierPreparateur")
-  preparationPieceLines              PreparationPieceLine[]  @relation("PreparationPieceLinePreparedBy")
+  pmoSupervisorScopes                PmoSupervisorScope[]      @relation("PmoScopeOwner")
+  pmoScopeMemberships                PmoSupervisorScope[]      @relation("PmoScopeSupervisor")
+  financeRatesCreated                FinanceRate[]             @relation("FinanceRateCreatedBy")
+  transferLotsCreated                TransferLot[]             @relation("TransferLotCreatedBy")
+  transferLotsAuthorized             TransferLot[]             @relation("TransferLotAuthorizedBy")
+  transferLotsCeibacValidated        TransferLot[]             @relation("TransferLotCeibacValidatedBy")
+  transferMovementsCreated           TransferMovement[]        @relation("TransferMovementCreatedBy")
+  transferMovementsCeibacValidated   TransferMovement[]        @relation("TransferMovementCeibacValidatedBy")
+  transferMovementsMinistryValidated TransferMovement[]        @relation("TransferMovementMinistryValidatedBy")
+  transferSignaturesCaptured         TransferSignature[]       @relation("TransferSignatureCapturedBy")
+  transferTrackingPoints             TransferTrackingPoint[]   @relation("TransferTrackingCapturedBy")
+  dossiersPrepared                   Dossier[]                 @relation("DossierPreparateur")
+  preparationPieceLines              PreparationPieceLine[]    @relation("PreparationPieceLinePreparedBy")
+  emailReportSubscription            EmailReportSubscription?  @relation("EmailReportRecipient")
+  emailReportSubscriptionsCreated    EmailReportSubscription[] @relation("EmailReportCreatedBy")
+  emailReportDeliveries              EmailReportDelivery[]     @relation("EmailReportDeliveryRecipient")
+  emailReportDeliveriesTriggered     EmailReportDelivery[]     @relation("EmailReportDeliveryTriggeredBy")
 
   @@index([roleId])
   @@map("users")
@@ -333,7 +337,7 @@ model TransferMovement {
   ceibaEscortName       String?                  @map("ceiba_escort_name") @db.VarChar(120)
   sealReferences        String?                  @map("seal_references") @db.Text
   sealStatus            TransferSealStatus?      @map("seal_status")
-  incidentReported      Boolean                   @default(false) @map("incident_reported")
+  incidentReported      Boolean                  @default(false) @map("incident_reported")
   incidentDescription   String?                  @map("incident_description") @db.Text
   occurredAt            DateTime                 @map("occurred_at")
   fromSiteId            Int                      @map("from_site_id")
@@ -549,19 +553,19 @@ model TypePiece {
 // (les exemples métier — "Cocody" — sont déjà dans les 201 communes
 // importées) plutôt qu'un champ texte libre dupliqué.
 model Site {
-  id                Int       @id @default(autoincrement())
-  code              String    @unique
+  id                Int              @id @default(autoincrement())
+  code              String           @unique
   nom               String
-  typeSite          String?   @map("type_site")
+  typeSite          String?          @map("type_site")
   organisation      SiteOrganisation @default(MINISTERE)
-  description       String?   @db.Text
-  isActive          Boolean   @default(true) @map("is_active")
-  dateMiseEnService DateTime? @map("date_mise_en_service")
+  description       String?          @db.Text
+  isActive          Boolean          @default(true) @map("is_active")
+  dateMiseEnService DateTime?        @map("date_mise_en_service")
   responsable       String?
   telephone         String?
   email             String?
-  adresse           String?   @db.Text
-  communeId         Int?      @map("commune_id")
+  adresse           String?          @db.Text
+  communeId         Int?             @map("commune_id")
   quartier          String?
   ville             String?
   region            String?
@@ -1541,4 +1545,54 @@ model Setting {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("settings")
+}
+
+// Diffusion contrôlée des indicateurs de pilotage. Une seule configuration
+// est autorisée par destinataire afin d'éviter les envois concurrents ou
+// contradictoires pour un même compte.
+model EmailReportSubscription {
+  id            Int       @id @default(autoincrement())
+  userId        Int       @unique @map("user_id")
+  frequency     String    @default("WEEKLY") @db.VarChar(16)
+  dayOfWeek     Int       @default(1) @map("day_of_week")
+  dayOfMonth    Int       @default(1) @map("day_of_month")
+  hourUtc       Int       @default(7) @map("hour_utc")
+  includePoints Boolean   @default(true) @map("include_points")
+  isActive      Boolean   @default(true) @map("is_active")
+  nextSendAt    DateTime  @map("next_send_at")
+  lastSentAt    DateTime? @map("last_sent_at")
+  createdById   Int       @map("created_by_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user       User                  @relation("EmailReportRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  createdBy  User                  @relation("EmailReportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  deliveries EmailReportDelivery[]
+
+  @@index([isActive, nextSendAt])
+  @@map("email_report_subscriptions")
+}
+
+model EmailReportDelivery {
+  id                Int       @id @default(autoincrement())
+  subscriptionId    Int       @map("subscription_id")
+  recipientUserId   Int       @map("recipient_user_id")
+  triggeredById     Int?      @map("triggered_by_id")
+  triggerType       String    @map("trigger_type") @db.VarChar(16)
+  scheduledFor      DateTime  @map("scheduled_for")
+  idempotencyKey    String    @unique @map("idempotency_key") @db.VarChar(191)
+  status            String    @default("PENDING") @db.VarChar(16)
+  providerMessageId String?   @map("provider_message_id") @db.VarChar(191)
+  errorMessage      String?   @map("error_message") @db.Text
+  sentAt            DateTime? @map("sent_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  subscription EmailReportSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  recipient    User                    @relation("EmailReportDeliveryRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+  triggeredBy  User?                   @relation("EmailReportDeliveryTriggeredBy", fields: [triggeredById], references: [id], onDelete: SetNull)
+
+  @@index([subscriptionId, createdAt])
+  @@index([recipientUserId, createdAt])
+  @@index([status, createdAt])
+  @@map("email_report_deliveries")
 }

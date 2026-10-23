@@ -60,6 +60,11 @@ if (workerToken.length < 32 || /change|example|placeholder/i.test(workerToken)) 
   errors.push("INDEXING_WORKER_TOKEN must be a generated secret of at least 32 characters.");
 }
 
+const reportsToken = process.env.REPORTS_CRON_SECRET || "";
+if (reportsToken.length < 32 || /change|example|placeholder/i.test(reportsToken)) {
+  errors.push("REPORTS_CRON_SECRET must be a generated secret of at least 32 characters.");
+}
+
 if (errors.length) {
   for (const error of errors) console.error(error);
   process.exitCode = 1;

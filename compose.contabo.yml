@@ -82,6 +82,33 @@ services:
         max-size: "20m"
         max-file: "3"
 
+  email-report-scheduler:
+    image: ${APP_IMAGE:-colect-app:local}
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 20s
+    command: ["node", "deploy/email-report-scheduler.mjs"]
+    env_file:
+      - path: ${APP_ENV_FILE:-/opt/colect-app/shared/app.env}
+        format: raw
+    environment:
+      GEOARCHIVES_INTERNAL_URL: http://app:3000
+      REPORTS_POLL_SECONDS: "60"
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - default
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   caddy:
     # Only enable on a dedicated server where ports 80/443 are available.
     profiles: ["caddy"]

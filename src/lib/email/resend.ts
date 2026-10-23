@@ -26,6 +26,14 @@ interface PasswordAccessMessage {
   expiresInMinutes: number;
 }
 
+interface TransactionalEmailMessage {
+  idempotencyKey: string;
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+}
+
 function getEmailConfiguration() {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const from = process.env.EMAIL_FROM?.trim();
@@ -67,27 +75,18 @@ export function assertEmailConfigured(): void {
   getApplicationUrl();
 }
 
-export async function sendPasswordAccessEmail(message: PasswordAccessMessage): Promise<string> {
+export async function sendTransactionalEmail(message: TransactionalEmailMessage): Promise<string> {
   const { apiKey, from } = getEmailConfiguration();
   const resend = new Resend(apiKey);
-  const subject = message.purpose === "ACTIVATE"
-    ? "Votre accès GeoArchives"
-    : "Réinitialisation de votre mot de passe GeoArchives";
-
   const { data, error } = await resend.emails.send(
     {
       from,
-      to: [message.email],
-      subject,
-      html: renderPasswordAccessEmail({
-        name: message.name,
-        email: message.email,
-        resetUrl: message.resetUrl,
-        purpose: message.purpose,
-        expiresInMinutes: message.expiresInMinutes,
-      }),
+      to: [message.to],
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
     },
-    { headers: { "Idempotency-Key": message.idempotencyKey } }
+    { headers: { "Idempotency-Key": message.idempotencyKey } },
   );
 
   if (error || !data?.id) {
@@ -95,4 +94,23 @@ export async function sendPasswordAccessEmail(message: PasswordAccessMessage): P
   }
 
   return data.id;
+}
+
+export async function sendPasswordAccessEmail(message: PasswordAccessMessage): Promise<string> {
+  const subject = message.purpose === "ACTIVATE"
+    ? "Votre accès GeoArchives"
+    : "Réinitialisation de votre mot de passe GeoArchives";
+
+  return sendTransactionalEmail({
+    idempotencyKey: message.idempotencyKey,
+    to: message.email,
+    subject,
+    html: renderPasswordAccessEmail({
+      name: message.name,
+      email: message.email,
+      resetUrl: message.resetUrl,
+      purpose: message.purpose,
+      expiresInMinutes: message.expiresInMinutes,
+    }),
+  });
 }

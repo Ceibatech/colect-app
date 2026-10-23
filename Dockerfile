@@ -43,7 +43,7 @@ COPY --from=builder --chown=node:node /app/next.config.ts /app/tsconfig.json ./
 COPY --from=builder --chown=node:node /app/prisma ./prisma
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next ./.next
-COPY --from=builder --chown=node:node /app/deploy/healthcheck.mjs /app/deploy/validate-env.mjs /app/deploy/backup-database.mjs ./deploy/
+COPY --from=builder --chown=node:node /app/deploy/healthcheck.mjs /app/deploy/validate-env.mjs /app/deploy/backup-database.mjs /app/deploy/email-report-scheduler.mjs ./deploy/
 
 RUN mkdir -p /var/data/documents && chown node:node /var/data/documents
 USER node

@@ -21,6 +21,12 @@ if ! grep -q '^INDEXING_WORKER_TOKEN=' "$shared/app.env"; then
   chmod 600 "$shared/app.env"
 fi
 
+if ! grep -q '^REPORTS_CRON_SECRET=' "$shared/app.env"; then
+  command -v openssl >/dev/null 2>&1 || { echo 'openssl is required to provision the email report scheduler token.' >&2; exit 1; }
+  printf '\nREPORTS_CRON_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$shared/app.env"
+  chmod 600 "$shared/app.env"
+fi
+
 # Read only the supported non-secret settings; never execute an environment file.
 setting() { sed -n "s/^$1=//p" "$shared/deploy.env" | tr -d '\r'; }
 export DOMAIN APP_HTTP_PORT ALFRESCO_DOCKER_NETWORK
@@ -59,7 +65,7 @@ on_failure() {
   trap - ERR
   if [[ "$rollout_started" == true && -n "$previous" ]]; then
     echo 'Deployment failed; restoring the previous application image. Database migrations are not reversed.' >&2
-    dc stop indexing-worker >/dev/null 2>&1 || true
+    dc stop email-report-scheduler indexing-worker >/dev/null 2>&1 || true
     previous_revision=$(basename "$previous")
     export APP_IMAGE="colect-app:$previous_revision"
     export INDEXING_WORKER_IMAGE="colect-indexing-worker:$previous_revision"
@@ -67,6 +73,9 @@ on_failure() {
     rollback_services=(app)
     if "${rollback[@]}" config --services | grep -qx 'indexing-worker'; then
       rollback_services+=(indexing-worker)
+    fi
+    if "${rollback[@]}" config --services | grep -qx 'email-report-scheduler'; then
+      rollback_services+=(email-report-scheduler)
     fi
     "${rollback[@]}" up -d --no-build --wait --wait-timeout 180 "${rollback_services[@]}" ||
       echo 'Automatic application restore failed; operator action required.' >&2
@@ -87,7 +96,7 @@ dc run --rm --no-deps app node deploy/validate-env.mjs
 # The first Render cutover needs an equivalent write pause on the old host.
 if [[ -n "$previous" ]]; then
   rollout_started=true
-  dc stop indexing-worker app
+  dc stop email-report-scheduler indexing-worker app
 fi
 # Fail before changing schema/application when the database cannot be backed up.
 dc run --rm --no-deps --volume "$shared/db-backups:/backups" app node deploy/backup-database.mjs
@@ -100,7 +109,7 @@ dc run --rm --no-deps --volume "$shared/document-backups:/backups" app \
 dc run --rm --no-deps app node node_modules/prisma/build/index.js migrate deploy
 
 rollout_started=true
-dc up -d --no-build --wait --wait-timeout 300 app indexing-worker
+dc up -d --no-build --wait --wait-timeout 300 app indexing-worker email-report-scheduler
 bash "$release/deploy/activate-alfresco.sh" "$revision"
 dc exec -T app node deploy/healthcheck.mjs --readiness
 if [[ "$proxy_mode" == caddy ]]; then

@@ -27,6 +27,7 @@ import {
   ClipboardCheck,
   Search,
   ScanSearch,
+  MailCheck,
 } from "lucide-react";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
@@ -90,6 +91,7 @@ export const NAV_ITEMS: NavItem[] = [
       { title: "Natures de dossier", href: "/administration/natures", icon: Tags, permission: "REFERENTIEL_MANAGE" },
       { title: "Types de pièces", href: "/administration/types-piece", icon: FileStack, permission: "REFERENTIEL_MANAGE" },
       { title: "Champs d'indexation", href: "/administration/indexation", icon: ScanSearch, permission: "SETTINGS_MANAGE" },
+      { title: "Rapports par e-mail", href: "/administration/rapports-email", icon: MailCheck, permission: "SETTINGS_MANAGE" },
       { title: "Paramètres", href: "/administration/parametres", icon: SlidersHorizontal, permission: "SETTINGS_MANAGE" },
       { title: "Audit", href: "/administration/audit", icon: ScrollText, permission: "AUDIT_VIEW" },
     ],
