@@ -97,6 +97,11 @@ services:
     depends_on:
       app:
         condition: service_healthy
+    # The shared application image probes localhost:3000 by default. This
+    # service is a polling process, not an HTTP server, so that inherited
+    # healthcheck would incorrectly mark a healthy scheduler as unhealthy.
+    healthcheck:
+      disable: true
     networks:
       - default
     security_opt:
