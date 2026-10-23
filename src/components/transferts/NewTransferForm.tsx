@@ -117,6 +117,7 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
   }
 
   function selectInventoryLocation(siteId: number, entrepotId: number | null) {
+    if (sourceSiteId === String(siteId) && sourceEntrepotId === String(entrepotId ?? "none")) return;
     setSourceSiteId(String(siteId));
     setSourceEntrepotId(entrepotId === null ? "none" : String(entrepotId));
     resetSourceSelection();
