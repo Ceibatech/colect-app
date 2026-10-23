@@ -58,11 +58,13 @@ export function AppSidebar({ permissions, roleCode }: { permissions: PermissionC
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-1">
-        <SidebarGroup className="gap-2 px-2">
-          <SidebarGroupLabel className="text-sidebar-foreground/50">Modules</SidebarGroupLabel>
+      <SidebarContent className="px-1.5 pb-3">
+        <SidebarGroup className="gap-1.5 px-1.5 pt-1">
+          <SidebarGroupLabel className="h-7 px-2.5 text-[11px] font-medium text-sidebar-foreground/45">
+            Modules
+          </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu className="gap-1.5">
               {visibleItems.map((item) => (
                 <NavEntry key={item.href} item={item} pathname={pathname} permissions={permissions} roleCode={roleCode} />
               ))}
@@ -85,8 +87,9 @@ function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pa
       isActive={active}
       tooltip={item.title}
       className={cn(
-        "h-9 rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground",
-        active && "bg-sidebar-primary text-sidebar-primary-foreground shadow-[0_8px_20px_rgba(0,0,0,0.18)] hover:bg-sidebar-primary hover:text-sidebar-primary-foreground"
+        "relative h-9 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground/75 transition-colors [&>svg]:size-[17px] [&>svg]:text-sidebar-foreground/60 hover:bg-sidebar-accent/65 hover:text-sidebar-accent-foreground hover:[&>svg]:text-sidebar-foreground/85",
+        active &&
+          "bg-sidebar-accent/90 text-sidebar-accent-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-brand-green [&>svg]:text-brand-green hover:bg-sidebar-accent/90 hover:[&>svg]:text-brand-green"
       )}
       render={
         <Link href={item.href} aria-current={active ? "page" : undefined}>
@@ -104,7 +107,7 @@ function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pa
   return (
     <SidebarMenuItem>
       {trigger}
-      <SidebarMenuSub className="mt-1 border-sidebar-border/60">
+      <SidebarMenuSub className="mx-0 mb-0.5 ml-4 mt-1 gap-0.5 border-sidebar-border/70 px-0 py-0.5 pl-3">
         {children.map((child) => {
           const childActive = pathname === child.href;
           return (
@@ -112,8 +115,9 @@ function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pa
               <SidebarMenuSubButton
                 isActive={childActive}
                 className={cn(
-                  "rounded-md text-sidebar-foreground/70 hover:bg-sidebar-accent/80 hover:text-sidebar-accent-foreground",
-                  childActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                  "relative h-8 rounded-md px-2 text-[12.5px] font-medium text-sidebar-foreground/58 transition-colors hover:bg-white/[0.05] hover:text-sidebar-accent-foreground",
+                  childActive &&
+                    "bg-white/[0.07] font-semibold text-sidebar-accent-foreground before:absolute before:-left-[13px] before:h-4 before:w-0.5 before:rounded-full before:bg-brand-green hover:bg-white/[0.07]"
                 )}
                 render={
                   <Link href={child.href} aria-current={childActive ? "page" : undefined}>
