@@ -37,11 +37,11 @@ export function PageHeader({
   className?: string;
   tone?: "dashboard" | "collecte" | "dossiers" | "preparation" | "numerisation" | "conditionnement" | "indexation" | "archivage" | "transfer" | "quality" | "admin";
 }) {
-  const toneColor = tone ? `var(--activity-${tone})` : null;
+  const toneColor = tone ? `var(--workspace-page-accent, var(--activity-${tone}))` : null;
   const toneStyle = toneColor ? { "--page-tone": toneColor } as CSSProperties : undefined;
   return (
     <section style={toneStyle} className={cn("relative min-w-0 overflow-hidden rounded-lg border border-border/70 bg-card/95 p-4 shadow-[0_1px_2px_rgba(16,24,40,0.05),0_18px_48px_rgba(16,24,40,0.07)] sm:p-5 lg:p-6", className)}>
-      <div style={toneColor ? { backgroundColor: toneColor } : undefined} className={cn("absolute inset-x-0 top-0 h-1", !toneColor && "bg-gradient-to-r from-primary via-brand-green to-brand-gold")} aria-hidden="true" />
+      <div style={toneColor ? { backgroundColor: toneColor } : undefined} className="absolute inset-x-0 top-0 h-1 bg-primary" aria-hidden="true" />
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/8 to-transparent" aria-hidden="true" />
       <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 space-y-3">
