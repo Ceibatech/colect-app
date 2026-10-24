@@ -17,9 +17,11 @@ import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { buildBreadcrumb } from "@/lib/utils/breadcrumb";
 import type { RoleCode } from "@/lib/permissions/constants";
+import { useWorkspaceTheme } from "@/components/layout/WorkspaceTheme";
 
 export function Header({ name, email, roleCode }: { name: string; email: string; roleCode: RoleCode }) {
   const pathname = usePathname();
+  const workspace = useWorkspaceTheme();
   const crumbs = buildBreadcrumb(pathname).map((crumb) =>
     roleCode === "VALIDATEUR_CEIBAC" && crumb.href === "/transferts"
       ? { ...crumb, title: "Validation interne" }
@@ -27,7 +29,7 @@ export function Header({ name, email, roleCode }: { name: string; email: string;
   );
 
   return (
-    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-background/85 px-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70 sm:px-4">
+    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between gap-3 border-t-2 border-t-primary border-b border-b-border/70 bg-background/85 px-3 backdrop-blur-xl supports-[backdrop-filter]:bg-background/70 sm:px-4">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
         <Separator orientation="vertical" className="hidden h-5 sm:block" />
@@ -55,6 +57,11 @@ export function Header({ name, email, roleCode }: { name: string; email: string;
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
+        {workspace?.isMultiFunction && workspace.activityLabel ? (
+          <span className="hidden rounded-md border border-primary/25 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary xl:inline-flex">
+            {workspace.activityLabel}
+          </span>
+        ) : null}
         <div className="hidden items-center gap-1.5 rounded-md border border-border/70 bg-card/80 px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-sm lg:flex">
           <ShieldCheck className="h-3.5 w-3.5 text-brand-green" />
           Session sécurisée

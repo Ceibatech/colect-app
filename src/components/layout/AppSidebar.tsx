@@ -20,9 +20,8 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { NAV_ITEMS, isNavItemVisible, type NavItem } from "@/config/navigation";
-import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
+import { getRoleLabel, type PermissionCode, type RoleCode } from "@/lib/permissions/constants";
 import { cn } from "@/lib/utils";
-import type { CSSProperties } from "react";
 
 function isActive(pathname: string, href: string) {
   return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -57,6 +56,10 @@ export function AppSidebar({ permissions, roleCode }: { permissions: PermissionC
             <span className="truncate text-xs text-sidebar-foreground/60">SAE interne CEIBA</span>
           </div>
         </div>
+        <div className="flex items-center gap-2 rounded-md border border-sidebar-border bg-sidebar-accent/50 px-2.5 py-2 text-xs text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[var(--workspace-role-mark)]" aria-hidden="true" />
+          <span>{getRoleLabel(roleCode)}</span>
+        </div>
       </SidebarHeader>
 
       <SidebarContent className="px-1.5 pb-3">
@@ -82,7 +85,6 @@ export function AppSidebar({ permissions, roleCode }: { permissions: PermissionC
 function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pathname: string; permissions: PermissionCode[]; roleCode: RoleCode }) {
   const children = item.children?.filter((child) => isNavItemVisible(child, permissions, roleCode));
   const active = isActive(pathname, item.href);
-  const toneStyle = { "--activity-tone": `var(--activity-${item.tone ?? "dashboard"})` } as CSSProperties;
 
   const trigger = (
     <SidebarMenuButton
@@ -91,7 +93,7 @@ function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pa
       className={cn(
         "relative h-9 rounded-md px-2.5 text-[13px] font-medium text-sidebar-foreground/75 transition-colors [&>svg]:size-[17px] [&>svg]:text-sidebar-foreground/60 hover:bg-sidebar-accent/65 hover:text-sidebar-accent-foreground hover:[&>svg]:text-sidebar-foreground/85",
         active &&
-          "bg-sidebar-accent/90 text-sidebar-accent-foreground before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-[var(--activity-tone)] [&>svg]:text-[var(--activity-tone)] hover:bg-sidebar-accent/90 hover:[&>svg]:text-[var(--activity-tone)]"
+          "data-active:bg-sidebar-primary data-active:text-sidebar-primary-foreground [&>svg]:text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground hover:[&>svg]:text-sidebar-primary-foreground"
       )}
       render={
         <Link href={item.href} aria-current={active ? "page" : undefined}>
@@ -103,11 +105,11 @@ function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pa
   );
 
   if (!children || children.length === 0) {
-    return <SidebarMenuItem style={toneStyle}>{trigger}</SidebarMenuItem>;
+    return <SidebarMenuItem>{trigger}</SidebarMenuItem>;
   }
 
   return (
-    <SidebarMenuItem style={toneStyle}>
+    <SidebarMenuItem>
       {trigger}
       <SidebarMenuSub className="mx-0 mb-0.5 ml-4 mt-1 gap-0.5 border-sidebar-border/70 px-0 py-0.5 pl-3">
         {children.map((child) => {
@@ -119,7 +121,7 @@ function NavEntry({ item, pathname, permissions, roleCode }: { item: NavItem; pa
                 className={cn(
                   "relative h-8 rounded-md px-2 text-[12.5px] font-medium text-sidebar-foreground/58 transition-colors hover:bg-white/[0.05] hover:text-sidebar-accent-foreground",
                   childActive &&
-                    "bg-white/[0.07] font-semibold text-sidebar-accent-foreground before:absolute before:-left-[13px] before:h-4 before:w-0.5 before:rounded-full before:bg-[var(--activity-tone)] hover:bg-white/[0.07]"
+                    "bg-white/[0.07] font-semibold text-sidebar-accent-foreground before:absolute before:-left-[13px] before:h-4 before:w-0.5 before:rounded-full before:bg-sidebar-primary hover:bg-white/[0.07]"
                 )}
                 render={
                   <Link href={child.href} aria-current={childActive ? "page" : undefined}>

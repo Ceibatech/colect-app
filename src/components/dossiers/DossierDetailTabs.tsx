@@ -28,6 +28,7 @@ import { IndexingWorkspace } from "@/components/dossiers/IndexingWorkspace";
 import type { IndexingFieldOption } from "@/components/dossiers/DocumentPreindexDialog";
 import type { PermissionCode } from "@/lib/permissions/constants";
 import { ETAT_CONSERVATION_OPTIONS } from "@/lib/validation/dossier";
+import { useDossierWorkspaceActivity } from "@/components/layout/WorkspaceTheme";
 
 function etatLabel(value: "BON_ETAT" | "DEGRADE" | null) {
   return ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label ?? null;
@@ -179,6 +180,7 @@ export function DossierDetailTabs({
   // documenté dans ARCHITECTURE.md). <Tabs>/<TabsList>/<TabsTrigger>
   // restent utilisés normalement pour la navigation.
   const [tab, setTab] = useState<string>(initialTab);
+  useDossierWorkspaceActivity(tab);
   const archivedDocumentCount = dossier.documents.filter(
     (document) => document.digitalArchiveStatus === "ARCHIVE",
   ).length;
