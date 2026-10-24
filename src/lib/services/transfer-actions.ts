@@ -388,7 +388,14 @@ export async function createTransferLot(
         },
       });
       return { id: lot.id, reference };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+      // Up to 200 cartons and all their dossiers are checked and saved atomically.
+      // The remote inventory database can exceed Prisma's default 5-second limit
+      // during the stock checks alone. Keep a bounded budget for this operation.
+      maxWait: 10_000,
+      timeout: 60_000,
+    });
 
     revalidatePath("/transferts");
     revalidatePath("/transferts/validation");
@@ -400,6 +407,9 @@ export async function createTransferLot(
       return { error: "Un autre transfert vient de modifier ce stock. Actualisez puis réessayez." };
     }
     console.error("Transfer lot creation failed.", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028") {
+      return { error: "L'enregistrement du lot a dépassé le délai disponible. Consultez le registre avant de réessayer pour vérifier si le lot a été créé." };
+    }
     return { error: "Le lot de transfert n'a pas pu être créé." };
   }
 }
