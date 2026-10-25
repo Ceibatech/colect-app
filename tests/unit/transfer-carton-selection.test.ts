@@ -7,8 +7,8 @@ import {
 describe("transfer carton selection", () => {
   it("an exact permanent reference cannot match another carton's old label", () => {
     const items = groupAvailableTransferCartons([
-      { ...row(1, "OLD", null), cartonId: 10 },
-      { ...row(2, "CTN-00000010", null), cartonId: 11 },
+      row(1, 10, "OLD", null),
+      row(2, 11, "CTN-00000010", null),
     ]).items;
     expect(filterTransferCartons(items, "ctn-00000010").map((item) => item.token)).toEqual(["carton:10"]);
   });
