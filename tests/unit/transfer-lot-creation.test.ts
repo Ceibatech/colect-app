@@ -6,9 +6,10 @@ const mocks = vi.hoisted(() => ({
   conflict: vi.fn(), createLot: vi.fn(), createItems: vi.fn(),
   createDossiers: vi.fn(), audit: vi.fn(), revalidate: vi.fn(),
   findDossiers: vi.fn(), lockCartons: vi.fn(), reservedCarton: vi.fn(),
+  users: vi.fn(), createParticipants: vi.fn(),
 }));
 vi.mock("@/lib/auth/current-user", () => ({ requirePermission: mocks.permission }));
-vi.mock("@/lib/prisma/client", () => ({ prisma: { site: { findFirst: mocks.site }, entrepot: { findFirst: mocks.entrepot }, $transaction: mocks.transaction } }));
+vi.mock("@/lib/prisma/client", () => ({ prisma: { site: { findFirst: mocks.site }, entrepot: { findFirst: mocks.entrepot }, user: { findMany: mocks.users }, $transaction: mocks.transaction } }));
 vi.mock("@/lib/utils/server-request", () => ({ getClientIp: async () => "192.0.2.1" }));
 vi.mock("@/lib/services/transfer-notification-service", () => ({ notifyTransferWorkflow: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidate }));
@@ -28,9 +29,9 @@ function form(tokens: Array<string | null> = cartons.map(buildTransferCartonToke
   const data = new FormData();
   Object.entries({
     sourceSiteId: "2", destinationSiteId: "3", plannedAt: "2026-11-01T08:00:00Z",
-    archiveSupport: "PHYSIQUE", plannedRoute: "Ministère vers CEIBA", transportMethod: "Fourgon sécurisé",
-    ceibaParticipants: "Équipe CEIBA", sdaParticipants: "Équipe SDA", riskAssessment: "Risques évalués",
-    securityMeasures: "Cartons scellés", motif: "Traitement documentaire",
+    archiveSupport: "PHYSIQUE", plannedRoute: "Ministère vers CEIBA", transportMethod: "FOURGON_PRESTATAIRE",
+    ceibaParticipantIds: "4", sdaParticipantIds: "9", risks: "PERTE",
+    securityMeasures: "SCELLES", motif: "Traitement documentaire",
     cartonTokens: JSON.stringify(tokens),
   }).forEach(([key, value]) => data.set(key, value));
   return data;
@@ -40,7 +41,11 @@ describe("creation of a full 200-carton transfer batch", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.permission.mockResolvedValue({ userId: 7 });
-    mocks.site.mockResolvedValue({ id: 2 });
+    mocks.site.mockImplementation(async ({ where }: { where: { id: number } }) => ({ id: where.id, organisation: where.id === 3 ? "CEIBA" : "MINISTERE" }));
+    mocks.users.mockResolvedValue([
+      { id: 4, name: "Agent CEIBA", role: { code: "GESTIONNAIRE_TRANSFERT" } },
+      { id: 9, name: "Agent SDA", role: { code: "VALIDATEUR_MINISTERE" } },
+    ]);
     mocks.entrepot.mockResolvedValue({ id: 7 });
     mocks.conflict.mockResolvedValue(null);
     mocks.reservedCarton.mockResolvedValue(null);
@@ -67,6 +72,7 @@ describe("creation of a full 200-carton transfer batch", () => {
           create: mocks.createLot,
           update: async () => ({}),
         },
+        transferLotParticipant: { createMany: mocks.createParticipants },
         dossier: { findMany: async (query: unknown) => { elapsed = 5_200; return mocks.findDossiers(query); } },
         transferLotDossier: {
           findFirst: async () => { checkBudget(); return mocks.conflict(); },
@@ -176,5 +182,52 @@ describe("creation of a full 200-carton transfer batch", () => {
     expect(result.error).toContain("Consultez le registre avant de réessayer");
     expect(result.success).toBeUndefined();
     expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it("fige les intervenants habilités et les choix de planification dans le lot", async () => {
+    const result = await createTransferLot({}, form());
+    expect(result).toMatchObject({ success: true });
+    expect(mocks.createLot).toHaveBeenCalledWith({ data: expect.objectContaining({
+      transportMethod: "Fourgon sécurisé d'un prestataire agréé",
+      ceibaParticipants: "Agent CEIBA — Gestionnaire des transferts CEIBA",
+      sdaParticipants: "Agent SDA — Responsable validation SDA",
+      riskAssessment: "Perte ou égarement de cartons",
+      securityMeasures: "Cartons fermés et scellés numérotés",
+    }) });
+    expect(mocks.createParticipants).toHaveBeenCalledWith({ data: [
+      { transferLotId: 42, userId: 4, side: "CEIBA", roleCode: "GESTIONNAIRE_TRANSFERT" },
+      { transferLotId: 42, userId: 9, side: "SDA", roleCode: "VALIDATEUR_MINISTERE" },
+    ] });
+  });
+
+  it("accepte le sens retour, d'un site CEIBA vers un site du ministère", async () => {
+    mocks.site.mockImplementation(async ({ where }: { where: { id: number } }) => ({ id: where.id, organisation: where.id === 2 ? "CEIBA" : "MINISTERE" }));
+    const result = await createTransferLot({}, form());
+    expect(result).toMatchObject({ success: true, lotId: 42 });
+    expect(mocks.audit).toHaveBeenCalledWith({ data: expect.objectContaining({ newValue: expect.objectContaining({ direction: "RESTITUTION" }) }) });
+  });
+
+  it("refuse une opération entre deux sites du même côté", async () => {
+    mocks.site.mockResolvedValue({ id: 2, organisation: "MINISTERE" });
+    const result = await createTransferLot({}, form());
+    expect(result.error).toContain("dans un sens ou dans l'autre");
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("refuse un intervenant SDA qui n'a pas de profil de transfert SDA", async () => {
+    const data = form();
+    data.set("sdaParticipantIds", "4");
+    const result = await createTransferLot({}, data);
+    expect(result.error).toContain("intervenant SDA");
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("exige une précision pour le moyen de transport « Autre »", async () => {
+    const data = form();
+    data.set("transportMethod", "AUTRE");
+    expect((await createTransferLot({}, data)).error).toContain("moyen de transport");
+    data.set("transportMethodOther", "Pirogue motorisée");
+    expect(await createTransferLot({}, data)).toMatchObject({ success: true });
+    expect(mocks.createLot).toHaveBeenLastCalledWith({ data: expect.objectContaining({ transportMethod: "Autre : Pirogue motorisée" }) });
   });
 });

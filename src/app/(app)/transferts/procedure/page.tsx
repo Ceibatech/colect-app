@@ -35,7 +35,7 @@ export default async function TransferProcedurePage() {
         eyebrow="Référentiel opérationnel"
         icon={BookOpenCheck}
         title="Procédure de transfert et de sécurisation"
-        description="Règles applicables aux archives du ministère entre le site de départ et le site CEIBA destinataire."
+        description="Règles applicables aux archives du ministère entre un site du ministère et un site CEIBA, dans les deux sens : prise en charge puis restitution."
         actions={<Link href="/transferts" className={buttonVariants({ variant: "outline" })}><ArrowLeft /> Registre</Link>}
         stats={[
           { label: "Autorisation", value: "F01" },

@@ -211,7 +211,7 @@ export default async function TransfersPage() {
                   <div className="grid grid-cols-3 gap-3 border-y border-border/60 py-3 text-sm">
                     <Metric label="Dossiers" value={row.stock.total} />
                     <Metric label="En circulation" value={row.stock.outsideOrigin} />
-                    <Metric label="Au site CEIBA" value={row.stock.atDestination} />
+                    <Metric label="À destination" value={row.stock.atDestination} />
                   </div>
                   <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                     <span>{row.destination}</span>
@@ -229,7 +229,7 @@ export default async function TransfersPage() {
                     <TableHead>Trajet</TableHead>
                     <TableHead className="text-center">Dossiers</TableHead>
                     <TableHead className="text-center">En circulation</TableHead>
-                    <TableHead className="text-center">Au site CEIBA</TableHead>
+                    <TableHead className="text-center">À destination</TableHead>
                     <TableHead>Mouvements</TableHead>
                     <TableHead>État</TableHead>
                     <TableHead className="pr-5 text-right">Accès</TableHead>

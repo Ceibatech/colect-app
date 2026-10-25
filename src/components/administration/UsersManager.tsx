@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { createUser, updateUser, type ActionResult } from "@/lib/services/user-admin-service";
 import { cn } from "@/lib/utils";
 import { SendPendingUsersAccessDialog, SendUserAccessButton } from "@/components/administration/UserAccessEmailControls";
-import { getRoleLabel, ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
+import { getRoleLabel, ROLE_CODES, TRANSFER_ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
 import { normalizePersonName, personInitials } from "@/lib/utils/person-name";
 
 export interface UserRow {
@@ -63,7 +63,7 @@ function displayRoleName(role: Pick<RoleOption, "code" | "name">) {
 
 function roleBadgeClass(code: string) {
   if (["ADMIN", "SUPERVISEUR"].includes(code)) return "border-primary/25 bg-primary/8 text-primary";
-  if (["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE"].includes(code)) return "border-brand-green/30 bg-brand-green/10 text-brand-green";
+  if ((TRANSFER_ROLE_CODES as readonly string[]).includes(code)) return "border-brand-green/30 bg-brand-green/10 text-brand-green";
   if (code === "FINANCE") return "border-brand-gold/35 bg-brand-gold/10 text-brand-gold";
   if (["EXECUTIF", "PMO", "CONSULTATION"].includes(code)) return "border-sky-500/25 bg-sky-500/10 text-sky-700 dark:text-sky-300";
   return "border-border bg-muted/60 text-foreground";
@@ -100,7 +100,7 @@ function RoleSelect({
           <SelectItem key={o.value} value={o.value}>
             <span className="flex w-full items-center justify-between gap-3">
               <span>{o.label}</span>
-              {o.code === "EXECUTIF" || o.code === "PMO" ? (
+              {o.code === "EXECUTIF" || o.code === "EXECUTIF_SDA" || o.code === "PMO" ? (
                 <span className="rounded-sm border border-primary/20 bg-primary/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-primary">
                   Lecture seule
                 </span>
@@ -108,7 +108,7 @@ function RoleSelect({
                 <span className="rounded-sm border border-brand-gold/30 bg-brand-gold/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand-gold">
                   Budget
                 </span>
-              ) : o.code === "GESTIONNAIRE_TRANSFERT" || o.code === "VALIDATEUR_CEIBAC" || o.code === "VALIDATEUR_MINISTERE" ? (
+              ) : (TRANSFER_ROLE_CODES as readonly string[]).includes(o.code) ? (
                 <span className="rounded-sm border border-brand-green/30 bg-brand-green/8 px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand-green">
                   Transferts
                 </span>

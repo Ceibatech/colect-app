@@ -47,8 +47,9 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     expect(writePerms).toEqual([]);
   });
 
-  it("EXECUTIF est strictement limité aux tableaux de bord", () => {
-    expect(ROLE_PERMISSIONS.EXECUTIF).toEqual(["DASHBOARD_VIEW"]);
+  it("EXECUTIF est limité aux tableaux de bord et à la lecture des transferts", () => {
+    expect(ROLE_PERMISSIONS.EXECUTIF).toEqual(["DASHBOARD_VIEW", "TRANSFER_VIEW"]);
+    expect(ROLE_PERMISSIONS.EXECUTIF_SDA).toEqual(["DASHBOARD_VIEW", "TRANSFER_VIEW"]);
   });
 
   it("FINANCE ne reçoit que le pilotage financier", () => {
@@ -109,7 +110,7 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     expect(new Set(rolesWithReject)).toEqual(new Set(["ADMIN", "SUPERVISEUR"]));
   });
 
-  it("réserve les opérations de transfert au gestionnaire dédié et à ADMIN", () => {
+  it("répartit les actions de transfert entre les profils CEIBA et SDA", () => {
     const rolesWithCreate = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_CREATE"));
     const rolesWithOperate = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_OPERATE"));
     const rolesWithAuthorize = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_AUTHORIZE"));
@@ -118,11 +119,12 @@ describe("ROLE_PERMISSIONS (matrice RBAC)", () => {
     const rolesWithTracking = ROLE_CODES.filter((role) => ROLE_PERMISSIONS[role].includes("TRANSFER_TRACK"));
 
     expect(new Set(rolesWithCreate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
-    expect(new Set(rolesWithOperate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
+    expect(new Set(rolesWithOperate)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT", "GESTIONNAIRE_TRANSFERT_SDA"]));
     expect(new Set(rolesWithAuthorize)).toEqual(new Set(["ADMIN", "SUPERVISEUR", "VALIDATEUR_MINISTERE"]));
     expect(new Set(rolesWithCeibacValidation)).toEqual(new Set(["ADMIN", "VALIDATEUR_CEIBAC"]));
     expect(new Set(rolesWithCeibacApproval)).toEqual(new Set(["ADMIN", "VALIDATEUR_CEIBAC"]));
-    expect(new Set(rolesWithTracking)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT"]));
+    expect(new Set(rolesWithTracking)).toEqual(new Set(["ADMIN", "GESTIONNAIRE_TRANSFERT", "CONVOYEUR"]));
+    expect(ROLE_PERMISSIONS.CONVOYEUR).toEqual(["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_TRACK"]);
     expect(ROLE_PERMISSIONS.OPERATEUR).not.toContain("TRANSFER_VIEW");
   });
 

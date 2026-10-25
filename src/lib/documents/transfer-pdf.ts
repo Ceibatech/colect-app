@@ -96,7 +96,7 @@ export async function createTransferAuthorizationPdf(input: TransferAuthorizatio
     ["Autorisé le", formatDateTime(input.authorizedAt)],
     ["Transfert prévu", input.plannedAt ? formatDate(input.plannedAt) : "À planifier"],
     ["Site de départ et adresse", `${input.source} - ${input.sourceAddress}`],
-    ["Site CEIBA de réception", `${input.destination} - ${input.destinationAddress}`],
+    ["Site de réception et adresse", `${input.destination} - ${input.destinationAddress}`],
   ]);
 
   writer.section("Périmètre autorisé");
@@ -166,10 +166,10 @@ export async function createTransferMovementPdf(input: TransferMovementPdfInput)
   const to = returns ? input.source : input.destination;
   const toAddress = returns ? input.sourceAddress : input.destinationAddress;
   const direction = input.type === "SORTIE"
-    ? "Site du ministère vers site CEIBA"
+    ? "Site de départ vers site de destination"
     : input.type === "RETOUR"
-      ? "Site CEIBA vers site du ministère"
-      : "Réception au site de traitement CEIBA";
+      ? "Retour vers le site d'origine"
+      : "Réception au site de destination";
 
   writer.section("A - Identification du déplacement");
   writer.fields([

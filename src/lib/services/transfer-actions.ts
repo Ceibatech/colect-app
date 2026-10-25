@@ -16,6 +16,9 @@ import {
 } from "@/lib/utils/transfer-stock";
 import { getClientIp } from "@/lib/utils/server-request";
 import { buildTransferCartonToken, MAX_TRANSFER_CARTONS } from "@/lib/transfers/carton-selection";
+import { resolveTransferDirection } from "@/lib/transfers/direction";
+import { resolveMultiChoice, resolveSingleChoice, SECURITY_MEASURES, TRANSFER_RISKS, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
+import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
 import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 
 export interface TransferActionState {
@@ -181,6 +184,35 @@ function movementNotificationDetails(movement: NonNullable<Awaited<ReturnType<ty
   ];
 }
 
+type ParticipantUser = { id: number; name: string; role: { code: string } };
+
+/**
+ * Les intervenants sont des comptes actifs du profil de transfert de leur côté :
+ * CEIBA (gestionnaire, validateur interne, convoyeur) et SDA (gestionnaire SDA,
+ * responsable validation SDA). La mention imprimée est figée au nom et au profil.
+ */
+function resolveParticipants(users: ParticipantUser[], ceibaIds: number[], sdaIds: number[]) {
+  const byId = new Map(users.map((user) => [user.id, user]));
+  const sides = [
+    { side: "CEIBA" as const, ids: [...new Set(ceibaIds)], allowed: CEIBA_TRANSFER_ROLE_CODES as readonly string[], label: "CEIBA" },
+    { side: "SDA" as const, ids: [...new Set(sdaIds)], allowed: SDA_TRANSFER_ROLE_CODES as readonly string[], label: "SDA" },
+  ];
+  const rows: Array<{ userId: number; side: "CEIBA" | "SDA"; roleCode: string }> = [];
+  const texts: Record<"CEIBA" | "SDA", string[]> = { CEIBA: [], SDA: [] };
+  for (const { side, ids, allowed, label } of sides) {
+    for (const id of ids) {
+      const user = byId.get(id);
+      if (!user || !allowed.includes(user.role.code)) {
+        return { error: `Un intervenant ${label} n'est plus actif ou n'a pas de profil de transfert ${label}. Actualisez la liste.` };
+      }
+      if (rows.some((row) => row.userId === id)) return { error: "Un même compte ne peut pas intervenir des deux côtés." };
+      rows.push({ userId: id, side, roleCode: user.role.code });
+      texts[side].push(`${user.name} — ${getRoleLabel(user.role.code as RoleCode)}`);
+    }
+  }
+  return { rows, ceibaText: texts.CEIBA.join("; "), sdaText: texts.SDA.join("; ") };
+}
+
 export async function createTransferLot(
   _previous: TransferActionState,
   formData: FormData,
@@ -196,14 +228,24 @@ export async function createTransferLot(
     archiveSupport: formData.get("archiveSupport"),
     plannedRoute: formData.get("plannedRoute"),
     transportMethod: formData.get("transportMethod"),
-    ceibaParticipants: formData.get("ceibaParticipants"),
-    sdaParticipants: formData.get("sdaParticipants"),
-    riskAssessment: formData.get("riskAssessment"),
-    securityMeasures: formData.get("securityMeasures"),
+    transportMethodOther: formData.get("transportMethodOther"),
+    ceibaParticipantIds: formData.getAll("ceibaParticipantIds"),
+    sdaParticipantIds: formData.getAll("sdaParticipantIds"),
+    risks: formData.getAll("risks"),
+    riskOther: formData.get("riskOther"),
+    securityMeasures: formData.getAll("securityMeasures"),
+    securityMeasureOther: formData.get("securityMeasureOther"),
     motif: formData.get("motif"),
     cartonTokens: parseStringList(formData.get("cartonTokens")),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Lot de transfert invalide." };
+
+  const transportMethod = resolveSingleChoice(TRANSPORT_METHODS, parsed.data.transportMethod, parsed.data.transportMethodOther);
+  if (!transportMethod) return { error: "Choisissez le moyen de transport (précisez-le si « Autre »)." };
+  const risks = resolveMultiChoice(TRANSFER_RISKS, parsed.data.risks, parsed.data.riskOther);
+  if (!risks?.length) return { error: "Cochez les risques identifiés (précisez-les si « Autre »)." };
+  const securityMeasures = resolveMultiChoice(SECURITY_MEASURES, parsed.data.securityMeasures, parsed.data.securityMeasureOther);
+  if (!securityMeasures?.length) return { error: "Cochez les mesures de sécurisation (précisez-les si « Autre »)." };
 
   if (
     parsed.data.sourceSiteId === parsed.data.destinationSiteId
@@ -228,18 +270,27 @@ export async function createTransferLot(
     cartonIds.push(identity.cartonId);
   }
 
-  const [sourceSite, destinationSite, sourceEntrepot, destinationEntrepot] = await Promise.all([
-    prisma.site.findFirst({ where: { id: parsed.data.sourceSiteId, isActive: true, organisation: "MINISTERE" }, select: { id: true } }),
-    prisma.site.findFirst({ where: { id: parsed.data.destinationSiteId, isActive: true, organisation: "CEIBA" }, select: { id: true } }),
+  const [sourceSite, destinationSite, sourceEntrepot, destinationEntrepot, participantUsers] = await Promise.all([
+    prisma.site.findFirst({ where: { id: parsed.data.sourceSiteId, isActive: true }, select: { id: true, organisation: true } }),
+    prisma.site.findFirst({ where: { id: parsed.data.destinationSiteId, isActive: true }, select: { id: true, organisation: true } }),
     parsed.data.sourceEntrepotId
       ? prisma.entrepot.findFirst({ where: { id: parsed.data.sourceEntrepotId, siteId: parsed.data.sourceSiteId, isActive: true }, select: { id: true } })
       : Promise.resolve(null),
     parsed.data.destinationEntrepotId
       ? prisma.entrepot.findFirst({ where: { id: parsed.data.destinationEntrepotId, siteId: parsed.data.destinationSiteId, isActive: true }, select: { id: true } })
       : Promise.resolve(null),
+    prisma.user.findMany({
+      where: { id: { in: [...parsed.data.ceibaParticipantIds, ...parsed.data.sdaParticipantIds] }, isActive: true },
+      select: { id: true, name: true, role: { select: { code: true } } },
+    }),
   ]);
-  if (!sourceSite) return { error: "Le point de départ doit être un site d'inventaire actif du ministère." };
-  if (!destinationSite) return { error: "La destination doit être un site de traitement CEIBA actif." };
+  if (!sourceSite || !destinationSite) return { error: "Le site de départ et le site de destination doivent être actifs." };
+  const direction = resolveTransferDirection(sourceSite.organisation, destinationSite.organisation);
+  if (!direction) {
+    return { error: "Une opération relie un site du ministère et un site CEIBA, dans un sens ou dans l'autre." };
+  }
+  const participants = resolveParticipants(participantUsers, parsed.data.ceibaParticipantIds, parsed.data.sdaParticipantIds);
+  if ("error" in participants) return { error: participants.error };
   if (parsed.data.sourceEntrepotId && !sourceEntrepot) return { error: "L'entrepôt de départ est invalide." };
   if (parsed.data.destinationEntrepotId && !destinationEntrepot) return { error: "L'entrepôt de destination est invalide." };
 
@@ -340,11 +391,11 @@ export async function createTransferLot(
           plannedAt,
           archiveSupport: parsed.data.archiveSupport,
           plannedRoute: parsed.data.plannedRoute,
-          transportMethod: parsed.data.transportMethod,
-          ceibaParticipants: parsed.data.ceibaParticipants,
-          sdaParticipants: parsed.data.sdaParticipants,
-          riskAssessment: parsed.data.riskAssessment,
-          securityMeasures: parsed.data.securityMeasures,
+          transportMethod,
+          ceibaParticipants: participants.ceibaText,
+          sdaParticipants: participants.sdaText,
+          riskAssessment: risks.join("; "),
+          securityMeasures: securityMeasures.join("; "),
           motif: parsed.data.motif || null,
           createdById: session.userId,
         },
@@ -352,6 +403,9 @@ export async function createTransferLot(
       const year = new Date().getUTCFullYear();
       const reference = `LOT-${year}-${String(lot.id).padStart(6, "0")}`;
       await tx.transferLot.update({ where: { id: lot.id }, data: { reference } });
+      await tx.transferLotParticipant.createMany({
+        data: participants.rows.map((row) => ({ transferLotId: lot.id, ...row })),
+      });
 
       if (unlocatedIds.length > 0) {
         const attached = await tx.dossier.updateMany({
@@ -391,7 +445,7 @@ export async function createTransferLot(
           action: "TRANSFER_LOT_CREATE",
           entity: "TRANSFER_LOT",
           entityId: lot.id,
-          newValue: { reference, dossierCount: dossierIds.length, attachedToSourceCount: unlocatedIds.length, cartonCount: groups.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId },
+          newValue: { reference, direction, dossierCount: dossierIds.length, attachedToSourceCount: unlocatedIds.length, cartonCount: groups.length, sourceSiteId: parsed.data.sourceSiteId, destinationSiteId: parsed.data.destinationSiteId, participantUserIds: participants.rows.map((row) => row.userId) },
           ipAddress: ip,
         },
       });

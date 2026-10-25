@@ -190,12 +190,15 @@ export function TransferMovementDialog({
   items,
   sourceLabel,
   destinationLabel,
+  escortSuggestions = [],
 }: {
   lotId: number;
   type: TransferMovementTypeCode;
   items: TransferMovementItemOption[];
   sourceLabel: string;
   destinationLabel: string;
+  /** Convoyeurs désignés sur l'opération, proposés pour le champ convoyeur. */
+  escortSuggestions?: string[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -269,7 +272,7 @@ export function TransferMovementDialog({
               <div className="space-y-2"><Label htmlFor={`${type}-vehicleDescription`}>Véhicule sécurisé</Label><Input id={`${type}-vehicleDescription`} name="vehicleDescription" required maxLength={160} placeholder="Type, couleur ou identification" disabled={pending} /></div>
               <div className="space-y-2"><Label htmlFor={`${type}-driverName`}>Chauffeur</Label><Input id={`${type}-driverName`} name="driverName" required maxLength={120} disabled={pending} /></div>
               <div className="space-y-2"><Label htmlFor={`${type}-driverPhone`}>Téléphone du chauffeur</Label><Input id={`${type}-driverPhone`} name="driverPhone" type="tel" maxLength={40} disabled={pending} /></div>
-              <div className="space-y-2"><Label htmlFor={`${type}-ceibaEscortName`}>Convoyeur CEIBA</Label><Input id={`${type}-ceibaEscortName`} name="ceibaEscortName" required maxLength={120} disabled={pending} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-ceibaEscortName`}>Convoyeur CEIBA</Label><Input id={`${type}-ceibaEscortName`} name="ceibaEscortName" required maxLength={120} disabled={pending} list={escortSuggestions.length ? `${type}-escort-options` : undefined} defaultValue={escortSuggestions.length === 1 ? escortSuggestions[0] : undefined} />{escortSuggestions.length ? <datalist id={`${type}-escort-options`}>{escortSuggestions.map((name) => <option key={name} value={name} />)}</datalist> : null}</div>
               {!isReception ? <div className="space-y-2"><Label htmlFor={`${type}-sealReferences`}>Références des scellés</Label><Input id={`${type}-sealReferences`} name="sealReferences" maxLength={2000} placeholder="Numéros séparés par des virgules" disabled={pending} /></div> : null}
             </div>
           </section>

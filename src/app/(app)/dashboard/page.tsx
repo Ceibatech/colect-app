@@ -63,6 +63,24 @@ const DASHBOARD_COPY: Record<RoleCode, { eyebrow: string; title: string; descrip
     description: "Validez les opérations soumises avant leur transmission au SDA et contrôlez les constats d'arrivée.",
     progress: "Transferts contrôlés",
   },
+  CONVOYEUR: {
+    eyebrow: "Convoi",
+    title: "Suivi des convois",
+    description: "Retrouvez les lots en cours de transport et partagez la position du convoi.",
+    progress: "Convois suivis",
+  },
+  GESTIONNAIRE_TRANSFERT_SDA: {
+    eyebrow: "Transferts SDA",
+    title: "Remises et réceptions SDA",
+    description: "Remettez ou réceptionnez les cartons sur les sites du ministère et signez les bordereaux.",
+    progress: "Mouvements tracés",
+  },
+  EXECUTIF_SDA: {
+    eyebrow: "Vue exécutive SDA",
+    title: "Pilotage des transferts",
+    description: "Lecture globale des opérations de transfert, du stock par site et des preuves signées.",
+    progress: "Transferts suivis",
+  },
   VALIDATEUR_MINISTERE: {
     eyebrow: "Validation SDA",
     title: "Validation des transferts",
@@ -102,7 +120,8 @@ export default async function DashboardPage() {
     // Les sessions déjà ouvertes gardent leurs permissions jusqu'à la reconnexion.
     redirect(session.permissions.includes("TRANSFER_CEIBAC_APPROVE") ? "/transferts/validation-ceibac" : "/transferts");
   }
-  if (session.roleCode === "GESTIONNAIRE_TRANSFERT") redirect("/transferts");
+  // Le registre des transferts sert de tableau de bord aux profils du circuit.
+  if (["GESTIONNAIRE_TRANSFERT", "GESTIONNAIRE_TRANSFERT_SDA", "CONVOYEUR", "EXECUTIF_SDA"].includes(session.roleCode)) redirect("/transferts");
   if (session.roleCode === "PREPARATEUR") redirect("/preparation");
   if (session.roleCode === "NUMERISATEUR") redirect("/numerisation");
   if (session.roleCode === "CONDITIONNEUR") redirect("/conditionnement");
