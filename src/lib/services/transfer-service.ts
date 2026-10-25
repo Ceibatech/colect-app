@@ -34,6 +34,8 @@ export async function getTransferCreateData() {
         code: true,
         nom: true,
         organisation: true,
+        latitude: true,
+        longitude: true,
         entrepots: {
           where: { isActive: true },
           orderBy: { nom: "asc" },
