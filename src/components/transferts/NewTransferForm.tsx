@@ -2,9 +2,11 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ListChecks, Loader2, PackageCheck, Search } from "lucide-react";
+import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ExternalLink, ListChecks, Loader2, LocateFixed, PackageCheck, Route, Search } from "lucide-react";
 import { toast } from "sonner";
 import { createTransferLot, type TransferActionState } from "@/lib/services/transfer-actions";
+import { suggestTransferRoute } from "@/lib/services/transfer-route-service";
+import { buildGoogleMapsDirectionsUrl, formatRouteText, isValidGeoPoint, type GeoPoint } from "@/lib/transfers/route-suggestion";
 import { MAX_TRANSFER_CARTONS, type TransferCartonItem } from "@/lib/transfers/carton-selection";
 import { TRANSFER_DIRECTIONS, type TransferDirection } from "@/lib/transfers/direction";
 import { OTHER_OPTION, SECURITY_MEASURES, TRANSFER_RISKS, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
@@ -23,6 +25,8 @@ interface SiteOption {
   code: string;
   nom: string;
   organisation: "MINISTERE" | "CEIBA" | "AUTRE";
+  latitude: number | null;
+  longitude: number | null;
   entrepots: Array<{ id: number; code: string; nom: string; localisation: string | null }>;
 }
 
@@ -72,6 +76,11 @@ export function NewTransferForm({ sites, inventory, participants }: {
     return ceiba.length === 1 ? String(ceiba[0].id) : "";
   });
   const [transportMethod, setTransportMethod] = useState("");
+  const [plannedRoute, setPlannedRoute] = useState("");
+  const [myPosition, setMyPosition] = useState<GeoPoint | null>(null);
+  const [locating, setLocating] = useState(false);
+  const [routing, setRouting] = useState(false);
+  const [routeNote, setRouteNote] = useState("");
   const [risks, setRisks] = useState<Set<string>>(new Set());
   const [measures, setMeasures] = useState<Set<string>>(new Set());
   const [destinationEntrepotId, setDestinationEntrepotId] = useState("none");
@@ -124,6 +133,59 @@ export function NewTransferForm({ sites, inventory, participants }: {
     setPage(1);
     setResults(emptyPage);
     setLoadError("");
+  }
+
+  const sitePoint = (site: SiteOption | undefined): GeoPoint | null => {
+    const point = site ? { latitude: site.latitude ?? Number.NaN, longitude: site.longitude ?? Number.NaN } : null;
+    return isValidGeoPoint(point) ? point : null;
+  };
+  const routeOrigin = myPosition ?? sitePoint(sourceSite);
+  const routeDestination = sitePoint(destinationSite);
+  const googleMapsUrl = routeOrigin && routeDestination ? buildGoogleMapsDirectionsUrl(routeOrigin, routeDestination) : null;
+
+  function locateMe() {
+    if (!("geolocation" in navigator)) {
+      toast.error("La géolocalisation n'est pas disponible sur cet appareil.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setMyPosition({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        setLocating(false);
+        toast.success("Position actuelle retenue comme point de départ de l'itinéraire.");
+      },
+      () => {
+        setLocating(false);
+        toast.error("Position refusée ou indisponible. Autorisez la localisation dans le navigateur.");
+      },
+      { enableHighAccuracy: true, timeout: 15_000 },
+    );
+  }
+
+  async function proposeRoute() {
+    if (!routeOrigin || !routeDestination) {
+      toast.error(!routeDestination
+        ? "Le site de destination n'a pas de position GPS. Renseignez-la dans Administration → Sites."
+        : "Le site d'origine n'a pas de position GPS : utilisez « Partir de ma position » ou renseignez-la dans Administration → Sites.");
+      return;
+    }
+    setRouting(true);
+    setRouteNote("");
+    try {
+      const result = await suggestTransferRoute(routeOrigin, routeDestination);
+      if (result.summary) {
+        const originLabel = myPosition ? "Position actuelle" : sourceSite?.nom ?? "Départ";
+        setPlannedRoute(formatRouteText(originLabel, destinationSite?.nom ?? "Destination", result.summary));
+        setRouteNote("Trajet le plus rapide selon le réseau routier (OpenStreetMap), hors trafic. Vérifiez le trafic sur Google Maps avant le départ.");
+      } else {
+        setRouteNote(result.error ?? "Itinéraire indisponible : saisissez-le à la main.");
+      }
+    } catch {
+      setRouteNote("Itinéraire indisponible : saisissez-le à la main.");
+    } finally {
+      setRouting(false);
+    }
   }
 
   function changeDirection(next: TransferDirection) {
@@ -374,7 +436,20 @@ export function NewTransferForm({ sites, inventory, participants }: {
             </select>
             {transportMethod === OTHER_OPTION ? <Input name="transportMethodOther" required minLength={2} maxLength={300} placeholder="Préciser le moyen de transport" disabled={pending} /> : null}
           </div>
-          <div className="space-y-2 sm:col-span-2"><Label htmlFor="plannedRoute">Itinéraire prévu</Label><Input id="plannedRoute" name="plannedRoute" required maxLength={2000} placeholder="Site de départ, trajet autorisé et site de destination" disabled={pending} /></div>
+          <div className="space-y-2 sm:col-span-2 lg:col-span-3">
+            <Label htmlFor="plannedRoute">Itinéraire prévu</Label>
+            <Input id="plannedRoute" name="plannedRoute" required maxLength={2000} value={plannedRoute} onChange={(event) => setPlannedRoute(event.target.value)} placeholder="Site de départ, trajet autorisé et site de destination" disabled={pending} />
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" variant="outline" onClick={proposeRoute} disabled={pending || routing || !sourceSite || !destinationSite}>
+                {routing ? <Loader2 className="animate-spin" /> : <Route />} Proposer l&apos;itinéraire
+              </Button>
+              <Button type="button" size="sm" variant={myPosition ? "secondary" : "ghost"} onClick={locateMe} disabled={pending || locating}>
+                {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />} {myPosition ? "Départ : ma position" : "Partir de ma position"}
+              </Button>
+              {googleMapsUrl ? <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline">Voir sur Google Maps (trafic en temps réel) <ExternalLink className="h-3.5 w-3.5" /></a> : null}
+            </div>
+            {routeNote ? <p className="text-xs text-muted-foreground">{routeNote}</p> : null}
+          </div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="motif">Objet / contexte</Label><Input id="motif" name="motif" maxLength={2000} placeholder={sourceIsMinistry ? "Numérisation, indexation, garde temporaire..." : "Restitution après numérisation, réintégration au site..."} disabled={pending} /></div>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
