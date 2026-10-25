@@ -3,11 +3,13 @@ import { Prisma, type StatutArchivage, type StatutConditionnement, type StatutIn
 import { prisma } from "@/lib/prisma/client";
 import type { ProductionQueueSearch } from "@/lib/validation/production-queue";
 import { buildCartonToken, cartonWhereFromToken, getCartonDisplay } from "@/lib/workflow/carton-identity";
+import { parseCartonReference } from "@/lib/cartons/reference";
 
 const PAGE_SIZE = 20;
 
 type GroupSeed = {
   token: string;
+  cartonId: number | null;
   siteId: number | null;
   codeBarres: string | null;
   libelleCarton: string | null;
@@ -16,7 +18,7 @@ type GroupSeed = {
 
 async function getCartonPage(where: Prisma.DossierWhereInput, page: number) {
   const rawGroups = await prisma.dossier.groupBy({
-    by: ["siteId", "codeBarres", "libelleCarton"],
+    by: ["cartonId", "siteId", "codeBarres", "libelleCarton"],
     where,
     _count: { _all: true },
     orderBy: [{ siteId: "asc" }, { codeBarres: "asc" }, { libelleCarton: "asc" }],
@@ -32,6 +34,7 @@ async function getCartonPage(where: Prisma.DossierWhereInput, page: number) {
     } else {
       merged.set(token, {
         token,
+        cartonId: group.cartonId,
         siteId: group.siteId,
         codeBarres: group.codeBarres,
         libelleCarton: group.libelleCarton,
@@ -48,9 +51,11 @@ async function getCartonPage(where: Prisma.DossierWhereInput, page: number) {
 }
 
 function searchConstraint(q?: string): Prisma.DossierWhereInput[] {
+  const cartonId = q ? parseCartonReference(q) : null;
   return [
-    { OR: [{ codeBarres: { not: null } }, { libelleCarton: { not: null } }] },
+    { OR: [{ cartonId: { not: null } }, { codeBarres: { not: null } }, { libelleCarton: { not: null } }] },
     ...(q ? [{ OR: [
+      ...(cartonId !== null ? [{ cartonId }] : []),
       { reference: { contains: q } },
       { codeBarres: { contains: q } },
       { libelleCarton: { contains: q } },
@@ -90,6 +95,7 @@ export async function getNumerisationWorkspace(filters: ProductionQueueSearch) {
           where: { AND: [where, { OR: pageWheres }] },
           select: {
             id: true,
+            cartonId: true,
             siteId: true,
             codeBarres: true,
             libelleCarton: true,
@@ -105,6 +111,7 @@ export async function getNumerisationWorkspace(filters: ProductionQueueSearch) {
           orderBy: { reference: "asc" },
           select: {
             id: true,
+            cartonId: true,
             reference: true,
             nom: true,
             prenoms: true,
@@ -184,6 +191,7 @@ export async function getConditionnementWorkspace(filters: ProductionQueueSearch
           where: { AND: [where, { OR: pageWheres }] },
           select: {
             id: true,
+            cartonId: true,
             siteId: true,
             codeBarres: true,
             libelleCarton: true,
@@ -201,6 +209,7 @@ export async function getConditionnementWorkspace(filters: ProductionQueueSearch
           orderBy: { reference: "asc" },
           select: {
             id: true,
+            cartonId: true,
             reference: true,
             nom: true,
             prenoms: true,
@@ -282,6 +291,7 @@ async function getFinalStageWorkspace(stage: "INDEXATION" | "ARCHIVAGE", filters
     where: { AND: [where, { OR: pageWheres }] },
     select: {
       id: true,
+      cartonId: true,
       siteId: true,
       codeBarres: true,
       libelleCarton: true,

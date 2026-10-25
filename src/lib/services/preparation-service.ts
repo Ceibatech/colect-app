@@ -3,6 +3,7 @@ import { Prisma, type StatutPreparation } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import type { PreparationSearch } from "@/lib/validation/preparation";
 import { buildCartonToken, cartonWhereFromToken, getCartonDisplay } from "@/lib/workflow/carton-identity";
+import { parseCartonReference } from "@/lib/cartons/reference";
 
 export const PREPARATION_PAGE_SIZE = 20;
 const PREPARATION_CLAIM_TTL_MS = 2 * 60 * 60 * 1000;
@@ -19,12 +20,14 @@ function buildSearchWhere(filters: PreparationSearch): Prisma.DossierWhereInput 
   const statuses = STATUS_FILTERS[filters.statut];
   const constraints: Prisma.DossierWhereInput[] = [
     { statutValidation: "VALIDE" },
-    { OR: [{ codeBarres: { not: null } }, { libelleCarton: { not: null } }] },
+    { OR: [{ cartonId: { not: null } }, { codeBarres: { not: null } }, { libelleCarton: { not: null } }] },
   ];
   if (statuses) constraints.push({ statutPreparation: { in: statuses } });
   if (filters.q) {
+    const cartonId = parseCartonReference(filters.q);
     constraints.push({
       OR: [
+        ...(cartonId !== null ? [{ cartonId }] : []),
         { reference: { contains: filters.q } },
         { codeBarres: { contains: filters.q } },
         { libelleCarton: { contains: filters.q } },
@@ -44,7 +47,7 @@ export async function getPreparationWorkspace(filters: PreparationSearch) {
 
   const [rawGroups, grouped, selectedCartonItems, unidentifiedCount] = await Promise.all([
     prisma.dossier.groupBy({
-      by: ["siteId", "codeBarres", "libelleCarton"],
+      by: ["cartonId", "siteId", "codeBarres", "libelleCarton"],
       where,
       _count: { _all: true },
       orderBy: [{ siteId: "asc" }, { codeBarres: "asc" }, { libelleCarton: "asc" }],
@@ -68,6 +71,7 @@ export async function getPreparationWorkspace(filters: PreparationSearch) {
     prisma.dossier.count({
       where: {
         statutValidation: "VALIDE",
+        cartonId: null,
         codeBarres: null,
         libelleCarton: null,
         ...(STATUS_FILTERS[filters.statut]
@@ -79,6 +83,7 @@ export async function getPreparationWorkspace(filters: PreparationSearch) {
 
   const mergedGroups = new Map<string, {
     token: string;
+    cartonId: number | null;
     siteId: number | null;
     codeBarres: string | null;
     libelleCarton: string | null;
@@ -94,6 +99,7 @@ export async function getPreparationWorkspace(filters: PreparationSearch) {
     } else {
       mergedGroups.set(token, {
         token,
+        cartonId: group.cartonId,
         siteId: group.siteId,
         codeBarres: group.codeBarres,
         libelleCarton: group.libelleCarton,
@@ -113,6 +119,7 @@ export async function getPreparationWorkspace(filters: PreparationSearch) {
         where: { AND: [where, { OR: pageWheres }] },
         select: {
           id: true,
+          cartonId: true,
           siteId: true,
           codeBarres: true,
           libelleCarton: true,

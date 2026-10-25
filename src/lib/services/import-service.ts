@@ -4,6 +4,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { parseCsv } from "@/lib/utils/csv";
 import { IMPORT_COLUMNS } from "@/lib/validation/import-columns";
+import { buildCartonLegacyKey, resolveCartonId } from "@/lib/cartons/persistence";
+import { dossierImportFingerprint, DOSSIER_IMPORT_IDENTITY_SELECT } from "@/lib/import/dossier-identity";
 import {
   canonicalizeCommuneLabel,
   canonicalizeLotissementLabel,
@@ -112,7 +114,7 @@ interface RefMaps {
   lotissementByRef: Map<string, number>;
   lotissementCommuneById: Map<number, number>;
   natureByRef: Map<string, number>;
-  existingBarcodes: Set<string>;
+  existingDossiers: Set<string>;
 }
 
 function resolveCommuneRef(ref: string | undefined, maps: RefMaps): number | null {
@@ -126,12 +128,12 @@ function resolveLotissementRef(ref: string | undefined, maps: RefMaps): number |
 }
 
 async function loadRefMaps(): Promise<RefMaps> {
-  const [operateurs, communes, lotissements, natures, existingCodeBarres] = await Promise.all([
+  const [operateurs, communes, lotissements, natures, existingDossiers] = await Promise.all([
     prisma.operateur.findMany({ where: { isActive: true }, select: { id: true, matricule: true } }),
     prisma.commune.findMany({ select: { id: true, code: true, nom: true } }),
     prisma.lotissement.findMany({ where: { isActive: true }, select: { id: true, communeId: true, code: true, nom: true } }),
     prisma.natureDossier.findMany({ select: { id: true, code: true, libelle: true } }),
-    prisma.dossier.findMany({ where: { codeBarres: { not: null } }, select: { codeBarres: true } }),
+    prisma.dossier.findMany({ select: DOSSIER_IMPORT_IDENTITY_SELECT }),
   ]);
 
   return {
@@ -146,7 +148,7 @@ async function loadRefMaps(): Promise<RefMaps> {
     ] as const)),
     lotissementCommuneById: new Map(lotissements.map((l) => [l.id, l.communeId])),
     natureByRef: new Map(natures.flatMap((n) => [[n.code.toLowerCase(), n.id], [n.libelle.toLowerCase(), n.id]] as const)),
-    existingBarcodes: new Set(existingCodeBarres.map((d) => d.codeBarres!)),
+    existingDossiers: new Set(existingDossiers.map(dossierImportFingerprint)),
   };
 }
 
@@ -156,7 +158,7 @@ async function loadRefMaps(): Promise<RefMaps> {
  * fait jamais confiance à un état "valide" renvoyé par le client.
  */
 function validateDataRows(dataRows: ImportRowData[], maps: RefMaps): ImportRowResult[] {
-  const seenBarcodesInFile = new Set<string>();
+  const seenDossiersInFile = new Set<string>();
 
   return dataRows.map((data, idx) => {
     const errors: string[] = [];
@@ -165,15 +167,6 @@ function validateDataRows(dataRows: ImportRowData[], maps: RefMaps): ImportRowRe
 
     if (!data.operateurMatricule || !maps.operateurByMatricule.has(data.operateurMatricule.toLowerCase())) {
       errors.push(`Opérateur "${data.operateurMatricule ?? ""}" introuvable ou inactif.`);
-    }
-
-    if (data.codeBarres) {
-      if (maps.existingBarcodes.has(data.codeBarres) || seenBarcodesInFile.has(data.codeBarres)) {
-        isDuplicate = true;
-        errors.push(`Code-barres "${data.codeBarres}" déjà utilisé (base ou fichier).`);
-      } else {
-        seenBarcodesInFile.add(data.codeBarres);
-      }
     }
 
     const communeId = resolveCommuneRef(data.communeRef, maps);
@@ -202,6 +195,16 @@ function validateDataRows(dataRows: ImportRowData[], maps: RefMaps): ImportRowRe
     }
     if (!data.nom && !data.prenoms) {
       warnings.push("Nom et prénoms non renseignés.");
+    }
+
+    if (errors.length === 0) {
+      const fingerprint = dossierImportFingerprint(buildDossierImportData({ data }, maps, ""));
+      if (maps.existingDossiers.has(fingerprint) || seenDossiersInFile.has(fingerprint)) {
+        isDuplicate = true;
+        errors.push("Ce dossier avec les mêmes informations existe déjà (base ou fichier).");
+      } else {
+        seenDossiersInFile.add(fingerprint);
+      }
     }
 
     return {
@@ -255,7 +258,7 @@ function getReferenceSequence(reference: string | undefined, year: number): numb
 }
 
 function buildDossierImportData(
-  row: ImportRowResult,
+  row: Pick<ImportRowResult, "data">,
   maps: RefMaps,
   reference: string,
 ): Prisma.DossierCreateManyInput {
@@ -329,6 +332,9 @@ export async function confirmImport(userId: number, fileName: string, dataRows: 
         });
         let sequence = getReferenceSequence(latestDossier?.reference, year);
         let createdCount = 0;
+        // Une résolution et un verrou par carton, même s'il contient des
+        // centaines de lignes dans plusieurs lots createMany.
+        const cartonIdsByKey = new Map<string, number | null>();
 
         for (let offset = 0; offset < validRows.length; offset += IMPORT_BATCH_SIZE) {
           const rows = validRows.slice(offset, offset + IMPORT_BATCH_SIZE);
@@ -336,6 +342,18 @@ export async function confirmImport(userId: number, fileName: string, dataRows: 
             const reference = `DOS-${year}-${String(sequence++).padStart(6, "0")}`;
             return { row, reference, data: buildDossierImportData(row, maps, reference) };
           });
+
+          for (const item of batch) {
+            const key = buildCartonLegacyKey(item.data);
+            if (!key) {
+              item.data.cartonId = null;
+              continue;
+            }
+            if (!cartonIdsByKey.has(key)) {
+              cartonIdsByKey.set(key, await resolveCartonId(tx, item.data));
+            }
+            item.data.cartonId = cartonIdsByKey.get(key)!;
+          }
 
           await tx.dossier.createMany({ data: batch.map((item) => item.data) });
           const created = await tx.dossier.findMany({

@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getOperateurScopeFilter } from "@/lib/services/access-scope";
+import { parseCartonReference } from "@/lib/cartons/reference";
 
 export interface DocumentSearchInput {
   query?: string;
@@ -44,11 +45,12 @@ export async function searchIndexedDocuments(input: DocumentSearchInput) {
   const pageSize = Math.min(50, Math.max(10, input.pageSize ?? 20));
   const page = Math.max(1, input.page ?? 1);
   const operateurScope = await getOperateurScopeFilter(session);
+  const cartonId = parseCartonReference(query);
   const booleanQuery = booleanSearchQuery(query);
   let rankedIds: number[] = [];
   const scores = new Map<number, number>();
 
-  if (booleanQuery) {
+  if (booleanQuery && cartonId === null) {
     try {
       const rows = await prisma.$queryRaw<Array<{ id: number; score: number }>>(Prisma.sql`
         SELECT id, MATCH(search_text) AGAINST (${booleanQuery} IN BOOLEAN MODE) AS score
@@ -76,7 +78,9 @@ export async function searchIndexedDocuments(input: DocumentSearchInput) {
   };
   if (query) {
     where.AND = [
-      rankedIds.length > 0
+      cartonId !== null
+        ? { dossier: { cartonId } }
+        : rankedIds.length > 0
         ? { id: { in: rankedIds } }
         : {
             OR: [
@@ -106,6 +110,7 @@ export async function searchIndexedDocuments(input: DocumentSearchInput) {
       typePiece: { select: { libelle: true } },
       dossier: {
         select: {
+          cartonId: true,
           reference: true,
           nom: true,
           prenoms: true,

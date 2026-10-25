@@ -1,5 +1,6 @@
 /** Physical cartons are counted at their current site and room, at every workflow stage. */
 export function summarizeInventoryLocations(rows: Array<{
+  cartonId?: number | null;
   siteId: number | null;
   entrepotId: number | null;
   codeBarres: string | null;
@@ -17,7 +18,7 @@ export function summarizeInventoryLocations(rows: Array<{
       dossiers: 0, unidentifiedDossiers: 0, cartons: new Set<string>(),
     };
     location.dossiers += row._count._all;
-    const identity = row.codeBarres?.trim() ? `code:${row.codeBarres.trim()}`
+    const identity = row.cartonId != null ? `carton:${row.cartonId}` : row.codeBarres?.trim() ? `code:${row.codeBarres.trim()}`
       : row.libelleCarton?.trim() ? `label:${row.libelleCarton.trim()}` : null;
     if (identity) location.cartons.add(identity);
     else location.unidentifiedDossiers += row._count._all;

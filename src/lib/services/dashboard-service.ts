@@ -600,7 +600,8 @@ export interface CartonsDossiersEtatOverview {
 /**
  * Indicateurs état de conservation des cartons/dossiers (Phase 15+).
  * Plusieurs dossiers peuvent partager un carton : les cartons sont donc
- * comptés par code-barres distinct, jamais par nombre de lignes dossier.
+ * comptés par identifiant physique distinct, jamais par nombre de lignes
+ * dossier ou par ancien code-barres susceptible d'être réutilisé.
  */
 export async function getCartonsDossiersEtatOverview(): Promise<CartonsDossiersEtatOverview> {
   const session = await requirePermission("DASHBOARD_VIEW");
@@ -609,15 +610,15 @@ export async function getCartonsDossiersEtatOverview(): Promise<CartonsDossiersE
 
   const [cartons, nombreDossiers, cartonsDegrades, nombreDossiersDegrades] = await Promise.all([
     prisma.dossier.findMany({
-      where: { ...base, codeBarres: { not: null } },
-      distinct: ["codeBarres"],
-      select: { codeBarres: true },
+      where: { ...base, cartonId: { not: null } },
+      distinct: ["cartonId"],
+      select: { cartonId: true },
     }),
     prisma.dossier.count({ where: base }),
     prisma.dossier.findMany({
-      where: { ...base, codeBarres: { not: null }, etatCarton: "DEGRADE" },
-      distinct: ["codeBarres"],
-      select: { codeBarres: true },
+      where: { ...base, cartonId: { not: null }, etatCarton: "DEGRADE" },
+      distinct: ["cartonId"],
+      select: { cartonId: true },
     }),
     prisma.dossier.count({ where: { ...base, etatDossier: "DEGRADE" } }),
   ]);
