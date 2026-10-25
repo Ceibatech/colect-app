@@ -12,6 +12,7 @@ import {
   localityMatchKey,
 } from "@/lib/utils/locality-normalization";
 import { evaluateInventorySubmission } from "@/lib/workflow/automatic-validation";
+import { resolveCartonId } from "@/lib/cartons/persistence";
 
 const MAX_REFERENCE_ATTEMPTS = 5;
 
@@ -186,17 +187,18 @@ async function resolveNatureDossierId(natureDossierId: number | null, autreLibre
  * documentée, cf. DATABASE.md).
  */
 async function createDossierWithUniqueReference(
-  data: Omit<Prisma.DossierUncheckedCreateInput, "reference">
+  data: Omit<Prisma.DossierUncheckedCreateInput, "reference">,
+  tx: Prisma.TransactionClient,
 ) {
   const year = new Date().getFullYear();
   let attempt = 0;
   let lastError: unknown;
 
   while (attempt < MAX_REFERENCE_ATTEMPTS) {
-    const count = await prisma.dossier.count({ where: { reference: { startsWith: `DOS-${year}-` } } });
+    const count = await tx.dossier.count({ where: { reference: { startsWith: `DOS-${year}-` } } });
     const reference = `DOS-${year}-${String(count + 1 + attempt).padStart(6, "0")}`;
     try {
-      return await prisma.dossier.create({ data: { ...data, reference } });
+      return await tx.dossier.create({ data: { ...data, reference } });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
         lastError = e;
@@ -231,18 +233,32 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
     if (session.roleCode === "OPERATEUR" && existing.operateurId !== operateurId) {
       throw new Error("Vous ne pouvez modifier que vos propres brouillons.");
     }
-    const updated = await prisma.dossier.update({
-      where: { id: draftId },
-      data: { ...data, operateurId },
-    });
+    const updated = await prisma.$transaction(async (tx) => {
+      const cartonId = await resolveCartonId(tx, data, existing);
+      const updated = await tx.dossier.updateMany({
+        // A transfer or another edit may have committed while we waited for
+        // the carton lock. Never restore the stale form's previous location.
+        where: {
+          id: draftId, updatedAt: existing.updatedAt, statutCollecte: "BROUILLON",
+          cartonId: existing.cartonId, siteId: existing.siteId, entrepotId: existing.entrepotId,
+        },
+        data: { ...data, operateurId, cartonId },
+      });
+      if (updated.count !== 1) throw new Error("Ce dossier a été modifié ou déplacé pendant la saisie. Rechargez sa fiche avant de l'enregistrer.");
+      return { id: existing.id, reference: existing.reference };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 60_000 });
     return { id: updated.id, reference: updated.reference };
   }
 
-  const created = await createDossierWithUniqueReference({
-    ...data,
-    operateurId,
-    statutCollecte: "BROUILLON",
-  });
+  const created = await prisma.$transaction(async (tx) => {
+    const cartonId = await resolveCartonId(tx, data);
+    return createDossierWithUniqueReference({
+      ...data,
+      operateurId,
+      cartonId,
+      statutCollecte: "BROUILLON",
+    }, tx);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 60_000 });
 
   await prisma.dossierHistory.create({
     data: { dossierId: created.id, userId: session.userId, action: "CREATION", nouveauStatut: "BROUILLON" },
@@ -283,6 +299,7 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
     where: { id: draft.id },
     select: {
       id: true,
+      cartonId: true,
       codeBarres: true,
       siteId: true,
       entrepotId: true,
@@ -297,7 +314,15 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
 
   const duplicateBarcode = dossier.codeBarres
     ? (await prisma.dossier.count({
-        where: { id: { not: dossier.id }, codeBarres: dossier.codeBarres },
+        where: {
+          id: { not: dossier.id },
+          codeBarres: dossier.codeBarres,
+          siteId: dossier.siteId,
+          entrepotId: dossier.entrepotId,
+          ...(dossier.cartonId != null
+            ? { OR: [{ cartonId: { not: dossier.cartonId } }, { cartonId: null }] }
+            : {}),
+        },
       })) > 0
     : false;
   const decision = evaluateInventorySubmission({

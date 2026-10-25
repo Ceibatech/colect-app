@@ -2,6 +2,32 @@ import { describe, expect, it } from "vitest";
 import { buildCartonToken, cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 
 describe("carton identity", () => {
+  it("conserve l'identité après déplacement et modification des anciens libellés", () => {
+    const before = { cartonId: 42, siteId: 1, codeBarres: "ANCIEN-1", libelleCarton: null };
+    const after = { cartonId: 42, siteId: 9, codeBarres: "MODIFIE", libelleCarton: "Nouveau libellé" };
+    expect(buildCartonToken(before)).toBe("carton:42");
+    expect(buildCartonToken(after)).toBe("carton:42");
+    expect(cartonWhereFromToken("carton:42")).toEqual({ cartonId: 42 });
+    expect(parseCartonToken("carton:42")).toEqual({ cartonId: 42, siteId: undefined, codeBarres: null, libelleCarton: null });
+  });
+
+  it("ne fusionne pas deux cartons portant le même ancien code", () => {
+    const sameLegacy = { siteId: 1, codeBarres: "A-1", libelleCarton: "A" };
+    expect(buildCartonToken({ ...sameLegacy, cartonId: 1 })).not.toBe(buildCartonToken({ ...sameLegacy, cartonId: 2 }));
+  });
+
+  it("affiche l'identifiant unique avant les repères d'origine", () => {
+    expect(getCartonDisplay({ cartonId: 42, codeBarres: "ABC", libelleCarton: "Carton A" }))
+      .toEqual({ label: "CTN-00000042", description: "ABC · Carton A" });
+    expect(getCartonDisplay({ cartonId: 42, codeBarres: "ABC", libelleCarton: "ABC" }))
+      .toEqual({ label: "CTN-00000042", description: "ABC" });
+  });
+
+  it.each(["carton:0", "carton:-1", "carton:1.2", "carton:2147483648", "carton:2|site:1", "carton:abc", "carton:"])("refuse l'identifiant physique invalide %s", (token) => {
+    expect(parseCartonToken(token)).toBeNull();
+    expect(cartonWhereFromToken(token)).toBeNull();
+  });
+
   it("distingue un même code de carton selon le site", () => {
     expect(buildCartonToken({ siteId: 1, codeBarres: "CARTON-01", libelleCarton: null }))
       .not.toBe(buildCartonToken({ siteId: 2, codeBarres: "CARTON-01", libelleCarton: null }));

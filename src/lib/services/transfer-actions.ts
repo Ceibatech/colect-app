@@ -16,7 +16,7 @@ import {
 } from "@/lib/utils/transfer-stock";
 import { getClientIp } from "@/lib/utils/server-request";
 import { buildTransferCartonToken, MAX_TRANSFER_CARTONS } from "@/lib/transfers/carton-selection";
-import { cartonWhereFromToken, parseCartonToken } from "@/lib/workflow/carton-identity";
+import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 
 export interface TransferActionState {
   success?: boolean;
@@ -217,13 +217,15 @@ export async function createTransferLot(
   if (cartonTokens.length > MAX_TRANSFER_CARTONS) return { error: `Une opération est limitée à ${MAX_TRANSFER_CARTONS} cartons.` };
 
   const cartonFilters: Prisma.DossierWhereInput[] = [];
+  const cartonIds: number[] = [];
   for (const token of cartonTokens) {
     const identity = parseCartonToken(token);
     const where = cartonWhereFromToken(token);
-    if (!identity || identity.siteId !== undefined || !where) {
+    if (!identity?.cartonId || !where) {
       return { error: "Un identifiant de carton est invalide. Actualisez la proposition." };
     }
     cartonFilters.push(where);
+    cartonIds.push(identity.cartonId);
   }
 
   const [sourceSite, destinationSite, sourceEntrepot, destinationEntrepot] = await Promise.all([
@@ -245,6 +247,9 @@ export async function createTransferLot(
     const ip = await getClientIp();
     const plannedAt = new Date(parsed.data.plannedAt);
     const result = await prisma.$transaction(async (tx) => {
+      // Same lock as inventory intake: no dossier can join a carton while its
+      // complete manifest is being captured. Lock in ID order to avoid deadlocks.
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id IN (${Prisma.join([...cartonIds].sort((a, b) => a - b))}) ORDER BY id FOR UPDATE`);
       const operationStart = new Date(Date.UTC(plannedAt.getUTCFullYear(), plannedAt.getUTCMonth(), plannedAt.getUTCDate()));
       const operationEnd = new Date(operationStart);
       operationEnd.setUTCDate(operationEnd.getUTCDate() + 1);
@@ -264,32 +269,28 @@ export async function createTransferLot(
         throw new TransferRuleError(`L'opération de cette date est déjà en cours de signature (${signedOperation.reference}). Planifiez une nouvelle date pour ajouter d'autres cartons.`);
       }
 
-      const locationWhere: Prisma.DossierWhereInput = parsed.data.includeUnlocated
-        ? {
-            OR: [
-              { siteId: parsed.data.sourceSiteId, entrepotId: parsed.data.sourceEntrepotId ?? null },
-              { siteId: null },
-            ],
-          }
-        : { siteId: parsed.data.sourceSiteId, entrepotId: parsed.data.sourceEntrepotId ?? null };
       const dossiers = await tx.dossier.findMany({
-        where: {
-          AND: [locationWhere, { OR: cartonFilters }],
-        },
-        select: { id: true, reference: true, siteId: true, codeBarres: true, libelleCarton: true },
+        // Fetch the entire carton, including members whose location is NULL.
+        // SQL NOT(location) would miss those members because of NULL semantics.
+        where: { OR: cartonFilters },
+        select: { id: true, reference: true, cartonId: true, siteId: true, entrepotId: true, codeBarres: true, libelleCarton: true },
       });
+      if (dossiers.some((dossier) => !(parsed.data.includeUnlocated && dossier.siteId === null)
+        && !(dossier.siteId === parsed.data.sourceSiteId && dossier.entrepotId === (parsed.data.sourceEntrepotId ?? null)))) {
+        throw new TransferRuleError("Les dossiers d'un carton sont répartis entre plusieurs emplacements. Corrigez leur emplacement avant de transférer le carton complet.");
+      }
 
       const selectedTokenSet = new Set(cartonTokens);
-      const grouped = new Map<string, { token: string; code: string; label: string | null; dossiers: typeof dossiers }>();
+      const grouped = new Map<string, { token: string; cartonId: number; code: string; label: string | null; dossiers: typeof dossiers }>();
       for (const dossier of dossiers) {
         const token = buildTransferCartonToken(dossier);
-        if (!token || !selectedTokenSet.has(token)) continue;
-        const code = dossier.codeBarres?.trim() || dossier.libelleCarton?.trim();
-        if (!code) continue;
+        if (!token || !selectedTokenSet.has(token) || dossier.cartonId == null) continue;
+        const display = getCartonDisplay(dossier);
         const group = grouped.get(token) ?? {
           token,
-          code,
-          label: dossier.codeBarres?.trim() ? dossier.libelleCarton?.trim() || null : null,
+          cartonId: dossier.cartonId,
+          code: display.label,
+          label: display.description,
           dossiers: [],
         };
         group.dossiers.push(dossier);
@@ -305,11 +306,16 @@ export async function createTransferLot(
       }
       const dossierIds = groups.flatMap((group) => group.dossiers.map((dossier) => dossier.id));
 
+      const reservedCarton = await tx.transferLotItem.findFirst({
+        where: { cartonId: { in: cartonIds }, status: { in: ["PREVU", "SORTI", "RECU"] }, transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } } },
+        select: { transferLot: { select: { reference: true } } },
+      });
+      if (reservedCarton) throw new TransferRuleError(`Un carton appartient déjà au lot ouvert ${reservedCarton.transferLot.reference}.`);
       const conflict = await tx.transferLotDossier.findFirst({
         where: {
           dossierId: { in: dossierIds },
           transferLotItem: {
-            status: { in: ["PREVU", "SORTI"] },
+            status: { in: ["PREVU", "SORTI", "RECU"] },
             transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
           },
         },
@@ -355,11 +361,13 @@ export async function createTransferLot(
         if (attached.count !== unlocatedIds.length) {
           throw new TransferRuleError("L'emplacement d'un dossier historique vient d'être modifié. Actualisez la liste puis réessayez.");
         }
+        await tx.carton.updateMany({ where: { id: { in: cartonIds } }, data: { legacyKey: null } });
       }
 
       await tx.transferLotItem.createMany({
         data: groups.map((group) => ({
           transferLotId: lot.id,
+          cartonId: group.cartonId,
           cartonCode: group.code,
           cartonLabel: group.label,
           dossierCountSnapshot: group.dossiers.length,
@@ -367,12 +375,12 @@ export async function createTransferLot(
       });
       const createdItems = await tx.transferLotItem.findMany({
         where: { transferLotId: lot.id },
-        select: { id: true, cartonCode: true },
+        select: { id: true, cartonId: true },
       });
-      const itemByCode = new Map(createdItems.map((item) => [item.cartonCode, item.id]));
+      const itemByCarton = new Map(createdItems.map((item) => [item.cartonId, item.id]));
       await tx.transferLotDossier.createMany({
         data: groups.flatMap((group) => group.dossiers.map((dossier) => ({
-          transferLotItemId: itemByCode.get(group.code)!,
+          transferLotItemId: itemByCarton.get(group.cartonId)!,
           dossierId: dossier.id,
         }))),
       });
@@ -962,6 +970,13 @@ export async function approveTransferMovementByMinistry(
 
       const dossierIds = [...new Set(movement.items.flatMap((entry) => entry.transferLotItem.dossiers.map((link) => link.dossierId)))];
       const itemIds = movement.items.map((entry) => entry.transferLotItemId);
+      const cartonIds = [...new Set(movement.items.flatMap((entry) => entry.transferLotItem.cartonId == null ? [] : [entry.transferLotItem.cartonId]))].sort((a, b) => a - b);
+      if (cartonIds.length > 0) {
+        await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id IN (${Prisma.join(cartonIds)}) ORDER BY id FOR UPDATE`);
+        const extraMembers = await tx.dossier.count({ where: { cartonId: { in: cartonIds }, id: { notIn: dossierIds } } });
+        if (extraMembers > 0) throw new TransferRuleError("Le contenu d'un carton a changé depuis la création du manifeste. Faites vérifier le lot avant le mouvement.");
+        await tx.carton.updateMany({ where: { id: { in: cartonIds } }, data: { legacyKey: null } });
+      }
       const updatedDossiers = await tx.dossier.updateMany({
         where: { id: { in: dossierIds }, ...flow.expectedLocation },
         data: flow.nextLocation,
@@ -1027,7 +1042,7 @@ export async function approveTransferMovementByMinistry(
         },
       });
       return { transferLotId: movement.transferLotId, reference: movement.reference, type: movement.type };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10_000, timeout: 60_000 });
 
     revalidatePath(`/transferts/${result.transferLotId}`);
     revalidatePath("/transferts");

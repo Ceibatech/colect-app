@@ -288,6 +288,7 @@ model TransferLot {
 model TransferLotItem {
   id                   Int                @id @default(autoincrement())
   transferLotId        Int                @map("transfer_lot_id")
+  cartonId             Int?               @map("carton_id")
   cartonCode           String             @map("carton_code")
   cartonLabel          String?            @map("carton_label")
   dossierCountSnapshot Int                @map("dossier_count_snapshot")
@@ -299,11 +300,13 @@ model TransferLotItem {
   updatedAt            DateTime           @updatedAt @map("updated_at")
 
   transferLot   TransferLot            @relation(fields: [transferLotId], references: [id], onDelete: Cascade)
+  carton        Carton?                @relation(fields: [cartonId], references: [id], onDelete: Restrict)
   dossiers      TransferLotDossier[]
   movementItems TransferMovementItem[]
 
   @@unique([transferLotId, cartonCode])
   @@index([cartonCode, status])
+  @@index([cartonId])
   @@index([status])
   @@map("transfer_lot_items")
 }
@@ -881,8 +884,24 @@ enum StatutArchivage {
   REJETE
 }
 
+// Identité physique stable. Le code-barres et le libellé d'origine restent
+// conservés sur les dossiers et sur les bordereaux historiques.
+model Carton {
+  id               Int               @id @default(autoincrement())
+  // Clé technique d'admission concurrente, effacée lors d'un changement
+  // d'emplacement/identification. Jamais utilisée comme référence publique.
+  legacyKey        String?           @unique @map("legacy_key") @db.Char(64)
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  dossiers         Dossier[]
+  transferLotItems TransferLotItem[]
+
+  @@map("cartons")
+}
+
 model Dossier {
   id Int @id @default(autoincrement())
+  cartonId Int? @map("carton_id")
 
   // Référence unique générée automatiquement : DOS-2026-000001
   reference String @unique
@@ -988,6 +1007,7 @@ model Dossier {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   operateur             Operateur              @relation(fields: [operateurId], references: [id])
+  carton                Carton?                @relation(fields: [cartonId], references: [id], onDelete: Restrict)
   preparateur           User?                  @relation("DossierPreparateur", fields: [preparateurId], references: [id], onDelete: SetNull)
   conditionneur         User?                  @relation("DossierConditionneur", fields: [conditionneurId], references: [id], onDelete: SetNull)
   site                  Site?                  @relation(fields: [siteId], references: [id])
@@ -1011,6 +1031,7 @@ model Dossier {
   @@index([siteId])
   @@index([entrepotId])
   @@index([codeBarres])
+  @@index([cartonId])
   @@index([numeroDdu])
   @@index([numeroDirectionService])
   @@index([numeroGuichet])

@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@prisma/client";
+import { parseCartonReference } from "@/lib/cartons/reference";
 import type {
   StatutCollecte,
   StatutValidation,
@@ -50,9 +51,11 @@ export async function searchDossiers(filters: DossierSearchFilters, options: Dos
   if (filters.q) {
     const q = filters.q.trim();
     if (q) {
-      where.OR = [
+      const cartonId = parseCartonReference(q);
+      where.OR = cartonId !== null ? [{ cartonId }] : [
         { reference: { contains: q } },
         { codeBarres: { contains: q } },
+        { libelleCarton: { contains: q } },
         { numeroDdu: { contains: q } },
         { numeroDirectionService: { contains: q } },
         { numeroGuichet: { contains: q } },

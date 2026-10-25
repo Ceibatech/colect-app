@@ -1,9 +1,11 @@
-import { buildCartonToken } from "@/lib/workflow/carton-identity";
+import { buildCartonToken, getCartonDisplay } from "@/lib/workflow/carton-identity";
+import { formatCartonReference, parseCartonReference } from "@/lib/cartons/reference";
 
 export const MAX_TRANSFER_CARTONS = 200;
 
 export interface TransferCartonSourceRow {
   id: number;
+  cartonId?: number | null;
   siteId: number | null;
   codeBarres: string | null;
   libelleCarton: string | null;
@@ -18,8 +20,9 @@ export interface TransferCartonItem {
   unlocatedDossierCount: number;
 }
 
-export function buildTransferCartonToken(row: Pick<TransferCartonSourceRow, "codeBarres" | "libelleCarton">) {
+export function buildTransferCartonToken(row: Pick<TransferCartonSourceRow, "cartonId" | "codeBarres" | "libelleCarton">) {
   return buildCartonToken({
+    cartonId: row.cartonId,
     siteId: undefined,
     codeBarres: row.codeBarres,
     libelleCarton: row.libelleCarton,
@@ -27,7 +30,7 @@ export function buildTransferCartonToken(row: Pick<TransferCartonSourceRow, "cod
 }
 
 export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
-  const grouped = new Map<string, TransferCartonItem & { hasConflict: boolean }>();
+  const grouped = new Map<string, TransferCartonItem & { hasConflict: boolean; labels: Set<string> }>();
   let unidentifiedDossierCount = 0;
 
   for (const row of rows) {
@@ -37,26 +40,22 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
       continue;
     }
 
-    const code = row.codeBarres?.trim() || row.libelleCarton?.trim();
-    if (!code) {
-      unidentifiedDossierCount++;
-      continue;
-    }
+    const display = getCartonDisplay(row);
+    const code = display.label;
 
     const current = grouped.get(token) ?? {
       token,
       code,
-      label: row.codeBarres?.trim() ? row.libelleCarton?.trim() || null : null,
+      label: display.description,
       dossierCount: 0,
       unlocatedDossierCount: 0,
       hasConflict: false,
+      labels: new Set<string>(),
     };
     current.dossierCount++;
     if (row.siteId === null) current.unlocatedDossierCount++;
     if (row.transferLotDossiers.length > 0) current.hasConflict = true;
-    if (!current.label && row.codeBarres?.trim() && row.libelleCarton?.trim()) {
-      current.label = row.libelleCarton.trim();
-    }
+    if (display.description) current.labels.add(display.description);
     grouped.set(token, current);
   }
 
@@ -65,7 +64,7 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
     .map((item) => ({
       token: item.token,
       code: item.code,
-      label: item.label,
+      label: [...item.labels].join(" · ") || null,
       dossierCount: item.dossierCount,
       unlocatedDossierCount: item.unlocatedDossierCount,
     }))
@@ -75,6 +74,8 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
 }
 
 export function filterTransferCartons(items: TransferCartonItem[], query?: string) {
+  const cartonId = parseCartonReference(query ?? "");
+  if (cartonId !== null) return items.filter((item) => item.code === formatCartonReference(cartonId));
   const normalizedQuery = normalizeSearch(query ?? "");
   if (!normalizedQuery) return items;
   return items.filter((item) => normalizeSearch(`${item.code} ${item.label ?? ""}`).includes(normalizedQuery));

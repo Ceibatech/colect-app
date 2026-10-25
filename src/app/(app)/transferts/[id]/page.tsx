@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getTransferLotDetail } from "@/lib/services/transfer-service";
+import { formatCartonReference } from "@/lib/cartons/reference";
 import {
   getTransferMovementLabel,
   getTransferMovementStatusLabel,
@@ -59,11 +60,11 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
     .flatMap((movement) => movement.items.map((entry) => entry.transferLotItem.id)));
   const movementOptions = (status: TransferItemStatusCode): TransferMovementItemOption[] => lot.items
     .filter((item) => item.status === status && !pendingMovementItemIds.has(item.id))
-    .map((item) => ({ id: item.id, cartonCode: item.cartonCode, cartonLabel: item.cartonLabel, dossierCount: item.dossierCountSnapshot }));
+    .map((item) => ({ id: item.id, cartonCode: item.cartonId == null ? item.cartonCode : formatCartonReference(item.cartonId), cartonLabel: item.cartonLabel, dossierCount: item.dossierCountSnapshot }));
   const dossierRows = lot.items.flatMap((item) => item.dossiers.map((entry) => ({
     ...entry.dossier,
-    cartonCode: item.cartonCode.startsWith("DOSSIER-") ? null : item.cartonCode,
-    cartonLabel: item.cartonLabel,
+    cartonCode: item.cartonId != null ? formatCartonReference(item.cartonId) : item.cartonCode.startsWith("DOSSIER-") ? null : item.cartonCode,
+    cartonLabel: [item.cartonId != null && item.cartonCode !== formatCartonReference(item.cartonId) ? item.cartonCode : null, item.cartonLabel].filter(Boolean).join(" · ") || null,
     status: item.status as TransferItemStatusCode,
   })));
 
@@ -160,7 +161,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         </div>
         <div className="hidden overflow-x-auto lg:block">
           <Table className="min-w-[900px]">
-            <TableHeader><TableRow className="bg-muted/45 hover:bg-muted/45"><TableHead className="pl-5">Dossier</TableHead><TableHead>Titulaire</TableHead><TableHead>Code-barres</TableHead><TableHead>Libellé du carton</TableHead><TableHead className="pr-5">Situation</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow className="bg-muted/45 hover:bg-muted/45"><TableHead className="pl-5">Dossier</TableHead><TableHead>Titulaire</TableHead><TableHead>ID carton</TableHead><TableHead>Identification historique</TableHead><TableHead className="pr-5">Situation</TableHead></TableRow></TableHeader>
             <TableBody>
               {dossierRows.map((dossier) => (
                 <TableRow key={dossier.id}>

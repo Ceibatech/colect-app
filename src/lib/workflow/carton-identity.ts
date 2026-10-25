@@ -1,12 +1,19 @@
 import type { Prisma } from "@prisma/client";
+import { formatCartonReference } from "@/lib/cartons/reference";
 
 export type CartonIdentity = {
+  cartonId?: number | null;
   siteId: number | null | undefined;
   codeBarres: string | null;
   libelleCarton: string | null;
 };
 
 export function buildCartonToken(identity: CartonIdentity) {
+  if (identity.cartonId != null) {
+    return Number.isInteger(identity.cartonId) && identity.cartonId > 0 && identity.cartonId <= 2_147_483_647
+      ? `carton:${identity.cartonId}`
+      : null;
+  }
   const site = identity.siteId === undefined ? "any" : identity.siteId === null ? "none" : String(identity.siteId);
   if (identity.codeBarres?.trim()) {
     return `site:${site}|code:${encodeURIComponent(identity.codeBarres.trim())}`;
@@ -19,6 +26,12 @@ export function buildCartonToken(identity: CartonIdentity) {
 
 export function parseCartonToken(token: string): CartonIdentity | null {
   const trimmed = token.trim();
+  if (trimmed.startsWith("carton:")) {
+    const rawId = trimmed.slice(7);
+    const cartonId = Number(rawId);
+    if (!/^\d+$/.test(rawId) || !Number.isInteger(cartonId) || cartonId <= 0 || cartonId > 2_147_483_647) return null;
+    return { cartonId, siteId: undefined, codeBarres: null, libelleCarton: null };
+  }
   const separator = trimmed.indexOf("|");
   const sitePart = separator >= 0 ? trimmed.slice(0, separator) : "site:any";
   const identityPart = separator >= 0 ? trimmed.slice(separator + 1) : trimmed;
@@ -50,6 +63,7 @@ export function parseCartonToken(token: string): CartonIdentity | null {
 export function cartonWhereFromToken(token: string): Prisma.DossierWhereInput | null {
   const identity = parseCartonToken(token);
   if (!identity) return null;
+  if (identity.cartonId != null) return { cartonId: identity.cartonId };
 
   return {
     ...(identity.siteId !== undefined ? { siteId: identity.siteId } : {}),
@@ -59,7 +73,13 @@ export function cartonWhereFromToken(token: string): Prisma.DossierWhereInput | 
   };
 }
 
-export function getCartonDisplay(identity: Pick<CartonIdentity, "codeBarres" | "libelleCarton">) {
+export function getCartonDisplay(identity: Pick<CartonIdentity, "cartonId" | "codeBarres" | "libelleCarton">) {
+  if (identity.cartonId != null) {
+    return {
+      label: formatCartonReference(identity.cartonId),
+      description: Array.from(new Set([identity.codeBarres?.trim(), identity.libelleCarton?.trim()].filter(Boolean))).join(" · ") || null,
+    };
+  }
   return {
     label: identity.codeBarres ?? identity.libelleCarton ?? "Carton non identifié",
     description: identity.codeBarres && identity.libelleCarton ? identity.libelleCarton : null,

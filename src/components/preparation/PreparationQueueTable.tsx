@@ -8,6 +8,7 @@ import type { PreparationWorkspaceItem } from "@/lib/services/preparation-servic
 import { cn } from "@/lib/utils";
 import { STATUT_PREPARATION_LABELS, statutBadgeVariant } from "@/lib/utils/dossier-status";
 import { PreparationClaimButton } from "./PreparationClaimButton";
+import { getCartonDisplay } from "@/lib/workflow/carton-identity";
 
 const dateFmt = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 
@@ -60,6 +61,7 @@ export function PreparationQueueTable({
               item.preparateurId === currentUserId;
             const canValidate = permissions.includes("PREPARATION_VALIDATE") && item.statutPreparation === "A_VALIDER";
             const actionLabel = canContinue ? "Continuer" : canValidate ? "Contrôler" : "Consulter";
+            const carton = getCartonDisplay(item);
 
             return (
               <TableRow key={item.id} className="hover:bg-accent/30">
@@ -70,8 +72,8 @@ export function PreparationQueueTable({
                   </p>
                 </TableCell>
                 <TableCell>
-                  <p className="font-medium">{item.codeBarres ?? item.libelleCarton ?? "Non identifié"}</p>
-                  {item.codeBarres && item.libelleCarton ? <p className="text-xs text-muted-foreground">{item.libelleCarton}</p> : null}
+                  <p className="font-mono font-medium">{carton.label}</p>
+                  {carton.description ? <p className="text-xs text-muted-foreground">{carton.description}</p> : null}
                 </TableCell>
                 <TableCell>{item.site?.nom ?? "À confirmer"}</TableCell>
                 <TableCell>

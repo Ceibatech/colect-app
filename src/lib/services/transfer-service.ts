@@ -42,7 +42,7 @@ export async function getTransferCreateData() {
     }),
     prisma.dossier.count(),
     prisma.dossier.groupBy({
-      by: ["siteId", "entrepotId", "codeBarres", "libelleCarton"],
+      by: ["cartonId", "siteId", "entrepotId", "codeBarres", "libelleCarton"],
       _count: { _all: true },
     }),
   ]);
@@ -68,13 +68,14 @@ export async function searchTransferCartons(options: TransferCartonSearchOptions
     where: locationWhere,
     select: {
       id: true,
+      cartonId: true,
       siteId: true,
       codeBarres: true,
       libelleCarton: true,
       transferLotDossiers: {
         where: {
           transferLotItem: {
-            status: { in: ["PREVU", "SORTI"] },
+            status: { in: ["PREVU", "SORTI", "RECU"] },
             transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } },
           },
         },

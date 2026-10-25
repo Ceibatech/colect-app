@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { DossierListItem } from "@/lib/services/dossier-query-service";
+import { formatCartonReference } from "@/lib/cartons/reference";
 import {
   STATUT_COLLECTE_LABELS,
   STATUT_VALIDATION_LABELS,
@@ -35,7 +36,7 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
         <TableHeader>
           <TableRow className="bg-muted/60 hover:bg-muted/60">
             <TableHead>Référence</TableHead>
-            <TableHead>Code-barres</TableHead>
+            <TableHead>Carton</TableHead>
             <TableHead>Direction/Service</TableHead>
             <TableHead>Nom</TableHead>
             <TableHead>Prénoms</TableHead>
@@ -56,7 +57,16 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
           {items.map((d) => (
             <TableRow key={d.id} className="hover:bg-accent/30">
               <TableCell className="font-mono text-xs font-semibold text-primary whitespace-nowrap">{d.reference}</TableCell>
-              <TableCell className="text-muted-foreground whitespace-nowrap">{d.codeBarres ?? "—"}</TableCell>
+              <TableCell className="whitespace-nowrap">
+                {d.cartonId !== null ? (
+                  <Link href={`/dossiers?q=${formatCartonReference(d.cartonId)}`} className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline" title="Voir les dossiers accessibles de ce carton">
+                    {formatCartonReference(d.cartonId)}
+                  </Link>
+                ) : <span className="text-muted-foreground">Non identifié</span>}
+                {(d.codeBarres || d.libelleCarton) ? (
+                  <div className="text-xs text-muted-foreground">{[d.codeBarres, d.libelleCarton].filter(Boolean).join(" · ")}</div>
+                ) : null}
+              </TableCell>
               <TableCell className="whitespace-nowrap">{d.numeroDdu ?? "—"}</TableCell>
               <TableCell className="font-medium whitespace-nowrap">{d.nom ?? "—"}</TableCell>
               <TableCell className="whitespace-nowrap">{d.prenoms ?? "—"}</TableCell>
