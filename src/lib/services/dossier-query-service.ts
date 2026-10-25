@@ -52,8 +52,7 @@ export async function searchDossiers(filters: DossierSearchFilters, options: Dos
     const q = filters.q.trim();
     if (q) {
       const cartonId = parseCartonReference(q);
-      where.OR = [
-        ...(cartonId !== null ? [{ cartonId }] : []),
+      where.OR = cartonId !== null ? [{ cartonId }] : [
         { reference: { contains: q } },
         { codeBarres: { contains: q } },
         { libelleCarton: { contains: q } },

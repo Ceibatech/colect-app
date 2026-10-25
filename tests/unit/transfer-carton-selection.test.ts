@@ -5,6 +5,13 @@ import {
 } from "@/lib/transfers/carton-selection";
 
 describe("transfer carton selection", () => {
+  it("an exact permanent reference cannot match another carton's old label", () => {
+    const items = groupAvailableTransferCartons([
+      { ...row(1, "OLD", null), cartonId: 10 },
+      { ...row(2, "CTN-00000010", null), cartonId: 11 },
+    ]).items;
+    expect(filterTransferCartons(items, "ctn-00000010").map((item) => item.token)).toEqual(["carton:10"]);
+  });
   it("groups every dossier of one physical carton into one selectable row", () => {
     const result = groupAvailableTransferCartons([
       row(1, 1, "CB-001", "Carton A"),

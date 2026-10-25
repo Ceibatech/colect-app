@@ -59,7 +59,7 @@ describe("files de traitement par carton physique", () => {
   it.each(workspaces)("%s accepte une recherche par référence CTN", async (_name, workspace) => {
     mocks.dossierGroupBy.mockResolvedValue([]);
     await workspace({ page: 1, statut: "TOUS", q: "CTN-00000010" });
-    expect(JSON.stringify(mocks.dossierGroupBy.mock.calls[0][0].where)).toContain('"cartonId":10');
+    expect(mocks.dossierGroupBy.mock.calls[0][0].where.AND).toContainEqual({ cartonId: 10 });
   });
 
   it("ouvre un carton sélectionné indépendamment de son ancien emplacement", async () => {
@@ -74,8 +74,23 @@ describe("recherche d'un carton et périmètre utilisateur", () => {
     await searchDossiers({ q: "CTN-00000010", operateurId: { in: [17, 18] } }, { page: 1, pageSize: 20, sort: "createdAt", dir: "desc" });
     const where = mocks.dossierFindMany.mock.calls[0][0].where;
     expect(where.operateurId).toEqual({ in: [17, 18] });
-    expect(where.OR).toContainEqual({ cartonId: 10 });
+    expect(where.OR).toEqual([{ cartonId: 10 }]);
     expect(mocks.dossierCount.mock.calls[0][0].where).toEqual(where);
+  });
+
+  it("reserves a CTN query for its physical carton even if another carton has the same text as an old barcode", async () => {
+    const rows = [
+      { id: 1, cartonId: 10, codeBarres: "ANCIEN-A" },
+      { id: 2, cartonId: 11, codeBarres: "CTN-00000010" },
+    ];
+    mocks.dossierFindMany.mockImplementation(async ({ where }: {
+      where: { OR: Array<{ cartonId?: number; codeBarres?: { contains: string } }> };
+    }) => rows.filter((row) => where.OR.some((clause) =>
+      clause.cartonId !== undefined ? clause.cartonId === row.cartonId
+        : clause.codeBarres !== undefined && row.codeBarres.includes(clause.codeBarres.contains),
+    )));
+    const result = await searchDossiers({ q: "CTN-00000010" }, { page: 1, pageSize: 20, sort: "createdAt", dir: "desc" });
+    expect(result.items.map((row) => row.id)).toEqual([1]);
   });
 
   it("retrouve les documents d'un carton sans exiger que son ID figure dans l'OCR", async () => {

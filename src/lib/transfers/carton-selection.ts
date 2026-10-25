@@ -1,4 +1,5 @@
 import { buildCartonToken, getCartonDisplay } from "@/lib/workflow/carton-identity";
+import { formatCartonReference, parseCartonReference } from "@/lib/cartons/reference";
 
 export const MAX_TRANSFER_CARTONS = 200;
 
@@ -73,6 +74,8 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
 }
 
 export function filterTransferCartons(items: TransferCartonItem[], query?: string) {
+  const cartonId = parseCartonReference(query ?? "");
+  if (cartonId !== null) return items.filter((item) => item.code === formatCartonReference(cartonId));
   const normalizedQuery = normalizeSearch(query ?? "");
   if (!normalizedQuery) return items;
   return items.filter((item) => normalizeSearch(`${item.code} ${item.label ?? ""}`).includes(normalizedQuery));

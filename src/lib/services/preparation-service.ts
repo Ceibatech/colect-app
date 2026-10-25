@@ -25,9 +25,8 @@ function buildSearchWhere(filters: PreparationSearch): Prisma.DossierWhereInput 
   if (statuses) constraints.push({ statutPreparation: { in: statuses } });
   if (filters.q) {
     const cartonId = parseCartonReference(filters.q);
-    constraints.push({
+    constraints.push(cartonId !== null ? { cartonId } : {
       OR: [
-        ...(cartonId !== null ? [{ cartonId }] : []),
         { reference: { contains: filters.q } },
         { codeBarres: { contains: filters.q } },
         { libelleCarton: { contains: filters.q } },

@@ -54,8 +54,7 @@ function searchConstraint(q?: string): Prisma.DossierWhereInput[] {
   const cartonId = q ? parseCartonReference(q) : null;
   return [
     { OR: [{ cartonId: { not: null } }, { codeBarres: { not: null } }, { libelleCarton: { not: null } }] },
-    ...(q ? [{ OR: [
-      ...(cartonId !== null ? [{ cartonId }] : []),
+    ...(q ? [cartonId !== null ? { cartonId } : { OR: [
       { reference: { contains: q } },
       { codeBarres: { contains: q } },
       { libelleCarton: { contains: q } },
