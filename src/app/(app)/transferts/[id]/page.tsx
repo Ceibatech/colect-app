@@ -42,6 +42,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   ]);
   if (!lot) notFound();
 
+  const escortSuggestions = lot.participants.filter((participant) => participant.roleCode === "CONVOYEUR").map((participant) => participant.user.name);
   const sourceLabel = placeLabel(lot.sourceSite.nom, lot.sourceEntrepot);
   const destinationLabel = placeLabel(lot.destinationSite.nom, lot.destinationEntrepot);
   const stock = getTransferDossierStockSummary(lot.items.map((item) => ({
@@ -104,7 +105,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <CardTitle>Situation du stock</CardTitle>
-                <CardDescription>Le stock du site CEIBA n&apos;augmente qu&apos;après les validations interne et SDA du constat de réception.</CardDescription>
+                <CardDescription>Le stock du site de destination n&apos;augmente qu&apos;après les validations interne et SDA du constat de réception.</CardDescription>
               </div>
               <TransferLotStatusBadge status={lot.status as TransferLotStatusCode} />
             </div>
@@ -112,7 +113,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <StockMetric label="Site du ministère" value={stock.atOrigin} hint="non sorti + retourné" tone="default" />
             <StockMetric label="En transit" value={stock.inTransit} hint="sorti, non réceptionné" tone="warning" />
-            <StockMetric label="Site CEIBA" value={stock.atDestination} hint="réception confirmée" tone="success" />
+            <StockMetric label="À destination" value={stock.atDestination} hint="réception confirmée" tone="success" />
             <StockMetric label="Dossiers identifiés" value={stock.total} hint="composition figée" tone="default" />
           </CardContent>
         </Card>
@@ -135,9 +136,9 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <CardDescription>Un bordereau distinct est produit pour chaque mouvement, y compris en cas de sortie ou de retour partiel.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <TransferMovementDialog lotId={lot.id} type="SORTIE" items={movementOptions("PREVU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
-            <TransferMovementDialog lotId={lot.id} type="RECEPTION" items={movementOptions("SORTI")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
-            <TransferMovementDialog lotId={lot.id} type="RETOUR" items={movementOptions("RECU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
+            <TransferMovementDialog lotId={lot.id} type="SORTIE" escortSuggestions={escortSuggestions} items={movementOptions("PREVU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
+            <TransferMovementDialog lotId={lot.id} type="RECEPTION" escortSuggestions={escortSuggestions} items={movementOptions("SORTI")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
+            <TransferMovementDialog lotId={lot.id} type="RETOUR" escortSuggestions={escortSuggestions} items={movementOptions("RECU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
           </CardContent>
         </Card>
       ) : null}

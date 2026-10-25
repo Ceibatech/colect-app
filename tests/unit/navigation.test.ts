@@ -33,12 +33,12 @@ describe("role-aware dashboard navigation", () => {
     expect(visible).toEqual(expected);
   });
 
-  it("limits the executive sidebar to the dashboard module", () => {
+  it("limits the executive sidebar to the dashboard and the transfer register", () => {
     const visible = NAV_ITEMS
       .filter((item) => isNavItemVisible(item, ROLE_PERMISSIONS.EXECUTIF, "EXECUTIF"))
       .map((item) => item.href);
 
-    expect(visible).toEqual(["/dashboard"]);
+    expect(visible).toEqual(["/dashboard", "/transferts"]);
   });
 
   it("limits Finance to dashboards and excludes operational modules", () => {

@@ -20,6 +20,41 @@ ministère et un site CEIBA.
 - **Service informatique / CEIBA Analytics** protège les fichiers, les supports
   électroniques et les données pendant le transfert.
 
+## Profils GeoArchives
+
+Les profils sont symétriques entre CEIBA et le SDA ; chacun arrive sur le registre
+des transferts, qui lui sert de tableau de bord.
+
+| Côté | Profil | Droits |
+|---|---|---|
+| CEIBA | Exécutif | Tableaux de bord et registre, lecture seule |
+| CEIBA | Gestionnaire des transferts CEIBA | Crée et soumet les opérations, enregistre les mouvements, suivi GPS |
+| CEIBA | Validateur interne | Visa interne des lots et des constats de réception |
+| CEIBA | Convoyeur | Suivi GPS du convoi depuis son téléphone, lecture du registre |
+| SDA | Exécutif SDA | Registre des transferts, lecture seule |
+| SDA | Gestionnaire de transfert SDA | Remet ou réceptionne les cartons et signe les bordereaux de son site |
+| SDA | Responsable validation SDA | Autorisation F01 et contre-signature des sorties et réceptions |
+
+Un administrateur attribue ces profils dans **Administration → Utilisateurs**.
+
+## Deux sens, un seul circuit
+
+Une opération relie un site du ministère et un site CEIBA, dans un sens ou dans
+l'autre : **prise en charge** (ministère → CEIBA) ou **restitution** (CEIBA →
+ministère). Les étapes, visas et preuves sont identiques ; le site de destination
+réceptionne (F03) et le SDA contre-signe.
+
+## Planification d'une opération
+
+- **Intervenants** : choisis parmi les comptes actifs ayant un profil de transfert
+  de leur côté (CEIBA : gestionnaire, validateur interne, convoyeur ; SDA :
+  gestionnaire SDA, responsable validation SDA). Le nom et le profil sont figés
+  sur l'opération et imprimés sur la F01. Les convoyeurs désignés sont proposés
+  dans le champ « Convoyeur » du bon de sortie.
+- **Moyen de transport** : liste déroulante, avec « Autre » à préciser.
+- **Risques** et **mesures de sécurisation** : cases à cocher, avec « Autre » à
+  préciser (`src/lib/transfers/planning-options.ts`).
+
 ## Circuit numérique
 
 1. **Gestionnaire des transferts** : identifier le lot, examiner les dossiers et
@@ -34,7 +69,7 @@ ministère et un site CEIBA.
    le convoyeur CEIBA, les scellés et les signatures de remise. Le système produit
    le bon de sortie et bordereau de transfert F02. Les dossiers passent en transit.
    Le convoyeur démarre le suivi GPS depuis son appareil.
-5. **Arrivée sur le site CEIBA** : contrôler le nombre et l'état des contenants,
+5. **Arrivée sur le site de destination** : contrôler le nombre et l'état des contenants,
    la concordance avec le bordereau et les scellés. Le système produit le
    procès-verbal de réception et de déchargement F03. Toute anomalie impose un
    constat écrit. Le validateur CEIBA vise la réception, puis le ministère la

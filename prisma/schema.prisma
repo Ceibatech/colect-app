@@ -120,6 +120,7 @@ model User {
   emailReportDeliveries              EmailReportDelivery[]     @relation("EmailReportDeliveryRecipient")
   emailReportDeliveriesTriggered     EmailReportDelivery[]     @relation("EmailReportDeliveryTriggeredBy")
   transferEmailDeliveries            TransferEmailDelivery[]   @relation("TransferEmailDeliveryRecipient")
+  transferLotParticipations          TransferLotParticipant[]
 
   @@index([roleId])
   @@map("users")
@@ -263,16 +264,17 @@ model TransferLot {
   createdAt              DateTime          @default(now()) @map("created_at")
   updatedAt              DateTime          @updatedAt @map("updated_at")
 
-  sourceSite          Site                    @relation("TransferSourceSite", fields: [sourceSiteId], references: [id])
-  sourceEntrepot      Entrepot?               @relation("TransferSourceEntrepot", fields: [sourceEntrepotId], references: [id])
-  destinationSite     Site                    @relation("TransferDestinationSite", fields: [destinationSiteId], references: [id])
-  destinationEntrepot Entrepot?               @relation("TransferDestinationEntrepot", fields: [destinationEntrepotId], references: [id])
-  createdBy           User                    @relation("TransferLotCreatedBy", fields: [createdById], references: [id])
-  authorizedBy        User?                   @relation("TransferLotAuthorizedBy", fields: [authorizedById], references: [id])
-  ceibacValidatedBy   User?                   @relation("TransferLotCeibacValidatedBy", fields: [ceibacValidatedById], references: [id], onDelete: SetNull)
+  sourceSite          Site                     @relation("TransferSourceSite", fields: [sourceSiteId], references: [id])
+  sourceEntrepot      Entrepot?                @relation("TransferSourceEntrepot", fields: [sourceEntrepotId], references: [id])
+  destinationSite     Site                     @relation("TransferDestinationSite", fields: [destinationSiteId], references: [id])
+  destinationEntrepot Entrepot?                @relation("TransferDestinationEntrepot", fields: [destinationEntrepotId], references: [id])
+  createdBy           User                     @relation("TransferLotCreatedBy", fields: [createdById], references: [id])
+  authorizedBy        User?                    @relation("TransferLotAuthorizedBy", fields: [authorizedById], references: [id])
+  ceibacValidatedBy   User?                    @relation("TransferLotCeibacValidatedBy", fields: [ceibacValidatedById], references: [id], onDelete: SetNull)
   items               TransferLotItem[]
   movements           TransferMovement[]
   trackingPoints      TransferTrackingPoint[]
+  participants        TransferLotParticipant[]
 
   @@index([sourceSiteId, sourceEntrepotId])
   @@index([destinationSiteId, destinationEntrepotId])
@@ -285,6 +287,29 @@ model TransferLot {
 // Une ligne représente un carton physique identifié. Les dossiers liés sont
 // figés au moment de la constitution du lot pour conserver la preuve de son
 // contenu même si l'inventaire évolue ensuite.
+enum TransferParticipantSide {
+  CEIBA
+  SDA
+}
+
+// Intervenant désigné sur une opération, choisi parmi les comptes habilités.
+// La mention imprimée reste le texte figé du lot (ceibaParticipants/sdaParticipants).
+model TransferLotParticipant {
+  id            Int                     @id @default(autoincrement())
+  transferLotId Int                     @map("transfer_lot_id")
+  userId        Int                     @map("user_id")
+  side          TransferParticipantSide
+  roleCode      String                  @map("role_code") @db.VarChar(64)
+  createdAt     DateTime                @default(now()) @map("created_at")
+
+  transferLot TransferLot @relation(fields: [transferLotId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([transferLotId, userId])
+  @@index([userId])
+  @@map("transfer_lot_participants")
+}
+
 model TransferLotItem {
   id                   Int                @id @default(autoincrement())
   transferLotId        Int                @map("transfer_lot_id")
@@ -900,7 +925,7 @@ model Carton {
 }
 
 model Dossier {
-  id Int @id @default(autoincrement())
+  id       Int  @id @default(autoincrement())
   cartonId Int? @map("carton_id")
 
   // Référence unique générée automatiquement : DOS-2026-000001
@@ -973,32 +998,32 @@ model Dossier {
   mobile          String?
 
   // --- SUIVI APPLICATIF (ajouté pour la gestion du processus métier) ---
-  statutCollecte     StatutCollecte     @default(BROUILLON) @map("statut_collecte")
-  statutValidation   StatutValidation   @default(EN_ATTENTE) @map("statut_validation")
+  statutCollecte        StatutCollecte        @default(BROUILLON) @map("statut_collecte")
+  statutValidation      StatutValidation      @default(EN_ATTENTE) @map("statut_validation")
   // Phase 20+ : étape "Préparation", intercalée entre Validation et
   // Numérisation — voir le commentaire sur l'enum StatutPreparation.
-  statutPreparation  StatutPreparation  @default(EN_ATTENTE) @map("statut_preparation")
-  statutNumerisation StatutNumerisation @default(EN_ATTENTE) @map("statut_numerisation")
+  statutPreparation     StatutPreparation     @default(EN_ATTENTE) @map("statut_preparation")
+  statutNumerisation    StatutNumerisation    @default(EN_ATTENTE) @map("statut_numerisation")
   statutConditionnement StatutConditionnement @default(EN_ATTENTE) @map("statut_conditionnement")
-  statutIndexation   StatutIndexation   @default(EN_ATTENTE) @map("statut_indexation")
-  statutArchivage    StatutArchivage    @default(EN_ATTENTE) @map("statut_archivage")
+  statutIndexation      StatutIndexation      @default(EN_ATTENTE) @map("statut_indexation")
+  statutArchivage       StatutArchivage       @default(EN_ATTENTE) @map("statut_archivage")
 
-  dateSoumission            DateTime? @map("date_soumission")
-  dateValidation            DateTime? @map("date_validation")
-  datePreparation           DateTime? @map("date_preparation")
+  dateSoumission              DateTime? @map("date_soumission")
+  dateValidation              DateTime? @map("date_validation")
+  datePreparation             DateTime? @map("date_preparation")
   // Agent ayant renseigné la dernière préparation. Il est volontairement
   // distinct de `operateurId`, qui reste l'auteur de l'inventaire initial.
-  preparateurId             Int?      @map("preparateur_id")
-  preparationClaimedAt      DateTime? @map("preparation_claimed_at")
-  dateSoumissionPreparation DateTime? @map("date_soumission_preparation")
-  observationsPreparation   String?   @map("observations_preparation") @db.Text
-  dateNumerisation          DateTime? @map("date_numerisation")
-  conditionneurId           Int?      @map("conditionneur_id")
-  conditionnementClaimedAt  DateTime? @map("conditionnement_claimed_at")
-  dateConditionnement       DateTime? @map("date_conditionnement")
-  observationsConditionnement String? @map("observations_conditionnement") @db.Text
-  dateIndexation            DateTime? @map("date_indexation")
-  dateArchivage             DateTime? @map("date_archivage")
+  preparateurId               Int?      @map("preparateur_id")
+  preparationClaimedAt        DateTime? @map("preparation_claimed_at")
+  dateSoumissionPreparation   DateTime? @map("date_soumission_preparation")
+  observationsPreparation     String?   @map("observations_preparation") @db.Text
+  dateNumerisation            DateTime? @map("date_numerisation")
+  conditionneurId             Int?      @map("conditionneur_id")
+  conditionnementClaimedAt    DateTime? @map("conditionnement_claimed_at")
+  dateConditionnement         DateTime? @map("date_conditionnement")
+  observationsConditionnement String?   @map("observations_conditionnement") @db.Text
+  dateIndexation              DateTime? @map("date_indexation")
+  dateArchivage               DateTime? @map("date_archivage")
 
   nombrePages  Int?
   observations String? @db.Text

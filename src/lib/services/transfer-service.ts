@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
+import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
 import { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import {
   getTransferDossierStockSummary,
@@ -24,7 +25,7 @@ export interface TransferCartonSearchOptions {
 
 export async function getTransferCreateData() {
   await requirePermission("TRANSFER_CREATE");
-  const [sites, totalDossiers, inventoryGroups] = await Promise.all([
+  const [sites, totalDossiers, inventoryGroups, participantUsers] = await Promise.all([
     prisma.site.findMany({
       where: { isActive: true },
       orderBy: { nom: "asc" },
@@ -45,10 +46,20 @@ export async function getTransferCreateData() {
       by: ["cartonId", "siteId", "entrepotId", "codeBarres", "libelleCarton"],
       _count: { _all: true },
     }),
+    prisma.user.findMany({
+      where: { isActive: true, role: { code: { in: [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES] } } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, role: { select: { code: true } } },
+    }),
   ]);
 
   const inventory = summarizeInventoryLocations(inventoryGroups);
-  return { sites, totalDossiers, inventory };
+  const toOption = (user: (typeof participantUsers)[number]) => ({ id: user.id, name: user.name, roleCode: user.role.code, roleLabel: getRoleLabel(user.role.code as RoleCode) });
+  const participants = {
+    ceiba: participantUsers.filter((user) => (CEIBA_TRANSFER_ROLE_CODES as readonly string[]).includes(user.role.code)).map(toOption),
+    sda: participantUsers.filter((user) => (SDA_TRANSFER_ROLE_CODES as readonly string[]).includes(user.role.code)).map(toOption),
+  };
+  return { sites, totalDossiers, inventory, participants };
 }
 
 export async function searchTransferCartons(options: TransferCartonSearchOptions) {
@@ -330,6 +341,10 @@ export async function getTransferLotDetail(id: number) {
       destinationEntrepot: true,
       createdBy: { select: { id: true, name: true } },
       authorizedBy: { select: { id: true, name: true } },
+      participants: {
+        orderBy: { id: "asc" },
+        select: { side: true, roleCode: true, user: { select: { id: true, name: true } } },
+      },
       items: {
         orderBy: { cartonCode: "asc" },
         include: {

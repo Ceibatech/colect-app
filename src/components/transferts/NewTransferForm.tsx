@@ -6,6 +6,8 @@ import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ListChecks, Loader2, Pack
 import { toast } from "sonner";
 import { createTransferLot, type TransferActionState } from "@/lib/services/transfer-actions";
 import { MAX_TRANSFER_CARTONS, type TransferCartonItem } from "@/lib/transfers/carton-selection";
+import { TRANSFER_DIRECTIONS, type TransferDirection } from "@/lib/transfers/direction";
+import { OTHER_OPTION, SECURITY_MEASURES, TRANSFER_RISKS, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
 import type { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 
 interface SiteOption {
   id: number;
@@ -23,6 +24,13 @@ interface SiteOption {
   nom: string;
   organisation: "MINISTERE" | "CEIBA" | "AUTRE";
   entrepots: Array<{ id: number; code: string; nom: string; localisation: string | null }>;
+}
+
+interface ParticipantOption {
+  id: number;
+  name: string;
+  roleCode: string;
+  roleLabel: string;
 }
 
 interface TransferCartonPage {
@@ -45,14 +53,27 @@ function warehouseLabel(warehouse: SiteOption["entrepots"][number]) {
   return [warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ");
 }
 
-export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inventory: ReturnType<typeof summarizeInventoryLocations> }) {
+export function NewTransferForm({ sites, inventory, participants }: {
+  sites: SiteOption[];
+  inventory: ReturnType<typeof summarizeInventoryLocations>;
+  participants: { ceiba: ParticipantOption[]; sda: ParticipantOption[] };
+}) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createTransferLot, initialState);
-  const ministrySites = useMemo(() => sites.filter((site) => site.organisation === "MINISTERE"), [sites]);
-  const ceibaSites = useMemo(() => sites.filter((site) => site.organisation === "CEIBA"), [sites]);
+  const [direction, setDirection] = useState<TransferDirection>("PRISE_EN_CHARGE");
+  const route = TRANSFER_DIRECTIONS[direction];
+  const sourceSites = useMemo(() => sites.filter((site) => site.organisation === route.source), [sites, route.source]);
+  const destinationSites = useMemo(() => sites.filter((site) => site.organisation === route.destination), [sites, route.destination]);
+  const sourceIsMinistry = route.source === "MINISTERE";
   const [sourceSiteId, setSourceSiteId] = useState("");
   const [sourceEntrepotId, setSourceEntrepotId] = useState("none");
-  const [destinationSiteId, setDestinationSiteId] = useState(() => ceibaSites.length === 1 ? String(ceibaSites[0].id) : "");
+  const [destinationSiteId, setDestinationSiteId] = useState(() => {
+    const ceiba = sites.filter((site) => site.organisation === "CEIBA");
+    return ceiba.length === 1 ? String(ceiba[0].id) : "";
+  });
+  const [transportMethod, setTransportMethod] = useState("");
+  const [risks, setRisks] = useState<Set<string>>(new Set());
+  const [measures, setMeasures] = useState<Set<string>>(new Set());
   const [destinationEntrepotId, setDestinationEntrepotId] = useState("none");
   const [includeUnlocated, setIncludeUnlocated] = useState(false);
   const [selected, setSelected] = useState<Map<string, TransferCartonItem>>(new Map());
@@ -91,8 +112,8 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
     };
   }, [sourceSiteId, sourceEntrepotId, includeUnlocated, search, page]);
 
-  const sourceSite = ministrySites.find((site) => String(site.id) === sourceSiteId);
-  const destinationSite = ceibaSites.find((site) => String(site.id) === destinationSiteId);
+  const sourceSite = sourceSites.find((site) => String(site.id) === sourceSiteId);
+  const destinationSite = destinationSites.find((site) => String(site.id) === destinationSiteId);
   const selectedTokens = useMemo(() => [...selected.keys()], [selected]);
   const selectedDossierCount = useMemo(() => [...selected.values()].reduce((sum, item) => sum + item.dossierCount, 0), [selected]);
   const allPageSelected = results.items.length > 0 && results.items.every((item) => selected.has(item.token));
@@ -103,6 +124,17 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
     setPage(1);
     setResults(emptyPage);
     setLoadError("");
+  }
+
+  function changeDirection(next: TransferDirection) {
+    if (next === direction) return;
+    setDirection(next);
+    setSourceSiteId("");
+    setSourceEntrepotId("none");
+    const destinations = sites.filter((site) => site.organisation === TRANSFER_DIRECTIONS[next].destination);
+    setDestinationSiteId(destinations.length === 1 ? String(destinations[0].id) : "");
+    setDestinationEntrepotId("none");
+    resetSourceSelection();
   }
 
   function changeSourceSite(value: string | null) {
@@ -192,6 +224,18 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
       <input type="hidden" name="includeUnlocated" value={String(includeUnlocated)} />
       {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
 
+      <input type="hidden" name="direction" value={direction} />
+      <section className="space-y-3 rounded-lg border bg-card p-4 lg:p-5">
+        <div><h2 className="font-semibold">Sens du transfert</h2><p className="text-sm text-muted-foreground">Le circuit est le même dans les deux sens : visa interne, visa SDA, bon de sortie F02, procès-verbal de réception F03 contre-signé.</p></div>
+        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Sens du transfert">
+          {(Object.keys(TRANSFER_DIRECTIONS) as TransferDirection[]).map((key) => (
+            <Button key={key} type="button" role="radio" aria-checked={direction === key} variant={direction === key ? "secondary" : "outline"} className="h-auto justify-start whitespace-normal py-3 text-left" onClick={() => changeDirection(key)} disabled={pending}>
+              {TRANSFER_DIRECTIONS[key].label}
+            </Button>
+          ))}
+        </div>
+      </section>
+
       <section className="space-y-4 rounded-lg border bg-card p-4 lg:p-5">
         <div>
           <h2 className="font-semibold">Où se trouvent les cartons inventoriés ?</h2>
@@ -205,12 +249,12 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
               {locations.length === 0 ? <p className="text-xs text-muted-foreground">Aucun dossier à cet emplacement.</p> : locations.map((location) => {
                 const warehouse = site.entrepots.find((item) => item.id === location.entrepotId);
                 const label = location.entrepotId === null ? "Sans salle renseignée" : warehouse ? warehouseLabel(warehouse) : "Salle inactive ou non disponible";
-                return <Button key={location.entrepotId ?? "none"} type="button" variant={sourceSiteId === String(site.id) && sourceEntrepotId === String(location.entrepotId ?? "none") ? "secondary" : "outline"} className="h-auto w-full justify-between whitespace-normal py-2 text-left" disabled={pending || site.organisation !== "MINISTERE" || (location.entrepotId !== null && !warehouse)} onClick={() => selectInventoryLocation(site.id, location.entrepotId)}>
+                return <Button key={location.entrepotId ?? "none"} type="button" variant={sourceSiteId === String(site.id) && sourceEntrepotId === String(location.entrepotId ?? "none") ? "secondary" : "outline"} className="h-auto w-full justify-between whitespace-normal py-2 text-left" disabled={pending || site.organisation !== route.source || (location.entrepotId !== null && !warehouse)} onClick={() => selectInventoryLocation(site.id, location.entrepotId)}>
                   <span>{label}</span>
                   <span className="ml-2 text-xs">{location.cartons.toLocaleString("fr-FR")} cartons · {location.dossiers.toLocaleString("fr-FR")} dossiers</span>
                 </Button>;
               })}
-              {site.organisation !== "MINISTERE" && locations.length > 0 ? <p className="text-xs text-muted-foreground">Stock visible. Cette opération de sortie part d’un site du ministère ; les retours se font depuis le lot reçu.</p> : null}
+              {site.organisation !== route.source && locations.length > 0 ? <p className="text-xs text-muted-foreground">Stock visible. Dans le sens choisi, l’opération part d’un site {sourceIsMinistry ? "du ministère" : "CEIBA"}.</p> : null}
             </div>;
           })}
         </div>
@@ -219,12 +263,12 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
 
       <section className="grid gap-5 rounded-lg border bg-card p-4 shadow-sm lg:grid-cols-[1fr_auto_1fr] lg:items-start lg:p-5">
         <div className="space-y-4">
-          <div><h2 className="font-semibold">Site du ministère · origine</h2><p className="text-sm text-muted-foreground">Site d&apos;inventaire qui détient actuellement les cartons.</p></div>
+          <div><h2 className="font-semibold">{sourceIsMinistry ? "Site du ministère" : "Site CEIBA"} · origine</h2><p className="text-sm text-muted-foreground">Site qui détient actuellement les cartons.</p></div>
           <div className="space-y-2">
-            <Label>Site du ministère</Label>
-            <Select name="sourceSiteId" items={ministrySites.map((site) => ({ label: siteLabel(site), value: String(site.id) }))} value={sourceSiteId} onValueChange={changeSourceSite} disabled={pending}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site du ministère" /></SelectTrigger>
-              <SelectContent>{ministrySites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{siteLabel(site)}</SelectItem>)}</SelectContent>
+            <Label>{sourceIsMinistry ? "Site du ministère" : "Site CEIBA"}</Label>
+            <Select name="sourceSiteId" items={sourceSites.map((site) => ({ label: siteLabel(site), value: String(site.id) }))} value={sourceSiteId} onValueChange={changeSourceSite} disabled={pending}>
+              <SelectTrigger className="w-full"><SelectValue placeholder={sourceIsMinistry ? "Choisir le site du ministère" : "Choisir le site CEIBA"} /></SelectTrigger>
+              <SelectContent>{sourceSites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{siteLabel(site)}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
@@ -239,12 +283,12 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
         <div className="hidden h-full items-center text-muted-foreground lg:flex"><ArrowRight className="mt-16 h-6 w-6" /></div>
 
         <div className="space-y-4">
-          <div><h2 className="font-semibold">Site CEIBA · destination</h2><p className="text-sm text-muted-foreground">Site de traitement qui intégrera le stock après réception signée.</p></div>
+          <div><h2 className="font-semibold">{sourceIsMinistry ? "Site CEIBA" : "Site du ministère"} · destination</h2><p className="text-sm text-muted-foreground">Site qui intégrera le stock après réception signée.</p></div>
           <div className="space-y-2">
-            <Label>Site CEIBA</Label>
-            <Select name="destinationSiteId" items={ceibaSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={destinationSiteId} onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }} disabled={pending}>
-              <SelectTrigger className="w-full"><SelectValue placeholder="Choisir le site CEIBA" /></SelectTrigger>
-              <SelectContent>{ceibaSites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
+            <Label>{sourceIsMinistry ? "Site CEIBA" : "Site du ministère"}</Label>
+            <Select name="destinationSiteId" items={destinationSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={destinationSiteId} onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }} disabled={pending}>
+              <SelectTrigger className="w-full"><SelectValue placeholder={sourceIsMinistry ? "Choisir le site CEIBA" : "Choisir le site du ministère"} /></SelectTrigger>
+              <SelectContent>{destinationSites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
@@ -259,7 +303,7 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
 
       <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-end lg:justify-between lg:p-5">
-          <div><h2 className="font-semibold">Cartons disponibles au site du ministère</h2><p className="text-sm text-muted-foreground">Un carton sélectionné inclut automatiquement tous les dossiers qu&apos;il contient.</p></div>
+          <div><h2 className="font-semibold">Cartons disponibles au site d&apos;origine</h2><p className="text-sm text-muted-foreground">Un carton sélectionné inclut automatiquement tous les dossiers qu&apos;il contient.</p></div>
           <div className="relative w-full lg:w-96"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="ID carton, code-barres ou libellé" className="pl-9" disabled={!sourceSiteId} /></div>
         </div>
 
@@ -268,7 +312,7 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge variant="secondary" className="rounded-md">{selected.size}/{MAX_TRANSFER_CARTONS} cartons</Badge>
               <Badge variant="outline" className="rounded-md">{selectedDossierCount} dossiers inclus</Badge>
-              <span className="text-muted-foreground">{sourceSiteId ? `${results.total} carton${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site du ministère pour charger le stock"}</span>
+              <span className="text-muted-foreground">{sourceSiteId ? `${results.total} carton${results.total > 1 ? "s" : ""} disponible${results.total > 1 ? "s" : ""}` : "Choisissez le site d'origine pour charger le stock"}</span>
             </div>
             <div className="flex flex-wrap gap-2">
               {results.items.length > 0 ? <Button type="button" size="sm" variant="outline" onClick={toggleCurrentPage}>{allPageSelected ? "Retirer cette page" : "Sélectionner cette page"}</Button> : null}
@@ -321,15 +365,27 @@ export function NewTransferForm({ sites, inventory }: { sites: SiteOption[]; inv
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required disabled={pending} /></div>
           <div className="space-y-2"><Label htmlFor="archiveSupport">Support des archives</Label><select id="archiveSupport" name="archiveSupport" defaultValue="PHYSIQUE" required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="PHYSIQUE">Physique</option><option value="ELECTRONIQUE">Électronique</option><option value="HYBRIDE">Hybride</option></select></div>
-          <div className="space-y-2"><Label htmlFor="transportMethod">Moyen de transport prévu</Label><Input id="transportMethod" name="transportMethod" required maxLength={160} placeholder="Ex. véhicule fermé dédié" disabled={pending} /></div>
-          <div className="space-y-2 sm:col-span-2"><Label htmlFor="plannedRoute">Itinéraire prévu</Label><Input id="plannedRoute" name="plannedRoute" required maxLength={2000} placeholder="Site de départ, trajet autorisé et site CEIBA" disabled={pending} /></div>
-          <div className="space-y-2"><Label htmlFor="motif">Objet / contexte</Label><Input id="motif" name="motif" maxLength={2000} placeholder="Numérisation, indexation, garde temporaire..." disabled={pending} /></div>
-          <div className="space-y-2"><Label htmlFor="ceibaParticipants">Intervenants CEIBA habilités</Label><Textarea id="ceibaParticipants" name="ceibaParticipants" required rows={3} maxLength={2000} placeholder="Noms et fonctions" disabled={pending} /></div>
-          <div className="space-y-2"><Label htmlFor="sdaParticipants">Intervenants SDA habilités</Label><Textarea id="sdaParticipants" name="sdaParticipants" required rows={3} maxLength={2000} placeholder="Noms et fonctions" disabled={pending} /></div>
-          <div className="space-y-2"><Label htmlFor="riskAssessment">Risques identifiés</Label><Textarea id="riskAssessment" name="riskAssessment" required rows={3} maxLength={2000} placeholder="Perte, vol, détérioration, intempéries..." disabled={pending} /></div>
-          <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="securityMeasures">Mesures de sécurisation</Label><Textarea id="securityMeasures" name="securityMeasures" required rows={3} maxLength={2000} placeholder="Conditionnement, fermeture, scellés, surveillance et protection des supports" disabled={pending} /></div>
+          <div className="space-y-2">
+            <Label htmlFor="transportMethod">Moyen de transport prévu</Label>
+            <select id="transportMethod" name="transportMethod" value={transportMethod} onChange={(event) => setTransportMethod(event.target.value)} required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+              <option value="" disabled>Choisir le moyen de transport</option>
+              {TRANSPORT_METHODS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              <option value={OTHER_OPTION}>Autre (préciser)</option>
+            </select>
+            {transportMethod === OTHER_OPTION ? <Input name="transportMethodOther" required minLength={2} maxLength={300} placeholder="Préciser le moyen de transport" disabled={pending} /> : null}
+          </div>
+          <div className="space-y-2 sm:col-span-2"><Label htmlFor="plannedRoute">Itinéraire prévu</Label><Input id="plannedRoute" name="plannedRoute" required maxLength={2000} placeholder="Site de départ, trajet autorisé et site de destination" disabled={pending} /></div>
+          <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="motif">Objet / contexte</Label><Input id="motif" name="motif" maxLength={2000} placeholder={sourceIsMinistry ? "Numérisation, indexation, garde temporaire..." : "Restitution après numérisation, réintégration au site..."} disabled={pending} /></div>
         </div>
-        <p className="text-xs leading-5 text-muted-foreground">Après création, l&apos;opération est soumise à la validation interne, puis transmise à la validation SDA. Le stock du site d&apos;inventaire diminue uniquement après le bon de sortie contre-signé; le stock du site CEIBA augmente après l&apos;attestation de réception validée.</p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ParticipantPicker name="ceibaParticipantIds" title="Intervenants CEIBA habilités" options={participants.ceiba} disabled={pending} emptyHint="Aucun compte CEIBA actif avec un profil de transfert (gestionnaire, validateur interne, convoyeur)." />
+          <ParticipantPicker name="sdaParticipantIds" title="Intervenants SDA habilités" options={participants.sda} disabled={pending} emptyHint="Aucun compte SDA actif avec un profil de transfert (gestionnaire SDA, responsable validation SDA)." />
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ChoiceGroup name="risks" otherName="riskOther" title="Risques identifiés" options={TRANSFER_RISKS} selected={risks} onChange={setRisks} disabled={pending} />
+          <ChoiceGroup name="securityMeasures" otherName="securityMeasureOther" title="Mesures de sécurisation" options={SECURITY_MEASURES} selected={measures} onChange={setMeasures} disabled={pending} />
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">Après création, l&apos;opération est soumise à la validation interne, puis transmise à la validation SDA. Le stock du site d&apos;origine diminue uniquement après le bon de sortie contre-signé ; celui du site de destination augmente après l&apos;attestation de réception validée. Les administrateurs attribuent les profils de transfert dans Administration → Utilisateurs.</p>
       </section>
 
       <div className="flex justify-end"><Button type="submit" disabled={pending || selected.size === 0 || !sourceSiteId || !destinationSiteId}>{pending ? <Loader2 className="animate-spin" /> : <PackageCheck />}Valider la sélection · {selected.size} carton{selected.size > 1 ? "s" : ""} / {selectedDossierCount} dossiers</Button></div>
@@ -346,6 +402,54 @@ async function fetchCartons(options: { sourceSiteId: string; sourceEntrepotId: s
   const payload = await response.json() as TransferCartonPage | { error?: string };
   if (!response.ok || !("items" in payload)) throw new Error("error" in payload ? payload.error : "Chargement impossible.");
   return payload;
+}
+
+function ParticipantPicker({ name, title, options, disabled, emptyHint }: { name: string; title: string; options: ParticipantOption[]; disabled: boolean; emptyHint: string }) {
+  return (
+    <fieldset className="space-y-2 rounded-md border p-3">
+      <legend className="px-1 text-sm font-medium">{title}</legend>
+      {options.length === 0 ? <p className="text-xs text-muted-foreground">{emptyHint}</p> : (
+        <div className="max-h-56 space-y-1 overflow-y-auto">
+          {options.map((option) => (
+            <label key={option.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40">
+              <Checkbox name={name} value={String(option.id)} disabled={disabled} />
+              <span className="min-w-0 flex-1"><span className="font-medium">{option.name}</span><span className="ml-2 text-xs text-muted-foreground">{option.roleLabel}</span></span>
+            </label>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+function ChoiceGroup({ name, otherName, title, options, selected, onChange, disabled }: {
+  name: string;
+  otherName: string;
+  title: string;
+  options: readonly { value: string; label: string }[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+  disabled: boolean;
+}) {
+  function toggle(value: string, checked: boolean) {
+    const next = new Set(selected);
+    if (checked) next.add(value); else next.delete(value);
+    onChange(next);
+  }
+  return (
+    <fieldset className="space-y-2 rounded-md border p-3">
+      <legend className="px-1 text-sm font-medium">{title}</legend>
+      <div className="grid gap-1 sm:grid-cols-2">
+        {[...options, { value: OTHER_OPTION, label: "Autre (préciser)" }].map((option) => (
+          <label key={option.value} className="flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40">
+            <Checkbox name={name} value={option.value} checked={selected.has(option.value)} onCheckedChange={(value) => toggle(option.value, value === true)} disabled={disabled} />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+      {selected.has(OTHER_OPTION) ? <Input name={otherName} required minLength={2} maxLength={300} placeholder="Préciser" disabled={disabled} /> : null}
+    </fieldset>
+  );
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {

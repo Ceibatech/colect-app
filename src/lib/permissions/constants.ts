@@ -4,7 +4,7 @@
  * par l'application (contrôles serveur, middleware, UI conditionnelle).
  */
 
-export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "PREPARATEUR", "NUMERISATEUR", "CONDITIONNEUR", "INDEXEUR", "ARCHIVISTE", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
+export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "PREPARATEUR", "NUMERISATEUR", "CONDITIONNEUR", "INDEXEUR", "ARCHIVISTE", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "CONVOYEUR", "GESTIONNAIRE_TRANSFERT_SDA", "VALIDATEUR_MINISTERE", "EXECUTIF_SDA", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
@@ -17,9 +17,12 @@ export const ROLE_LABELS: Record<RoleCode, string> = {
   CONDITIONNEUR: "Agent de reconditionnement",
   INDEXEUR: "Agent d’indexation",
   ARCHIVISTE: "Archiviste",
-  GESTIONNAIRE_TRANSFERT: "Gestionnaire des transferts",
+  GESTIONNAIRE_TRANSFERT: "Gestionnaire des transferts CEIBA",
   VALIDATEUR_CEIBAC: "Validateur interne",
-  VALIDATEUR_MINISTERE: "Validateur SDA",
+  CONVOYEUR: "Convoyeur",
+  GESTIONNAIRE_TRANSFERT_SDA: "Gestionnaire de transfert SDA",
+  VALIDATEUR_MINISTERE: "Responsable validation SDA",
+  EXECUTIF_SDA: "Exécutif SDA",
   FINANCE: "Finance",
   PMO: "PMO",
   EXECUTIF: "Exécutif",
@@ -139,10 +142,16 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "TRANSFER_TRACK",
   ],
   VALIDATEUR_CEIBAC: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_CEIBAC_APPROVE", "TRANSFER_CEIBAC_VALIDATE"],
+  // Suit le convoi depuis son téléphone ; aucune signature ni création.
+  CONVOYEUR: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_TRACK"],
+  // Côté ministère : remet ou réceptionne les cartons et signe les bordereaux
+  // de son site ; la validation SDA reste au responsable de validation.
+  GESTIONNAIRE_TRANSFERT_SDA: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_OPERATE"],
   VALIDATEUR_MINISTERE: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_AUTHORIZE"],
+  EXECUTIF_SDA: ["DASHBOARD_VIEW", "TRANSFER_VIEW"],
   FINANCE: ["DASHBOARD_VIEW", "FINANCE_VIEW", "FINANCE_CONFIGURE"],
   PMO: ["DASHBOARD_VIEW", "PMO_VIEW"],
-  EXECUTIF: ["DASHBOARD_VIEW"],
+  EXECUTIF: ["DASHBOARD_VIEW", "TRANSFER_VIEW"],
   CONSULTATION: [
     "DASHBOARD_VIEW",
     "DOSSIER_READ",
@@ -153,6 +162,15 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
     "ARCHIVAGE_VIEW",
   ],
 };
+
+/**
+ * Profils du circuit de transfert, symétriques entre CEIBA et le SDA du
+ * ministère. Les intervenants d'une opération sont choisis parmi les comptes
+ * actifs de ces profils (hors exécutifs, en lecture seule).
+ */
+export const CEIBA_TRANSFER_ROLE_CODES = ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "CONVOYEUR"] as const satisfies readonly RoleCode[];
+export const SDA_TRANSFER_ROLE_CODES = ["GESTIONNAIRE_TRANSFERT_SDA", "VALIDATEUR_MINISTERE"] as const satisfies readonly RoleCode[];
+export const TRANSFER_ROLE_CODES = [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES, "EXECUTIF_SDA"] as const satisfies readonly RoleCode[];
 
 /**
  * Routes de premier niveau réservées à certains rôles (contrôle grossier au
@@ -178,5 +196,5 @@ export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly R
   { prefix: "/import", roles: ["ADMIN", "OPERATEUR", "AGENT_INVENTAIRE"] },
   { prefix: "/transferts/validation-ceibac", roles: ["ADMIN", "VALIDATEUR_CEIBAC"] },
   { prefix: "/transferts/validation", roles: ["ADMIN", "SUPERVISEUR", "VALIDATEUR_MINISTERE"] },
-  { prefix: "/transferts", roles: ["ADMIN", "SUPERVISEUR", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "VALIDATEUR_MINISTERE"] },
+  { prefix: "/transferts", roles: ["ADMIN", "SUPERVISEUR", "EXECUTIF", ...TRANSFER_ROLE_CODES] },
 ];
