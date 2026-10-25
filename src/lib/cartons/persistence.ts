@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import { normalizeCartonIdentity } from "@/lib/cartons/identity-normalization";
 
 export type CartonIntakeIdentity = {
   siteId?: number | null;
@@ -9,28 +10,38 @@ export type CartonIntakeIdentity = {
   libelleCarton?: string | null;
 };
 
-function normalizedIdentity(identity: CartonIntakeIdentity) {
-  const barcode = identity.codeBarres?.trim();
-  const label = identity.libelleCarton?.trim();
-  return barcode ? { kind: "code", value: barcode } : label ? { kind: "label", value: label } : null;
+/**
+ * Retire tout espacement (y compris insécable) d'une colonne. Doit rester
+ * aligné avec `normalizeCartonCode` / `normalizeCartonLabel`.
+ */
+function stripSpacesSql(column: Prisma.Sql) {
+  return Prisma.sql`REGEXP_REPLACE(COALESCE(${column}, ''), '(*UCP)[[:space:]]+', '')`;
 }
 
-/** Même encodage que la migration SQL, sans ambiguïté de séparateurs/collation. */
+/**
+ * Clé d'admission concurrente (v2 : identité normalisée — casse, accents et
+ * espacement du libellé ; espacement du code). Le préfixe de version évite
+ * toute collision avec les clés v1 calculées sur le texte brut.
+ */
 export function buildCartonLegacyKey(identity: CartonIntakeIdentity): string | null {
-  const normalized = normalizedIdentity(identity);
+  const normalized = normalizeCartonIdentity(identity);
   if (!normalized) return null;
   const hex = Buffer.from(normalized.value, "utf8").toString("hex").toUpperCase();
   return createHash("sha256")
-    .update(`${identity.siteId ?? "~"}:${identity.entrepotId ?? "~"}:${normalized.kind}:${hex}`)
+    .update(`v2:${identity.siteId ?? "~"}:${identity.entrepotId ?? "~"}:${normalized.kind}:${hex}`)
     .digest("hex");
 }
 
 async function matchingCartonIds(tx: Prisma.TransactionClient, identity: CartonIntakeIdentity) {
-  const normalized = normalizedIdentity(identity);
+  const normalized = normalizeCartonIdentity(identity);
   if (!normalized) return [];
+  const code = stripSpacesSql(Prisma.sql`d.code_barres`);
+  const label = stripSpacesSql(Prisma.sql`d.libelle_carton`);
+  // Code : comparaison binaire (casse significative). Libellé : la collation
+  // unicode_ci absorbe casse et accents, comme normalizeCartonLabel.
   const identifyingClause = normalized.kind === "code"
-    ? Prisma.sql`BINARY TRIM(d.code_barres) = BINARY ${normalized.value}`
-    : Prisma.sql`NULLIF(TRIM(d.code_barres), '') IS NULL AND BINARY TRIM(d.libelle_carton) = BINARY ${normalized.value}`;
+    ? Prisma.sql`BINARY ${code} = BINARY ${normalized.value}`
+    : Prisma.sql`${code} = '' AND CONVERT(${label} USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${normalized.value} USING utf8mb4) COLLATE utf8mb4_unicode_ci`;
   return tx.$queryRaw<Array<{ cartonId: number }>>(Prisma.sql`
     SELECT DISTINCT d.carton_id AS cartonId FROM dossiers d
     WHERE d.carton_id IS NOT NULL

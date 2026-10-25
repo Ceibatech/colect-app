@@ -17,7 +17,8 @@
     "test:unit:watch": "vitest",
     "test:api": "playwright test --project=api",
     "test:e2e": "playwright test --project=e2e",
-    "test": "npm run test:unit && npm run test:api && npm run test:e2e"
+    "test": "npm run test:unit && npm run test:api && npm run test:e2e",
+    "cartons:duplicates": "tsx scripts/carton-duplicates.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
