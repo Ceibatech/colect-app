@@ -1,0 +1,64 @@
+name: Exporter les libellés de cartons (lecture seule)
+
+# Lancement manuel. Produit un CSV téléchargeable (site, salle, CTN, libellé
+# saisi, nombres de dossiers), sans donnée personnelle et sans écriture en base.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-export-carton-labels
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Export des libellés de cartons
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Exporter depuis le VPS en SSH vérifié
+        env:
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-export.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          mkdir -p export
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            "$CONTABO_USER@$CONTABO_HOST" \
+            'test -f /opt/colect-app/current/deploy/export-carton-labels.sh || { echo "La release en service ne contient pas encore le script d export." >&2; exit 1; }; bash /opt/colect-app/current/deploy/export-carton-labels.sh' \
+            > export/libelles-cartons.csv
+          head -c 3 export/libelles-cartons.csv | od -An -tx1 | grep -q "ef bb bf" || { echo "Le fichier exporté n'est pas un CSV valide." >&2; exit 1; }
+          echo "Lignes exportées : $(( $(wc -l < export/libelles-cartons.csv) - 1 ))"
+
+      - name: Publier le fichier (conservé 3 jours)
+        uses: actions/upload-artifact@v4
+        with:
+          name: libelles-cartons
+          path: export/libelles-cartons.csv
+          retention-days: 3
+          if-no-files-found: error
