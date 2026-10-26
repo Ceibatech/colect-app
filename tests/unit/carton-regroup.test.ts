@@ -12,21 +12,26 @@ describe("regroupement des cartons par libellé", () => {
 
   it("calcule la même clé d'admission que l'application", () => {
     const identity = { siteId: 2, entrepotId: 3, libelleCarton: "Anan Cocoteraie 1", codeBarres: "123" };
-    expect(legacyKey(2, 3, normalizeCartonLabel(identity.libelleCarton)!)).toBe(buildCartonLegacyKey(identity));
+    expect(legacyKey(2, normalizeCartonLabel(identity.libelleCarton)!)).toBe(buildCartonLegacyKey(identity));
+    expect(buildCartonLegacyKey({ ...identity, entrepotId: 9 })).toBe(buildCartonLegacyKey(identity));
   });
 
-  it("regroupe les variantes d'un libellé dans le plus ancien CTN de la salle", () => {
+  it("regroupe les variantes d'un libellé du même site dans le plus ancien CTN, quelle que soit la salle", () => {
     const plan = planRegroup([
       { id: 1, cartonId: 9, siteId: 2, entrepotId: 3, libelleCarton: "Anan Cocoteraie 1" },
       { id: 2, cartonId: 5, siteId: 2, entrepotId: 3, libelleCarton: "ANAN cocoteraie  1" },
       { id: 3, cartonId: 7, siteId: 2, entrepotId: 3, libelleCarton: "anan-cocotéraie 1er" },
       { id: 4, cartonId: 8, siteId: 2, entrepotId: 3, libelleCarton: "Anna Cocoteraie 1" },
       { id: 5, cartonId: 6, siteId: 2, entrepotId: 4, libelleCarton: "Anan Cocoteraie 1" },
+      { id: 6, cartonId: 4, siteId: 1, entrepotId: 1, libelleCarton: "Anan Cocoteraie 1" },
     ]);
     expect(plan.merges).toHaveLength(1);
     expect(plan.merges[0].target).toBe(5);
-    expect(plan.merges[0].moves.map((m: { from: number }) => m.from)).toEqual([7, 9]);
-    expect(plan.cartonsAfter).toBe(plan.cartonsBefore - 2);
+    expect(plan.merges[0].moves.map((m: { from: number }) => m.from)).toEqual([6, 7, 9]);
+    // Rangé dans la salle majoritaire (3) : le dossier saisi en salle 4 y est aligné.
+    expect(plan.merges[0].entrepotId).toBe(3);
+    expect(plan.merges[0].relocate).toEqual([5]);
+    expect(plan.cartonsAfter).toBe(plan.cartonsBefore - 3);
   });
 
   it("laisse les libellés génériques et les cartons en transfert", () => {

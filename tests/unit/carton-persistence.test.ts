@@ -19,13 +19,13 @@ function transaction() {
 }
 
 describe("résolution persistante des cartons", () => {
-  it("identifie le carton par son libellé, sans mélanger deux sites ou salles", () => {
+  it("identifie le carton par son libellé dans son site, quelle que soit la salle", () => {
     const key = buildCartonLegacyKey(identity);
     expect(key).toMatch(/^[a-f0-9]{64}$/);
     expect(buildCartonLegacyKey({ ...identity, codeBarres: "AUTRE-CODE" })).toBe(key);
     expect(buildCartonLegacyKey({ ...identity, libelleCarton: " ARCHIVES. " })).toBe(key);
     expect(buildCartonLegacyKey({ ...identity, siteId: 4 })).not.toBe(key);
-    expect(buildCartonLegacyKey({ ...identity, entrepotId: null })).not.toBe(key);
+    expect(buildCartonLegacyKey({ ...identity, entrepotId: null })).toBe(key);
   });
 
   it("utilise le code (casse significative) uniquement en l'absence de libellé et préserve les frontières des champs", () => {

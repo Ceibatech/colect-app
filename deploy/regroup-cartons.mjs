@@ -8,8 +8,9 @@
 // Les cartons ont été identifiés à partir du code-barres de chaque dossier, si
 // bien qu'un même carton physique porte plusieurs CTN. Le libellé est la seule
 // identification fiable : les dossiers de même libellé (casse, accents,
-// ponctuation, espaces et ordinaux ignorés), dans la même salle du même site,
-// sont regroupés dans le plus ancien CTN du groupe. C'est ce CTN qui sera
+// ponctuation, espaces et ordinaux ignorés), dans le même site — quelle que
+// soit la salle saisie — sont regroupés dans le plus ancien CTN du groupe, et
+// rangés dans la salle où se trouve la majorité de ses dossiers. C'est ce CTN qui sera
 // imprimé en QR code sur le carton.
 //
 // Ne sont PAS regroupés (listés dans le rapport) :
@@ -44,9 +45,9 @@ export function labelKey(value) {
 }
 
 /** Même clé d'admission v3 que buildCartonLegacyKey (src/lib/cartons/persistence.ts). */
-export function legacyKey(siteId, entrepotId, key) {
+export function legacyKey(siteId, key) {
   const hex = Buffer.from(key, "utf8").toString("hex").toUpperCase();
-  return createHash("sha256").update(`v3:${siteId ?? "~"}:${entrepotId ?? "~"}:label:${hex}`).digest("hex");
+  return createHash("sha256").update(`v4:${siteId ?? "~"}:label:${hex}`).digest("hex");
 }
 
 const ctn = (id) => `CTN-${String(id).padStart(8, "0")}`;
@@ -60,9 +61,11 @@ export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, enga
     if (d.cartonId == null) continue;
     const key = labelKey(d.libelleCarton);
     if (!key) { withoutLabel++; continue; }
-    const id = `${d.siteId ?? "-"}|${d.entrepotId ?? "-"}|${key}`;
-    const group = groups.get(id) ?? { siteId: d.siteId, entrepotId: d.entrepotId, key, labels: new Map(), cartons: new Map(), dossiers: 0 };
+    const id = `${d.siteId ?? "-"}|${key}`;
+    const group = groups.get(id) ?? { siteId: d.siteId, key, labels: new Map(), cartons: new Map(), salles: new Map(), dossierSalles: new Map(), dossiers: 0 };
     group.dossiers++;
+    group.salles.set(d.entrepotId ?? null, (group.salles.get(d.entrepotId ?? null) ?? 0) + 1);
+    group.dossierSalles.set(d.id, d.entrepotId ?? null);
     const label = tidy(d.libelleCarton);
     group.labels.set(label, (group.labels.get(label) ?? 0) + 1);
     const members = group.cartons.get(d.cartonId) ?? [];
@@ -74,9 +77,12 @@ export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, enga
   const generic = [];
   const blocked = [];
   for (const group of groups.values()) {
-    if (group.cartons.size < 2) continue;
+    if (group.cartons.size < 2 && group.salles.size < 2) continue;
     const label = [...group.labels.entries()].sort((a, b) => b[1] - a[1])[0][0];
-    const summary = { siteId: group.siteId, entrepotId: group.entrepotId, key: group.key, label, variants: [...group.labels.keys()], dossiers: group.dossiers, cartons: group.cartons.size };
+    // Un carton est rangé dans une seule salle : celle où se trouve la majorité de ses dossiers.
+    const entrepotId = [...group.salles.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const relocate = [...group.dossierSalles.entries()].filter(([, salle]) => salle !== entrepotId).map(([dossierId]) => dossierId);
+    const summary = { siteId: group.siteId, entrepotId, key: group.key, label, variants: [...group.labels.keys()], dossiers: group.dossiers, cartons: group.cartons.size, salles: group.salles.size, relocate };
     if (group.dossiers > maxDossiers) { generic.push(summary); continue; }
     const ids = [...group.cartons.keys()].sort((a, b) => a - b);
     if (ids.some((id) => engagedCartonIds.has(id))) { blocked.push(summary); continue; }
@@ -91,6 +97,7 @@ export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, enga
     cartonsBefore,
     cartonsAfter: cartonsBefore - removed,
     dossiersMoved: merges.reduce((sum, m) => sum + m.moves.reduce((s, move) => s + move.dossierIds.length, 0), 0),
+    dossiersRelocated: merges.reduce((sum, m) => sum + m.relocate.length, 0),
   };
 }
 
@@ -131,11 +138,22 @@ export async function regroupCartons(db, { apply = false, maxDossiers = DEFAULT_
           })),
         });
       }
-      const key = legacyKey(merge.siteId, merge.entrepotId, merge.key);
-      // La clé peut être portée par un autre carton du même libellé (salle différente impossible : la clé l'inclut).
+      if (merge.relocate.length) {
+        await tx.dossier.updateMany({ where: { id: { in: merge.relocate } }, data: { entrepotId: merge.entrepotId } });
+        await tx.dossierHistory.createMany({
+          data: merge.relocate.map((dossierId) => ({
+            dossierId,
+            action: "CARTON_REGROUPEMENT_SALLE",
+            commentaire: `Salle alignée sur celle du carton ${ctn(merge.target)} (libellé « ${merge.label} »).`,
+            metadata: { cartonId: merge.target, entrepotId: merge.entrepotId },
+          })),
+        });
+      }
+      const key = legacyKey(merge.siteId, merge.key);
+      // La clé peut être portée par un autre carton du même libellé dans ce site.
       await tx.carton.updateMany({ where: { legacyKey: key, id: { not: merge.target } }, data: { legacyKey: null } });
       await tx.carton.update({ where: { id: merge.target }, data: { legacyKey: key } });
-      const removed = await tx.$executeRawUnsafe(
+      const removed = fromIds.length === 0 ? 0 : await tx.$executeRawUnsafe(
         `DELETE c FROM cartons c
          LEFT JOIN dossiers d ON d.carton_id = c.id
          LEFT JOIN transfer_lot_items t ON t.carton_id = c.id
@@ -176,7 +194,7 @@ async function printReport(db, plan, csvPath, log = console.log) {
   const siteNames = new Map(sites.map((s) => [s.id, s.nom]));
   const entrepotNames = new Map(entrepots.map((e) => [e.id, e.nom]));
   log(`  Cartons (CTN) : ${plan.cartonsBefore} → ${plan.cartonsAfter} après regroupement`);
-  log(`  Libellés regroupés : ${plan.merges.length} — dossiers rattachés à un autre CTN : ${plan.dossiersMoved}`);
+  log(`  Libellés regroupés : ${plan.merges.length} — dossiers rattachés à un autre CTN : ${plan.dossiersMoved} — dossiers dont la salle est alignée : ${plan.dossiersRelocated}`);
   log(`  Libellés génériques laissés tels quels (plus de dossiers que le seuil) : ${plan.generic.length}`);
   log(`  Groupes bloqués par un transfert ouvert : ${plan.blocked.length}`);
   log(`  Dossiers sans libellé de carton : ${plan.withoutLabel}`);
