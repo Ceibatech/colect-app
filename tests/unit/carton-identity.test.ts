@@ -18,7 +18,7 @@ describe("carton identity", () => {
 
   it("affiche l'identifiant unique avant les repères d'origine", () => {
     expect(getCartonDisplay({ cartonId: 42, codeBarres: "ABC", libelleCarton: "Carton A" }))
-      .toEqual({ label: "CTN-00000042", description: "ABC · Carton A" });
+      .toEqual({ label: "CTN-00000042", description: "Carton A" });
     expect(getCartonDisplay({ cartonId: 42, codeBarres: "ABC", libelleCarton: "ABC" }))
       .toEqual({ label: "CTN-00000042", description: "ABC" });
   });

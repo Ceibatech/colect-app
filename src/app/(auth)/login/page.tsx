@@ -4,6 +4,7 @@ import { Archive, CheckCircle2, FileSearch, LockKeyhole, ShieldCheck } from "luc
 
 import { getSession } from "@/lib/auth/current-user";
 import { LoginForm } from "@/components/auth/LoginForm";
+import { safeReturnPath } from "@/lib/auth/return-path";
 import { Badge } from "@/components/ui/badge";
 import { BRAND } from "@/config/branding";
 
@@ -32,10 +33,11 @@ const capabilities = [
   },
 ] as const;
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const from = safeReturnPath((await searchParams).from);
   const session = await getSession();
   if (session) {
-    redirect("/dashboard");
+    redirect(from);
   }
 
   return (
@@ -118,7 +120,7 @@ export default async function LoginPage() {
             </p>
           </div>
 
-          <LoginForm />
+          <LoginForm from={from === "/dashboard" ? undefined : from} />
 
           <div className="mt-8 border-t border-border/70 pt-5">
             <p className="flex items-center justify-center gap-2 text-center text-xs leading-5 text-muted-foreground">

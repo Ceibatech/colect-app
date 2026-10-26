@@ -32,6 +32,7 @@ import {
   PackageCheck,
   Archive,
   Navigation,
+  QrCode,
 } from "lucide-react";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
@@ -71,6 +72,7 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Collecte", href: "/collecte", icon: FilePlus2, permission: "DOSSIER_CREATE", tone: "collecte" },
   { title: "Dossiers", href: "/dossiers", icon: FolderOpen, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "CONSULTATION"], tone: "dossiers" },
   { title: "Recherche documentaire", href: "/recherche", icon: Search, permission: "DOSSIER_READ", roles: ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "EXECUTIF", "PMO", "CONSULTATION"], tone: "dossiers" },
+  { title: "Cartons et QR codes", href: "/cartons", icon: QrCode, permission: "DOSSIER_READ", tone: "dossiers" },
   { title: "Préparation", href: "/preparation", icon: ClipboardCheck, permission: "PREPARATION_VIEW", tone: "preparation" },
   { title: "Numérisation", href: "/numerisation", icon: ScanLine, permission: "NUMERISATION_VIEW", tone: "numerisation" },
   { title: "Reconditionnement", href: "/conditionnement", icon: PackageCheck, permission: "CONDITIONNEMENT_VIEW", tone: "conditionnement" },

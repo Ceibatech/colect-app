@@ -32,11 +32,20 @@ export function buildCartonLegacyKey(identity: CartonIntakeIdentity): string | n
     .digest("hex");
 }
 
+/**
+ * Version SQL de `normalizeCartonLabel` : minuscules, ordinaux réduits,
+ * ponctuation et espaces retirés ; la collation unicode_ci absorbe les accents
+ * lors de la comparaison.
+ */
+export function cartonLabelKeySql(column: Prisma.Sql) {
+  return Prisma.sql`REGEXP_REPLACE(REGEXP_REPLACE(LOWER(COALESCE(${column}, '')), '(*UCP)([0-9]+)(?:[[:space:]]*(?:ème|eme|ère|ere)|er|e)(?![[:alnum:]])', '\\\\1'), '(*UCP)[^[:alnum:]]+', '')`;
+}
+
 async function matchingCartonIds(tx: Prisma.TransactionClient, identity: CartonIntakeIdentity) {
   const normalized = normalizeCartonIdentity(identity);
   if (!normalized) return [];
   const code = stripSpacesSql(Prisma.sql`d.code_barres`);
-  const label = stripSpacesSql(Prisma.sql`d.libelle_carton`);
+  const label = cartonLabelKeySql(Prisma.sql`d.libelle_carton`);
   // Code : comparaison binaire (casse significative). Libellé : la collation
   // unicode_ci absorbe casse et accents, comme normalizeCartonLabel.
   const identifyingClause = normalized.kind === "label"

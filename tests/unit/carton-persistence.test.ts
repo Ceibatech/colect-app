@@ -19,17 +19,19 @@ function transaction() {
 }
 
 describe("résolution persistante des cartons", () => {
-  it("normalise les espaces du code sans mélanger deux sites, salles ou variantes binaires", () => {
+  it("identifie le carton par son libellé, sans mélanger deux sites ou salles", () => {
     const key = buildCartonLegacyKey(identity);
     expect(key).toMatch(/^[a-f0-9]{64}$/);
-    expect(buildCartonLegacyKey({ ...identity, codeBarres: " BOX-1 " })).toBe(key);
+    expect(buildCartonLegacyKey({ ...identity, codeBarres: "AUTRE-CODE" })).toBe(key);
+    expect(buildCartonLegacyKey({ ...identity, libelleCarton: " ARCHIVES. " })).toBe(key);
     expect(buildCartonLegacyKey({ ...identity, siteId: 4 })).not.toBe(key);
     expect(buildCartonLegacyKey({ ...identity, entrepotId: null })).not.toBe(key);
-    expect(buildCartonLegacyKey({ ...identity, codeBarres: "box-1" })).not.toBe(key);
   });
 
-  it("utilise le libellé uniquement en l'absence de code et préserve les frontières des champs", () => {
-    expect(buildCartonLegacyKey({ ...identity, codeBarres: " " })).toBe(buildCartonLegacyKey({ ...identity, codeBarres: null }));
+  it("utilise le code (casse significative) uniquement en l'absence de libellé et préserve les frontières des champs", () => {
+    const byCode = { ...identity, libelleCarton: null };
+    expect(buildCartonLegacyKey({ ...byCode, codeBarres: " BOX-1 " })).toBe(buildCartonLegacyKey(byCode));
+    expect(buildCartonLegacyKey({ ...byCode, codeBarres: "box-1" })).not.toBe(buildCartonLegacyKey(byCode));
     expect(buildCartonLegacyKey({ siteId: 1, entrepotId: 23, codeBarres: "x" })).not.toBe(buildCartonLegacyKey({ siteId: 12, entrepotId: 3, codeBarres: "x" }));
     expect(buildCartonLegacyKey({ codeBarres: "x" })).not.toBe(buildCartonLegacyKey({ libelleCarton: "x" }));
   });
@@ -72,9 +74,9 @@ describe("résolution persistante des cartons", () => {
     await expect(resolveCartonId(tx, identity)).rejects.toThrow("transfert ouvert");
   });
 
-  it("conserve l'identité d'un dossier déjà lié pendant une correction de code", async () => {
+  it("conserve l'identité d'un dossier déjà lié pendant une correction de libellé", async () => {
     const { tx, mocks } = transaction();
-    const result = await resolveCartonId(tx, { ...identity, codeBarres: "BOX-RENOMME" }, { ...identity, id: 6, cartonId: 11 });
+    const result = await resolveCartonId(tx, { ...identity, libelleCarton: "Archives renommées" }, { ...identity, id: 6, cartonId: 11 });
     expect(result).toBe(11);
     expect(mocks.carton.update).toHaveBeenCalledWith({ where: { id: 11 }, data: { legacyKey: null } });
     expect(mocks.$executeRaw).not.toHaveBeenCalled();

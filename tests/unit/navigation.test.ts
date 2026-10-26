@@ -66,12 +66,12 @@ describe("role-aware dashboard navigation", () => {
   });
 
   it.each([
-    ["AGENT_INVENTAIRE", ["/dashboard", "/collecte", "/dossiers", "/recherche", "/import"]],
-    ["PREPARATEUR", ["/dashboard", "/preparation"]],
-    ["NUMERISATEUR", ["/dashboard", "/numerisation"]],
-    ["CONDITIONNEUR", ["/dashboard", "/conditionnement"]],
-    ["INDEXEUR", ["/dashboard", "/indexation"]],
-    ["ARCHIVISTE", ["/dashboard", "/archivage"]],
+    ["AGENT_INVENTAIRE", ["/dashboard", "/collecte", "/dossiers", "/recherche", "/cartons", "/import"]],
+    ["PREPARATEUR", ["/dashboard", "/cartons", "/preparation"]],
+    ["NUMERISATEUR", ["/dashboard", "/cartons", "/numerisation"]],
+    ["CONDITIONNEUR", ["/dashboard", "/cartons", "/conditionnement"]],
+    ["INDEXEUR", ["/dashboard", "/cartons", "/indexation"]],
+    ["ARCHIVISTE", ["/dashboard", "/cartons", "/archivage"]],
   ] satisfies Array<[RoleCode, string[]]>)
   ("limits %s to its assigned activity", (role, expected) => {
     const visible = NAV_ITEMS

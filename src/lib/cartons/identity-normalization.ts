@@ -5,8 +5,8 @@
  * « 643-699 zone4/c » / « 643-699 zone 4/c ») : ces variantes désignent le même
  * contenant et doivent recevoir le même identifiant CTN.
  *
- * - Libellé (identité du carton) : insensible à la casse, aux accents et à
- *   tout espacement.
+ * - Libellé (identité du carton) : insensible à la casse, aux accents, à la
+ *   ponctuation, à l'espacement et à l'écriture des ordinaux (2ème / 2eme / 2e).
  * - Code-barres (repli si aucun libellé) : insensible à l'espacement
  *   seulement ; la casse reste significative.
  *
@@ -28,12 +28,20 @@ export function normalizeCartonCode(value: string | null | undefined): string | 
   return normalized || null;
 }
 
+/** Ordinaux : « 2ème », « 2eme », « 1er », « 3e » se réduisent à leur nombre. */
+/**
+ * Clé d'un libellé : sans casse, sans accents, sans ponctuation ni espaces,
+ * ordinaux réduits à leur nombre. « Zone 4/C - 2ème rang » et
+ * « zone4c 2eme RANG » donnent la même clé. Doit rester alignée avec
+ * `cartonLabelKeySql` (persistence.ts).
+ */
 export function normalizeCartonLabel(value: string | null | undefined): string | null {
   const normalized = (value ?? "")
     .normalize("NFKD")
     .replace(/\p{M}+/gu, "")
     .toLowerCase()
-    .replace(WHITESPACE, "");
+    .replace(/(\d+)(?:\s*(?:eme|ere)|er|e)(?![\p{L}\p{N}])/gu, "$1")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
   return normalized || null;
 }
 

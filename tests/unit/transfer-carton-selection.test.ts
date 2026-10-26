@@ -20,7 +20,7 @@ describe("transfer carton selection", () => {
     ]);
 
     expect(result.items).toEqual([
-      expect.objectContaining({ token: "carton:1", code: "CTN-00000001", label: "CB-001 · Carton A", dossierCount: 2 }),
+      expect.objectContaining({ token: "carton:1", code: "CTN-00000001", label: "Carton A", dossierCount: 2 }),
       expect.objectContaining({ token: "carton:2", code: "CTN-00000002", dossierCount: 1, unlocatedDossierCount: 1 }),
     ]);
   });
