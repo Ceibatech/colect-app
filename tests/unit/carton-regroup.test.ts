@@ -59,7 +59,7 @@ describe("regroupement intelligent des libellés", () => {
   });
 
   it("ne fusionne jamais des repères différents", () => {
-    const pairs = [["ABEKAN BERNARD 32", "ABEKAN BERNARD 33"], ["Koumassi remblai I", "Koumassi remblai II"], ["Zone 4/B", "Zone 4/C"], ["391-399", "391-398"]];
+    const pairs = [["ABEKAN BERNARD 32", "ABEKAN BERNARD 33"], ["Koumassi remblai I", "Koumassi remblai II"], ["Zone 4/B", "Zone 4/C"], ["391-399", "392-399"]];
     for (const pair of pairs) {
       const [a, b] = cluster(pair);
       expect(a).not.toBe(b);
@@ -80,5 +80,25 @@ describe("correction des noms de communes et de quartiers", () => {
     expect(keyOf.get("1|Kouassi")).toBe(keyOf.get("1|Koumassi"));
     expect(keyOf.get("1|Abekan Benard")).toBe(keyOf.get("1|Abekan Bernard"));
     expect(keyOf.get("1|ABEKAN BERNARD 32")).not.toBe(keyOf.get("1|ABEKAN BERNARD 33"));
+  });
+});
+
+describe("ordre des mots", () => {
+  it("reconnaît le même libellé écrit dans un autre ordre", () => {
+    const { keyOf } = clusterLabels([{ siteId: 1, label: "Zone 4/c 595-599", count: 1 }, { siteId: 1, label: "595-599 zone 4/c", count: 1 }, { siteId: 1, label: "Zone 4/c 596-599", count: 1 }], 1e9);
+    expect(keyOf.get("1|Zone 4/c 595-599")).toBe(keyOf.get("1|595-599 zone 4/c"));
+    expect(keyOf.get("1|Zone 4/c 595-599")).not.toBe(keyOf.get("1|Zone 4/c 596-599"));
+  });
+});
+
+describe("plages de numéros", () => {
+  it("rapproche une plage avec une faute d'un chiffre, jamais un numéro seul", () => {
+    const labels = ["738-785 zone4/c", "738-775 zone4/c", "ABEKAN BERNARD 32", "ABEKAN BERNARD 33", "738-785 zone4/b", "739-786 zone4/c"];
+    const { keyOf } = clusterLabels(labels.map((label) => ({ siteId: 1, label, count: 1 })), 1e9);
+    const k = (label: string) => keyOf.get(`1|${label}`);
+    expect(k("738-785 zone4/c")).toBe(k("738-775 zone4/c"));
+    expect(k("ABEKAN BERNARD 32")).not.toBe(k("ABEKAN BERNARD 33"));
+    expect(k("738-785 zone4/c")).not.toBe(k("738-785 zone4/b"));
+    expect(k("738-785 zone4/c")).not.toBe(k("739-786 zone4/c"));
   });
 });
