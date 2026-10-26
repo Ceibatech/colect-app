@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { createUser, updateUser, type ActionResult } from "@/lib/services/user-admin-service";
 import { cn } from "@/lib/utils";
 import { SendPendingUsersAccessDialog, SendUserAccessButton } from "@/components/administration/UserAccessEmailControls";
+import { UserDeleteControl } from "@/components/administration/UserDeleteControl";
 import { getRoleLabel, ROLE_CODES, TRANSFER_ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
 import { normalizePersonName, personInitials } from "@/lib/utils/person-name";
 
@@ -499,6 +500,7 @@ export function UsersManager({
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <SendUserAccessButton userId={u.id} email={u.email} disabled={!u.isActive} />
+                    {u.id !== currentUserId ? <UserDeleteControl userId={u.id} name={normalizePersonName(u.name)} email={u.email} /> : null}
                   </div>
                 </TableCell>
               </TableRow>

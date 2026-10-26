@@ -7,13 +7,14 @@ import { getClientIp } from "@/lib/utils/server-request";
 import { hashPassword } from "@/lib/auth/password";
 import { createUserSchema, updateUserSchema } from "@/lib/validation/user-admin";
 import { issuePasswordAccessEmail } from "@/lib/services/password-reset-service";
+import { isDeletionConfirmed, userDeletionBlockers } from "@/lib/utils/user-deletion";
 
 /**
- * CRUD administration des utilisateurs (Phase 15+, §11) — jamais de
- * suppression physique : un utilisateur est référencé par de nombreux
- * historiques (dossier_history, audit_logs, workflow_transitions...),
- * une suppression casserait l'intégrité de ces journaux. Seule la
- * désactivation (`isActive`) empêche la connexion sans perdre l'historique.
+ * CRUD administration des utilisateurs (Phase 15+, §11) — un utilisateur est
+ * référencé par de nombreux historiques (dossier_history, workflow_transitions,
+ * transferts...). La désactivation (`isActive`) empêche la connexion sans
+ * perdre l'historique. La suppression physique (`deleteUser`) n'est autorisée
+ * que pour un compte sans aucune trace métier (voir lib/utils/user-deletion.ts).
  *
  * Lien Opérateur : un utilisateur de rôle OPERATEUR a besoin d'une fiche
  * `operateurs` (1:1, `userId`) pour apparaître dans les listes d'opérateurs
@@ -328,6 +329,112 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
   });
 
   return { success: true };
+}
+
+/**
+ * Suppression définitive d'un compte, réservée à USER_MANAGE. Refusée pour
+ * son propre compte, pour le dernier administrateur et pour tout compte ayant
+ * laissé une trace métier (on propose alors la désactivation). Les événements
+ * d'audit déjà journalisés par ce compte restent, sans auteur ; l'entrée
+ * USER_DELETE conserve son identité.
+ */
+export async function deleteUser(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  void _prevState;
+  const session = await requirePermission("USER_MANAGE");
+  if (id === session.userId) return { error: "Vous ne pouvez pas supprimer votre propre compte." };
+
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: { role: true, operateur: { select: { id: true, matricule: true } } },
+  });
+  if (!user) return { error: "Utilisateur introuvable." };
+
+  if (!isDeletionConfirmed(String(formData.get("confirmEmail") ?? ""), user.email)) {
+    return { error: "L'e-mail saisi ne correspond pas au compte à supprimer." };
+  }
+
+  if (user.role.code === "ADMIN") {
+    const otherAdmins = await prisma.user.count({ where: { id: { not: id }, isActive: true, role: { code: "ADMIN" } } });
+    if (otherAdmins === 0) return { error: "Impossible de supprimer le dernier administrateur actif." };
+  }
+
+  const [
+    dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, imports, exports, qualityChecks,
+    anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines, financeRatesCreated,
+    transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
+    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured,
+    transferTrackingPoints, transferLotParticipations, emailReportSubscriptionsCreated, supervisedOperateurs,
+    operateurDossiers, operateurNumerisations, operateurIndexations, operateurArchivages,
+  ] = await Promise.all([
+    prisma.dossierHistory.count({ where: { userId: id } }),
+    prisma.workflowTransition.count({ where: { userId: id } }),
+    prisma.document.count({ where: { uploadedBy: id } }),
+    prisma.document.count({ where: { preIndexedBy: id } }),
+    prisma.import.count({ where: { userId: id } }),
+    prisma.export.count({ where: { userId: id } }),
+    prisma.qualityCheck.count({ where: { userId: id } }),
+    prisma.anomalie.count({ where: { corrigePar: id } }),
+    prisma.dossier.count({ where: { preparateurId: id } }),
+    prisma.dossier.count({ where: { conditionneurId: id } }),
+    prisma.preparationPieceLine.count({ where: { preparedById: id } }),
+    prisma.financeRate.count({ where: { createdById: id } }),
+    prisma.transferLot.count({ where: { createdById: id } }),
+    prisma.transferLot.count({ where: { authorizedById: id } }),
+    prisma.transferLot.count({ where: { ceibacValidatedById: id } }),
+    prisma.transferMovement.count({ where: { createdById: id } }),
+    prisma.transferMovement.count({ where: { ceibacValidatedById: id } }),
+    prisma.transferMovement.count({ where: { ministryValidatedById: id } }),
+    prisma.transferSignature.count({ where: { capturedById: id } }),
+    prisma.transferTrackingPoint.count({ where: { capturedById: id } }),
+    prisma.transferLotParticipant.count({ where: { userId: id } }),
+    prisma.emailReportSubscription.count({ where: { createdById: id } }),
+    prisma.operateur.count({ where: { supervisorId: id } }),
+    prisma.dossier.count({ where: { operateur: { userId: id } } }),
+    prisma.numerisation.count({ where: { operateur: { userId: id } } }),
+    prisma.indexation.count({ where: { operateur: { userId: id } } }),
+    prisma.archivage.count({ where: { operateur: { userId: id } } }),
+  ]);
+
+  const blockers = userDeletionBlockers({
+    dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, imports, exports, qualityChecks,
+    anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines, financeRatesCreated,
+    transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
+    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured,
+    transferTrackingPoints, transferLotParticipations, emailReportSubscriptionsCreated, supervisedOperateurs,
+    operateurDossiers: operateurDossiers + operateurNumerisations + operateurIndexations + operateurArchivages,
+  });
+  if (blockers.length > 0) {
+    return {
+      error: `Suppression impossible : ce compte a laissé une trace dans l'application (${blockers.join(", ")}). Désactivez-le plutôt pour conserver l'historique.`,
+    };
+  }
+
+  const ip = await getClientIp();
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.auditLog.create({
+        data: {
+          userId: session.userId,
+          action: "USER_DELETE",
+          entity: "USER",
+          entityId: id,
+          oldValue: { name: user.name, email: user.email, role: user.role.code, matricule: user.operateur?.matricule ?? null },
+          ipAddress: ip,
+        },
+      });
+      await tx.notification.deleteMany({ where: { userId: id } });
+      await tx.transferEmailDelivery.deleteMany({ where: { recipientUserId: id } });
+      await tx.emailReportDelivery.deleteMany({ where: { recipientUserId: id } });
+      if (user.operateur) await tx.operateur.delete({ where: { id: user.operateur.id } });
+      // PasswordResetToken, PmoSupervisorScope et EmailReportSubscription sont en cascade.
+      await tx.user.delete({ where: { id } });
+    });
+  } catch (error) {
+    console.error("User deletion failed.", error);
+    return { error: "Suppression impossible : des données restent liées à ce compte. Désactivez-le plutôt." };
+  }
+
+  return { success: true, message: `Compte ${user.email} supprimé.` };
 }
 
 export async function sendUserAccessEmail(

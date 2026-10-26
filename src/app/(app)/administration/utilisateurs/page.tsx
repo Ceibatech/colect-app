@@ -48,7 +48,7 @@ export default async function AdminUtilisateursPage() {
         eyebrow="Sécurité"
         icon={Users}
         title="Utilisateurs"
-        description={`${users.length} compte${users.length > 1 ? "s" : ""}. La désactivation retire l'accès sans supprimer l'historique.`}
+        description={`${users.length} compte${users.length > 1 ? "s" : ""}. La désactivation retire l'accès sans supprimer l'historique ; la suppression n'est possible que pour un compte sans activité.`}
         stats={[
           { label: "Comptes", value: users.length },
           { label: "Actifs", value: users.filter((u) => u.isActive).length, tone: "success" },
