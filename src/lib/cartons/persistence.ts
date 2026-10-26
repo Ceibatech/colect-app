@@ -19,16 +19,16 @@ function stripSpacesSql(column: Prisma.Sql) {
 }
 
 /**
- * Clé d'admission concurrente (v2 : identité normalisée — casse, accents et
- * espacement du libellé ; espacement du code). Le préfixe de version évite
- * toute collision avec les clés v1 calculées sur le texte brut.
+ * Clé d'admission concurrente (v3 : le libellé normalisé identifie le carton,
+ * le code-barres seulement à défaut de libellé). Le préfixe de version évite
+ * toute collision avec les clés précédentes.
  */
 export function buildCartonLegacyKey(identity: CartonIntakeIdentity): string | null {
   const normalized = normalizeCartonIdentity(identity);
   if (!normalized) return null;
   const hex = Buffer.from(normalized.value, "utf8").toString("hex").toUpperCase();
   return createHash("sha256")
-    .update(`v2:${identity.siteId ?? "~"}:${identity.entrepotId ?? "~"}:${normalized.kind}:${hex}`)
+    .update(`v3:${identity.siteId ?? "~"}:${identity.entrepotId ?? "~"}:${normalized.kind}:${hex}`)
     .digest("hex");
 }
 
@@ -39,16 +39,18 @@ async function matchingCartonIds(tx: Prisma.TransactionClient, identity: CartonI
   const label = stripSpacesSql(Prisma.sql`d.libelle_carton`);
   // Code : comparaison binaire (casse significative). Libellé : la collation
   // unicode_ci absorbe casse et accents, comme normalizeCartonLabel.
-  const identifyingClause = normalized.kind === "code"
-    ? Prisma.sql`BINARY ${code} = BINARY ${normalized.value}`
-    : Prisma.sql`${code} = '' AND CONVERT(${label} USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${normalized.value} USING utf8mb4) COLLATE utf8mb4_unicode_ci`;
+  const identifyingClause = normalized.kind === "label"
+    ? Prisma.sql`CONVERT(${label} USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(${normalized.value} USING utf8mb4) COLLATE utf8mb4_unicode_ci`
+    : Prisma.sql`${label} = '' AND BINARY ${code} = BINARY ${normalized.value}`;
+  // Tant que d'anciens cartons de même libellé n'ont pas été regroupés, le plus
+  // ancien CTN (celui que conserve le regroupement) reçoit les nouveaux dossiers.
   return tx.$queryRaw<Array<{ cartonId: number }>>(Prisma.sql`
-    SELECT DISTINCT d.carton_id AS cartonId FROM dossiers d
+    SELECT MIN(d.carton_id) AS cartonId FROM dossiers d
     WHERE d.carton_id IS NOT NULL
       AND d.site_id <=> ${identity.siteId ?? null}
       AND d.entrepot_id <=> ${identity.entrepotId ?? null}
       AND ${identifyingClause}
-    LIMIT 2
+    HAVING MIN(d.carton_id) IS NOT NULL
   `);
 }
 
