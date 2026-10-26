@@ -121,6 +121,8 @@ model User {
   emailReportDeliveriesTriggered     EmailReportDelivery[]     @relation("EmailReportDeliveryTriggeredBy")
   transferEmailDeliveries            TransferEmailDelivery[]   @relation("TransferEmailDeliveryRecipient")
   transferLotParticipations          TransferLotParticipant[]
+  // Sites dont le compte est responsable (profil RESPONSABLE_SITE).
+  responsibleSites                   UserSite[]
 
   @@index([roleId])
   @@map("users")
@@ -287,6 +289,21 @@ model TransferLot {
 // Une ligne représente un carton physique identifié. Les dossiers liés sont
 // figés au moment de la constitution du lot pour conserver la preuve de son
 // contenu même si l'inventaire évolue ensuite.
+// Rattachement d'un responsable de site à ses sites : il remet les cartons qui
+// en partent et fait l'état des lieux de ceux qui y arrivent.
+model UserSite {
+  userId    Int      @map("user_id")
+  siteId    Int      @map("site_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, siteId])
+  @@index([siteId])
+  @@map("user_sites")
+}
+
 enum TransferParticipantSide {
   CEIBA
   SDA
@@ -626,6 +643,7 @@ model Site {
   transferLotsTo        TransferLot[]      @relation("TransferDestinationSite")
   transferMovementsFrom TransferMovement[] @relation("TransferMovementFromSite")
   transferMovementsTo   TransferMovement[] @relation("TransferMovementToSite")
+  responsibleUsers      UserSite[]
 
   @@index([communeId])
   @@map("sites")

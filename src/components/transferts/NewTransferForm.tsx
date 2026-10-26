@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ExternalLink, ListChecks, Loader2, LocateFixed, PackageCheck, Route, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -135,13 +135,55 @@ export function NewTransferForm({ sites, inventory, participants }: {
     setLoadError("");
   }
 
+  const [resolvedMapsUrl, setResolvedMapsUrl] = useState<string | null>(null);
+  // Le texte proposé n'écrase jamais une saisie manuelle de l'utilisateur.
+  const routeEditedRef = useRef(false);
   const sitePoint = (site: SiteOption | undefined): GeoPoint | null => {
     const point = site ? { latitude: site.latitude ?? Number.NaN, longitude: site.longitude ?? Number.NaN } : null;
     return isValidGeoPoint(point) ? point : null;
   };
-  const routeOrigin = myPosition ?? sitePoint(sourceSite);
-  const routeDestination = sitePoint(destinationSite);
-  const googleMapsUrl = routeOrigin && routeDestination ? buildGoogleMapsDirectionsUrl(routeOrigin, routeDestination) : null;
+  const knownOrigin = myPosition ?? sitePoint(sourceSite);
+  const knownDestination = sitePoint(destinationSite);
+  const googleMapsUrl = resolvedMapsUrl ?? (knownOrigin && knownDestination ? buildGoogleMapsDirectionsUrl(knownOrigin, knownDestination) : null);
+
+  type RouteEnds = { sourceId: number | null; destinationId: number | null; position: GeoPoint | null };
+  async function proposeRoute(ends: RouteEnds, automatic = false) {
+    const origin = sites.find((site) => site.id === ends.sourceId);
+    const destination = sites.find((site) => site.id === ends.destinationId);
+    if (!destination || (!ends.position && !origin)) {
+      if (!automatic) toast.error(!destination ? "Choisissez d'abord le site de destination." : "Choisissez le site d'origine ou utilisez « Partir de ma position ».");
+      return;
+    }
+    if (automatic && routeEditedRef.current) return;
+    setRouting(true);
+    setRouteNote("");
+    try {
+      const result = await suggestTransferRoute({ fromSiteId: origin?.id ?? null, fromPosition: ends.position, toSiteId: destination.id });
+      setResolvedMapsUrl(result.googleMapsUrl ?? null);
+      if (result.summary) {
+        setPlannedRoute(formatRouteText(ends.position ? "Position actuelle" : origin?.nom ?? "Départ", destination.nom, result.summary));
+        routeEditedRef.current = false;
+        const located = [result.from?.source === "adresse" ? "départ" : null, result.to?.source === "adresse" ? "destination" : null].filter(Boolean);
+        setRouteNote(`Trajet le plus rapide selon le réseau routier (OpenStreetMap), hors trafic.${located.length ? ` Position du site de ${located.join(" et du site de ")} estimée depuis son adresse : renseignez ses coordonnées GPS pour plus de précision.` : ""} Vérifiez le trafic sur Google Maps avant le départ.`);
+      } else {
+        setRouteNote(result.error ?? "Itinéraire indisponible : saisissez-le à la main.");
+      }
+    } catch {
+      setRouteNote("Itinéraire indisponible : saisissez-le à la main.");
+    } finally {
+      setRouting(false);
+    }
+  }
+
+  /** Proposition automatique dès que le départ et la destination sont connus. */
+  function routeEndsChanged(next: Partial<RouteEnds>) {
+    setResolvedMapsUrl(null);
+    void proposeRoute({
+      sourceId: next.sourceId !== undefined ? next.sourceId : sourceSite?.id ?? null,
+      destinationId: next.destinationId !== undefined ? next.destinationId : destinationSite?.id ?? null,
+      position: next.position !== undefined ? next.position : myPosition,
+    }, true);
+  }
 
   function locateMe() {
     if (!("geolocation" in navigator)) {
@@ -151,9 +193,13 @@ export function NewTransferForm({ sites, inventory, participants }: {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setMyPosition({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
         setLocating(false);
-        toast.success("Position actuelle retenue comme point de départ de l'itinéraire.");
+        routeEditedRef.current = false;
+        setMyPosition(point);
+        // L'itinéraire vers la destination est recalculé automatiquement.
+        routeEndsChanged({ position: point });
+        toast.success(destinationSite ? `Itinéraire calculé depuis votre position vers ${destinationSite.nom}.` : "Position retenue : choisissez le site de destination.");
       },
       () => {
         setLocating(false);
@@ -161,31 +207,6 @@ export function NewTransferForm({ sites, inventory, participants }: {
       },
       { enableHighAccuracy: true, timeout: 15_000 },
     );
-  }
-
-  async function proposeRoute() {
-    if (!routeOrigin || !routeDestination) {
-      toast.error(!routeDestination
-        ? "Le site de destination n'a pas de position GPS. Renseignez-la dans Administration → Sites."
-        : "Le site d'origine n'a pas de position GPS : utilisez « Partir de ma position » ou renseignez-la dans Administration → Sites.");
-      return;
-    }
-    setRouting(true);
-    setRouteNote("");
-    try {
-      const result = await suggestTransferRoute(routeOrigin, routeDestination);
-      if (result.summary) {
-        const originLabel = myPosition ? "Position actuelle" : sourceSite?.nom ?? "Départ";
-        setPlannedRoute(formatRouteText(originLabel, destinationSite?.nom ?? "Destination", result.summary));
-        setRouteNote("Trajet le plus rapide selon le réseau routier (OpenStreetMap), hors trafic. Vérifiez le trafic sur Google Maps avant le départ.");
-      } else {
-        setRouteNote(result.error ?? "Itinéraire indisponible : saisissez-le à la main.");
-      }
-    } catch {
-      setRouteNote("Itinéraire indisponible : saisissez-le à la main.");
-    } finally {
-      setRouting(false);
-    }
   }
 
   function changeDirection(next: TransferDirection) {
@@ -197,12 +218,15 @@ export function NewTransferForm({ sites, inventory, participants }: {
     setDestinationSiteId(destinations.length === 1 ? String(destinations[0].id) : "");
     setDestinationEntrepotId("none");
     resetSourceSelection();
+    setResolvedMapsUrl(null);
+    if (myPosition && destinations.length === 1) routeEndsChanged({ sourceId: null, destinationId: destinations[0].id });
   }
 
   function changeSourceSite(value: string | null) {
     setSourceSiteId(value ?? "");
     setSourceEntrepotId("none");
     resetSourceSelection();
+    routeEndsChanged({ sourceId: value ? Number(value) : null });
   }
 
   function changeSourceWarehouse(value: string | null) {
@@ -212,9 +236,11 @@ export function NewTransferForm({ sites, inventory, participants }: {
 
   function selectInventoryLocation(siteId: number, entrepotId: number | null) {
     if (sourceSiteId === String(siteId) && sourceEntrepotId === String(entrepotId ?? "none")) return;
+    const siteChanged = sourceSiteId !== String(siteId);
     setSourceSiteId(String(siteId));
     setSourceEntrepotId(entrepotId === null ? "none" : String(entrepotId));
     resetSourceSelection();
+    if (siteChanged) routeEndsChanged({ sourceId: siteId });
   }
 
   function siteLabel(site: SiteOption) {
@@ -348,7 +374,7 @@ export function NewTransferForm({ sites, inventory, participants }: {
           <div><h2 className="font-semibold">{sourceIsMinistry ? "Site CEIBA" : "Site du ministère"} · destination</h2><p className="text-sm text-muted-foreground">Site qui intégrera le stock après réception signée.</p></div>
           <div className="space-y-2">
             <Label>{sourceIsMinistry ? "Site CEIBA" : "Site du ministère"}</Label>
-            <Select name="destinationSiteId" items={destinationSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={destinationSiteId} onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); }} disabled={pending}>
+            <Select name="destinationSiteId" items={destinationSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={destinationSiteId} onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); routeEndsChanged({ destinationId: value ? Number(value) : null }); }} disabled={pending}>
               <SelectTrigger className="w-full"><SelectValue placeholder={sourceIsMinistry ? "Choisir le site CEIBA" : "Choisir le site du ministère"} /></SelectTrigger>
               <SelectContent>{destinationSites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
@@ -438,10 +464,10 @@ export function NewTransferForm({ sites, inventory, participants }: {
           </div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-3">
             <Label htmlFor="plannedRoute">Itinéraire prévu</Label>
-            <Input id="plannedRoute" name="plannedRoute" required maxLength={2000} value={plannedRoute} onChange={(event) => setPlannedRoute(event.target.value)} placeholder="Site de départ, trajet autorisé et site de destination" disabled={pending} />
+            <Input id="plannedRoute" name="plannedRoute" required maxLength={2000} value={plannedRoute} onChange={(event) => { routeEditedRef.current = true; setPlannedRoute(event.target.value); }} placeholder="Site de départ, trajet autorisé et site de destination" disabled={pending} />
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={proposeRoute} disabled={pending || routing || !sourceSite || !destinationSite}>
-                {routing ? <Loader2 className="animate-spin" /> : <Route />} Proposer l&apos;itinéraire
+              <Button type="button" size="sm" variant="outline" onClick={() => { routeEditedRef.current = false; void proposeRoute({ sourceId: sourceSite?.id ?? null, destinationId: destinationSite?.id ?? null, position: myPosition }); }} disabled={pending || routing || !destinationSite || (!sourceSite && !myPosition)}>
+                {routing ? <Loader2 className="animate-spin" /> : <Route />} Recalculer l&apos;itinéraire
               </Button>
               <Button type="button" size="sm" variant={myPosition ? "secondary" : "ghost"} onClick={locateMe} disabled={pending || locating}>
                 {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />} {myPosition ? "Départ : ma position" : "Partir de ma position"}

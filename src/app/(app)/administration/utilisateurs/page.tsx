@@ -1,6 +1,6 @@
 import { Users } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
-import { listUsersWithRoles, listRoles, listActiveOperateursForAssignment, listActiveSupervisorsForPmoAssignment } from "@/lib/services/user-admin-service";
+import { listUsersWithRoles, listRoles, listActiveOperateursForAssignment, listActiveSupervisorsForPmoAssignment, listActiveSitesForAssignment } from "@/lib/services/user-admin-service";
 import { UsersManager } from "@/components/administration/UsersManager";
 import { PageHeader } from "@/components/layout/PageHeader";
 
@@ -8,11 +8,12 @@ export const metadata = { title: "Utilisateurs — Administration" };
 
 export default async function AdminUtilisateursPage() {
   const session = await requirePermission("USER_MANAGE");
-  const [users, roles, operateurs, supervisors] = await Promise.all([
+  const [users, roles, operateurs, supervisors, sites] = await Promise.all([
     listUsersWithRoles(),
     listRoles(),
     listActiveOperateursForAssignment(),
     listActiveSupervisorsForPmoAssignment(),
+    listActiveSitesForAssignment(),
   ]);
 
   const serialized = users.map((u) => ({
@@ -25,6 +26,7 @@ export default async function AdminUtilisateursPage() {
     operateur: u.operateur ? { id: u.operateur.id, matricule: u.operateur.matricule, isActive: u.operateur.isActive } : null,
     supervisedCount: u._count.supervisedOperateurs,
     pmoSupervisorIds: u.pmoSupervisorScopes.map((scope) => scope.supervisorUserId),
+    responsibleSiteIds: u.responsibleSites.map((row) => row.siteId),
   }));
 
   const serializedOperateurs = operateurs.map((o) => ({
@@ -56,7 +58,7 @@ export default async function AdminUtilisateursPage() {
           { label: "Opérateurs", value: operateurs.length },
         ]}
       />
-      <UsersManager users={serialized} roles={roles} operateurs={serializedOperateurs} supervisors={serializedSupervisors} currentUserId={session.userId} />
+      <UsersManager users={serialized} roles={roles} operateurs={serializedOperateurs} supervisors={serializedSupervisors} sites={sites} currentUserId={session.userId} />
     </div>
   );
 }

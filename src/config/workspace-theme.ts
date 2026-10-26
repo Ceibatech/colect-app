@@ -59,7 +59,7 @@ export const WORKSPACE_PALETTES: Record<RoleCode, WorkspacePalette> = {
   GESTIONNAIRE_TRANSFERT: palette("GESTIONNAIRE_TRANSFERT", "Ocre", "#76600d", "#e6d28b", "#fbf8ed", "#292311", "#40361b"),
   VALIDATEUR_CEIBAC: palette("VALIDATEUR_CEIBAC", "Prune", "#873e65", "#edb7d1", "#fcf3f8", "#2c1824", "#452334"),
   CONVOYEUR: palette("CONVOYEUR", "Ambre", "#8a5a12", "#efc98a", "#fcf6ec", "#2b2112", "#45331a"),
-  GESTIONNAIRE_TRANSFERT_SDA: palette("GESTIONNAIRE_TRANSFERT_SDA", "Azur", "#1f5f86", "#a5cfe8", "#f0f7fb", "#132430", "#1b3a4d"),
+  RESPONSABLE_SITE: palette("RESPONSABLE_SITE", "Azur", "#1f5f86", "#a5cfe8", "#f0f7fb", "#132430", "#1b3a4d"),
   VALIDATEUR_MINISTERE: palette("VALIDATEUR_MINISTERE", "Marine", "#2a4d78", "#b0c9ed", "#f2f6fc", "#152136", "#20324f"),
   EXECUTIF_SDA: palette("EXECUTIF_SDA", "Ardoise bleue", "#3f5874", "#c0d0e2", "#f3f6fa", "#1b2530", "#283849"),
   FINANCE: palette("FINANCE", "Émeraude", "#216a53", "#a0d9be", "#f0f9f5", "#15271f", "#1c3d30"),

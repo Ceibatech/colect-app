@@ -30,6 +30,7 @@ export interface UserRow {
   operateur: { id: number; matricule: string; isActive: boolean } | null;
   supervisedCount: number;
   pmoSupervisorIds: number[];
+  responsibleSiteIds: number[];
 }
 
 export interface RoleOption {
@@ -46,6 +47,13 @@ export interface OperateurOption {
   prenoms: string | null;
   supervisorId: number | null;
   supervisorName: string | null;
+}
+
+export interface SiteOption {
+  id: number;
+  code: string;
+  nom: string;
+  organisation: "MINISTERE" | "CEIBA" | "AUTRE";
 }
 
 export interface SupervisorOption {
@@ -231,10 +239,54 @@ function PmoSupervisorAssignmentField({
     </div>
   );
 }
-function CreateUserForm({ roles, supervisors, onSuccess }: { roles: RoleOption[]; supervisors: SupervisorOption[]; onSuccess: (message?: string, warning?: string) => void }) {
+function ResponsibleSitesField({
+  sites,
+  selected,
+  onToggle,
+  disabled,
+}: {
+  sites: SiteOption[];
+  selected: number[];
+  onToggle: (id: number, checked: boolean) => void;
+  disabled?: boolean;
+}) {
+  const organisationLabel = { MINISTERE: "Ministère", CEIBA: "CEIBA", AUTRE: "Autre" } as const;
+  return (
+    <div className="space-y-2">
+      <Label>Sites dont il est responsable</Label>
+      <div className="max-h-52 space-y-1 overflow-y-auto rounded-md border p-2">
+        {sites.length === 0 ? (
+          <p className="p-1 text-xs text-muted-foreground">Aucun site actif. Créez d&apos;abord les sites dans Administration → Sites.</p>
+        ) : sites.map((site) => (
+          <div key={site.id} className="flex items-center gap-2 rounded px-1 py-1 hover:bg-muted/50">
+            <Checkbox id={`responsible-site-${site.id}`} checked={selected.includes(site.id)} onCheckedChange={(value) => onToggle(site.id, value === true)} disabled={disabled} />
+            <Label htmlFor={`responsible-site-${site.id}`} className="min-w-0 flex-1 cursor-pointer font-normal">
+              <span className="block truncate font-medium">{site.nom}</span>
+              <span className="block truncate text-xs text-muted-foreground">{organisationLabel[site.organisation]} · {site.code}</span>
+            </Label>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs leading-5 text-muted-foreground">Il remettra les cartons qui partent de ces sites et fera l&apos;état des lieux de ceux qui y arrivent. Il intervient du côté CEIBA ou SDA selon l&apos;organisation du site.</p>
+      {selected.map((id) => <input key={id} type="hidden" name="siteIds" value={id} />)}
+    </div>
+  );
+}
+
+function useToggleList(initial: number[]) {
+  const [selected, setSelected] = useState<number[]>(initial);
+  const toggle = useCallback((id: number, checked: boolean) => {
+    setSelected((previous) => (checked && !previous.includes(id) ? [...previous, id] : checked ? previous : previous.filter((value) => value !== id)));
+  }, []);
+  return [selected, toggle] as const;
+}
+
+function CreateUserForm({ roles, supervisors, sites, onSuccess }: { roles: RoleOption[]; supervisors: SupervisorOption[]; sites: SiteOption[]; onSuccess: (message?: string, warning?: string) => void }) {
   const [state, formAction, isPending] = useActionState(createUser, initialState);
   const [roleId, setRoleId] = useState("");
   const isPmo = roles.find((role) => String(role.id) === roleId)?.code === "PMO";
+  const isSiteResponsible = roles.find((role) => String(role.id) === roleId)?.code === "RESPONSABLE_SITE";
+  const [selectedSites, toggleSite] = useToggleList([]);
   const [selectedSupervisors, setSelectedSupervisors] = useState<number[]>([]);
   const toggleSupervisor = useCallback((id: number, checked: boolean) => {
     setSelectedSupervisors((previous) => (checked && !previous.includes(id) ? [...previous, id] : checked ? previous : previous.filter((value) => value !== id)));
@@ -285,6 +337,7 @@ function CreateUserForm({ roles, supervisors, onSuccess }: { roles: RoleOption[]
           disabled={isPending}
         />
       ) : null}
+      {isSiteResponsible ? <ResponsibleSitesField sites={sites} selected={selectedSites} onToggle={toggleSite} disabled={isPending} /> : null}
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
@@ -300,6 +353,7 @@ function EditUserForm({
   roles,
   operateurs,
   supervisors,
+  sites,
   onSuccess,
   canDeactivate,
 }: {
@@ -307,6 +361,7 @@ function EditUserForm({
   roles: RoleOption[];
   operateurs: OperateurOption[];
   supervisors: SupervisorOption[];
+  sites: SiteOption[];
   onSuccess: () => void;
   canDeactivate: boolean;
 }) {
@@ -317,6 +372,8 @@ function EditUserForm({
   const selectedRoleCode = roles.find((r) => String(r.id) === roleId)?.code;
   const isSuperviseur = selectedRoleCode === "SUPERVISEUR";
   const isPmo = selectedRoleCode === "PMO";
+  const isSiteResponsible = selectedRoleCode === "RESPONSABLE_SITE";
+  const [selectedSites, toggleSite] = useToggleList(user.responsibleSiteIds);
 
   const [selectedOperateurs, setSelectedOperateurs] = useState<number[]>(() =>
     operateurs.filter((o) => o.supervisorId === user.id).map((o) => o.id)
@@ -378,6 +435,7 @@ function EditUserForm({
           disabled={isPending}
         />
       ) : null}
+      {isSiteResponsible ? <ResponsibleSitesField sites={sites} selected={selectedSites} onToggle={toggleSite} disabled={isPending} /> : null}
       <DialogFooter>
         <Button type="submit" disabled={isPending}>
           {isPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
@@ -393,12 +451,14 @@ export function UsersManager({
   roles,
   operateurs,
   supervisors,
+  sites,
   currentUserId,
 }: {
   users: UserRow[];
   roles: RoleOption[];
   operateurs: OperateurOption[];
   supervisors: SupervisorOption[];
+  sites: SiteOption[];
   currentUserId: number;
 }) {
   const router = useRouter();
@@ -434,7 +494,7 @@ export function UsersManager({
                 Choisissez le niveau d&apos;accès adapté. Exécutif dispose d&apos;une lecture globale, PMO d&apos;un périmètre d&apos;équipes et Finance des points et budgets. Aucun de ces profils ne saisit de dossier.
               </DialogDescription>
             </DialogHeader>
-            <CreateUserForm roles={roles} supervisors={supervisors} onSuccess={onSuccessCreate} />
+            <CreateUserForm roles={roles} supervisors={supervisors} sites={sites} onSuccess={onSuccessCreate} />
           </DialogContent>
         </Dialog>
       </div>
@@ -480,6 +540,10 @@ export function UsersManager({
                     <span className="mt-1 block text-[11px] text-muted-foreground">
                       {u.pmoSupervisorIds.length} superviseur{u.pmoSupervisorIds.length > 1 ? "s" : ""}
                     </span>
+                  ) : u.role.code === "RESPONSABLE_SITE" ? (
+                    <span className={cn("mt-1 block text-[11px]", u.responsibleSiteIds.length ? "text-muted-foreground" : "text-destructive")}>
+                      {u.responsibleSiteIds.length ? sites.filter((site) => u.responsibleSiteIds.includes(site.id)).map((site) => site.nom).join(", ") : "Aucun site rattaché"}
+                    </span>
                   ) : null}
                 </TableCell>
                 <TableCell>
@@ -522,6 +586,7 @@ export function UsersManager({
               roles={roles}
               operateurs={operateurs}
               supervisors={supervisors}
+              sites={sites}
               onSuccess={onSuccessEdit}
               canDeactivate={editing.id !== currentUserId}
             />
