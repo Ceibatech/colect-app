@@ -385,7 +385,7 @@ class UserDeletionRefused extends Error {}
 async function countUserTraces(db: Prisma.TransactionClient, id: number): Promise<Record<UserDeletionBlockerKey, number>> {
   const [
     dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, indexingJobsRequested, indexingRunsTriggered,
-    imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines,
+    imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, reconditionnementSessions, preparationPieceLines,
     financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
     transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints,
     transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,
@@ -403,6 +403,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
     db.anomalie.count({ where: { corrigePar: id } }),
     db.dossier.count({ where: { preparateurId: id } }),
     db.dossier.count({ where: { conditionneurId: id } }),
+    db.reconditionnementSession.count({ where: { userId: id } }),
     db.preparationPieceLine.count({ where: { preparedById: id } }),
     db.financeRate.count({ where: { createdById: id } }),
     db.transferLot.count({ where: { createdById: id } }),
@@ -424,7 +425,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
   ]);
   return {
     dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, indexingJobsRequested, indexingRunsTriggered,
-    imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines,
+    imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, reconditionnementSessions, preparationPieceLines,
     financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
     transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints,
     transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,

@@ -169,7 +169,7 @@ const CONDITIONNEMENT_STATUS: Record<ProductionQueueSearch["statut"], StatutCond
   TOUS: undefined,
 };
 
-export async function getConditionnementWorkspace(filters: ProductionQueueSearch) {
+export async function getConditionnementWorkspace(filters: ProductionQueueSearch, currentUserId?: number) {
   const constraints: Prisma.DossierWhereInput[] = [
     { statutNumerisation: "TERMINE" },
     ...searchConstraint(filters.q),
@@ -217,6 +217,14 @@ export async function getConditionnementWorkspace(filters: ProductionQueueSearch
             dateConditionnement: true,
             observationsConditionnement: true,
             conditionneur: { select: { name: true } },
+            reconditionnementSessions: {
+              where: { abandoned: false },
+              orderBy: { startedAt: "asc" },
+              select: {
+                id: true, userId: true, startedAt: true, finishedAt: true, durationSeconds: true, etatRemise: true, observations: true,
+                user: { select: { name: true } },
+              },
+            },
           },
         })
       : Promise.resolve([]),
@@ -226,6 +234,13 @@ export async function getConditionnementWorkspace(filters: ProductionQueueSearch
       _count: { _all: true },
     }),
   ]);
+  // Dossier que l'agent a en cours, où qu'il soit : il ne peut en avoir qu'un.
+  const myOpenSession = currentUserId
+    ? await prisma.reconditionnementSession.findFirst({
+        where: { userId: currentUserId, finishedAt: null },
+        select: { startedAt: true, dossier: { select: { id: true, reference: true, cartonId: true, siteId: true, codeBarres: true, libelleCarton: true } } },
+      })
+    : null;
   const claimCutoff = Date.now() - 2 * 60 * 60 * 1000;
   const cartons = groupedPage.groups.map((group) => {
     const dossiers = pageDossiers.filter((dossier) => buildCartonToken(dossier) === group.token);
@@ -248,6 +263,9 @@ export async function getConditionnementWorkspace(filters: ProductionQueueSearch
   return {
     cartons,
     selectedItems,
+    myOpenSession: myOpenSession
+      ? { startedAt: myOpenSession.startedAt, dossierId: myOpenSession.dossier.id, reference: myOpenSession.dossier.reference, cartonToken: buildCartonToken(myOpenSession.dossier) }
+      : null,
     page,
     total: groupedPage.total,
     totalPages: groupedPage.totalPages,
@@ -262,6 +280,7 @@ export async function getConditionnementWorkspace(filters: ProductionQueueSearch
 export type NumerisationCartonItem = Awaited<ReturnType<typeof getNumerisationWorkspace>>["cartons"][number];
 export type NumerisationDossierItem = Awaited<ReturnType<typeof getNumerisationWorkspace>>["selectedItems"][number];
 export type ConditionnementCartonItem = Awaited<ReturnType<typeof getConditionnementWorkspace>>["cartons"][number];
+export type ConditionnementDossierItem = Awaited<ReturnType<typeof getConditionnementWorkspace>>["selectedItems"][number];
 
 const REVIEW_STATUS = {
   A_TRAITER: ["EN_ATTENTE", "EN_COURS", "REJETE"],
