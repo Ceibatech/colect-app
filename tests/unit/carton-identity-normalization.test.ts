@@ -40,7 +40,8 @@ describe("normalisation de l'identification des cartons", () => {
   it("attribue la même clé d'admission aux variantes d'un même carton, par emplacement", () => {
     const key = buildCartonLegacyKey({ ...at, libelleCarton: "Anan Cocoteraie 1" });
     expect(buildCartonLegacyKey({ ...at, libelleCarton: "anan  cocoteraie 1" })).toBe(key);
-    expect(buildCartonLegacyKey({ ...at, entrepotId: 3, libelleCarton: "Anan Cocoteraie 1" })).not.toBe(key);
+    expect(buildCartonLegacyKey({ ...at, entrepotId: 3, libelleCarton: "Anan Cocoteraie 1" })).toBe(key);
+    expect(buildCartonLegacyKey({ ...at, siteId: 99, libelleCarton: "Anan Cocoteraie 1" })).not.toBe(key);
   });
 
   it("nettoie l'affichage et mesure les quasi-doublons", () => {

@@ -19,16 +19,17 @@ function stripSpacesSql(column: Prisma.Sql) {
 }
 
 /**
- * Clé d'admission concurrente (v3 : le libellé normalisé identifie le carton,
- * le code-barres seulement à défaut de libellé). Le préfixe de version évite
- * toute collision avec les clés précédentes.
+ * Clé d'admission concurrente (v4 : même libellé dans le même site = même
+ * carton, quelle que soit la salle saisie ; le code-barres seulement à défaut
+ * de libellé). Le préfixe de version évite toute collision avec les clés
+ * précédentes.
  */
 export function buildCartonLegacyKey(identity: CartonIntakeIdentity): string | null {
   const normalized = normalizeCartonIdentity(identity);
   if (!normalized) return null;
   const hex = Buffer.from(normalized.value, "utf8").toString("hex").toUpperCase();
   return createHash("sha256")
-    .update(`v3:${identity.siteId ?? "~"}:${identity.entrepotId ?? "~"}:${normalized.kind}:${hex}`)
+    .update(`v4:${identity.siteId ?? "~"}:${normalized.kind}:${hex}`)
     .digest("hex");
 }
 
@@ -57,7 +58,6 @@ async function matchingCartonIds(tx: Prisma.TransactionClient, identity: CartonI
     SELECT MIN(d.carton_id) AS cartonId FROM dossiers d
     WHERE d.carton_id IS NOT NULL
       AND d.site_id <=> ${identity.siteId ?? null}
-      AND d.entrepot_id <=> ${identity.entrepotId ?? null}
       AND ${identifyingClause}
     HAVING MIN(d.carton_id) IS NOT NULL
   `);
