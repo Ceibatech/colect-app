@@ -1,0 +1,76 @@
+name: Compte de test e2e (Contabo)
+
+# Lancement manuel : crée ou supprime le compte administrateur temporaire
+# test-e2e@geoarchives.local (voir deploy/e2e-account.mjs). Seul le hachage
+# bcrypt du mot de passe est transmis.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "creer ou supprimer"
+        required: true
+        default: creer
+        type: choice
+        options: [creer, supprimer]
+      hash:
+        description: "Hachage bcrypt du mot de passe (mode creer)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-e2e-account
+  cancel-in-progress: false
+
+jobs:
+  account:
+    name: Compte de test (${{ inputs.mode }})
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Exécuter sur le VPS en SSH vérifié
+        env:
+          MODE: ${{ inputs.mode }}
+          HASH: ${{ inputs.hash }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          [[ "$MODE" == creer || "$MODE" == supprimer ]] || { echo "Mode invalide." >&2; exit 1; }
+          if [[ "$MODE" == creer ]]; then [[ "$HASH" =~ ^\$2[aby]\$1[0-2]\$[./A-Za-z0-9]{53}$ ]] || { echo "Hachage invalide." >&2; exit 1; }; else HASH=none; fi
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-e2e.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            "$CONTABO_USER@$CONTABO_HOST" bash -s -- "$MODE" "$(printf %q "$HASH")" <<'REMOTE'
+          set -euo pipefail
+          mode="$1"
+          hash="$2"
+          script=/opt/colect-app/current/deploy/e2e-account.sh
+          test -f "$script" || { echo "La release en service ne contient pas encore le script." >&2; exit 1; }
+          if [[ "$mode" == creer ]]; then bash "$script" creer "$hash"; else bash "$script" supprimer; fi
+          REMOTE
