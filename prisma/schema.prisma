@@ -113,6 +113,7 @@ model User {
   transferSignaturesCaptured         TransferSignature[]        @relation("TransferSignatureCapturedBy")
   transferTrackingPoints             TransferTrackingPoint[]    @relation("TransferTrackingCapturedBy")
   transferConvoyEvents               TransferConvoyEvent[]      @relation("TransferConvoyEventUser")
+  convoyTrackerToken                 ConvoyTrackerToken?
   dossiersPrepared                   Dossier[]                  @relation("DossierPreparateur")
   dossiersConditioned                Dossier[]                  @relation("DossierConditionneur")
   reconditionnementSessions          ReconditionnementSession[]
@@ -469,6 +470,8 @@ model TransferConvoyEvent {
   latitude      Float?
   longitude     Float?
   automatic     Boolean                 @default(false)
+  // Fiche de départ : véhicule, chauffeur, scellés, cartons contrôlés.
+  details       Json?
   occurredAt    DateTime                @default(now()) @map("occurred_at")
 
   transferLot TransferLot @relation(fields: [transferLotId], references: [id], onDelete: Cascade)
@@ -477,6 +480,20 @@ model TransferConvoyEvent {
   @@index([transferLotId, occurredAt])
   @@index([userId])
   @@map("transfer_convoy_events")
+}
+
+// Identifiant de l'application Traccar Client (gratuite) d'un convoyeur : elle
+// envoie la position même écran éteint, au protocole OsmAnd, sur /api/osmand.
+model ConvoyTrackerToken {
+  id         Int       @id @default(autoincrement())
+  userId     Int       @unique @map("user_id")
+  token      String    @unique @db.VarChar(64)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastSeenAt DateTime? @map("last_seen_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("convoy_tracker_tokens")
 }
 
 model TransferTrackingPoint {

@@ -117,3 +117,15 @@ export const recordTransferMovementSchema = z.object({
 
 export type CreateTransferLotInput = z.infer<typeof createTransferLotSchema>;
 export type RecordTransferMovementInput = z.infer<typeof recordTransferMovementSchema>;
+
+/** Fiche de départ du convoyeur, remplie avant « Démarrer le trajet ». */
+export const convoyDepartureSchema = z.object({
+  vehicleRegistration: z.string().trim().min(2, "Indiquez l'immatriculation du véhicule.").max(80),
+  driverName: z.string().trim().min(2, "Indiquez le nom du chauffeur.").max(120),
+  driverPhone: z.string().trim().max(40).optional(),
+  sealReferences: z.string().trim().max(1000).optional(),
+  checkedItemIds: z.array(z.number().int().positive()).max(500),
+  missingNote: z.string().trim().max(1000).optional(),
+});
+
+export type ConvoyDepartureInput = z.infer<typeof convoyDepartureSchema>;

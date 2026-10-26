@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma/client";
 import { transferTrackingPointSchema } from "@/lib/validation/transfer";
 import { apiErrorResponse } from "@/lib/utils/api-response";
 import { ApiError } from "@/lib/utils/api-error";
-import { assertConvoyActor, detectArrival, getConvoyOverview } from "@/lib/services/convoy-service";
+import { getConvoyOverview, recordTrackingPoint } from "@/lib/services/convoy-service";
 
 function parseLotId(value: string) {
   const id = Number(value);
@@ -37,41 +37,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const lotId = parseLotId((await params).id);
     const parsed = transferTrackingPointSchema.safeParse(await request.json());
     if (!parsed.success) throw new ApiError(parsed.error.issues[0]?.message ?? "Coordonnées invalides.", 400);
-    const capturedAt = new Date(parsed.data.capturedAt);
-    if (capturedAt.getTime() > Date.now() + 5 * 60_000) throw new ApiError("La date GPS ne peut pas être dans le futur.", 400);
-
-    const lot = await prisma.transferLot.findFirst({
-      where: { id: lotId, items: { some: { status: "SORTI" } } },
-      select: { id: true },
-    });
-    if (!lot) throw new ApiError("Le suivi GPS est disponible uniquement lorsqu'un chargement est en transit.", 409);
-    // Un convoyeur ne suit que les convois auxquels il a été désigné.
-    await assertConvoyActor(session, lotId);
-    const lastPoint = await prisma.transferTrackingPoint.findFirst({
-      where: { transferLotId: lotId, capturedById: session.userId },
-      orderBy: { capturedAt: "desc" },
-      select: { capturedAt: true },
-    });
-    if (lastPoint && capturedAt.getTime() - lastPoint.capturedAt.getTime() < 8_000) {
-      throw new ApiError("Attendez quelques secondes avant le prochain point GPS.", 429);
-    }
-
-    const point = await prisma.transferTrackingPoint.create({
-      data: {
-        transferLotId: lotId,
-        capturedById: session.userId,
-        latitude: parsed.data.latitude,
-        longitude: parsed.data.longitude,
-        accuracy: parsed.data.accuracy,
-        speed: parsed.data.speed,
-        heading: parsed.data.heading,
-        capturedAt,
-      },
-      select: { id: true, capturedAt: true },
-    });
-    // Arrivée détectée automatiquement à l'approche du site d'arrivée.
-    const arrival = await detectArrival(session, lotId, parsed.data);
-    return NextResponse.json({ point, arrived: !!arrival?.created }, { status: 201 });
+    const result = await recordTrackingPoint(session, lotId, { ...parsed.data, capturedAt: new Date(parsed.data.capturedAt) });
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     return apiErrorResponse(error);
   }

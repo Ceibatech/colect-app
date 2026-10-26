@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, ExternalLink, Flag, Loader2, LocateFixed, Navigation, Pause } from "lucide-react";
 import { toast } from "sonner";
@@ -42,7 +43,7 @@ function currentPosition(): Promise<GeolocationPosition | null> {
  * les 15 s. À l'arrivée — bouton « Je suis arrivé » ou position à moins de
  * 150 m du site d'arrivée — les responsables des deux sites sont notifiés.
  */
-export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey }: { lotId: number; canTrack: boolean; mapsKey?: string | null }) {
+export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = false }: { lotId: number; canTrack: boolean; mapsKey?: string | null; autoWatch?: boolean }) {
   const [points, setPoints] = useState<TrackingPoint[]>([]);
   const [events, setEvents] = useState<ConvoyEventView[]>([]);
   const [destination, setDestination] = useState<GeoPoint | null>(null);
@@ -79,8 +80,11 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey }: { lotId: numbe
 
   useEffect(() => stopWatching, [stopWatching]);
 
-  function watch() {
-    if (!navigator.geolocation) return toast.error("La géolocalisation n'est pas disponible sur cet appareil.");
+  const watch = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast.error("La géolocalisation n'est pas disponible sur cet appareil.");
+      return;
+    }
     setTracking(true);
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
@@ -117,7 +121,17 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey }: { lotId: numbe
       },
       { enableHighAccuracy: true, maximumAge: 5_000, timeout: 20_000 },
     );
-  }
+  }, [load, lotId, stopWatching]);
+
+  // Sur « Mes convois », le suivi reprend tout seul quand le convoi est en route.
+  const autoStartedRef = useRef(false);
+  const onTheRoadNow = convoyState(events).onTheRoad;
+  useEffect(() => {
+    if (!autoWatch || !canTrack || !onTheRoadNow || autoStartedRef.current || watchIdRef.current !== null) return;
+    autoStartedRef.current = true;
+    const timer = window.setTimeout(watch, 0);
+    return () => window.clearTimeout(timer);
+  }, [autoWatch, canTrack, onTheRoadNow, watch]);
 
   async function declare(action: "depart" | "arrivee") {
     setBusy(true);
@@ -177,11 +191,8 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey }: { lotId: numbe
           )}
           {latest ? <p className="text-sm text-muted-foreground">Dernière position : {dateTimeFormatter.format(new Date(latest.capturedAt))}, précision {Math.round(latest.accuracy ?? 0)} m, {latest.capturedBy.name}</p> : null}
           <div className="flex flex-wrap gap-2 [&_button]:min-h-11">
-            {canTrack && !state.onTheRoad && !state.arrived ? (
-              <Button disabled={busy} onClick={() => void declare("depart")}>{busy ? <Loader2 className="animate-spin" /> : <Navigation />} Démarrer le trajet</Button>
-            ) : null}
-            {canTrack && !state.onTheRoad && state.arrived ? (
-              <Button variant="outline" disabled={busy} onClick={() => void declare("depart")}><Navigation /> Nouveau trajet</Button>
+            {canTrack && !state.onTheRoad && !autoWatch ? (
+              <Button variant={state.arrived ? "outline" : "default"} render={<Link href="/transferts/convois" />}><Navigation /> {state.arrived ? "Nouveau trajet" : "Préparer le départ"}</Button>
             ) : null}
             {canTrack && state.onTheRoad && !tracking ? <Button variant="outline" onClick={watch}><Navigation /> Reprendre le suivi</Button> : null}
             {canTrack && state.onTheRoad ? (
