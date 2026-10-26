@@ -4,7 +4,7 @@
  *
  * Ne charge QUE la structure applicative fixe, jamais de donnée métier
  * inventée (cahier des charges §37/§79) :
- *   - rôles (ADMIN/SUPERVISEUR/OPERATEUR/GESTIONNAIRE_TRANSFERT/VALIDATEUR_CEIBAC/CONVOYEUR/GESTIONNAIRE_TRANSFERT_SDA/VALIDATEUR_MINISTERE/EXECUTIF_SDA/FINANCE/PMO/EXECUTIF/CONSULTATION)
+ *   - rôles (ADMIN/SUPERVISEUR/OPERATEUR/GESTIONNAIRE_TRANSFERT/VALIDATEUR_CEIBAC/CONVOYEUR/RESPONSABLE_SITE/VALIDATEUR_MINISTERE/EXECUTIF_SDA/FINANCE/PMO/EXECUTIF/CONSULTATION)
  *   - permissions + leur association aux rôles (matrice RBAC — source unique
  *     de vérité : src/lib/permissions/constants.ts)
  *   - statuts de workflow (BROUILLON/SOUMIS/EN_CONTROLE/... — états fixes du
@@ -36,7 +36,7 @@ const ROLES = [
   { code: "GESTIONNAIRE_TRANSFERT", name: "Gestionnaire des transferts CEIBA", description: "Constitution des lots, mouvements de stock et bordereaux signés." },
   { code: "VALIDATEUR_CEIBAC", name: "Validateur interne", description: "Validation interne des opérations avant transmission au SDA et contrôle des constats de réception documentaire." },
   { code: "CONVOYEUR", name: "Convoyeur", description: "Accompagne le convoi et partage sa position GPS pendant le transport." },
-  { code: "GESTIONNAIRE_TRANSFERT_SDA", name: "Gestionnaire de transfert SDA", description: "Remet ou réceptionne les cartons sur les sites du ministère et signe les bordereaux." },
+  { code: "RESPONSABLE_SITE", name: "Responsable de site", description: "Remet les cartons qui partent de ses sites et fait l'état des lieux de ceux qui y arrivent." },
   { code: "VALIDATEUR_MINISTERE", name: "Responsable validation SDA", description: "Autorisation SDA des opérations de transfert et contre-signature des réceptions après validation interne." },
   { code: "EXECUTIF_SDA", name: "Exécutif SDA", description: "Lecture seule du registre des transferts et du stock par site." },
   { code: "FINANCE", name: "Finance", description: "Pilotage des points, barèmes et projections budgétaires." },

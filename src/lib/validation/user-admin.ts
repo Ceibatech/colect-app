@@ -13,6 +13,8 @@ export const createUserSchema = z.object({
   roleId: z.coerce.number({ message: "Le rôle est requis" }).int().positive("Le rôle est requis"),
   telephone: z.string().max(30).optional().or(z.literal("")),
   supervisorIds: z.array(z.coerce.number().int().positive()).default([]),
+  // Sites rattachés à un compte « Responsable de site ».
+  siteIds: z.array(z.coerce.number().int().positive()).default([]),
 });
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 
@@ -25,5 +27,6 @@ export const updateUserSchema = z.object({
   operateurIds: z.array(z.coerce.number().int().positive()).default([]),
   // Superviseurs inclus dans le périmètre d'un compte PMO.
   supervisorIds: z.array(z.coerce.number().int().positive()).default([]),
+  siteIds: z.array(z.coerce.number().int().positive()).default([]),
 });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;

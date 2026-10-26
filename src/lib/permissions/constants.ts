@@ -4,7 +4,7 @@
  * par l'application (contrôles serveur, middleware, UI conditionnelle).
  */
 
-export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "PREPARATEUR", "NUMERISATEUR", "CONDITIONNEUR", "INDEXEUR", "ARCHIVISTE", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "CONVOYEUR", "GESTIONNAIRE_TRANSFERT_SDA", "VALIDATEUR_MINISTERE", "EXECUTIF_SDA", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
+export const ROLE_CODES = ["ADMIN", "SUPERVISEUR", "OPERATEUR", "AGENT_INVENTAIRE", "PREPARATEUR", "NUMERISATEUR", "CONDITIONNEUR", "INDEXEUR", "ARCHIVISTE", "GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "CONVOYEUR", "RESPONSABLE_SITE", "VALIDATEUR_MINISTERE", "EXECUTIF_SDA", "FINANCE", "PMO", "EXECUTIF", "CONSULTATION"] as const;
 export type RoleCode = (typeof ROLE_CODES)[number];
 
 export const ROLE_LABELS: Record<RoleCode, string> = {
@@ -20,7 +20,7 @@ export const ROLE_LABELS: Record<RoleCode, string> = {
   GESTIONNAIRE_TRANSFERT: "Gestionnaire des transferts CEIBA",
   VALIDATEUR_CEIBAC: "Validateur interne",
   CONVOYEUR: "Convoyeur",
-  GESTIONNAIRE_TRANSFERT_SDA: "Gestionnaire de transfert SDA",
+  RESPONSABLE_SITE: "Responsable de site",
   VALIDATEUR_MINISTERE: "Responsable validation SDA",
   EXECUTIF_SDA: "Exécutif SDA",
   FINANCE: "Finance",
@@ -144,9 +144,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
   VALIDATEUR_CEIBAC: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_CEIBAC_APPROVE", "TRANSFER_CEIBAC_VALIDATE"],
   // Suit le convoi depuis son téléphone ; aucune signature ni création.
   CONVOYEUR: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_TRACK"],
-  // Côté ministère : remet ou réceptionne les cartons et signe les bordereaux
-  // de son site ; la validation SDA reste au responsable de validation.
-  GESTIONNAIRE_TRANSFERT_SDA: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_OPERATE"],
+  // Rattaché à un ou plusieurs sites (ministère ou CEIBA) : remet les cartons
+  // qui partent de ses sites et fait l'état des lieux de ceux qui y arrivent.
+  // Le périmètre par site est contrôlé dans recordTransferMovement.
+  RESPONSABLE_SITE: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_OPERATE"],
   VALIDATEUR_MINISTERE: ["DASHBOARD_VIEW", "TRANSFER_VIEW", "TRANSFER_AUTHORIZE"],
   EXECUTIF_SDA: ["DASHBOARD_VIEW", "TRANSFER_VIEW"],
   FINANCE: ["DASHBOARD_VIEW", "FINANCE_VIEW", "FINANCE_CONFIGURE"],
@@ -169,8 +170,10 @@ export const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionCode[]> = {
  * actifs de ces profils (hors exécutifs, en lecture seule).
  */
 export const CEIBA_TRANSFER_ROLE_CODES = ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC", "CONVOYEUR"] as const satisfies readonly RoleCode[];
-export const SDA_TRANSFER_ROLE_CODES = ["GESTIONNAIRE_TRANSFERT_SDA", "VALIDATEUR_MINISTERE"] as const satisfies readonly RoleCode[];
-export const TRANSFER_ROLE_CODES = [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES, "EXECUTIF_SDA"] as const satisfies readonly RoleCode[];
+export const SDA_TRANSFER_ROLE_CODES = ["VALIDATEUR_MINISTERE"] as const satisfies readonly RoleCode[];
+/** Intervient du côté (CEIBA ou SDA) de l'organisation de ses sites. */
+export const SITE_RESPONSIBLE_ROLE_CODE = "RESPONSABLE_SITE" as const satisfies RoleCode;
+export const TRANSFER_ROLE_CODES = [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE, "EXECUTIF_SDA"] as const satisfies readonly RoleCode[];
 
 /**
  * Routes de premier niveau réservées à certains rôles (contrôle grossier au

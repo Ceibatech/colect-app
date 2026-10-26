@@ -10,6 +10,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requirePermission } from "@/lib/auth/current-user";
+import { prisma } from "@/lib/prisma/client";
+import { canSignMovementAtSite } from "@/lib/transfers/site-scope";
 import { getTransferLotDetail } from "@/lib/services/transfer-service";
 import { formatCartonReference } from "@/lib/cartons/reference";
 import {
@@ -52,7 +54,12 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   const canSubmit = session.permissions.includes("TRANSFER_SUBMIT") && lot.status === "BROUILLON";
   const canApproveCeibac = session.permissions.includes("TRANSFER_CEIBAC_APPROVE") && lot.status === "SOUMIS";
   const canAuthorize = session.permissions.includes("TRANSFER_AUTHORIZE") && lot.status === "VALIDE_CEIBAC";
-  const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "SOUMIS", "VALIDE_CEIBAC", "ANNULE", "CLOTURE"].includes(lot.status);
+  const responsibleSiteIds = session.roleCode === "RESPONSABLE_SITE"
+    ? (await prisma.userSite.findMany({ where: { userId: session.userId }, select: { siteId: true } })).map((row) => row.siteId)
+    : null;
+  const canSignAt = (type: "SORTIE" | "RECEPTION" | "RETOUR") => canSignMovementAtSite(type, lot, responsibleSiteIds);
+  const canOperate = session.permissions.includes("TRANSFER_OPERATE") && !["BROUILLON", "SOUMIS", "VALIDE_CEIBAC", "ANNULE", "CLOTURE"].includes(lot.status)
+    && (["SORTIE", "RECEPTION", "RETOUR"] as const).some(canSignAt);
   const canTrack = session.permissions.includes("TRANSFER_TRACK");
   const canValidateCeiba = session.permissions.includes("TRANSFER_CEIBAC_VALIDATE");
   const canValidateMinistry = session.permissions.includes("TRANSFER_AUTHORIZE");
@@ -136,9 +143,9 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
             <CardDescription>Un bordereau distinct est produit pour chaque mouvement, y compris en cas de sortie ou de retour partiel.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <TransferMovementDialog lotId={lot.id} type="SORTIE" escortSuggestions={escortSuggestions} items={movementOptions("PREVU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
-            <TransferMovementDialog lotId={lot.id} type="RECEPTION" escortSuggestions={escortSuggestions} items={movementOptions("SORTI")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
-            <TransferMovementDialog lotId={lot.id} type="RETOUR" escortSuggestions={escortSuggestions} items={movementOptions("RECU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} />
+            {canSignAt("SORTIE") ? <TransferMovementDialog lotId={lot.id} type="SORTIE" escortSuggestions={escortSuggestions} items={movementOptions("PREVU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} /> : null}
+            {canSignAt("RECEPTION") ? <TransferMovementDialog lotId={lot.id} type="RECEPTION" escortSuggestions={escortSuggestions} items={movementOptions("SORTI")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} /> : null}
+            {canSignAt("RETOUR") ? <TransferMovementDialog lotId={lot.id} type="RETOUR" escortSuggestions={escortSuggestions} items={movementOptions("RECU")} sourceLabel={sourceLabel} destinationLabel={destinationLabel} /> : null}
           </CardContent>
         </Card>
       ) : null}

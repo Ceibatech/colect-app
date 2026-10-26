@@ -31,6 +31,7 @@ import {
   ScanLine,
   PackageCheck,
   Archive,
+  Navigation,
 } from "lucide-react";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 
@@ -79,6 +80,8 @@ export const NAV_ITEMS: NavItem[] = [
     title: "Transferts", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW", tone: "transfer",
     children: [
       { title: "Registre et bordereaux", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW" },
+      { title: "Mon site", href: "/transferts/mon-site", icon: MapPinned, permission: "TRANSFER_OPERATE" },
+      { title: "Mes convois", href: "/transferts/convois", icon: Navigation, permission: "TRANSFER_TRACK" },
       { title: "Validation interne", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
       { title: "Validation SDA", href: "/transferts/validation", icon: ShieldCheck, permission: "TRANSFER_AUTHORIZE" },
     ],

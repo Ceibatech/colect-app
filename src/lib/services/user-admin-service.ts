@@ -8,6 +8,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { createUserSchema, updateUserSchema } from "@/lib/validation/user-admin";
 import { issuePasswordAccessEmail } from "@/lib/services/password-reset-service";
 import { Prisma } from "@prisma/client";
+import { SITE_RESPONSIBLE_ROLE_CODE } from "@/lib/permissions/constants";
 import { isDeletionConfirmed, userDeletionBlockers, type UserDeletionBlockerKey } from "@/lib/utils/user-deletion";
 
 /**
@@ -40,9 +41,28 @@ export async function listUsersWithRoles() {
       role: true,
       operateur: { select: { id: true, matricule: true, isActive: true } },
       pmoSupervisorScopes: { select: { supervisorUserId: true } },
+      responsibleSites: { select: { siteId: true } },
       _count: { select: { supervisedOperateurs: true } },
     },
   });
+}
+
+/** Sites actifs pouvant être rattachés à un responsable de site. */
+export async function listActiveSitesForAssignment() {
+  await requirePermission("USER_MANAGE");
+  return prisma.site.findMany({
+    where: { isActive: true },
+    orderBy: [{ organisation: "asc" }, { nom: "asc" }],
+    select: { id: true, code: true, nom: true, organisation: true },
+  });
+}
+
+async function validateResponsibleSites(roleCode: string, siteIds: number[]): Promise<string | null> {
+  if (roleCode !== SITE_RESPONSIBLE_ROLE_CODE) return null;
+  const unique = [...new Set(siteIds)];
+  if (unique.length === 0) return "Rattachez au moins un site au responsable de site.";
+  const valid = await prisma.site.count({ where: { id: { in: unique }, isActive: true } });
+  return valid === unique.length ? null : "Un site sélectionné est inactif ou introuvable.";
 }
 
 export async function listRoles() {
@@ -111,6 +131,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
     roleId: formData.get("roleId"),
     telephone: formData.get("telephone"),
     supervisorIds: formData.getAll("supervisorIds"),
+    siteIds: formData.getAll("siteIds"),
   });
   const sendInvitation = formData.get("sendInvitation") === "on";
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
@@ -131,6 +152,9 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
       return { error: "Un superviseur sélectionné est inactif ou n'a plus le rôle Superviseur." };
     }
   }
+
+  const siteError = await validateResponsibleSites(role.code, parsed.data.siteIds);
+  if (siteError) return { error: siteError };
 
   // Le compte est créé avec un secret aléatoire jamais montré à
   // l'administrateur. Seul le lien d'activation à usage unique permet à la
@@ -165,13 +189,20 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
       });
     }
 
+    if (role.code === SITE_RESPONSIBLE_ROLE_CODE) {
+      await tx.userSite.createMany({
+        data: [...new Set(parsed.data.siteIds)].map((siteId) => ({ userId: created.id, siteId })),
+        skipDuplicates: true,
+      });
+    }
+
     await tx.auditLog.create({
       data: {
         userId: session.userId,
         action: "USER_CREATE",
         entity: "USER",
         entityId: created.id,
-        newValue: { name: created.name, email, role: role.code, pmoSupervisorCount: role.code === "PMO" ? supervisorIds.length : 0 },
+        newValue: { name: created.name, email, role: role.code, pmoSupervisorCount: role.code === "PMO" ? supervisorIds.length : 0, siteIds: role.code === SITE_RESPONSIBLE_ROLE_CODE ? [...new Set(parsed.data.siteIds)] : [] },
         ipAddress: ip,
       },
     });
@@ -205,6 +236,7 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
     isActive: formData.get("isActive") === "on",
     operateurIds: formData.getAll("operateurIds"),
     supervisorIds: formData.getAll("supervisorIds"),
+    siteIds: formData.getAll("siteIds"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Formulaire invalide." };
 
@@ -246,6 +278,12 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
     }
   }
 
+  const siteError = await validateResponsibleSites(newRole.code, parsed.data.siteIds);
+  if (siteError) return { error: siteError };
+  const previousSiteIds = (await prisma.userSite.findMany({ where: { userId: id }, select: { siteId: true } })).map((row) => row.siteId).sort((a, b) => a - b);
+  const desiredSiteIds = newRole.code === SITE_RESPONSIBLE_ROLE_CODE ? [...new Set(parsed.data.siteIds)].sort((a, b) => a - b) : [];
+  const sitesChanged = previousSiteIds.join(",") !== desiredSiteIds.join(",");
+
   const ip = await getClientIp();
 
   await prisma.$transaction(async (tx) => {
@@ -255,7 +293,7 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
         name: parsed.data.name,
         roleId: newRole.id,
         isActive: parsed.data.isActive,
-        ...(before.roleId !== newRole.id || before.isActive !== parsed.data.isActive
+        ...(before.roleId !== newRole.id || before.isActive !== parsed.data.isActive || sitesChanged
           ? { sessionVersion: { increment: 1 } }
           : {}),
       },
@@ -316,14 +354,19 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
       await tx.pmoSupervisorScope.deleteMany({ where: { pmoUserId: id } });
     }
 
+    if (sitesChanged) {
+      await tx.userSite.deleteMany({ where: { userId: id } });
+      if (desiredSiteIds.length) await tx.userSite.createMany({ data: desiredSiteIds.map((siteId) => ({ userId: id, siteId })) });
+    }
+
     await tx.auditLog.create({
       data: {
         userId: session.userId,
         action: "USER_UPDATE",
         entity: "USER",
         entityId: id,
-        oldValue: { name: before.name, role: before.role.code, isActive: before.isActive },
-        newValue: { name: parsed.data.name, role: newRole.code, isActive: parsed.data.isActive, pmoSupervisorCount: newRole.code === "PMO" ? parsed.data.supervisorIds.length : 0 },
+        oldValue: { name: before.name, role: before.role.code, isActive: before.isActive, siteIds: previousSiteIds },
+        newValue: { name: parsed.data.name, role: newRole.code, isActive: parsed.data.isActive, pmoSupervisorCount: newRole.code === "PMO" ? parsed.data.supervisorIds.length : 0, siteIds: desiredSiteIds },
         ipAddress: ip,
       },
     });

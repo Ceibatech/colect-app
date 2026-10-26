@@ -43,6 +43,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       select: { id: true },
     });
     if (!lot) throw new ApiError("Le suivi GPS est disponible uniquement lorsqu'un chargement est en transit.", 409);
+    // Un convoyeur ne suit que les convois auxquels il a été désigné.
+    if (session.roleCode === "CONVOYEUR") {
+      const assigned = await prisma.transferLotParticipant.findFirst({ where: { transferLotId: lotId, userId: session.userId }, select: { id: true } });
+      if (!assigned) throw new ApiError("Vous n'êtes pas désigné comme convoyeur de ce lot.", 403);
+    }
     const lastPoint = await prisma.transferTrackingPoint.findFirst({
       where: { transferLotId: lotId, capturedById: session.userId },
       orderBy: { capturedAt: "desc" },
