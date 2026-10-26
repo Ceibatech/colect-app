@@ -5,9 +5,10 @@
  * « 643-699 zone4/c » / « 643-699 zone 4/c ») : ces variantes désignent le même
  * contenant et doivent recevoir le même identifiant CTN.
  *
- * - Libellé : insensible à la casse, aux accents et à tout espacement.
- * - Code-barres : insensible à l'espacement seulement ; la casse reste
- *   significative (un code scanné est une valeur exacte).
+ * - Libellé (identité du carton) : insensible à la casse, aux accents et à
+ *   tout espacement.
+ * - Code-barres (repli si aucun libellé) : insensible à l'espacement
+ *   seulement ; la casse reste significative.
  *
  * Les fautes de frappe (« Anna » / « Anan ») ne sont volontairement PAS
  * fusionnées automatiquement : elles sont listées par
@@ -36,15 +37,20 @@ export function normalizeCartonLabel(value: string | null | undefined): string |
   return normalized || null;
 }
 
-/** Identité canonique : le code-barres prime, le libellé sert en son absence. */
+/**
+ * Identité canonique d'un carton : son libellé, dans sa salle. Les cartons
+ * inventoriés n'avaient qu'un libellé ; l'identifiant unique (CTN) est généré
+ * à partir de lui. Le code-barres saisi sur la fiche appartient au dossier et
+ * ne sert d'identité qu'en l'absence de libellé.
+ */
 export function normalizeCartonIdentity(identity: {
   codeBarres?: string | null;
   libelleCarton?: string | null;
 }): { kind: CartonIdentityKind; value: string } | null {
-  const code = normalizeCartonCode(identity.codeBarres);
-  if (code) return { kind: "code", value: code };
   const label = normalizeCartonLabel(identity.libelleCarton);
-  return label ? { kind: "label", value: label } : null;
+  if (label) return { kind: "label", value: label };
+  const code = normalizeCartonCode(identity.codeBarres);
+  return code ? { kind: "code", value: code } : null;
 }
 
 /** Libellé lisible : bords rognés et espaces internes multiples réduits. */
