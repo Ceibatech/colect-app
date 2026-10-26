@@ -65,14 +65,17 @@ const tidy = (text) => (text ?? "").replace(/\s+/g, " ").trim();
 const STOPWORDS = new Set(["de", "du", "des", "la", "le", "les", "l", "d", "et", "lot", "lots", "n", "no", "num", "numero"]);
 const ROMAN = /^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii)$/;
 
-export function smartLabel(value) {
+export function smartLabel(value, correct = (word) => word) {
   const text = (value ?? "")
     .normalize("NFKD")
     .replace(/\p{M}+/gu, "")
     .toLowerCase()
     .replace(/(\d)\s*(?:m2|m 2|ha)(?![\p{L}\p{N}])/gu, "$1")
     .replace(/(\d+)(?:\s*(?:eme|ere)|er|e)(?![\p{L}\p{N}])/gu, "$1");
-  const tokens = (text.match(/\p{L}+|\p{N}+/gu) ?? []).filter((token) => !STOPWORDS.has(token));
+  const isMarker = (token) => /^\p{N}+$/u.test(token) || token.length === 1 || ROMAN.test(token);
+  const tokens = (text.match(/\p{L}+|\p{N}+/gu) ?? [])
+    .filter((token) => !STOPWORDS.has(token))
+    .map((token) => (isMarker(token) ? token : correct(token)));
   if (!tokens.length) return null;
   const markers = tokens
     .filter((token) => /^\p{N}+$/u.test(token) || token.length === 1 || ROMAN.test(token))
@@ -99,15 +102,74 @@ function closeEnough(a, b) {
   return previous[b.length] <= max;
 }
 
+// Communes d'Abidjan et des environs : noms de référence des libellés,
+// complétés par le référentiel des communes de l'application.
+export const KNOWN_PLACES = [
+  "abobo", "adjame", "attecoube", "cocody", "koumassi", "marcory", "plateau", "port", "bouet",
+  "treichville", "yopougon", "anyama", "bingerville", "songon", "brofodoume", "abidjan",
+];
+
+function wordsOf(text) {
+  return (text ?? "").normalize("NFKD").replace(/\p{M}+/gu, "").toLowerCase().match(/\p{L}{2,}/gu) ?? [];
+}
+
+/**
+ * Correcteur orthographique des libellés : un mot rare (moins de 5 dossiers)
+ * proche d'un mot de référence — commune connue, ou mot fréquent des
+ * libellés (au moins 20 dossiers) — est remplacé par lui. « Kouassi » →
+ * « koumassi », « Benard » → « bernard ». Même première lettre, une lettre
+ * d'écart (deux au-delà de 8 lettres).
+ */
+export function buildWordCorrector(entries, places = []) {
+  const counts = new Map();
+  for (const { label, count } of entries) for (const word of wordsOf(label)) counts.set(word, (counts.get(word) ?? 0) + count);
+  const reference = new Map();
+  for (const [word, count] of counts) if (count >= 20 && word.length >= 4) reference.set(word, count);
+  for (const place of [...KNOWN_PLACES, ...places.flatMap(wordsOf)]) if (place.length >= 4) reference.set(place, Number.MAX_SAFE_INTEGER);
+  const byInitial = new Map();
+  for (const [word, count] of reference) {
+    const list = byInitial.get(word[0]) ?? [];
+    list.push([word, count]);
+    byInitial.set(word[0], list);
+  }
+  for (const list of byInitial.values()) list.sort((a, b) => b[1] - a[1]);
+  const cache = new Map();
+  return (word) => {
+    if (word.length < 5 || reference.has(word) || (counts.get(word) ?? 0) >= 5) return word;
+    if (cache.has(word)) return cache.get(word);
+    const max = word.length > 8 ? 2 : 1;
+    const match = (byInitial.get(word[0]) ?? []).find(([candidate]) => Math.abs(candidate.length - word.length) <= max && editDistance(candidate, word, max) <= max);
+    const result = match ? match[0] : word;
+    cache.set(word, result);
+    return result;
+  };
+}
+
+function editDistance(a, b, max) {
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      rowMin = Math.min(rowMin, current[j]);
+    }
+    if (rowMin > max) return max + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
 /**
  * Associe à chaque (site, libellé) la clé de son groupe : même clé
  * intelligente, puis rapprochement des fautes de frappe autour du libellé le
  * plus fréquent (sans chaînage), tant que le groupe reste sous le seuil.
  */
-export function clusterLabels(entries, maxDossiers) {
+export function clusterLabels(entries, maxDossiers, places = []) {
+  const correct = buildWordCorrector(entries, places);
   const bySmart = new Map();
   for (const { siteId, label, count } of entries) {
-    const smart = smartLabel(label);
+    const smart = smartLabel(label, correct);
     if (!smart) continue;
     const id = `${siteId ?? "-"}|${smart.key}`;
     const row = bySmart.get(id) ?? { id, siteId, smart, count: 0, labels: [] };
@@ -140,7 +202,7 @@ export function clusterLabels(entries, maxDossiers) {
 }
 
 /** Plan de regroupement, calculé en mémoire à partir des dossiers. */
-export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, engagedCartonIds = new Set() } = {}) {
+export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, engagedCartonIds = new Set(), places = [] } = {}) {
   const counts = new Map();
   for (const d of dossiers) {
     if (d.cartonId == null || !labelKey(d.libelleCarton)) continue;
@@ -149,7 +211,7 @@ export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, enga
     entry.count++;
     counts.set(id, entry);
   }
-  const { keyOf, fuzzy } = clusterLabels([...counts.values()], maxDossiers);
+  const { keyOf, fuzzy } = clusterLabels([...counts.values()], maxDossiers, places);
   const groups = new Map();
   let withoutLabel = 0;
   for (const d of dossiers) {
@@ -205,7 +267,8 @@ async function loadPlan(db, options) {
     where: { cartonId: { not: null }, status: { in: ["PREVU", "SORTI", "RECU"] }, transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } } },
     select: { cartonId: true },
   });
-  return planRegroup(dossiers, { ...options, engagedCartonIds: new Set(engaged.map((row) => row.cartonId)) });
+  const communes = await db.commune.findMany({ select: { nom: true } });
+  return planRegroup(dossiers, { ...options, engagedCartonIds: new Set(engaged.map((row) => row.cartonId)), places: communes.map((c) => c.nom) });
 }
 
 export async function regroupCartons(db, { apply = false, maxDossiers = DEFAULT_MAX_DOSSIERS } = {}) {
