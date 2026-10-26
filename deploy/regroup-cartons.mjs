@@ -77,11 +77,33 @@ export function smartLabel(value, correct = (word) => word) {
     .filter((token) => !STOPWORDS.has(token))
     .map((token) => (isMarker(token) ? token : correct(token)));
   if (!tokens.length) return null;
-  const markers = tokens
-    .filter((token) => /^\p{N}+$/u.test(token) || token.length === 1 || ROMAN.test(token))
-    .map((token) => (/^\p{N}+$/u.test(token) ? String(Number(token)) : token));
-  const words = tokens.filter((token) => !(/^\p{N}+$/u.test(token) || token.length === 1 || ROMAN.test(token))).join("");
-  return { key: tokens.map((token) => (/^\p{N}+$/u.test(token) ? String(Number(token)) : token)).join(" "), markers: markers.join("-"), words };
+  // L'ordre des mots ne compte pas : « Zone 4/c 595-599 » = « 595-599 zone 4/c ».
+  const normalized = tokens.map((token) => (/^\p{N}+$/u.test(token) ? String(Number(token)) : token)).sort();
+  const markers = normalized.filter(isMarker);
+  const words = normalized.filter((token) => !isMarker(token)).join("");
+  return { key: normalized.join(" "), markers: markers.join("-"), markerList: markers, words };
+}
+
+/**
+ * Plage de numéros avec une faute d'un chiffre : mêmes repères sauf un nombre
+ * de même longueur (3 chiffres au moins) qui diffère d'un seul chiffre, et au
+ * moins un autre nombre commun (le début de plage). « 738-785 » ≈ « 738-775 » ;
+ * un numéro seul (« 32 » / « 33 ») n'est jamais rapproché.
+ */
+export function nearRange(a, b) {
+  if (a.length !== b.length) return false;
+  const numeric = (token) => /^\d+$/.test(token);
+  const long = (token) => numeric(token) && token.length >= 3;
+  if (a.filter(long).length < 2) return false;
+  const diffs = a.map((token, i) => [token, b[i]]).filter(([x, y]) => x !== y);
+  if (diffs.length !== 1) return false;
+  const [[x, y]] = diffs;
+  if (!numeric(x) || !numeric(y) || x.length !== y.length || x.length < 3) return false;
+  // Le début de plage (plus petit nombre) doit être commun : seule la fin diffère.
+  const startA = Math.min(...a.filter(long).map(Number));
+  const startB = Math.min(...b.filter(long).map(Number));
+  if (startA !== startB || Number(x) === startA || Number(y) === startB) return false;
+  return [...x].filter((digit, i) => digit !== y[i]).length === 1;
 }
 
 function closeEnough(a, b) {
@@ -183,9 +205,9 @@ export function clusterLabels(entries, maxDossiers, places = []) {
   for (const row of rows) {
     const home = row.count > maxDossiers ? null : clusters.find((cluster) =>
       cluster.siteId === row.siteId
-      && cluster.head.smart.markers === row.smart.markers
       && cluster.count + row.count <= maxDossiers
-      && closeEnough(cluster.head.smart.words, row.smart.words));
+      && ((cluster.head.smart.markers === row.smart.markers && closeEnough(cluster.head.smart.words, row.smart.words))
+        || (cluster.head.smart.words === row.smart.words && nearRange(cluster.head.smart.markerList, row.smart.markerList))));
     if (home) {
       home.count += row.count;
       home.members.push(row);
