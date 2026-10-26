@@ -112,6 +112,7 @@ model User {
   transferMovementsMinistryValidated TransferMovement[]         @relation("TransferMovementMinistryValidatedBy")
   transferSignaturesCaptured         TransferSignature[]        @relation("TransferSignatureCapturedBy")
   transferTrackingPoints             TransferTrackingPoint[]    @relation("TransferTrackingCapturedBy")
+  transferConvoyEvents               TransferConvoyEvent[]      @relation("TransferConvoyEventUser")
   dossiersPrepared                   Dossier[]                  @relation("DossierPreparateur")
   dossiersConditioned                Dossier[]                  @relation("DossierConditionneur")
   reconditionnementSessions          ReconditionnementSession[]
@@ -277,6 +278,7 @@ model TransferLot {
   items               TransferLotItem[]
   movements           TransferMovement[]
   trackingPoints      TransferTrackingPoint[]
+  convoyEvents        TransferConvoyEvent[]
   participants        TransferLotParticipant[]
 
   @@index([sourceSiteId, sourceEntrepotId])
@@ -449,6 +451,32 @@ model TransferSignature {
   @@unique([movementId, party])
   @@index([capturedById])
   @@map("transfer_signatures")
+}
+
+// Jalons du convoi : départ (le convoyeur lance le suivi) et arrivée (bouton
+// du convoyeur, ou détection automatique à l'approche du site d'arrivée). Ils
+// déclenchent la notification des responsables des deux sites.
+enum TransferConvoyEventType {
+  DEPART
+  ARRIVEE
+}
+
+model TransferConvoyEvent {
+  id            Int                     @id @default(autoincrement())
+  transferLotId Int                     @map("transfer_lot_id")
+  type          TransferConvoyEventType
+  userId        Int?                    @map("user_id")
+  latitude      Float?
+  longitude     Float?
+  automatic     Boolean                 @default(false)
+  occurredAt    DateTime                @default(now()) @map("occurred_at")
+
+  transferLot TransferLot @relation(fields: [transferLotId], references: [id], onDelete: Cascade)
+  user        User?       @relation("TransferConvoyEventUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([transferLotId, occurredAt])
+  @@index([userId])
+  @@map("transfer_convoy_events")
 }
 
 model TransferTrackingPoint {

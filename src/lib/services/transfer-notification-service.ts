@@ -14,11 +14,13 @@ export type TransferEmailEvent =
   | "MOVEMENT_SUBMITTED_MINISTRY"
   | "MOVEMENT_CEIBA_VALIDATED"
   | "MOVEMENT_SIGNED"
-  | "MOVEMENT_INCIDENT_REPORTED";
+  | "MOVEMENT_INCIDENT_REPORTED"
+  | "CONVOY_DEPARTED"
+  | "CONVOY_ARRIVED";
 
 interface TransferWorkflowNotification {
   event: TransferEmailEvent;
-  entityType: "TRANSFER_LOT" | "TRANSFER_MOVEMENT" | "TRANSFER_OPERATION";
+  entityType: "TRANSFER_LOT" | "TRANSFER_MOVEMENT" | "TRANSFER_OPERATION" | "TRANSFER_CONVOY";
   entityId: number;
   recipientRoleCodes: RoleCode[];
   recipientUserIds?: number[];

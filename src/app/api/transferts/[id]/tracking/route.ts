@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma/client";
 import { transferTrackingPointSchema } from "@/lib/validation/transfer";
 import { apiErrorResponse } from "@/lib/utils/api-response";
 import { ApiError } from "@/lib/utils/api-error";
+import { assertConvoyActor, detectArrival, getConvoyOverview } from "@/lib/services/convoy-service";
 
 function parseLotId(value: string) {
   const id = Number(value);
@@ -23,7 +24,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       take: 100,
       select: { id: true, latitude: true, longitude: true, accuracy: true, speed: true, heading: true, capturedAt: true, capturedBy: { select: { name: true } } },
     });
-    return NextResponse.json({ points: descending.reverse() });
+    const convoy = await getConvoyOverview(lotId);
+    return NextResponse.json({ points: descending.reverse(), ...convoy });
   } catch (error) {
     return apiErrorResponse(error);
   }
@@ -44,10 +46,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     if (!lot) throw new ApiError("Le suivi GPS est disponible uniquement lorsqu'un chargement est en transit.", 409);
     // Un convoyeur ne suit que les convois auxquels il a été désigné.
-    if (session.roleCode === "CONVOYEUR") {
-      const assigned = await prisma.transferLotParticipant.findFirst({ where: { transferLotId: lotId, userId: session.userId }, select: { id: true } });
-      if (!assigned) throw new ApiError("Vous n'êtes pas désigné comme convoyeur de ce lot.", 403);
-    }
+    await assertConvoyActor(session, lotId);
     const lastPoint = await prisma.transferTrackingPoint.findFirst({
       where: { transferLotId: lotId, capturedById: session.userId },
       orderBy: { capturedAt: "desc" },
@@ -70,7 +69,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       },
       select: { id: true, capturedAt: true },
     });
-    return NextResponse.json({ point }, { status: 201 });
+    // Arrivée détectée automatiquement à l'approche du site d'arrivée.
+    const arrival = await detectArrival(session, lotId, parsed.data);
+    return NextResponse.json({ point, arrived: !!arrival?.created }, { status: 201 });
   } catch (error) {
     return apiErrorResponse(error);
   }

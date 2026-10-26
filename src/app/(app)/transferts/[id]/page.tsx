@@ -150,7 +150,7 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
         </Card>
       ) : null}
 
-      {lot.items.some((item) => item.departedAt !== null) ? <ConvoyTrackingPanel lotId={lot.id} canTrack={canTrack && stock.inTransit > 0} /> : null}
+      {lot.items.some((item) => item.departedAt !== null) ? <ConvoyTrackingPanel lotId={lot.id} canTrack={canTrack && stock.inTransit > 0} mapsKey={process.env.GOOGLE_MAPS_API_KEY ?? null} /> : null}
 
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">

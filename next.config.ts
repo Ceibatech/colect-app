@@ -6,7 +6,7 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  "img-src 'self' data: blob: https://maps.googleapis.com https://maps.gstatic.com https://tile.openstreetmap.org",
   "font-src 'self' data:",
   `connect-src 'self'${isProduction ? "" : " ws: wss:"}`,
   "media-src 'self' blob:",

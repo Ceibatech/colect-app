@@ -40,7 +40,7 @@ const SET_NULL_USER_RELATIONS_COUNTED = new Set([
   "DocumentIndexingJob.requestedBy", "DocumentIndexingRun.triggeredBy", "Dossier.conditionneurId",
   "Dossier.preparateurId", "DossierHistory.userId", "EmailReportDelivery.triggeredById", "FinanceRate.createdById",
   "Operateur.supervisorId", "Operateur.userId", "QualityCheck.userId", "TransferLot.authorizedById",
-  "TransferLot.ceibacValidatedById", "TransferMovement.ceibacValidatedById", "TransferMovement.ministryValidatedById",
+  "TransferLot.ceibacValidatedById", "TransferConvoyEvent.userId", "TransferMovement.ceibacValidatedById", "TransferMovement.ministryValidatedById",
   "WorkflowTransition.userId",
 ]);
 

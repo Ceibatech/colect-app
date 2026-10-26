@@ -39,7 +39,7 @@ export default async function ConvoysPage() {
           {convoy.plannedRoute ? (
             <p className="flex gap-2 rounded-lg border border-border/70 bg-muted/40 p-3 text-sm"><Route className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> <span>{convoy.plannedRoute}</span></p>
           ) : null}
-          <ConvoyTrackingPanel lotId={convoy.id} canTrack />
+          <ConvoyTrackingPanel lotId={convoy.id} canTrack mapsKey={process.env.GOOGLE_MAPS_API_KEY ?? null} />
         </section>
       ))}
 

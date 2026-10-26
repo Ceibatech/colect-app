@@ -33,6 +33,7 @@ export const USER_DELETION_BLOCKERS = {
   transferMovementsMinistryValidated: "mouvements contre-signés",
   transferSignaturesCaptured: "signatures de transfert",
   transferTrackingPoints: "points de suivi GPS",
+  transferConvoyEvents: "départs ou arrivées de convoi déclarés",
   transferLotParticipations: "participations à des lots de transfert",
   emailReportSubscriptionsCreated: "abonnements de rapport créés",
   emailReportsTriggered: "envois de rapport déclenchés",
