@@ -83,6 +83,15 @@ export async function requirePermission(permission: PermissionCode): Promise<Ses
   return session;
 }
 
+/** Comme requirePermission, pour une page ouverte à plusieurs métiers. */
+export async function requireAnyPermission(...permissions: PermissionCode[]): Promise<SessionPayload> {
+  const session = await requireUser();
+  if (!permissions.some((permission) => session.permissions.includes(permission))) {
+    redirect("/dashboard?error=forbidden");
+  }
+  return session;
+}
+
 export function hasPermission(session: SessionPayload | null, permission: PermissionCode): boolean {
   return !!session?.permissions.includes(permission);
 }

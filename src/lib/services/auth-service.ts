@@ -1,5 +1,6 @@
 "use server";
 
+import { safeReturnPath } from "@/lib/auth/return-path";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma/client";
@@ -141,7 +142,7 @@ export async function loginAction(_prevState: LoginFormState, formData: FormData
     }),
   ]);
 
-  redirect("/dashboard");
+  redirect(safeReturnPath(formData.get("from")));
 }
 
 export async function logoutAction(): Promise<void> {

@@ -5,9 +5,10 @@
  * « 643-699 zone4/c » / « 643-699 zone 4/c ») : ces variantes désignent le même
  * contenant et doivent recevoir le même identifiant CTN.
  *
- * - Libellé : insensible à la casse, aux accents et à tout espacement.
- * - Code-barres : insensible à l'espacement seulement ; la casse reste
- *   significative (un code scanné est une valeur exacte).
+ * - Libellé (identité du carton) : insensible à la casse, aux accents, à la
+ *   ponctuation, à l'espacement et à l'écriture des ordinaux (2ème / 2eme / 2e).
+ * - Code-barres (repli si aucun libellé) : insensible à l'espacement
+ *   seulement ; la casse reste significative.
  *
  * Les fautes de frappe (« Anna » / « Anan ») ne sont volontairement PAS
  * fusionnées automatiquement : elles sont listées par
@@ -27,24 +28,37 @@ export function normalizeCartonCode(value: string | null | undefined): string | 
   return normalized || null;
 }
 
+/** Ordinaux : « 2ème », « 2eme », « 1er », « 3e » se réduisent à leur nombre. */
+/**
+ * Clé d'un libellé : sans casse, sans accents, sans ponctuation ni espaces,
+ * ordinaux réduits à leur nombre. « Zone 4/C - 2ème rang » et
+ * « zone4c 2eme RANG » donnent la même clé. Doit rester alignée avec
+ * `cartonLabelKeySql` (persistence.ts).
+ */
 export function normalizeCartonLabel(value: string | null | undefined): string | null {
   const normalized = (value ?? "")
     .normalize("NFKD")
     .replace(/\p{M}+/gu, "")
     .toLowerCase()
-    .replace(WHITESPACE, "");
+    .replace(/(\d+)(?:\s*(?:eme|ere)|er|e)(?![\p{L}\p{N}])/gu, "$1")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
   return normalized || null;
 }
 
-/** Identité canonique : le code-barres prime, le libellé sert en son absence. */
+/**
+ * Identité canonique d'un carton : son libellé, dans sa salle. Les cartons
+ * inventoriés n'avaient qu'un libellé ; l'identifiant unique (CTN) est généré
+ * à partir de lui. Le code-barres saisi sur la fiche appartient au dossier et
+ * ne sert d'identité qu'en l'absence de libellé.
+ */
 export function normalizeCartonIdentity(identity: {
   codeBarres?: string | null;
   libelleCarton?: string | null;
 }): { kind: CartonIdentityKind; value: string } | null {
-  const code = normalizeCartonCode(identity.codeBarres);
-  if (code) return { kind: "code", value: code };
   const label = normalizeCartonLabel(identity.libelleCarton);
-  return label ? { kind: "label", value: label } : null;
+  if (label) return { kind: "label", value: label };
+  const code = normalizeCartonCode(identity.codeBarres);
+  return code ? { kind: "code", value: code } : null;
 }
 
 /** Libellé lisible : bords rognés et espaces internes multiples réduits. */

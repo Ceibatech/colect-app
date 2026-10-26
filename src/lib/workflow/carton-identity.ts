@@ -77,7 +77,8 @@ export function getCartonDisplay(identity: Pick<CartonIdentity, "cartonId" | "co
   if (identity.cartonId != null) {
     return {
       label: formatCartonReference(identity.cartonId),
-      description: Array.from(new Set([identity.codeBarres?.trim(), identity.libelleCarton?.trim()].filter(Boolean))).join(" · ") || null,
+      // Le libellé identifie le carton ; le code-barres appartient au dossier.
+      description: identity.libelleCarton?.trim() || identity.codeBarres?.trim() || null,
     };
   }
   return {

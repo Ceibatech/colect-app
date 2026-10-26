@@ -18,6 +18,8 @@ export interface TransferCartonItem {
   label: string | null;
   dossierCount: number;
   unlocatedDossierCount: number;
+  /** Anciens codes-barres des dossiers : recherchables, mais pas affichés comme identité du carton. */
+  codes?: string[];
 }
 
 export function buildTransferCartonToken(row: Pick<TransferCartonSourceRow, "cartonId" | "codeBarres" | "libelleCarton">) {
@@ -30,7 +32,7 @@ export function buildTransferCartonToken(row: Pick<TransferCartonSourceRow, "car
 }
 
 export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
-  const grouped = new Map<string, TransferCartonItem & { hasConflict: boolean; labels: Set<string> }>();
+  const grouped = new Map<string, TransferCartonItem & { hasConflict: boolean; labels: Set<string>; codeSet: Set<string> }>();
   let unidentifiedDossierCount = 0;
 
   for (const row of rows) {
@@ -51,11 +53,13 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
       unlocatedDossierCount: 0,
       hasConflict: false,
       labels: new Set<string>(),
+      codeSet: new Set<string>(),
     };
     current.dossierCount++;
     if (row.siteId === null) current.unlocatedDossierCount++;
     if (row.transferLotDossiers.length > 0) current.hasConflict = true;
     if (display.description) current.labels.add(display.description);
+    if (row.codeBarres?.trim()) current.codeSet.add(row.codeBarres.trim());
     grouped.set(token, current);
   }
 
@@ -67,6 +71,7 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
       label: [...item.labels].join(" · ") || null,
       dossierCount: item.dossierCount,
       unlocatedDossierCount: item.unlocatedDossierCount,
+      codes: [...item.codeSet],
     }))
     .sort((left, right) => left.code.localeCompare(right.code, "fr", { numeric: true, sensitivity: "base" }));
 
@@ -78,7 +83,7 @@ export function filterTransferCartons(items: TransferCartonItem[], query?: strin
   if (cartonId !== null) return items.filter((item) => item.code === formatCartonReference(cartonId));
   const normalizedQuery = normalizeSearch(query ?? "");
   if (!normalizedQuery) return items;
-  return items.filter((item) => normalizeSearch(`${item.code} ${item.label ?? ""}`).includes(normalizedQuery));
+  return items.filter((item) => normalizeSearch(`${item.code} ${item.label ?? ""} ${(item.codes ?? []).join(" ")}`).includes(normalizedQuery));
 }
 
 function normalizeSearch(value: string) {

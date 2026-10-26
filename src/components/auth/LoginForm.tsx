@@ -11,12 +11,13 @@ import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2, LockKeyhole, Mail } from
 
 const initialState: LoginFormState = {};
 
-export function LoginForm() {
+export function LoginForm({ from }: { from?: string }) {
   const [state, formAction, isPending] = useActionState(loginAction, initialState);
   const [showPassword, setShowPassword] = useState(false);
 
   return (
     <form action={formAction} className="space-y-6">
+      {from ? <input type="hidden" name="from" value={from} /> : null}
       {state?.error ? (
         <Alert variant="destructive" className="border-destructive/30 bg-destructive/10">
           <AlertCircle className="h-4 w-4" />

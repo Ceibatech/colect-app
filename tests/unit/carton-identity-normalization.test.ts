@@ -30,9 +30,10 @@ describe("normalisation de l'identification des cartons", () => {
     expect(normalizeCartonCode("   ")).toBeNull();
   });
 
-  it("donne priorité au code-barres puis au libellé", () => {
+  it("identifie le carton par son libellé, le code-barres seulement à défaut", () => {
     expect(normalizeCartonIdentity({ codeBarres: " ", libelleCarton: "Box A" })).toEqual({ kind: "label", value: "boxa" });
-    expect(normalizeCartonIdentity({ codeBarres: "C 1", libelleCarton: "Box A" })).toEqual({ kind: "code", value: "C1" });
+    expect(normalizeCartonIdentity({ codeBarres: "C 1", libelleCarton: "Box A" })).toEqual({ kind: "label", value: "boxa" });
+    expect(normalizeCartonIdentity({ codeBarres: "C 1", libelleCarton: " " })).toEqual({ kind: "code", value: "C1" });
     expect(normalizeCartonIdentity({ codeBarres: null, libelleCarton: " " })).toBeNull();
   });
 
