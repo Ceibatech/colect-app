@@ -121,45 +121,54 @@ export async function regroupCartons(db, { apply = false, maxDossiers = DEFAULT_
     await tx.$queryRawUnsafe("SELECT id FROM cartons FOR UPDATE");
     // Recalcul sous verrou : aucune saisie ne s'intercale entre le plan et l'écriture.
     const locked = await loadPlan(tx, { maxDossiers });
+    // Écritures groupées : quelques centaines de requêtes au lieu de plusieurs milliers.
     let moved = 0;
-    let deleted = 0;
+    const history = [];
+    const allFromIds = locked.merges.flatMap((merge) => merge.moves.map((move) => move.from));
+    const keys = locked.merges.map((merge) => ({ id: merge.target, key: legacyKey(merge.siteId, merge.key) }));
+    // Libère les clés d'admission avant de les réattribuer aux CTN conservés.
+    for (let i = 0; i < allFromIds.length; i += 1000) {
+      await tx.carton.updateMany({ where: { id: { in: allFromIds.slice(i, i + 1000) } }, data: { legacyKey: null } });
+    }
+    for (let i = 0; i < keys.length; i += 500) {
+      const chunk = keys.slice(i, i + 500);
+      await tx.carton.updateMany({ where: { legacyKey: { in: chunk.map((k) => k.key) } }, data: { legacyKey: null } });
+    }
     for (const merge of locked.merges) {
-      const fromIds = merge.moves.map((move) => move.from);
-      await tx.carton.updateMany({ where: { id: { in: fromIds } }, data: { legacyKey: null } });
-      for (const move of merge.moves) {
-        const count = await tx.dossier.updateMany({ where: { id: { in: move.dossierIds }, cartonId: move.from }, data: { cartonId: merge.target } });
+      const dossierIds = merge.moves.flatMap((move) => move.dossierIds);
+      if (dossierIds.length) {
+        const count = await tx.dossier.updateMany({ where: { id: { in: dossierIds }, cartonId: { in: merge.moves.map((move) => move.from) } }, data: { cartonId: merge.target } });
         moved += count.count;
-        await tx.dossierHistory.createMany({
-          data: move.dossierIds.map((dossierId) => ({
-            dossierId,
-            action: "CARTON_REGROUPEMENT",
-            commentaire: `Carton ${ctn(move.from)} regroupé dans ${ctn(merge.target)} (libellé « ${merge.label} »).`,
-            metadata: { from: move.from, to: merge.target, key: merge.key },
-          })),
+      }
+      for (const move of merge.moves) {
+        for (const dossierId of move.dossierIds) history.push({
+          dossierId,
+          action: "CARTON_REGROUPEMENT",
+          commentaire: `Carton ${ctn(move.from)} regroupé dans ${ctn(merge.target)} (libellé « ${merge.label} »).`,
+          metadata: { from: move.from, to: merge.target, key: merge.key },
         });
       }
       if (merge.relocate.length) {
         await tx.dossier.updateMany({ where: { id: { in: merge.relocate } }, data: { entrepotId: merge.entrepotId } });
-        await tx.dossierHistory.createMany({
-          data: merge.relocate.map((dossierId) => ({
-            dossierId,
-            action: "CARTON_REGROUPEMENT_SALLE",
-            commentaire: `Salle alignée sur celle du carton ${ctn(merge.target)} (libellé « ${merge.label} »).`,
-            metadata: { cartonId: merge.target, entrepotId: merge.entrepotId },
-          })),
+        for (const dossierId of merge.relocate) history.push({
+          dossierId,
+          action: "CARTON_REGROUPEMENT_SALLE",
+          commentaire: `Salle alignée sur celle du carton ${ctn(merge.target)} (libellé « ${merge.label} »).`,
+          metadata: { cartonId: merge.target, entrepotId: merge.entrepotId },
         });
       }
-      const key = legacyKey(merge.siteId, merge.key);
-      // La clé peut être portée par un autre carton du même libellé dans ce site.
-      await tx.carton.updateMany({ where: { legacyKey: key, id: { not: merge.target } }, data: { legacyKey: null } });
-      await tx.carton.update({ where: { id: merge.target }, data: { legacyKey: key } });
-      const removed = fromIds.length === 0 ? 0 : await tx.$executeRawUnsafe(
+    }
+    for (const { id, key } of keys) await tx.carton.update({ where: { id }, data: { legacyKey: key } });
+    for (let i = 0; i < history.length; i += 2000) await tx.dossierHistory.createMany({ data: history.slice(i, i + 2000) });
+    let deleted = 0;
+    for (let i = 0; i < allFromIds.length; i += 1000) {
+      const ids = allFromIds.slice(i, i + 1000).map(Number);
+      deleted += await tx.$executeRawUnsafe(
         `DELETE c FROM cartons c
          LEFT JOIN dossiers d ON d.carton_id = c.id
          LEFT JOIN transfer_lot_items t ON t.carton_id = c.id
-         WHERE c.id IN (${fromIds.map(Number).join(",")}) AND d.id IS NULL AND t.id IS NULL`,
+         WHERE c.id IN (${ids.join(",")}) AND d.id IS NULL AND t.id IS NULL`,
       );
-      deleted += removed;
     }
     await tx.auditLog.create({
       data: {
@@ -173,7 +182,7 @@ export async function regroupCartons(db, { apply = false, maxDossiers = DEFAULT_
       },
     });
     return { moved, deleted, plan: locked };
-  }, { maxWait: 10_000, timeout: 300_000 });
+  }, { maxWait: 10_000, timeout: 900_000 });
   return { applied: true, ...result };
 }
 
