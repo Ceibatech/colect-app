@@ -3,7 +3,8 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
-import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
+import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
+import { participantAllowedOnSide } from "@/lib/transfers/participants";
 import { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import {
   getTransferDossierStockSummary,
@@ -49,17 +50,22 @@ export async function getTransferCreateData() {
       _count: { _all: true },
     }),
     prisma.user.findMany({
-      where: { isActive: true, role: { code: { in: [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES] } } },
+      where: { isActive: true, role: { code: { in: [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE] } } },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, role: { select: { code: true } } },
+      select: { id: true, name: true, role: { select: { code: true } }, responsibleSites: { select: { site: { select: { nom: true, organisation: true } } } } },
     }),
   ]);
 
   const inventory = summarizeInventoryLocations(inventoryGroups);
-  const toOption = (user: (typeof participantUsers)[number]) => ({ id: user.id, name: user.name, roleCode: user.role.code, roleLabel: getRoleLabel(user.role.code as RoleCode) });
+  const toOption = (organisation: "CEIBA" | "MINISTERE") => (user: (typeof participantUsers)[number]) => {
+    const siteNames = user.role.code === SITE_RESPONSIBLE_ROLE_CODE
+      ? user.responsibleSites.filter((row) => row.site.organisation === organisation).map((row) => row.site.nom) : [];
+    const roleLabel = getRoleLabel(user.role.code as RoleCode);
+    return { id: user.id, name: user.name, roleCode: user.role.code, roleLabel: siteNames.length ? `${roleLabel} · ${siteNames.join(", ")}` : roleLabel };
+  };
   const participants = {
-    ceiba: participantUsers.filter((user) => (CEIBA_TRANSFER_ROLE_CODES as readonly string[]).includes(user.role.code)).map(toOption),
-    sda: participantUsers.filter((user) => (SDA_TRANSFER_ROLE_CODES as readonly string[]).includes(user.role.code)).map(toOption),
+    ceiba: participantUsers.filter((user) => participantAllowedOnSide(user, "CEIBA")).map(toOption("CEIBA")),
+    sda: participantUsers.filter((user) => participantAllowedOnSide(user, "SDA")).map(toOption("MINISTERE")),
   };
   return { sites, totalDossiers, inventory, participants };
 }

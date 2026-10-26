@@ -17,8 +17,10 @@ import {
 import { getClientIp } from "@/lib/utils/server-request";
 import { buildTransferCartonToken, MAX_TRANSFER_CARTONS } from "@/lib/transfers/carton-selection";
 import { resolveTransferDirection } from "@/lib/transfers/direction";
+import { canSignMovementAtSite, movementEnds } from "@/lib/transfers/site-scope";
+import { participantAllowedOnSide, type ParticipantUser } from "@/lib/transfers/participants";
 import { resolveMultiChoice, resolveSingleChoice, SECURITY_MEASURES, TRANSFER_RISKS, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
-import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, type RoleCode } from "@/lib/permissions/constants";
+import { getRoleLabel, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
 import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 
 export interface TransferActionState {
@@ -101,6 +103,8 @@ async function getTransferMovementNotificationSummary(id: number) {
       reference: true,
       type: true,
       incidentReported: true,
+      fromSiteId: true,
+      toSiteId: true,
       transferLot: {
         select: {
           id: true,
@@ -184,30 +188,51 @@ function movementNotificationDetails(movement: NonNullable<Awaited<ReturnType<ty
   ];
 }
 
-type ParticipantUser = { id: number; name: string; role: { code: string } };
+/**
+ * Sites d'un responsable de site ; null pour les profils sans restriction de
+ * site (gestionnaire des transferts, administrateur).
+ */
+async function getResponsibleSiteIds(session: { userId: number; roleCode: string }): Promise<number[] | null> {
+  if (session.roleCode !== SITE_RESPONSIBLE_ROLE_CODE) return null;
+  const rows = await prisma.userSite.findMany({ where: { userId: session.userId }, select: { siteId: true } });
+  return rows.map((row) => row.siteId);
+}
+
+/** Responsables actifs rattachés aux sites donnés (destinataires des avis). */
+async function getSiteResponsibleUserIds(siteIds: number[]): Promise<number[]> {
+  const rows = await prisma.userSite.findMany({
+    where: { siteId: { in: [...new Set(siteIds)] }, user: { isActive: true, role: { code: SITE_RESPONSIBLE_ROLE_CODE } } },
+    select: { userId: true },
+  });
+  return [...new Set(rows.map((row) => row.userId))];
+}
 
 /**
  * Les intervenants sont des comptes actifs du profil de transfert de leur côté :
- * CEIBA (gestionnaire, validateur interne, convoyeur) et SDA (gestionnaire SDA,
- * responsable validation SDA). La mention imprimée est figée au nom et au profil.
+ * CEIBA (gestionnaire, validateur interne, convoyeur) et SDA (responsable
+ * validation SDA), plus les responsables de site du côté de leurs sites. La mention imprimée est figée au nom et au profil.
  */
 function resolveParticipants(users: ParticipantUser[], ceibaIds: number[], sdaIds: number[]) {
   const byId = new Map(users.map((user) => [user.id, user]));
   const sides = [
-    { side: "CEIBA" as const, ids: [...new Set(ceibaIds)], allowed: CEIBA_TRANSFER_ROLE_CODES as readonly string[], label: "CEIBA" },
-    { side: "SDA" as const, ids: [...new Set(sdaIds)], allowed: SDA_TRANSFER_ROLE_CODES as readonly string[], label: "SDA" },
+    { side: "CEIBA" as const, ids: [...new Set(ceibaIds)], label: "CEIBA" },
+    { side: "SDA" as const, ids: [...new Set(sdaIds)], label: "SDA" },
   ];
   const rows: Array<{ userId: number; side: "CEIBA" | "SDA"; roleCode: string }> = [];
   const texts: Record<"CEIBA" | "SDA", string[]> = { CEIBA: [], SDA: [] };
-  for (const { side, ids, allowed, label } of sides) {
+  for (const { side, ids, label } of sides) {
     for (const id of ids) {
       const user = byId.get(id);
-      if (!user || !allowed.includes(user.role.code)) {
+      if (!user || !participantAllowedOnSide(user, side)) {
         return { error: `Un intervenant ${label} n'est plus actif ou n'a pas de profil de transfert ${label}. Actualisez la liste.` };
       }
       if (rows.some((row) => row.userId === id)) return { error: "Un même compte ne peut pas intervenir des deux côtés." };
       rows.push({ userId: id, side, roleCode: user.role.code });
-      texts[side].push(`${user.name} — ${getRoleLabel(user.role.code as RoleCode)}`);
+      const organisation = side === "CEIBA" ? "CEIBA" : "MINISTERE";
+      const siteNames = user.role.code === SITE_RESPONSIBLE_ROLE_CODE
+        ? (user.responsibleSites ?? []).filter((row) => row.site.organisation === organisation).map((row) => row.site.nom)
+        : [];
+      texts[side].push(`${user.name} — ${getRoleLabel(user.role.code as RoleCode)}${siteNames.length ? ` (${siteNames.join(", ")})` : ""}`);
     }
   }
   return { rows, ceibaText: texts.CEIBA.join("; "), sdaText: texts.SDA.join("; ") };
@@ -281,7 +306,7 @@ export async function createTransferLot(
       : Promise.resolve(null),
     prisma.user.findMany({
       where: { id: { in: [...parsed.data.ceibaParticipantIds, ...parsed.data.sdaParticipantIds] }, isActive: true },
-      select: { id: true, name: true, role: { select: { code: true } } },
+      select: { id: true, name: true, role: { select: { code: true } }, responsibleSites: { select: { site: { select: { nom: true, organisation: true } } } } },
     }),
   ]);
   if (!sourceSite || !destinationSite) return { error: "Le site de départ et le site de destination doivent être actifs." };
@@ -701,6 +726,7 @@ export async function recordTransferMovement(
 
   const itemIds = [...new Set(parsed.data.itemIds)];
   if (itemIds.length !== parsed.data.itemIds.length) return { error: "Un groupe de dossiers a été sélectionné plusieurs fois." };
+  const responsibleSiteIds = await getResponsibleSiteIds(session);
   const occurredAt = new Date(parsed.data.occurredAt);
   if (occurredAt.getTime() > Date.now() + 5 * 60 * 1000) return { error: "La date du mouvement ne peut pas être dans le futur." };
 
@@ -746,8 +772,13 @@ export async function recordTransferMovement(
         throw new TransferRuleError(`Le bordereau ${pendingMovement.movement.reference} attend déjà une validation pour cette sélection.`);
       }
 
-      const fromSiteId = type === "RETOUR" ? lot.destinationSiteId : lot.sourceSiteId;
-      const toSiteId = type === "RETOUR" ? lot.sourceSiteId : lot.destinationSiteId;
+      const { fromSiteId, toSiteId } = movementEnds(type, lot);
+      if (!canSignMovementAtSite(type, lot, responsibleSiteIds)) {
+        const site = await tx.site.findUnique({ where: { id: type === "RECEPTION" ? toSiteId : fromSiteId }, select: { nom: true } });
+        throw new TransferRuleError(type === "RECEPTION"
+          ? `L'état des lieux d'arrivée revient au responsable du site ${site?.nom ?? "d'arrivée"}.`
+          : `La remise des cartons revient au responsable du site ${site?.nom ?? "de départ"}.`);
+      }
       const dossierIds = [...new Set(selected.flatMap((item) => item.dossiers.map((link) => link.dossierId)))];
       const temporaryReference = `TMP-${randomUUID()}`;
       const movement = await tx.transferMovement.create({
@@ -847,7 +878,8 @@ export async function recordTransferMovement(
         entityType: "TRANSFER_MOVEMENT",
         entityId: movement.id,
         recipientRoleCodes: [...recipientRoleCodes],
-        recipientUserIds: incident ? [movement.transferLot.createdById] : [],
+        // Les responsables des sites de départ et d'arrivée suivent chaque bordereau.
+        recipientUserIds: [...(incident ? [movement.transferLot.createdById] : []), ...await getSiteResponsibleUserIds([movement.fromSiteId, movement.toSiteId])],
         title: incident
           ? `Incident déclaré sur ${movement.reference}`
           : movement.type === "RECEPTION"
@@ -1113,7 +1145,7 @@ export async function approveTransferMovementByMinistry(
         entityType: "TRANSFER_MOVEMENT",
         entityId: movement.id,
         recipientRoleCodes: ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC"],
-        recipientUserIds: [movement.transferLot.createdById],
+        recipientUserIds: [movement.transferLot.createdById, ...await getSiteResponsibleUserIds([movement.fromSiteId, movement.toSiteId])],
         title: `Bordereau ${movement.reference} signé`,
         message: "Le visa final du ministère est enregistré. Le bordereau signé est disponible et le stock documentaire a été mis à jour.",
         reference: movement.reference,
