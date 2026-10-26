@@ -7,8 +7,9 @@ import { getClientIp } from "@/lib/utils/server-request";
 import { hashPassword } from "@/lib/auth/password";
 import { createUserSchema, updateUserSchema } from "@/lib/validation/user-admin";
 import { issuePasswordAccessEmail } from "@/lib/services/password-reset-service";
+import { Prisma } from "@prisma/client";
 import { SITE_RESPONSIBLE_ROLE_CODE } from "@/lib/permissions/constants";
-import { isDeletionConfirmed, userDeletionBlockers } from "@/lib/utils/user-deletion";
+import { isDeletionConfirmed, userDeletionBlockers, type UserDeletionBlockerKey } from "@/lib/utils/user-deletion";
 
 /**
  * CRUD administration des utilisateurs (Phase 15+, §11) — un utilisateur est
@@ -374,6 +375,63 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
   return { success: true };
 }
 
+class UserDeletionRefused extends Error {}
+
+/**
+ * Compte toutes les traces métier d'un compte. Chaque relation vers `users` en
+ * SET NULL doit figurer ici : sinon la suppression effacerait l'auteur sans
+ * prévenir (les relations RESTRICT feraient seulement échouer la suppression).
+ */
+async function countUserTraces(db: Prisma.TransactionClient, id: number): Promise<Record<UserDeletionBlockerKey, number>> {
+  const [
+    dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, indexingJobsRequested, indexingRunsTriggered,
+    imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines,
+    financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
+    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints,
+    transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,
+    operateurDossiers, operateurNumerisations, operateurIndexations, operateurArchivages,
+  ] = await Promise.all([
+    db.dossierHistory.count({ where: { userId: id } }),
+    db.workflowTransition.count({ where: { userId: id } }),
+    db.document.count({ where: { uploadedBy: id } }),
+    db.document.count({ where: { preIndexedBy: id } }),
+    db.documentIndexingJob.count({ where: { requestedBy: id } }),
+    db.documentIndexingRun.count({ where: { triggeredBy: id } }),
+    db.import.count({ where: { userId: id } }),
+    db.export.count({ where: { userId: id } }),
+    db.qualityCheck.count({ where: { userId: id } }),
+    db.anomalie.count({ where: { corrigePar: id } }),
+    db.dossier.count({ where: { preparateurId: id } }),
+    db.dossier.count({ where: { conditionneurId: id } }),
+    db.preparationPieceLine.count({ where: { preparedById: id } }),
+    db.financeRate.count({ where: { createdById: id } }),
+    db.transferLot.count({ where: { createdById: id } }),
+    db.transferLot.count({ where: { authorizedById: id } }),
+    db.transferLot.count({ where: { ceibacValidatedById: id } }),
+    db.transferMovement.count({ where: { createdById: id } }),
+    db.transferMovement.count({ where: { ceibacValidatedById: id } }),
+    db.transferMovement.count({ where: { ministryValidatedById: id } }),
+    db.transferSignature.count({ where: { capturedById: id } }),
+    db.transferTrackingPoint.count({ where: { capturedById: id } }),
+    db.transferLotParticipant.count({ where: { userId: id } }),
+    db.emailReportSubscription.count({ where: { createdById: id } }),
+    db.emailReportDelivery.count({ where: { triggeredById: id } }),
+    db.operateur.count({ where: { supervisorId: id } }),
+    db.dossier.count({ where: { operateur: { userId: id } } }),
+    db.numerisation.count({ where: { operateur: { userId: id } } }),
+    db.indexation.count({ where: { operateur: { userId: id } } }),
+    db.archivage.count({ where: { operateur: { userId: id } } }),
+  ]);
+  return {
+    dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, indexingJobsRequested, indexingRunsTriggered,
+    imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines,
+    financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
+    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints,
+    transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,
+    operateurDossiers: operateurDossiers + operateurNumerisations + operateurIndexations + operateurArchivages,
+  };
+}
+
 /**
  * Suppression définitive d'un compte, réservée à USER_MANAGE. Refusée pour
  * son propre compte, pour le dernier administrateur et pour tout compte ayant
@@ -396,65 +454,27 @@ export async function deleteUser(id: number, _prevState: ActionResult, formData:
     return { error: "L'e-mail saisi ne correspond pas au compte à supprimer." };
   }
 
-  if (user.role.code === "ADMIN") {
-    const otherAdmins = await prisma.user.count({ where: { id: { not: id }, isActive: true, role: { code: "ADMIN" } } });
-    if (otherAdmins === 0) return { error: "Impossible de supprimer le dernier administrateur actif." };
-  }
-
-  const [
-    dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, imports, exports, qualityChecks,
-    anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines, financeRatesCreated,
-    transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
-    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured,
-    transferTrackingPoints, transferLotParticipations, emailReportSubscriptionsCreated, supervisedOperateurs,
-    operateurDossiers, operateurNumerisations, operateurIndexations, operateurArchivages,
-  ] = await Promise.all([
-    prisma.dossierHistory.count({ where: { userId: id } }),
-    prisma.workflowTransition.count({ where: { userId: id } }),
-    prisma.document.count({ where: { uploadedBy: id } }),
-    prisma.document.count({ where: { preIndexedBy: id } }),
-    prisma.import.count({ where: { userId: id } }),
-    prisma.export.count({ where: { userId: id } }),
-    prisma.qualityCheck.count({ where: { userId: id } }),
-    prisma.anomalie.count({ where: { corrigePar: id } }),
-    prisma.dossier.count({ where: { preparateurId: id } }),
-    prisma.dossier.count({ where: { conditionneurId: id } }),
-    prisma.preparationPieceLine.count({ where: { preparedById: id } }),
-    prisma.financeRate.count({ where: { createdById: id } }),
-    prisma.transferLot.count({ where: { createdById: id } }),
-    prisma.transferLot.count({ where: { authorizedById: id } }),
-    prisma.transferLot.count({ where: { ceibacValidatedById: id } }),
-    prisma.transferMovement.count({ where: { createdById: id } }),
-    prisma.transferMovement.count({ where: { ceibacValidatedById: id } }),
-    prisma.transferMovement.count({ where: { ministryValidatedById: id } }),
-    prisma.transferSignature.count({ where: { capturedById: id } }),
-    prisma.transferTrackingPoint.count({ where: { capturedById: id } }),
-    prisma.transferLotParticipant.count({ where: { userId: id } }),
-    prisma.emailReportSubscription.count({ where: { createdById: id } }),
-    prisma.operateur.count({ where: { supervisorId: id } }),
-    prisma.dossier.count({ where: { operateur: { userId: id } } }),
-    prisma.numerisation.count({ where: { operateur: { userId: id } } }),
-    prisma.indexation.count({ where: { operateur: { userId: id } } }),
-    prisma.archivage.count({ where: { operateur: { userId: id } } }),
-  ]);
-
-  const blockers = userDeletionBlockers({
-    dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, imports, exports, qualityChecks,
-    anomaliesCorrected, dossiersPrepared, dossiersConditioned, preparationPieceLines, financeRatesCreated,
-    transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
-    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured,
-    transferTrackingPoints, transferLotParticipations, emailReportSubscriptionsCreated, supervisedOperateurs,
-    operateurDossiers: operateurDossiers + operateurNumerisations + operateurIndexations + operateurArchivages,
-  });
-  if (blockers.length > 0) {
-    return {
-      error: `Suppression impossible : ce compte a laissé une trace dans l'application (${blockers.join(", ")}). Désactivez-le plutôt pour conserver l'historique.`,
-    };
-  }
-
   const ip = await getClientIp();
   try {
     await prisma.$transaction(async (tx) => {
+      // Verrou du compte : toute écriture qui le référence (clé étrangère) attend
+      // la fin de cette transaction. Les traces sont donc comptées sans course.
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM users WHERE id = ${id} FOR UPDATE`);
+      if (user.role.code === "ADMIN") {
+        // Deux administrateurs qui se suppriment l'un l'autre en même temps ne
+        // doivent pas laisser l'application sans administrateur actif.
+        const admins = await tx.$queryRaw<Array<{ id: number }>>(Prisma.sql`
+          SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id
+          WHERE r.code = 'ADMIN' AND u.is_active = TRUE AND u.id <> ${id}
+          ORDER BY u.id FOR UPDATE`);
+        if (admins.length === 0) throw new UserDeletionRefused("Impossible de supprimer le dernier administrateur actif.");
+      }
+
+      const blockers = userDeletionBlockers(await countUserTraces(tx, id));
+      if (blockers.length > 0) {
+        throw new UserDeletionRefused(`Suppression impossible : ce compte a laissé une trace dans l'application (${blockers.join(", ")}). Désactivez-le plutôt pour conserver l'historique.`);
+      }
+
       await tx.auditLog.create({
         data: {
           userId: session.userId,
@@ -471,8 +491,9 @@ export async function deleteUser(id: number, _prevState: ActionResult, formData:
       if (user.operateur) await tx.operateur.delete({ where: { id: user.operateur.id } });
       // PasswordResetToken, PmoSupervisorScope et EmailReportSubscription sont en cascade.
       await tx.user.delete({ where: { id } });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 30_000 });
   } catch (error) {
+    if (error instanceof UserDeletionRefused) return { error: error.message };
     console.error("User deletion failed.", error);
     return { error: "Suppression impossible : des données restent liées à ce compte. Désactivez-le plutôt." };
   }
