@@ -53,15 +53,110 @@ export function legacyKey(siteId, key) {
 const ctn = (id) => `CTN-${String(id).padStart(8, "0")}`;
 const tidy = (text) => (text ?? "").replace(/\s+/g, " ").trim();
 
+
+// --- Regroupement intelligent -------------------------------------------
+// Au-delà de la clé exacte, deux libellés désignent le même carton quand :
+//   1. ils ne diffèrent que par des unités (m2, m², ha), des mots de liaison
+//      (de, du, la, les, et, lot, lots, n°…) ou la ponctuation ;
+//   2. ou par une faute de frappe légère (≤ 2 lettres, ≈ 12 % du texte),
+//      à condition que tous les repères soient identiques : nombres, chiffres
+//      romains et lettres isolées (« 32 » ≠ « 33 », « remblai I » ≠ « II »,
+//      « zone 4/C » ≠ « zone 4/B »).
+const STOPWORDS = new Set(["de", "du", "des", "la", "le", "les", "l", "d", "et", "lot", "lots", "n", "no", "num", "numero"]);
+const ROMAN = /^(i|ii|iii|iv|v|vi|vii|viii|ix|x|xi|xii)$/;
+
+export function smartLabel(value) {
+  const text = (value ?? "")
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .toLowerCase()
+    .replace(/(\d)\s*(?:m2|m 2|ha)(?![\p{L}\p{N}])/gu, "$1")
+    .replace(/(\d+)(?:\s*(?:eme|ere)|er|e)(?![\p{L}\p{N}])/gu, "$1");
+  const tokens = (text.match(/\p{L}+|\p{N}+/gu) ?? []).filter((token) => !STOPWORDS.has(token));
+  if (!tokens.length) return null;
+  const markers = tokens
+    .filter((token) => /^\p{N}+$/u.test(token) || token.length === 1 || ROMAN.test(token))
+    .map((token) => (/^\p{N}+$/u.test(token) ? String(Number(token)) : token));
+  const words = tokens.filter((token) => !(/^\p{N}+$/u.test(token) || token.length === 1 || ROMAN.test(token))).join("");
+  return { key: tokens.map((token) => (/^\p{N}+$/u.test(token) ? String(Number(token)) : token)).join(" "), markers: markers.join("-"), words };
+}
+
+function closeEnough(a, b) {
+  if (a.length < 6 || b.length < 6) return false;
+  const max = Math.min(2, Math.floor(Math.max(a.length, b.length) * 0.12));
+  if (max < 1 || Math.abs(a.length - b.length) > max) return false;
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      rowMin = Math.min(rowMin, current[j]);
+    }
+    if (rowMin > max) return false;
+    previous = current;
+  }
+  return previous[b.length] <= max;
+}
+
+/**
+ * Associe à chaque (site, libellé) la clé de son groupe : même clé
+ * intelligente, puis rapprochement des fautes de frappe autour du libellé le
+ * plus fréquent (sans chaînage), tant que le groupe reste sous le seuil.
+ */
+export function clusterLabels(entries, maxDossiers) {
+  const bySmart = new Map();
+  for (const { siteId, label, count } of entries) {
+    const smart = smartLabel(label);
+    if (!smart) continue;
+    const id = `${siteId ?? "-"}|${smart.key}`;
+    const row = bySmart.get(id) ?? { id, siteId, smart, count: 0, labels: [] };
+    row.count += count;
+    row.labels.push(label);
+    bySmart.set(id, row);
+  }
+  const rows = [...bySmart.values()].sort((a, b) => b.count - a.count);
+  const clusters = [];
+  const clusterOf = new Map();
+  for (const row of rows) {
+    const home = row.count > maxDossiers ? null : clusters.find((cluster) =>
+      cluster.siteId === row.siteId
+      && cluster.head.smart.markers === row.smart.markers
+      && cluster.count + row.count <= maxDossiers
+      && closeEnough(cluster.head.smart.words, row.smart.words));
+    if (home) {
+      home.count += row.count;
+      home.members.push(row);
+      clusterOf.set(row.id, home.head.id);
+    } else {
+      const cluster = { siteId: row.siteId, head: row, count: row.count, members: [row] };
+      clusters.push(cluster);
+      clusterOf.set(row.id, row.id);
+    }
+  }
+  const keyOf = new Map();
+  for (const row of rows) for (const label of row.labels) keyOf.set(`${row.siteId ?? "-"}|${label}`, clusterOf.get(row.id));
+  return { keyOf, fuzzy: clusters.filter((cluster) => cluster.members.length > 1).length };
+}
+
 /** Plan de regroupement, calculé en mémoire à partir des dossiers. */
 export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, engagedCartonIds = new Set() } = {}) {
+  const counts = new Map();
+  for (const d of dossiers) {
+    if (d.cartonId == null || !labelKey(d.libelleCarton)) continue;
+    const id = `${d.siteId ?? "-"}|${tidy(d.libelleCarton)}`;
+    const entry = counts.get(id) ?? { siteId: d.siteId, label: tidy(d.libelleCarton), count: 0 };
+    entry.count++;
+    counts.set(id, entry);
+  }
+  const { keyOf, fuzzy } = clusterLabels([...counts.values()], maxDossiers);
   const groups = new Map();
   let withoutLabel = 0;
   for (const d of dossiers) {
     if (d.cartonId == null) continue;
-    const key = labelKey(d.libelleCarton);
+    const key = keyOf.get(`${d.siteId ?? "-"}|${tidy(d.libelleCarton)}`);
     if (!key) { withoutLabel++; continue; }
-    const id = `${d.siteId ?? "-"}|${key}`;
+    const id = key;
     const group = groups.get(id) ?? { siteId: d.siteId, key, labels: new Map(), cartons: new Map(), salles: new Map(), dossierSalles: new Map(), dossiers: 0 };
     group.dossiers++;
     group.salles.set(d.entrepotId ?? null, (group.salles.get(d.entrepotId ?? null) ?? 0) + 1);
@@ -93,7 +188,7 @@ export function planRegroup(dossiers, { maxDossiers = DEFAULT_MAX_DOSSIERS, enga
   const cartonsBefore = new Set(dossiers.filter((d) => d.cartonId != null).map((d) => d.cartonId)).size;
   const removed = merges.reduce((sum, m) => sum + m.moves.length, 0);
   return {
-    merges, generic, blocked, withoutLabel,
+    merges, generic, blocked, withoutLabel, fuzzy,
     cartonsBefore,
     cartonsAfter: cartonsBefore - removed,
     dossiersMoved: merges.reduce((sum, m) => sum + m.moves.reduce((s, move) => s + move.dossierIds.length, 0), 0),
@@ -125,7 +220,7 @@ export async function regroupCartons(db, { apply = false, maxDossiers = DEFAULT_
     let moved = 0;
     const history = [];
     const allFromIds = locked.merges.flatMap((merge) => merge.moves.map((move) => move.from));
-    const keys = locked.merges.map((merge) => ({ id: merge.target, key: legacyKey(merge.siteId, merge.key) }));
+    const keys = locked.merges.map((merge) => ({ id: merge.target, key: legacyKey(merge.siteId, labelKey(merge.label)) }));
     // Libère les clés d'admission avant de les réattribuer aux CTN conservés.
     for (let i = 0; i < allFromIds.length; i += 1000) {
       await tx.carton.updateMany({ where: { id: { in: allFromIds.slice(i, i + 1000) } }, data: { legacyKey: null } });
@@ -204,6 +299,7 @@ async function printReport(db, plan, csvPath, log = console.log) {
   const entrepotNames = new Map(entrepots.map((e) => [e.id, e.nom]));
   log(`  Cartons (CTN) : ${plan.cartonsBefore} → ${plan.cartonsAfter} après regroupement`);
   log(`  Libellés regroupés : ${plan.merges.length} — dossiers rattachés à un autre CTN : ${plan.dossiersMoved} — dossiers dont la salle est alignée : ${plan.dossiersRelocated}`);
+  log(`  Rapprochements intelligents (unités, mots de liaison, fautes de frappe) : ${plan.fuzzy}`);
   log(`  Libellés génériques laissés tels quels (plus de dossiers que le seuil) : ${plan.generic.length}`);
   log(`  Groupes bloqués par un transfert ouvert : ${plan.blocked.length}`);
   log(`  Dossiers sans libellé de carton : ${plan.withoutLabel}`);
