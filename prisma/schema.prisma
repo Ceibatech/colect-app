@@ -87,39 +87,40 @@ model User {
   operateur                          Operateur?
   // Phase 16+ (§ affectation superviseur) : opérateurs dont ce user
   // (rôle SUPERVISEUR) a la charge — voir Operateur.supervisorId ci-dessous.
-  supervisedOperateurs               Operateur[]               @relation("OperateurSupervisor")
+  supervisedOperateurs               Operateur[]                @relation("OperateurSupervisor")
   dossierHistory                     DossierHistory[]
   workflowTransitions                WorkflowTransition[]
-  documentsUploaded                  Document[]                @relation("DocumentUploadedBy")
-  documentsPreIndexed                Document[]                @relation("DocumentPreIndexedBy")
-  documentIndexingRuns               DocumentIndexingRun[]     @relation("DocumentIndexingRunBy")
-  documentIndexingJobs               DocumentIndexingJob[]     @relation("DocumentIndexingJobRequestedBy")
+  documentsUploaded                  Document[]                 @relation("DocumentUploadedBy")
+  documentsPreIndexed                Document[]                 @relation("DocumentPreIndexedBy")
+  documentIndexingRuns               DocumentIndexingRun[]      @relation("DocumentIndexingRunBy")
+  documentIndexingJobs               DocumentIndexingJob[]      @relation("DocumentIndexingJobRequestedBy")
   qualityChecks                      QualityCheck[]
-  anomaliesCorrected                 Anomalie[]                @relation("AnomalieCorrigePar")
+  anomaliesCorrected                 Anomalie[]                 @relation("AnomalieCorrigePar")
   imports                            Import[]
   exports                            Export[]
   auditLogs                          AuditLog[]
   notifications                      Notification[]
   passwordResetTokens                PasswordResetToken[]
-  pmoSupervisorScopes                PmoSupervisorScope[]      @relation("PmoScopeOwner")
-  pmoScopeMemberships                PmoSupervisorScope[]      @relation("PmoScopeSupervisor")
-  financeRatesCreated                FinanceRate[]             @relation("FinanceRateCreatedBy")
-  transferLotsCreated                TransferLot[]             @relation("TransferLotCreatedBy")
-  transferLotsAuthorized             TransferLot[]             @relation("TransferLotAuthorizedBy")
-  transferLotsCeibacValidated        TransferLot[]             @relation("TransferLotCeibacValidatedBy")
-  transferMovementsCreated           TransferMovement[]        @relation("TransferMovementCreatedBy")
-  transferMovementsCeibacValidated   TransferMovement[]        @relation("TransferMovementCeibacValidatedBy")
-  transferMovementsMinistryValidated TransferMovement[]        @relation("TransferMovementMinistryValidatedBy")
-  transferSignaturesCaptured         TransferSignature[]       @relation("TransferSignatureCapturedBy")
-  transferTrackingPoints             TransferTrackingPoint[]   @relation("TransferTrackingCapturedBy")
-  dossiersPrepared                   Dossier[]                 @relation("DossierPreparateur")
-  dossiersConditioned                Dossier[]                 @relation("DossierConditionneur")
-  preparationPieceLines              PreparationPieceLine[]    @relation("PreparationPieceLinePreparedBy")
-  emailReportSubscription            EmailReportSubscription?  @relation("EmailReportRecipient")
-  emailReportSubscriptionsCreated    EmailReportSubscription[] @relation("EmailReportCreatedBy")
-  emailReportDeliveries              EmailReportDelivery[]     @relation("EmailReportDeliveryRecipient")
-  emailReportDeliveriesTriggered     EmailReportDelivery[]     @relation("EmailReportDeliveryTriggeredBy")
-  transferEmailDeliveries            TransferEmailDelivery[]   @relation("TransferEmailDeliveryRecipient")
+  pmoSupervisorScopes                PmoSupervisorScope[]       @relation("PmoScopeOwner")
+  pmoScopeMemberships                PmoSupervisorScope[]       @relation("PmoScopeSupervisor")
+  financeRatesCreated                FinanceRate[]              @relation("FinanceRateCreatedBy")
+  transferLotsCreated                TransferLot[]              @relation("TransferLotCreatedBy")
+  transferLotsAuthorized             TransferLot[]              @relation("TransferLotAuthorizedBy")
+  transferLotsCeibacValidated        TransferLot[]              @relation("TransferLotCeibacValidatedBy")
+  transferMovementsCreated           TransferMovement[]         @relation("TransferMovementCreatedBy")
+  transferMovementsCeibacValidated   TransferMovement[]         @relation("TransferMovementCeibacValidatedBy")
+  transferMovementsMinistryValidated TransferMovement[]         @relation("TransferMovementMinistryValidatedBy")
+  transferSignaturesCaptured         TransferSignature[]        @relation("TransferSignatureCapturedBy")
+  transferTrackingPoints             TransferTrackingPoint[]    @relation("TransferTrackingCapturedBy")
+  dossiersPrepared                   Dossier[]                  @relation("DossierPreparateur")
+  dossiersConditioned                Dossier[]                  @relation("DossierConditionneur")
+  reconditionnementSessions          ReconditionnementSession[]
+  preparationPieceLines              PreparationPieceLine[]     @relation("PreparationPieceLinePreparedBy")
+  emailReportSubscription            EmailReportSubscription?   @relation("EmailReportRecipient")
+  emailReportSubscriptionsCreated    EmailReportSubscription[]  @relation("EmailReportCreatedBy")
+  emailReportDeliveries              EmailReportDelivery[]      @relation("EmailReportDeliveryRecipient")
+  emailReportDeliveriesTriggered     EmailReportDelivery[]      @relation("EmailReportDeliveryTriggeredBy")
+  transferEmailDeliveries            TransferEmailDelivery[]    @relation("TransferEmailDeliveryRecipient")
   transferLotParticipations          TransferLotParticipant[]
   // Sites dont le compte est responsable (profil RESPONSABLE_SITE).
   responsibleSites                   UserSite[]
@@ -904,6 +905,12 @@ enum StatutNumerisation {
   REJETE
 }
 
+// Réponse de l'agent à la fin du reconditionnement d'un dossier.
+enum EtatRemiseDossier {
+  ETAT_INITIAL
+  AVEC_RESERVE
+}
+
 enum StatutConditionnement {
   EN_ATTENTE
   EN_COURS
@@ -1049,17 +1056,18 @@ model Dossier {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  operateur             Operateur              @relation(fields: [operateurId], references: [id])
-  carton                Carton?                @relation(fields: [cartonId], references: [id], onDelete: Restrict)
-  preparateur           User?                  @relation("DossierPreparateur", fields: [preparateurId], references: [id], onDelete: SetNull)
-  conditionneur         User?                  @relation("DossierConditionneur", fields: [conditionneurId], references: [id], onDelete: SetNull)
-  site                  Site?                  @relation(fields: [siteId], references: [id])
-  entrepot              Entrepot?              @relation(fields: [entrepotId], references: [id])
-  commune               Commune?               @relation(fields: [communeId], references: [id])
-  lotissement           Lotissement?           @relation(fields: [lotissementId], references: [id])
-  natureDossier         NatureDossier?         @relation(fields: [natureDossierId], references: [id])
-  typesPieces           TypePiece[]            @relation("DossierTypesPieces")
-  preparationPieceLines PreparationPieceLine[]
+  operateur                 Operateur                  @relation(fields: [operateurId], references: [id])
+  carton                    Carton?                    @relation(fields: [cartonId], references: [id], onDelete: Restrict)
+  preparateur               User?                      @relation("DossierPreparateur", fields: [preparateurId], references: [id], onDelete: SetNull)
+  conditionneur             User?                      @relation("DossierConditionneur", fields: [conditionneurId], references: [id], onDelete: SetNull)
+  reconditionnementSessions ReconditionnementSession[]
+  site                      Site?                      @relation(fields: [siteId], references: [id])
+  entrepot                  Entrepot?                  @relation(fields: [entrepotId], references: [id])
+  commune                   Commune?                   @relation(fields: [communeId], references: [id])
+  lotissement               Lotissement?               @relation(fields: [lotissementId], references: [id])
+  natureDossier             NatureDossier?             @relation(fields: [natureDossierId], references: [id])
+  typesPieces               TypePiece[]                @relation("DossierTypesPieces")
+  preparationPieceLines     PreparationPieceLine[]
 
   documents           Document[]
   numerisations       Numerisation[]
@@ -1705,4 +1713,29 @@ model TransferEmailDelivery {
   @@index([eventType, entityType, entityId])
   @@index([status, nextAttemptAt])
   @@map("transfer_email_deliveries")
+}
+
+// Temps passé par un agent sur un dossier lors du reconditionnement. Plusieurs
+// agents peuvent travailler sur le même carton : chacun prend un dossier à la
+// fois, le chrono démarre à « Commencer » et s'arrête quand il répond à la
+// question de fin. Un dossier libéré ou repris garde sa session, fermée.
+model ReconditionnementSession {
+  id              Int                @id @default(autoincrement())
+  dossierId       Int                @map("dossier_id")
+  userId          Int                @map("user_id")
+  startedAt       DateTime           @default(now()) @map("started_at")
+  finishedAt      DateTime?          @map("finished_at")
+  durationSeconds Int?               @map("duration_seconds")
+  // null tant que la session est ouverte ; renseigné à la fin.
+  etatRemise      EtatRemiseDossier? @map("etat_remise")
+  abandoned       Boolean            @default(false)
+  observations    String?            @db.Text
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  dossier Dossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([dossierId])
+  @@index([userId, finishedAt])
+  @@map("reconditionnement_sessions")
 }
