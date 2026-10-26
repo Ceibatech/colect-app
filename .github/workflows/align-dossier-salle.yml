@@ -1,0 +1,92 @@
+name: Ranger les dossiers dans une salle (Contabo)
+
+# Lancement manuel uniquement. Correction de saisie : tous les dossiers du site
+# de la salle désignée y sont rangés (voir deploy/align-dossier-salle.mjs).
+# « simulation » liste les salles et le nombre de dossiers à ranger.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "simulation (aucune écriture) ou appliquer"
+        required: true
+        default: simulation
+        type: choice
+        options: [simulation, appliquer]
+      confirmation:
+        description: "Pour appliquer, saisir exactement ALIGNER-SALLE"
+        required: false
+        default: ""
+        type: string
+      salle:
+        description: "Nom (ou mots du nom) de la salle cible, ex. Tour D mezzanine"
+        required: true
+        default: "Tour D mezzanine"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-align-salle
+  cancel-in-progress: false
+
+jobs:
+  align:
+    name: Rangement des dossiers (${{ inputs.mode }})
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Exécuter sur le VPS en SSH vérifié
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          SALLE: ${{ inputs.salle }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          [[ "$MODE" == simulation || "$MODE" == appliquer ]] || { echo "Mode invalide." >&2; exit 1; }
+          if [[ "$MODE" == appliquer ]]; then
+            [[ "$CONFIRMATION" == ALIGNER-SALLE ]] || { echo "Confirmation absente ou incorrecte : saisir ALIGNER-SALLE." >&2; exit 1; }
+          else
+            CONFIRMATION=none
+          fi
+          [[ "$SALLE" =~ ^[[:alnum:][:space:]\'./-]{2,80}$ ]] || { echo "Nom de salle invalide." >&2; exit 1; }
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-align.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            "$CONTABO_USER@$CONTABO_HOST" bash -s -- "$MODE" "$CONFIRMATION" "$SALLE" <<'REMOTE'
+          set -euo pipefail
+          mode="$1"
+          confirmation="$2"
+          salle="$3"
+          script=/opt/colect-app/current/deploy/align-dossier-salle.sh
+          test -f "$script" || { echo "La release en service ne contient pas encore le script de rangement." >&2; exit 1; }
+          if [[ "$mode" == appliquer ]]; then
+            bash "$script" appliquer "$confirmation" "$salle"
+          else
+            bash "$script" simulation "$salle"
+          fi
+          REMOTE
