@@ -85,6 +85,8 @@ jobs:
           CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
           CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
           CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+          # Optionnel : clé Google Maps (navigateur) recopiée dans shared/app.env.
+          GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
           set -euo pipefail
           umask 077
@@ -137,6 +139,15 @@ jobs:
           ssh "${ssh_options[@]}" "$destination" \
             "umask 077; set -C; cat > '/opt/colect-app/incoming/$archive_name'" \
             < "$transfer_dir/$COMMIT_SHA.tar.gz"
+
+          # Clé Google Maps : mise à jour de shared/app.env avant le déploiement,
+          # transmise sur l'entrée standard (jamais en argument de commande).
+          if [[ -n "${GOOGLE_MAPS_API_KEY:-}" ]]; then
+            [[ "$GOOGLE_MAPS_API_KEY" =~ ^[A-Za-z0-9_-]{20,100}$ ]] || { echo "GOOGLE_MAPS_API_KEY invalide." >&2; exit 1; }
+            printf '%s\n' "$GOOGLE_MAPS_API_KEY" | ssh "${ssh_options[@]}" "$destination" \
+              'umask 077; set -eu; read -r key; case "$key" in *[!A-Za-z0-9_-]*|"") exit 1;; esac; env_file=/opt/colect-app/shared/app.env; tmp=$(mktemp "$env_file.XXXXXX"); grep -v "^GOOGLE_MAPS_API_KEY=" "$env_file" > "$tmp" || true; printf "GOOGLE_MAPS_API_KEY=%s\n" "$key" >> "$tmp"; chmod 600 "$tmp"; mv -f "$tmp" "$env_file"'
+          fi
+          unset GOOGLE_MAPS_API_KEY
 
           ssh "${ssh_options[@]}" "$destination" bash -s -- \
             "$COMMIT_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$archive_checksum" <<'REMOTE'

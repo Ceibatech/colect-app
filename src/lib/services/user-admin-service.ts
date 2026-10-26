@@ -387,7 +387,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
     dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, indexingJobsRequested, indexingRunsTriggered,
     imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, reconditionnementSessions, preparationPieceLines,
     financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
-    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints,
+    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints, transferConvoyEvents,
     transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,
     operateurDossiers, operateurNumerisations, operateurIndexations, operateurArchivages,
   ] = await Promise.all([
@@ -414,6 +414,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
     db.transferMovement.count({ where: { ministryValidatedById: id } }),
     db.transferSignature.count({ where: { capturedById: id } }),
     db.transferTrackingPoint.count({ where: { capturedById: id } }),
+    db.transferConvoyEvent.count({ where: { userId: id } }),
     db.transferLotParticipant.count({ where: { userId: id } }),
     db.emailReportSubscription.count({ where: { createdById: id } }),
     db.emailReportDelivery.count({ where: { triggeredById: id } }),
@@ -427,7 +428,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
     dossierHistory, workflowTransitions, documentsUploaded, documentsPreIndexed, indexingJobsRequested, indexingRunsTriggered,
     imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, reconditionnementSessions, preparationPieceLines,
     financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
-    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints,
+    transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints, transferConvoyEvents,
     transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,
     operateurDossiers: operateurDossiers + operateurNumerisations + operateurIndexations + operateurArchivages,
   };

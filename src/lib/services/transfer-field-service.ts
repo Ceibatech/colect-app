@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma/client";
 import { formatCartonReference } from "@/lib/cartons/reference";
 import { SITE_RESPONSIBLE_ROLE_CODE } from "@/lib/permissions/constants";
 import { isValidGeoPoint } from "@/lib/transfers/route-suggestion";
+import { convoyState } from "@/lib/transfers/convoy";
 
 /**
  * Données « terrain » des transferts : l'espace du responsable de site
@@ -28,6 +29,7 @@ const lotInclude = {
   destinationSite: { select: { id: true, nom: true, organisation: true, latitude: true, longitude: true, adresse: true, ville: true } },
   destinationEntrepot: { select: { nom: true, localisation: true } },
   participants: { where: { roleCode: "CONVOYEUR" }, select: { user: { select: { name: true } } } },
+  convoyEvents: { orderBy: { occurredAt: "asc" as const }, select: { type: true, occurredAt: true, automatic: true } },
   items: {
     orderBy: { cartonCode: "asc" as const },
     select: {
@@ -70,6 +72,7 @@ function summarize(lot: LotWithItems) {
     inTransit: count("SORTI"),
     received: count("RECU"),
     escorts: lot.participants.map((participant) => participant.user.name),
+    convoy: convoyState(lot.convoyEvents),
   };
 }
 

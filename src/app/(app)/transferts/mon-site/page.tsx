@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 export const metadata = { title: "Mon site - Transferts - GeoArchives" };
 
 const dateFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+const timeFormatter = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short", timeZone: "Africa/Abidjan" });
 
 const movementStatus: Record<string, { label: string; className: string }> = {
   SOUMIS_CEIBAC: { label: "Visa interne en attente", className: "border-brand-gold/40 text-brand-gold" },
@@ -57,6 +58,11 @@ export default async function SiteWorkspacePage() {
         </div>
         {arrivals.length ? arrivals.map((lot) => (
           <FieldLotStrip key={lot.id} lot={lot} highlight="destination">
+            {lot.convoy.arrived ? (
+              <p className="w-full rounded-md bg-brand-green/10 px-3 py-2 text-sm font-medium text-brand-green">Véhicule arrivé à {timeFormatter.format(lot.convoy.arrivedAt!)}{lot.convoy.arrivalAutomatic ? " (détecté par GPS)" : ""}</p>
+            ) : lot.convoy.onTheRoad ? (
+              <p className="w-full rounded-md bg-brand-gold/10 px-3 py-2 text-sm font-medium text-brand-gold">En route depuis {timeFormatter.format(lot.convoy.departedAt!)} · <Link href={`/transferts/${lot.id}`} className="underline underline-offset-4">suivre le trajet</Link></p>
+            ) : null}
             {lot.items.length ? (
               <TransferMovementDialog lotId={lot.id} type="RECEPTION" items={lot.items} escortSuggestions={lot.escorts} sourceLabel={lot.source} destinationLabel={lot.destination} />
             ) : (
