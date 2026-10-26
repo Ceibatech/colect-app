@@ -71,3 +71,14 @@ describe("regroupement intelligent des libellés", () => {
     expect(keyOf.get("1|Marcory Alliodan")).not.toBe(keyOf.get("1|MARCORY ALIODAN"));
   });
 });
+
+describe("correction des noms de communes et de quartiers", () => {
+  it("rattache les fautes de frappe aux communes et aux mots fréquents", () => {
+    const entries = [["Koumassi", 1302], ["Kouassi", 2], ["Abekan Bernard", 1019], ["Abekan Benard", 3], ["ABEKAN BERNARD 32", 20], ["ABEKAN BERNARD 33", 16]]
+      .map(([label, count]) => ({ siteId: 1, label: label as string, count: count as number }));
+    const { keyOf } = clusterLabels(entries, 1e9, ["Koumassi"]);
+    expect(keyOf.get("1|Kouassi")).toBe(keyOf.get("1|Koumassi"));
+    expect(keyOf.get("1|Abekan Benard")).toBe(keyOf.get("1|Abekan Bernard"));
+    expect(keyOf.get("1|ABEKAN BERNARD 32")).not.toBe(keyOf.get("1|ABEKAN BERNARD 33"));
+  });
+});
