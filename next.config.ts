@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
           { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), payment=(), usb=(), geolocation=(self)",
+            value: "camera=(self), microphone=(), payment=(), usb=(), geolocation=(self)",
           },
           ...(isProduction
             ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }]

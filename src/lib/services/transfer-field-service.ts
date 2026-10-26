@@ -142,9 +142,43 @@ export async function getConvoyWorkspace() {
     items: { some: { status: { in: ["PREVU", "SORTI"] } } },
     ...(onlyAssigned ? { participants: { some: { userId: session.userId } } } : {}),
   });
-  return lots.map((lot) => ({
-    ...summarize(lot),
-    waiting: lot.items.filter((item) => item.status === "PREVU").length,
-    navigationUrl: navigationUrl(lot.destinationSite),
-  }));
+  // Pré-remplissage de la fiche de départ : véhicule et chauffeur du dernier bordereau de sortie.
+  const sorties = lots.length
+    ? await prisma.transferMovement.findMany({
+        where: { transferLotId: { in: lots.map((lot) => lot.id) }, type: "SORTIE" },
+        orderBy: { occurredAt: "desc" },
+        select: { transferLotId: true, vehicleRegistration: true, vehicleDescription: true, driverName: true, driverPhone: true, sealReferences: true },
+      })
+    : [];
+  return lots.map((lot) => {
+    const sortie = sorties.find((movement) => movement.transferLotId === lot.id);
+    return {
+      ...summarize(lot),
+      waiting: lot.items.filter((item) => item.status === "PREVU").length,
+      navigationUrl: navigationUrl(lot.destinationSite),
+      wazeUrl: wazeUrl(lot.destinationSite),
+      loadedCartons: lot.items
+        .filter((item) => item.status === "SORTI")
+        .map((item) => ({
+          id: item.id,
+          cartonId: item.cartonId,
+          code: item.cartonId == null ? item.cartonCode : formatCartonReference(item.cartonId),
+          label: item.cartonLabel,
+          dossiers: item.dossierCountSnapshot,
+        })),
+      prefill: {
+        vehicleRegistration: sortie?.vehicleRegistration ?? "",
+        driverName: sortie?.driverName ?? "",
+        driverPhone: sortie?.driverPhone ?? "",
+        sealReferences: sortie?.sealReferences ?? "",
+      },
+    };
+  });
+}
+
+/** Navigation Waze (voix et embouteillages gratuits) vers le site d'arrivée. */
+function wazeUrl(site: LotWithItems["destinationSite"]) {
+  const point = { latitude: site.latitude ?? Number.NaN, longitude: site.longitude ?? Number.NaN };
+  if (isValidGeoPoint(point)) return `https://waze.com/ul?ll=${point.latitude.toFixed(6)},${point.longitude.toFixed(6)}&navigate=yes`;
+  return `https://waze.com/ul?q=${encodeURIComponent([site.adresse, site.ville, site.nom].filter(Boolean).join(", "))}&navigate=yes`;
 }
