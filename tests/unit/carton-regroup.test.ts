@@ -40,3 +40,34 @@ describe("regroupement des cartons par libellé", () => {
     expect(planRegroup(many, { maxDossiers: 80, engagedCartonIds: new Set([3]) }).blocked).toHaveLength(1);
   });
 });
+
+import { clusterLabels } from "../../deploy/regroup-cartons.mjs";
+
+describe("regroupement intelligent des libellés", () => {
+  const cluster = (labels: string[], max = 80) => {
+    const { keyOf } = clusterLabels(labels.map((label) => ({ siteId: 1, label, count: 2 })), max);
+    return labels.map((label) => keyOf.get(`1|${label}`));
+  };
+
+  it("ignore les unités, les mots de liaison et les fautes légères", () => {
+    const [a, b] = cluster(["Zone 4/c superficie 4991m2-52918m2", "Zone 4/c superficie 4991-52918m2"]);
+    expect(a).toBe(b);
+    const [c, d, e] = cluster(["Zone 4/C complementaire lots 95-146", "Zone 4/C complémentaire 95-146", "Zone 4/C complementair 95-146"]);
+    expect(new Set([c, d, e]).size).toBe(1);
+    const [f, g] = cluster(["Marcory Alliodan", "MARCORY ALIODAN"]);
+    expect(f).toBe(g);
+  });
+
+  it("ne fusionne jamais des repères différents", () => {
+    const pairs = [["ABEKAN BERNARD 32", "ABEKAN BERNARD 33"], ["Koumassi remblai I", "Koumassi remblai II"], ["Zone 4/B", "Zone 4/C"], ["391-399", "391-398"]];
+    for (const pair of pairs) {
+      const [a, b] = cluster(pair);
+      expect(a).not.toBe(b);
+    }
+  });
+
+  it("n'agrandit pas un groupe au-delà du seuil", () => {
+    const { keyOf } = clusterLabels([{ siteId: 1, label: "Marcory Alliodan", count: 60 }, { siteId: 1, label: "MARCORY ALIODAN", count: 30 }], 80);
+    expect(keyOf.get("1|Marcory Alliodan")).not.toBe(keyOf.get("1|MARCORY ALIODAN"));
+  });
+});
