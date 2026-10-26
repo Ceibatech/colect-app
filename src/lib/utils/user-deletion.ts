@@ -14,6 +14,8 @@ export const USER_DELETION_BLOCKERS = {
   workflowTransitions: "transitions de workflow",
   documentsUploaded: "documents déposés",
   documentsPreIndexed: "documents pré-indexés",
+  indexingJobsRequested: "demandes d'indexation",
+  indexingRunsTriggered: "indexations lancées",
   imports: "imports",
   exports: "exports",
   qualityChecks: "contrôles qualité",
@@ -32,6 +34,7 @@ export const USER_DELETION_BLOCKERS = {
   transferTrackingPoints: "points de suivi GPS",
   transferLotParticipations: "participations à des lots de transfert",
   emailReportSubscriptionsCreated: "abonnements de rapport créés",
+  emailReportsTriggered: "envois de rapport déclenchés",
   operateurDossiers: "dossiers ou étapes rattachés à sa fiche opérateur",
   supervisedOperateurs: "opérateurs encore affectés",
 } as const;
