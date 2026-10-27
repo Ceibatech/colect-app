@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { ScanLine, Search } from "lucide-react";
+import { ScanLine } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getNumerisationWorkspace } from "@/lib/services/production-queue-service";
 import { parseProductionQueueSearch } from "@/lib/validation/production-queue";
 import { ScannerWorkstation } from "@/components/numerisation/ScannerWorkstation";
 import { NumerisationCartonTable } from "@/components/numerisation/NumerisationCartonTable";
 import { DataPagination } from "@/components/shared/DataPagination";
+import { SmartSearch } from "@/components/shared/SmartSearch";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
 
 export const metadata = { title: "Numérisation par carton — GeoArchives" };
 
@@ -51,7 +51,7 @@ export default async function NumerisationPage({ searchParams }: { searchParams:
       <section className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm">
         <div className="space-y-4 p-4">
           <div className="flex flex-wrap gap-2">{FILTERS.map((filter) => <Link key={filter.value} href={`/numerisation?statut=${filter.value}${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ""}`} className={buttonVariants({ size: "sm", variant: filters.statut === filter.value ? "default" : "outline" })}>{filter.label}</Link>)}</div>
-          <form className="flex max-w-xl gap-2" action="/numerisation" method="get"><input type="hidden" name="statut" value={filters.statut} /><div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input name="q" defaultValue={filters.q} className="pl-9" placeholder="Carton, dossier ou titulaire" /></div><Button type="submit" variant="outline">Rechercher</Button></form>
+          <SmartSearch key={filters.q ?? ""} stage="numerisation" basePath="/numerisation" statut={filters.statut} defaultValue={filters.q} />
         </div>
         <NumerisationCartonTable cartons={data.cartons} />
       </section>

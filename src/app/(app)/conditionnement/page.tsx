@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { PackageCheck, Search, Timer } from "lucide-react";
+import { PackageCheck, Timer } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getConditionnementWorkspace } from "@/lib/services/production-queue-service";
 import { parseProductionQueueSearch } from "@/lib/validation/production-queue";
 import { ConditionnementCartonQueue } from "@/components/conditionnement/ConditionnementCartonQueue";
 import { LiveTimer, ReconditionnementDossiers } from "@/components/conditionnement/ReconditionnementDossiers";
 import { DataPagination } from "@/components/shared/DataPagination";
+import { SmartSearch } from "@/components/shared/SmartSearch";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
 
 export const metadata = { title: "Reconditionnement — GeoArchives" };
 const FILTERS = [{ value: "A_TRAITER", label: "À conditionner" }, { value: "TERMINE", label: "Terminés" }, { value: "REJETE", label: "Rejetés" }, { value: "TOUS", label: "Tous" }] as const;
@@ -25,7 +25,7 @@ export default async function ConditionnementPage({ searchParams }: { searchPara
     <section className="grid grid-cols-3 gap-px overflow-hidden rounded-md border bg-border"><Metric label="À conditionner" value={data.summary.aConditionner} /><Metric label="En cours" value={data.summary.enCours} /><Metric label="Terminés" value={data.summary.termines} /></section>
     {data.myOpenSession ? <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-activity-conditionnement/40 bg-activity-conditionnement/10 p-4"><p className="flex items-center gap-2 text-sm"><Timer className="size-4 text-activity-conditionnement" /> Vous reconditionnez <span className="font-mono font-semibold">{data.myOpenSession.reference}</span> depuis <LiveTimer since={data.myOpenSession.startedAt} /></p>{data.myOpenSession.cartonToken && filters.carton !== data.myOpenSession.cartonToken ? <Link href={`/conditionnement?statut=TOUS&carton=${encodeURIComponent(data.myOpenSession.cartonToken)}`} className={buttonVariants({ size: "sm" })}>Reprendre ce dossier</Link> : null}</section> : null}
     {filters.carton && data.selectedItems.length > 0 ? <section className="overflow-hidden rounded-lg border bg-card"><div className="flex items-center justify-between gap-3 border-b p-4"><div><h2 className="font-semibold">Dossiers du carton</h2><p className="text-sm text-muted-foreground">Commencez un dossier, remettez-le dans son état initial, puis terminez-le en répondant à la question.</p></div><Link href="/conditionnement" className={buttonVariants({ size: "sm", variant: "outline" })}>Retour aux cartons</Link></div><ReconditionnementDossiers items={data.selectedItems} canUpdate={canUpdate} currentUserId={session.userId} myOpenDossierId={data.myOpenSession?.dossierId ?? null} /></section> : null}
-    <section className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm"><div className="space-y-4 p-4"><div className="flex flex-wrap gap-2">{FILTERS.map((filter) => <Link key={filter.value} href={`/conditionnement?statut=${filter.value}${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ""}`} className={buttonVariants({ size: "sm", variant: filters.statut === filter.value ? "default" : "outline" })}>{filter.label}</Link>)}</div><form className="flex max-w-xl gap-2" action="/conditionnement" method="get"><input type="hidden" name="statut" value={filters.statut} /><div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input name="q" defaultValue={filters.q} className="pl-9" placeholder="Carton, dossier ou titulaire" /></div><Button type="submit" variant="outline">Rechercher</Button></form></div><ConditionnementCartonQueue cartons={data.cartons} canUpdate={canUpdate} /></section>
+    <section className="overflow-hidden rounded-lg border border-border/70 bg-card shadow-sm"><div className="space-y-4 p-4"><div className="flex flex-wrap gap-2">{FILTERS.map((filter) => <Link key={filter.value} href={`/conditionnement?statut=${filter.value}${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ""}`} className={buttonVariants({ size: "sm", variant: filters.statut === filter.value ? "default" : "outline" })}>{filter.label}</Link>)}</div><SmartSearch key={filters.q ?? ""} stage="conditionnement" basePath="/conditionnement" statut={filters.statut} defaultValue={filters.q} /></div><ConditionnementCartonQueue cartons={data.cartons} canUpdate={canUpdate} /></section>
     <DataPagination basePath="/conditionnement" page={data.page} totalPages={data.totalPages} searchParams={paginationParams} />
   </div>;
 }

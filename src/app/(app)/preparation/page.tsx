@@ -1,14 +1,14 @@
 import Link from "next/link";
-import { ClipboardCheck, Search } from "lucide-react";
+import { ClipboardCheck } from "lucide-react";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getPreparationWorkspace } from "@/lib/services/preparation-service";
 import { parsePreparationSearch } from "@/lib/validation/preparation";
 import { PreparationQueueTable } from "@/components/preparation/PreparationQueueTable";
 import { PreparationCartonQueue } from "@/components/preparation/PreparationCartonQueue";
 import { DataPagination } from "@/components/shared/DataPagination";
+import { SmartSearch } from "@/components/shared/SmartSearch";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Préparation documentaire — GeoArchives" };
@@ -115,20 +115,15 @@ export default async function PreparationPage({
             ))}
           </div>
 
-          <form className="flex max-w-xl gap-2" action="/preparation" method="get">
-            <input type="hidden" name="statut" value={filters.statut} />
-            {filters.carton ? <input type="hidden" name="carton" value={filters.carton} /> : null}
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                name="q"
-                defaultValue={filters.q}
-                className="pl-9"
-                placeholder="Référence, code-barres, carton ou titulaire"
-              />
-            </div>
-            <Button type="submit" variant="outline">Rechercher</Button>
-          </form>
+          <SmartSearch
+            key={filters.q ?? ""}
+            stage="preparation"
+            basePath="/preparation"
+            statut={filters.statut}
+            defaultValue={filters.q}
+            placeholder="Référence, code-barres, carton ou titulaire"
+            hidden={filters.carton ? { carton: filters.carton } : {}}
+          />
         </div>
 
         <PreparationCartonQueue cartons={data.cartons} />
