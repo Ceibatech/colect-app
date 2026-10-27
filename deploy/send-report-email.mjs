@@ -20,35 +20,48 @@ export function parseList(value) {
 
 const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
+const nf = (value) => new Intl.NumberFormat("fr-FR").format(value);
+
 export function buildMessage(summary, files) {
   const date = new Date(summary.exportedAt).toLocaleString("fr-FR", { timeZone: "Africa/Abidjan", dateStyle: "long", timeStyle: "short" });
-  const subject = `Récupération des archives : ${summary.boxes} premières boîtes à récupérer et étiquettes`;
+  const subject = `Récupération des archives MULCV – ${summary.boxes} premières boîtes : tableau, rapport et étiquettes`;
   const lines = [
-    ["Boîtes retenues", `${summary.boxes} (${summary.first} à ${summary.last})`],
-    ["Dossiers à étiqueter", `${summary.dossiers}`],
-    ["Origine", `${summary.site} · Salle 1 · Mezzanine, Tour D`],
-    ["Boîtes à vérifier sur place", `${summary.toCheck}`],
-    ["Libellés génériques à découper", `${summary.generic} (${summary.genericDossiers} dossiers)`],
+    ["Boîtes retenues", `${nf(summary.boxes)} (${summary.first} à ${summary.last})`],
+    ["Dossiers concernés", nf(summary.dossiers)],
+    ["Lieu de récupération", `${summary.site}, Salle 1 – Mezzanine, Tour D`],
+    ["Boîtes à vérifier avant étiquetage", nf(summary.toCheck)],
+    ["Libellés à découper en plusieurs boîtes", `${nf(summary.generic)} (${nf(summary.genericDossiers)} dossiers)`],
   ];
   const attachments = {
-    xlsx: "le tableau des boîtes et de leurs dossiers (tableur)",
-    rapport: "le rapport de synthèse (PDF)",
-    "etiquettes-boites": "les étiquettes des boîtes, code-barres et QR code (PDF, 8 par page)",
-    "etiquettes-dossiers": "les étiquettes des dossiers, code-barres (PDF, 24 par page)",
+    xlsx: "Tableau détaillé des boîtes et de leurs dossiers (Excel)",
+    rapport: "Rapport de synthèse (PDF)",
+    "etiquettes-boites": "Étiquettes des boîtes : code-barres et QR code, 8 par page A4 (PDF)",
+    "etiquettes-dossiers": "Étiquettes des dossiers : code-barres, 24 par page A4 (PDF)",
   };
   const described = files.map((file) => {
     const key = file.endsWith(".xlsx") ? "xlsx" : Object.keys(attachments).find((k) => file.startsWith(k));
-    return `${esc(file)} : ${attachments[key] ?? "pièce jointe"}`;
+    return { file, label: attachments[key] ?? "pièce jointe" };
   });
-  const html = `<div style="font-family:Arial,sans-serif;font-size:14px;color:#1f2937;line-height:1.5">
-<p>Bonjour,</p>
-<p>Veuillez trouver ci-joint la préparation de la récupération des <b>${summary.boxes} premières boîtes</b>, établie à partir de GeoArchives (données du ${esc(date)}).</p>
-<table style="border-collapse:collapse;margin:8px 0">${lines.map(([k, v]) => `<tr><td style="padding:4px 16px 4px 0;color:#6b7280">${esc(k)}</td><td style="padding:4px 0"><b>${esc(v)}</b></td></tr>`).join("")}</table>
-<p><b>Identification</b> : chaque boîte a un nom unique et un code-barres permanent (CTN-00000123). Chaque dossier porte le code de sa boîte suivi de son numéro d'ordre (CTN-00000123-0001, -0002…), à coller sur sa chemise lors de la récupération.</p>
-<p><b>Pièces jointes</b> :</p><ul>${described.map((d) => `<li>${d}</li>`).join("")}</ul>
-<p>Les ${summary.generic} libellés génériques (plusieurs boîtes physiques sous un même nom, par exemple « Koumassi ») sont listés à part pour être découpés en boîtes sur place.</p>
-<p>Cordialement,<br>L'équipe GeoArchives – CEIBA Analytics</p></div>`;
-  const text = [`Bonjour,`, ``, `Ci-joint la préparation de la récupération des ${summary.boxes} premières boîtes (données du ${date}).`, ...lines.map(([k, v]) => `- ${k} : ${v}`), ``, `Pièces jointes :`, ...described.map((d) => `- ${d}`), ``, `L'équipe GeoArchives – CEIBA Analytics`].join("\n");
+  const p = (text) => `<p style="margin:0 0 12px">${text}</p>`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2937;line-height:1.55;max-width:680px">
+${p("Bonjour à tous,")}
+${p(`Comme demandé, vous trouverez ci-joint le découpage des <b>${nf(summary.boxes)} premières boîtes à récupérer</b>, établi à partir de GeoArchives sur la base des données arrêtées au ${esc(date)}.`)}
+<table style="border-collapse:collapse;margin:4px 0 16px;font-size:14px">${lines.map(([k, v]) => `<tr><td style="padding:5px 18px 5px 0;color:#4b5563;border-bottom:1px solid #e5e7eb">${esc(k)}</td><td style="padding:5px 0;border-bottom:1px solid #e5e7eb"><b>${esc(v)}</b></td></tr>`).join("")}</table>
+${p("<b>Identification retenue.</b> Chaque boîte dispose d'un nom unique et d'un code-barres permanent (ex. <span style=\"white-space:nowrap\">CTN-00000123</span>). Chaque dossier reçoit le code de sa boîte complété de son numéro d'ordre (ex. <span style=\"white-space:nowrap\">CTN-00000123-0001</span>). Lors de la récupération, l'étiquette de la boîte est apposée sur le carton et celle de chaque dossier sur sa chemise ; un scan suffit ensuite pour retrouver la boîte dans GeoArchives.")}
+${p("<b>Points d'attention.</b> Les boîtes à vérifier sont signalées dans le tableau. Les libellés génériques, qui désignent plusieurs boîtes physiques sous un même nom (par exemple « Koumassi »), sont listés à part et seront découpés en boîtes sur place avant étiquetage.")}
+${p("<b>Pièces jointes :</b>")}
+<ol style="margin:0 0 12px;padding-left:20px">${described.map((d) => `<li>${esc(d.label)} – <span style="color:#6b7280">${esc(d.file)}</span></li>`).join("")}</ol>
+${p("Nous restons à votre disposition pour toute précision.")}
+<p style="margin:16px 0 0">Cordialement,<br><b>L'équipe GeoArchives</b><br><span style="color:#6b7280">CEIBA Analytics</span></p></div>`;
+  const text = [
+    "Bonjour à tous,", "",
+    `Comme demandé, vous trouverez ci-joint le découpage des ${nf(summary.boxes)} premières boîtes à récupérer, établi à partir de GeoArchives sur la base des données arrêtées au ${date}.`, "",
+    ...lines.map(([k, v]) => `- ${k} : ${v}`), "",
+    "Identification retenue : chaque boîte dispose d'un nom unique et d'un code-barres permanent (ex. CTN-00000123). Chaque dossier reçoit le code de sa boîte complété de son numéro d'ordre (ex. CTN-00000123-0001).", "",
+    "Points d'attention : les boîtes à vérifier sont signalées dans le tableau ; les libellés génériques (plusieurs boîtes sous un même nom) sont listés à part pour être découpés sur place.", "",
+    "Pièces jointes :", ...described.map((d, i) => `${i + 1}. ${d.label} – ${d.file}`), "",
+    "Nous restons à votre disposition pour toute précision.", "", "Cordialement,", "L'équipe GeoArchives", "CEIBA Analytics",
+  ].join("\n");
   return { subject, html, text };
 }
 
