@@ -49,10 +49,12 @@ export async function alignDossierSalle(db, { query, apply = false }) {
     select: { dossierId: true },
   });
   const engagedIds = [...new Set(engaged.map((row) => row.dossierId))];
-  const where = { siteId: target.siteId, NOT: { entrepotId: target.id }, ...(engagedIds.length ? { id: { notIn: engagedIds } } : {}) };
+  // Sans salle (NULL) compris : « NOT entrepotId = X » écarterait les NULL en SQL.
+  const elsewhere = { OR: [{ entrepotId: null }, { entrepotId: { not: target.id } }] };
+  const where = { siteId: target.siteId, ...elsewhere, ...(engagedIds.length ? { id: { notIn: engagedIds } } : {}) };
   const toMove = await db.dossier.count({ where });
   const skipped = engagedIds.length
-    ? await db.dossier.count({ where: { siteId: target.siteId, NOT: { entrepotId: target.id }, id: { in: engagedIds } } })
+    ? await db.dossier.count({ where: { siteId: target.siteId, ...elsewhere, id: { in: engagedIds } } })
     : 0;
   if (!apply) return { applied: false, report, target, toMove, skipped };
 
