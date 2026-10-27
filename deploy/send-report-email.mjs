@@ -1,7 +1,7 @@
 // Envoie par e-mail (service d'envoi de GeoArchives, Resend) les fichiers de la
 // récupération des boîtes : tableur, rapport et planches d'étiquettes.
 //
-//   node deploy/send-report-email.mjs --dir=/outbox --to=a@x --cc=b@x,c@x
+//   node deploy/send-report-email.mjs --dir=/outbox --to=a@x --cc=b@x,c@x [--replaces=1]
 //
 // Lit summary.json et les fichiers .xlsx / .pdf du dossier. Utilise
 // RESEND_API_KEY et EMAIL_FROM de la configuration de l'application.
@@ -22,45 +22,43 @@ const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 
 const nf = (value) => new Intl.NumberFormat("fr-FR").format(value);
 
-export function buildMessage(summary, files) {
-  const date = new Date(summary.exportedAt).toLocaleString("fr-FR", { timeZone: "Africa/Abidjan", dateStyle: "long", timeStyle: "short" });
-  const subject = `Récupération des archives MULCV – ${summary.boxes} premières boîtes : tableau, rapport et étiquettes`;
-  const lines = [
-    ["Boîtes retenues", `${nf(summary.boxes)} (${summary.first} à ${summary.last})`],
-    ["Dossiers concernés", nf(summary.dossiers)],
-    ["Lieu de récupération", `${summary.site}, Salle 1 – Mezzanine, Tour D`],
-    ["Boîtes à vérifier avant étiquetage", nf(summary.toCheck)],
-    ["Libellés à découper en plusieurs boîtes", `${nf(summary.generic)} (${nf(summary.genericDossiers)} dossiers)`],
-  ];
-  const attachments = {
-    xlsx: "Tableau détaillé des boîtes et de leurs dossiers (Excel)",
-    rapport: "Rapport de synthèse (PDF)",
-    "etiquettes-boites": "Étiquettes des boîtes : code-barres et QR code, 8 par page A4 (PDF)",
-    "etiquettes-dossiers": "Étiquettes des dossiers : code-barres, 24 par page A4 (PDF)",
+export function buildMessage(summary, files, { replaces = false } = {}) {
+  const subject = `Récupération des archives MULCV – liste des ${nf(summary.boxes)} premiers cartons et étiquettes`;
+  const labels = {
+    "liste-cartons": "Liste des cartons et de leurs dossiers (Excel)",
+    "rapport-cartons": "Rapport de synthèse (PDF)",
+    "etiquettes-cartons": "Étiquettes des cartons (PDF)",
+    "etiquettes-dossiers": "Étiquettes des dossiers (PDF)",
   };
-  const described = files.map((file) => {
-    const key = file.endsWith(".xlsx") ? "xlsx" : Object.keys(attachments).find((k) => file.startsWith(k));
-    return { file, label: attachments[key] ?? "pièce jointe" };
-  });
+  const documents = files.map((file) => labels[Object.keys(labels).find((key) => file.startsWith(key))] ?? file);
+  const points = [
+    `${nf(summary.boxes)} cartons, contenant au total ${nf(summary.dossiers)} dossiers ; chaque carton est récupéré avec l'ensemble de ses dossiers ;`,
+    "chaque carton est identifié par un nom unique et un code-barres (exemple\u00a0: CTN\u201100000123) ;",
+    "chaque dossier porte le code-barres de son carton suivi de son numéro d'ordre (exemple\u00a0: CTN\u201100000123\u20110001), ce qui permet de rattacher chaque dossier à son carton lors de la récupération.",
+  ];
+  const notes = [
+    ...(summary.toCheck ? [`${nf(summary.toCheck)} carton${summary.toCheck > 1 ? "s présentent" : " présente"} une information à confirmer sur place ; ${summary.toCheck > 1 ? "ils sont signalés" : "il est signalé"} dans la liste ;`] : []),
+    `${nf(summary.generic)} intitulés de l'inventaire regroupent un grand nombre de dossiers (${nf(summary.genericDossiers)} au total, par exemple «\u00a0Koumassi\u00a0») et correspondent à plusieurs cartons ; ils ne figurent pas dans cette liste et seront répartis en cartons lors d'une prochaine étape.`,
+  ];
+  const intro = `Comme convenu, nous vous transmettons la liste des ${nf(summary.boxes)} premiers cartons à récupérer au site du ministère (Plateau, Salle 1 – Mezzanine, Tour D), ainsi que les étiquettes à apposer lors de la récupération.`;
+  const replaceNote = "Ce message constitue la version définitive. L'envoi de ce matin (9 h 45) était un message de test destiné à vérifier la bonne réception.";
   const p = (text) => `<p style="margin:0 0 12px">${text}</p>`;
+  const ul = (items, tag = "ul") => `<${tag} style="margin:0 0 14px;padding-left:22px">${items.map((item) => `<li style="margin-bottom:4px">${esc(item)}</li>`).join("")}</${tag}>`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2937;line-height:1.55;max-width:680px">
-${p("Bonjour à tous,")}
-${p(`Comme demandé, vous trouverez ci-joint le découpage des <b>${nf(summary.boxes)} premières boîtes à récupérer</b>, établi à partir de GeoArchives sur la base des données arrêtées au ${esc(date)}.`)}
-<table style="border-collapse:collapse;margin:4px 0 16px;font-size:14px">${lines.map(([k, v]) => `<tr><td style="padding:5px 18px 5px 0;color:#4b5563;border-bottom:1px solid #e5e7eb">${esc(k)}</td><td style="padding:5px 0;border-bottom:1px solid #e5e7eb"><b>${esc(v)}</b></td></tr>`).join("")}</table>
-${p("<b>Identification retenue.</b> Chaque boîte dispose d'un nom unique et d'un code-barres permanent (ex. <span style=\"white-space:nowrap\">CTN-00000123</span>). Chaque dossier reçoit le code de sa boîte complété de son numéro d'ordre (ex. <span style=\"white-space:nowrap\">CTN-00000123-0001</span>). Lors de la récupération, l'étiquette de la boîte est apposée sur le carton et celle de chaque dossier sur sa chemise ; un scan suffit ensuite pour retrouver la boîte dans GeoArchives.")}
-${p("<b>Points d'attention.</b> Les boîtes à vérifier sont signalées dans le tableau. Les libellés génériques, qui désignent plusieurs boîtes physiques sous un même nom (par exemple « Koumassi »), sont listés à part et seront découpés en boîtes sur place avant étiquetage.")}
-${p("<b>Pièces jointes :</b>")}
-<ol style="margin:0 0 12px;padding-left:20px">${described.map((d) => `<li>${esc(d.label)} – <span style="color:#6b7280">${esc(d.file)}</span></li>`).join("")}</ol>
-${p("Nous restons à votre disposition pour toute précision.")}
+${replaces ? p(`<i>${esc(replaceNote)}</i>`) : ""}${p("Bonjour à tous,")}
+${p(esc(intro))}
+${p("En synthèse :")}${ul(points)}
+${p("Points à noter :")}${ul(notes)}
+${p("Documents joints :")}${ul(documents, "ol")}
+${p("Nous restons à votre disposition pour tout complément.")}
 <p style="margin:16px 0 0">Cordialement,<br><b>L'équipe GeoArchives</b><br><span style="color:#6b7280">CEIBA Analytics</span></p></div>`;
   const text = [
-    "Bonjour à tous,", "",
-    `Comme demandé, vous trouverez ci-joint le découpage des ${nf(summary.boxes)} premières boîtes à récupérer, établi à partir de GeoArchives sur la base des données arrêtées au ${date}.`, "",
-    ...lines.map(([k, v]) => `- ${k} : ${v}`), "",
-    "Identification retenue : chaque boîte dispose d'un nom unique et d'un code-barres permanent (ex. CTN-00000123). Chaque dossier reçoit le code de sa boîte complété de son numéro d'ordre (ex. CTN-00000123-0001).", "",
-    "Points d'attention : les boîtes à vérifier sont signalées dans le tableau ; les libellés génériques (plusieurs boîtes sous un même nom) sont listés à part pour être découpés sur place.", "",
-    "Pièces jointes :", ...described.map((d, i) => `${i + 1}. ${d.label} – ${d.file}`), "",
-    "Nous restons à votre disposition pour toute précision.", "", "Cordialement,", "L'équipe GeoArchives", "CEIBA Analytics",
+    ...(replaces ? [replaceNote, ""] : []),
+    "Bonjour à tous,", "", intro, "",
+    "En synthèse :", ...points.map((x) => `- ${x}`), "",
+    "Points à noter :", ...notes.map((x) => `- ${x}`), "",
+    "Documents joints :", ...documents.map((x, i) => `${i + 1}. ${x}`), "",
+    "Nous restons à votre disposition pour tout complément.", "", "Cordialement,", "L'équipe GeoArchives", "CEIBA Analytics",
   ].join("\n");
   return { subject, html, text };
 }
@@ -75,13 +73,13 @@ async function main() {
   const from = process.env.EMAIL_FROM?.trim();
   if (!apiKey || !from) throw new Error("RESEND_API_KEY et EMAIL_FROM doivent être configurées.");
   const summary = JSON.parse(readFileSync(path.join(dir, "summary.json"), "utf8"));
-  const order = ["boites-a-recuperer", "rapport", "etiquettes-boites", "etiquettes-dossiers"];
+  const order = ["liste-cartons", "rapport-cartons", "etiquettes-cartons", "etiquettes-dossiers"];
   const files = readdirSync(dir).filter((file) => /\.(xlsx|pdf)$/.test(file))
     .sort((a, b) => order.findIndex((k) => a.startsWith(k)) - order.findIndex((k) => b.startsWith(k)));
   if (files.length < 4) throw new Error(`Pièces jointes incomplètes : ${files.join(", ")}`);
   const total = files.reduce((sum, file) => sum + statSync(path.join(dir, file)).size, 0);
   if (total > 30 * 1024 * 1024) throw new Error("Pièces jointes trop volumineuses (plus de 30 Mo).");
-  const { subject, html, text } = buildMessage(summary, files);
+  const { subject, html, text } = buildMessage(summary, files, { replaces: args.replaces === "1" });
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Idempotency-Key": `recuperation-${args.key ?? Date.now()}` },
