@@ -1,0 +1,72 @@
+name: Exporter les boîtes à récupérer (lecture seule)
+
+# Lancement manuel. Produit un JSON téléchargeable des N premières boîtes
+# (ordre CTN) et de leurs dossiers, pour l'étiquetage code-barres. Contient les
+# titulaires : artefact conservé 1 jour. Aucune écriture en base.
+on:
+  workflow_dispatch:
+    inputs:
+      limite:
+        description: "Nombre de boîtes"
+        required: true
+        default: "200"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-export-recuperation
+  cancel-in-progress: false
+
+jobs:
+  export:
+    name: Export des boîtes à récupérer
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Exporter depuis le VPS en SSH vérifié
+        env:
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+          LIMITE: ${{ inputs.limite }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$LIMITE" =~ ^[0-9]{1,4}$ ]] || { echo "Limite invalide." >&2; exit 1; }
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-recup.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          mkdir -p export
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            "$CONTABO_USER@$CONTABO_HOST" \
+            "test -f /opt/colect-app/current/deploy/export-recuperation.sh || { echo 'Script absent de la release.' >&2; exit 1; }; bash /opt/colect-app/current/deploy/export-recuperation.sh $LIMITE" \
+            > export/boites.json
+          python3 -c "import json;d=json.load(open('export/boites.json'));print('Boîtes exportées :', len(d['boxes']))"
+
+      - name: Publier le fichier (conservé 3 jours)
+        uses: actions/upload-artifact@v4
+        with:
+          name: boites-a-recuperer
+          path: export/boites.json
+          retention-days: 1
+          if-no-files-found: error
