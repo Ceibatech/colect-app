@@ -1,4 +1,4 @@
-"""Tableau et étiquettes code-barres des premières boîtes à récupérer.
+"""Liste, rapport et étiquettes code-barres des premiers cartons à récupérer.
 usage: python3 build.py boites.json sortie_dossier"""
 import json, sys, collections, datetime
 from openpyxl import Workbook
@@ -26,7 +26,7 @@ generic_raw = [b for b in data["boxes"] if len(b["dossiers"]) > GENERIC and b["i
 boxes = []
 for rank, b in enumerate(real[:LIMIT], 1):
     labels = collections.Counter(tidy(d["libelle"]) for d in b["dossiers"] if tidy(d["libelle"]))
-    label = labels.most_common(1)[0][0] if labels else "Sans libellé"
+    label = labels.most_common(1)[0][0] if labels else "Sans intitulé"
     first = b["dossiers"][0] if b["dossiers"] else {}
     boxes.append(dict(rank=rank, id=b["id"], code=ctn(b["id"]), label=label, variants=[l for l, _ in labels.most_common()[1:]],
                       site=first.get("site") or "", salle=first.get("salle") or "", dossiers=b["dossiers"]))
@@ -40,7 +40,7 @@ total_dossiers = sum(len(b["dossiers"]) for b in boxes)
 def summary(b):
     labels = collections.Counter(tidy(d["libelle"]) for d in b["dossiers"] if tidy(d["libelle"]))
     first = b["dossiers"][0]
-    return dict(code=ctn(b["id"]), name=labels.most_common(1)[0][0] if labels else "Sans libellé", dossiers=len(b["dossiers"]), site=first.get("site") or "", salle=first.get("salle") or "",
+    return dict(code=ctn(b["id"]), name=labels.most_common(1)[0][0] if labels else "Sans intitulé", dossiers=len(b["dossiers"]), site=first.get("site") or "", salle=first.get("salle") or "",
                 communes=", ".join(sorted({d["commune"] for d in b["dossiers"] if d["commune"]}))[:200], lotissements=", ".join(sorted({d["lotissement"] for d in b["dossiers"] if d["lotissement"]}))[:300])
 big = [summary(b) for b in generic_raw]
 
@@ -61,16 +61,16 @@ def finish(ws):
             c.font = F; c.border = Border(bottom=thin); c.alignment = Alignment(vertical="top", wrap_text=True)
     ws.auto_filter.ref = ws.dimensions
 
-ws = wb.active; ws.title = "Boîtes"
-sheet(ws, ["N°", "Code-barres de la boîte", "Nom unique de la boîte", "Site", "Salle", "Dossiers", "Codes-barres des dossiers", "Premier dossier", "Dernier dossier", "Autres écritures du libellé", "À vérifier"],
+ws = wb.active; ws.title = "Cartons"
+sheet(ws, ["N°", "Code-barres du carton", "Nom du carton", "Site", "Salle", "Nombre de dossiers", "Codes-barres des dossiers", "Premier dossier", "Dernier dossier", "Autres écritures de l'intitulé", "Observation"],
       [6, 20, 40, 24, 26, 10, 30, 18, 18, 36, 40])
 for b in boxes:
     codes = b["dossier_codes"]
     import re
     notes = []
     if not b["salle"]: notes.append("Salle non renseignée")
-    if b["label"] == "Sans libellé": notes.append("Sans libellé")
-    if re.fullmatch(r"(?i)(a+\d*|q-?\d)", b["label"]): notes.append("Libellé à confirmer (saisie de test ?)")
+    if b["label"] == "Sans intitulé": notes.append("Sans intitulé")
+    if re.fullmatch(r"(?i)(a+\d*|q-?\d)", b["label"]): notes.append("Intitulé à confirmer sur place")
     note = " ; ".join(notes)
     b["note"] = note
     ws.append([b["rank"], b["code"], b["name"], b["site"], b["salle"], len(b["dossiers"]),
@@ -81,33 +81,33 @@ for b in boxes:
 finish(ws)
 
 wd = wb.create_sheet("Dossiers")
-sheet(wd, ["Code-barres du dossier", "Code-barres de la boîte", "Nom de la boîte", "N° dans la boîte", "Référence dossier", "Titulaire", "Commune", "Lotissement", "Îlot", "Lot", "Titre foncier", "Ancien code-barres saisi"],
+sheet(wd, ["Code-barres du dossier", "Code-barres du carton", "Nom du carton", "N° dans le carton", "Référence dossier", "Titulaire", "Commune", "Lotissement", "Îlot", "Lot", "Titre foncier", "Ancien code-barres saisi"],
       [22, 18, 34, 10, 18, 28, 18, 26, 8, 8, 16, 18])
 for b in boxes:
     for i, (code, d) in enumerate(b["dossier_codes"], 1):
         wd.append([code, b["code"], b["name"], i, d["reference"], d["titulaire"], d["commune"], d["lotissement"], d["ilot"], d["lot"], d["titreFoncier"], d["codeBarresSaisi"]])
 finish(wd)
 
-wg = wb.create_sheet("Libellés à découper")
-sheet(wg, ["Code actuel", "Libellé", "Dossiers", "Site", "Salle", "Communes", "Lotissements"], [16, 36, 10, 22, 24, 30, 60])
+wg = wb.create_sheet("Intitulés à répartir")
+sheet(wg, ["Code actuel", "Intitulé", "Nombre de dossiers", "Site", "Salle", "Communes", "Lotissements"], [16, 36, 10, 22, 24, 30, 60])
 for g in big:
     wg.append([g["code"], g["name"], g["dossiers"], g["site"], g["salle"], g["communes"], g["lotissements"]])
 finish(wg)
 
 wr = wb.create_sheet("Règles")
 rules = [
-    ("Boîtes retenues", f"Les {len(boxes)} premières boîtes du {SITE} dans l'ordre de l'inventaire (identifiant CTN croissant). Les sites de démonstration sont exclus."),
-    ("Nom unique", "Le libellé saisi à l'inventaire, regroupé et harmonisé (mêmes libellés malgré les fautes de frappe). S'il se répète, le code de la boîte y est ajouté."),
-    ("Code-barres de la boîte", "CTN-00000123 : identifiant permanent de la boîte dans GeoArchives (code 128 et QR code sur l'étiquette)."),
-    ("Code-barres d'un dossier", "Code de sa boîte + numéro d'ordre : CTN-00000123-0001, CTN-00000123-0002… Scanné dans GeoArchives, il ouvre la fiche de la boîte."),
-    ("Boîtes retenues (taille)", f"Seules les boîtes de {GENERIC} dossiers au plus sont retenues."),
-    ("Libellés à découper", f"{len(big)} libellé(s) génériques intercalés dans l'inventaire regroupent chacun plus de {GENERIC} dossiers ({sum(g['dossiers'] for g in big)} au total, ex. « Koumassi ») : ce sont plusieurs boîtes physiques sous un même nom. Ils sont listés à part, à découper sur place en boîtes avant étiquetage."),
-    ("Extraction", f"Base de production, {data['exportedAt'][:16].replace('T', ' ')} UTC. {len(boxes)} boîtes, {total_dossiers} dossiers."),
+    ("Cartons retenus", f"Les {len(boxes)} premiers cartons du {SITE} dans l'ordre de l'inventaire. Chaque carton est récupéré avec l'ensemble de ses dossiers."),
+    ("Nom du carton", "L'intitulé inscrit à l'inventaire, harmonisé (variantes d'écriture regroupées). Si deux cartons portent le même intitulé, le code du carton y est ajouté."),
+    ("Code-barres du carton", "CTN-00000123 : identifiant permanent du carton dans GeoArchives (code-barres et QR code sur l'étiquette)."),
+    ("Code-barres d'un dossier", "Code de son carton suivi de son numéro d'ordre : CTN-00000123-0001, CTN-00000123-0002… Il rattache chaque dossier à son carton."),
+    
+    ("Intitulés à répartir", f"{len(big)} intitulés de l'inventaire regroupent chacun un grand nombre de dossiers ({sum(g['dossiers'] for g in big)} au total, par exemple « Koumassi ») et correspondent à plusieurs cartons. Ils ne font pas partie de cette liste et seront répartis en cartons lors d'une prochaine étape."),
+    ("Extraction", f"Base de production, {data['exportedAt'][:16].replace('T', ' ')} UTC. {len(boxes)} cartons, {total_dossiers} dossiers."),
 ]
 sheet(wr, ["Élément", "Règle"], [26, 110])
 for r in rules: wr.append(list(r))
 finish(wr)
-xlsx = f"{outdir}/boites-a-recuperer-{len(boxes)}.xlsx"
+xlsx = f"{outdir}/liste-cartons-a-recuperer-{len(boxes)}.xlsx"
 wb.save(xlsx)
 
 # ---------- Étiquettes des boîtes (A4, 8 par page, 95 x 66 mm) ----------
@@ -145,7 +145,7 @@ def dossier_labels(path):
             bc.drawOn(c, x + (lw - bc.width) / 2, y + 17*mm)
             c.setFont("Helvetica-Bold", 8.5); c.drawCentredString(x + lw / 2, y + 12.5*mm, code)
             c.setFont("Helvetica", 7); c.drawString(x + 3*mm, y + 7.5*mm, f'Dossier {d["reference"]}')
-            c.setFont("Helvetica", 6.5); c.drawString(x + 3*mm, y + 3*mm, ("Boîte : " + b["name"])[:52])
+            c.setFont("Helvetica", 6.5); c.drawString(x + 3*mm, y + 3*mm, ("Carton : " + b["name"])[:52])
             i += 1
     c.save()
 
@@ -164,35 +164,35 @@ def report(path):
     exported = datetime.datetime.fromisoformat(data["exportedAt"].replace("Z", "+00:00"))
     to_check = [b for b in boxes if b.get("note")]
     story = [
-        Paragraph("Récupération des archives – 200 premières boîtes", h1),
+        Paragraph(f"Récupération des archives – {len(boxes)} premiers cartons", h1),
         Paragraph(f"GeoArchives · CEIBA Analytics · données au {exported.strftime('%d/%m/%Y à %H:%M')} (UTC)", small),
         Spacer(1, 8),
         Paragraph("Synthèse", h2),
         Table([
-            ["Boîtes retenues", f"{len(boxes)}"],
-            ["Dossiers à étiqueter", f"{total_dossiers}"],
+            ["Cartons retenus", f"{len(boxes)}"],
+            ["Dossiers contenus", f"{total_dossiers}"],
             ["Site et salle d'origine", f"{SITE} · Salle 1 · Mezzanine, Tour D"],
-            ["Plage des codes de boîtes", f"{boxes[0]['code']} à {boxes[-1]['code']}"],
-            ["Boîtes à vérifier sur place", f"{len(to_check)}"],
-            ["Libellés génériques à découper", f"{len(big)} ({sum(g['dossiers'] for g in big)} dossiers)"],
+            ["Codes des cartons", f"{boxes[0]['code']} à {boxes[-1]['code']}"],
+            ["Cartons à vérifier sur place", f"{len(to_check)}"],
+            ["Intitulés à répartir en plusieurs cartons", f"{len(big)} ({sum(g['dossiers'] for g in big)} dossiers)"],
         ], colWidths=[70*mm, 100*mm], style=TableStyle([
             ("FONT", (0, 0), (-1, -1), "Helvetica", 9.5), ("FONT", (1, 0), (1, -1), "Helvetica-Bold", 9.5),
             ("LINEBELOW", (0, 0), (-1, -1), 0.3, colors.HexColor("#D0D5DD")), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
         ])),
-        Paragraph("Identification des boîtes et des dossiers", h2),
-        Paragraph("Chaque boîte reçoit un <b>nom unique</b> (son libellé d'inventaire, harmonisé) et un <b>code-barres</b> permanent "
+        Paragraph("Identification des cartons et des dossiers", h2),
+        Paragraph("Chaque carton reçoit un <b>nom unique</b> (son intitulé d'inventaire, harmonisé) et un <b>code-barres</b> permanent "
                   "de la forme <b>CTN-00000123</b>, imprimé en code 128 et en QR code sur son étiquette.", body),
-        Paragraph("Chaque dossier porte le <b>code de sa boîte suivi de son numéro d'ordre</b> : CTN-00000123-0001, CTN-00000123-0002… "
-                  "Scanné dans GeoArchives, ce code ouvre la fiche de la boîte. Lors de la récupération, on colle l'étiquette de la boîte "
+        Paragraph("Chaque carton est récupéré avec <b>l'ensemble de ses dossiers</b>. Chaque dossier porte le <b>code de son carton suivi de son numéro d'ordre</b> : CTN-00000123-0001, CTN-00000123-0002… "
+                  "Lors de la récupération, l'étiquette du carton est apposée sur le carton "
                   "sur le carton et celle de chaque dossier sur sa chemise.", body),
         Paragraph("Points d'attention", h2),
     ]
     if to_check:
-        story.append(Paragraph("Boîtes à vérifier avant étiquetage : " + "; ".join(f"{b['code']} « {b['name']} » ({b['note']})" for b in to_check) + ".", body))
-    story.append(Paragraph(f"{len(big)} libellés regroupent chacun plus de {GENERIC} dossiers : ce sont plusieurs boîtes physiques sous un même nom "
-                           "(liste en annexe). Ils ne figurent pas parmi les 200 boîtes et doivent être découpés en boîtes sur place.", body))
-    story += [PageBreak(), Paragraph("Liste des boîtes", h2)]
-    rows = [["N°", "Code-barres", "Nom de la boîte", "Dossiers", "Codes des dossiers"]]
+        story.append(Paragraph("Cartons à vérifier avant étiquetage : " + "; ".join(f"{b['code']} « {b['name']} » ({b['note']})" for b in to_check) + ".", body))
+    story.append(Paragraph(f"{len(big)} intitulés de l'inventaire regroupent chacun un grand nombre de dossiers et correspondent à plusieurs cartons "
+                           "(liste en annexe). Ils ne figurent pas dans cette liste et seront répartis en cartons lors d'une prochaine étape.", body))
+    story += [PageBreak(), Paragraph("Liste des cartons", h2)]
+    rows = [["N°", "Code-barres", "Nom du carton", "Dossiers", "Codes des dossiers"]]
     for b in boxes:
         codes = b["dossier_codes"]
         rows.append([str(b["rank"]), b["code"], Paragraph(b["name"], small), str(len(b["dossiers"])), f"…-0001 à …-{len(codes):04d}"])
@@ -205,8 +205,8 @@ def report(path):
     ]))
     story.append(table)
     if big:
-        story += [Paragraph("Annexe – libellés génériques à découper", h2)]
-        grows = [["Code actuel", "Libellé", "Dossiers"]] + [[g["code"], Paragraph(g["name"], small), str(g["dossiers"])] for g in big]
+        story += [Paragraph("Annexe – intitulés à répartir en plusieurs cartons", h2)]
+        grows = [["Code actuel", "Intitulé", "Dossiers"]] + [[g["code"], Paragraph(g["name"], small), str(g["dossiers"])] for g in big]
         gt = Table(grows, colWidths=[30*mm, 120*mm, 20*mm], repeatRows=1)
         gt.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), navy), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                                 ("FONT", (0, 0), (-1, 0), "Helvetica-Bold", 8.5), ("FONT", (0, 1), (-1, -1), "Helvetica", 8), ("ALIGN", (2, 0), (2, -1), "RIGHT")]))
@@ -216,11 +216,11 @@ def report(path):
         canvas_.drawString(15*mm, 10*mm, "GeoArchives – Récupération des archives MULCV")
         canvas_.drawRightString(A4[0] - 15*mm, 10*mm, f"Page {doc.page}")
     SimpleDocTemplate(path, pagesize=A4, leftMargin=15*mm, rightMargin=15*mm, topMargin=15*mm, bottomMargin=16*mm,
-                      title="Récupération – 200 premières boîtes", author="CEIBA Analytics").build(story, onFirstPage=footer, onLaterPages=footer)
+                      title=f"Récupération – {len(boxes)} premiers cartons", author="CEIBA Analytics").build(story, onFirstPage=footer, onLaterPages=footer)
 
-box_labels(f"{outdir}/etiquettes-boites.pdf")
+box_labels(f"{outdir}/etiquettes-cartons.pdf")
 dossier_labels(f"{outdir}/etiquettes-dossiers.pdf")
-report(f"{outdir}/rapport-boites-a-recuperer-{len(boxes)}.pdf")
+report(f"{outdir}/rapport-cartons-a-recuperer-{len(boxes)}.pdf")
 summary = {"boxes": len(boxes), "dossiers": total_dossiers, "first": boxes[0]["code"], "last": boxes[-1]["code"], "site": SITE,
            "toCheck": sum(1 for b in boxes if b.get("note")), "generic": len(big), "genericDossiers": sum(g["dossiers"] for g in big), "exportedAt": data["exportedAt"]}
 json.dump(summary, open(f"{outdir}/summary.json", "w", encoding="utf-8"), ensure_ascii=False)

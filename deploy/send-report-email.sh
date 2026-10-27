@@ -3,7 +3,8 @@
 # de l'application, puis supprime le dossier.
 #   bash /opt/colect-app/current/deploy/send-report-email.sh <id> <a@x,b@x> <c@x,...>
 set -Eeuo pipefail
-id=${1:-}; to=${2:-}; cc=${3:-}
+id=${1:-}; to=${2:-}; cc=${3:-}; replaces=${4:-0}
+[[ "$replaces" == 0 || "$replaces" == 1 ]] || { echo 'Option invalide.' >&2; exit 1; }
 [[ "$id" =~ ^[0-9]{1,20}$ ]] || { echo 'Identifiant invalide.' >&2; exit 1; }
 [[ "$to" =~ ^[A-Za-z0-9._%+@,-]{3,600}$ && "$cc" =~ ^[A-Za-z0-9._%+@,-]{0,600}$ ]] || { echo 'Adresses invalides.' >&2; exit 1; }
 umask 077
@@ -33,4 +34,4 @@ outbox="$shared/outbox/$id"
 trap 'rm -rf -- "$outbox"' EXIT
 chmod -R a+rX "$outbox"
 docker compose --project-name colect-app --env-file "$shared/deploy.env" -f "$release/compose.contabo.yml" \
-  run --rm --no-deps -T --volume "$outbox:/outbox:ro" app node deploy/send-report-email.mjs --dir=/outbox "--to=$to" "--cc=$cc" "--key=$id"
+  run --rm --no-deps -T --volume "$outbox:/outbox:ro" app node deploy/send-report-email.mjs --dir=/outbox "--to=$to" "--cc=$cc" "--key=$id" "--replaces=$replaces"

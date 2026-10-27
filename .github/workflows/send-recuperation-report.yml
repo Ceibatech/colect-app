@@ -15,15 +15,19 @@ on:
         type: choice
         options: [apercu, envoyer]
       destinataires:
-        description: "Destinataires, séparés par des virgules"
+        description: "Destinataires, séparés par des virgules (obligatoire)"
         required: true
-        default: "md@ceiba-analytics.com"
         type: string
       copie:
-        description: "Copie, séparée par des virgules"
-        required: false
-        default: "daf@ceiba-analytics.com,dac03@ceiba-analytics.com,dac01@ceiba-analytics.com,dac@ceiba-analytics.com"
+        description: "Copie, séparée par des virgules, ou « aucune »"
+        required: true
+        default: "aucune"
         type: string
+      remplace:
+        description: "Ajouter une mention indiquant que ce message remplace un envoi précédent"
+        required: false
+        default: false
+        type: boolean
       boites:
         description: "Nombre de boîtes"
         required: true
@@ -55,6 +59,7 @@ jobs:
           TO: ${{ inputs.destinataires }}
           CC: ${{ inputs.copie }}
           BOITES: ${{ inputs.boites }}
+          REMPLACE: ${{ inputs.remplace && '1' || '0' }}
           CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
           CONTABO_USER: ${{ secrets.CONTABO_USER }}
           CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
@@ -68,6 +73,9 @@ jobs:
           [[ "$BOITES" =~ ^[0-9]{1,4}$ ]] || { echo "Nombre de boîtes invalide." >&2; exit 1; }
           [[ "$TO" =~ ^[A-Za-z0-9._%+@,\ -]{3,600}$ && "$CC" =~ ^[A-Za-z0-9._%+@,\ -]{0,600}$ ]] || { echo "Adresses invalides." >&2; exit 1; }
           TO="${TO// /}"; CC="${CC// /}"
+          if [[ "$CC" == aucune ]]; then CC=""; fi
+          [[ -n "$TO" ]] || { echo "Destinataires obligatoires." >&2; exit 1; }
+          echo "Destinataires : $TO — copie : ${CC:-aucune}"
           [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
           [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
           [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
@@ -101,7 +109,7 @@ jobs:
             for file in rapport/*.xlsx rapport/*.pdf rapport/summary.json; do
               ssh "${ssh_options[@]}" "$destination" "umask 022; set -C; cat > '/opt/colect-app/shared/outbox/$id/$(basename "$file")'" < "$file"
             done
-            ssh "${ssh_options[@]}" "$destination" "bash /opt/colect-app/current/deploy/send-report-email.sh $id '$TO' '$CC'"
+            ssh "${ssh_options[@]}" "$destination" "bash /opt/colect-app/current/deploy/send-report-email.sh $id '$TO' '$CC' $REMPLACE"
           fi
 
       - name: Conserver les fichiers produits (3 jours)
