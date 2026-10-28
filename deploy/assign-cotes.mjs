@@ -12,6 +12,7 @@
 // Une cote déjà attribuée n'est jamais modifiée (elle est imprimée).
 // Le script de déploiement sauvegarde la base avant --apply.
 // Règles miroir de src/lib/cartons/cote.ts : garder les deux alignés.
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { PrismaClient, Prisma } from "@prisma/client";
@@ -95,7 +96,23 @@ async function inspect(db) {
   return { natures, natureCounts, communes, sigles, cartonPlan, pendingDossiers, total };
 }
 
-const NATURE_ACD = { code: "ACD", libelle: "Dossiers ACD", description: "Référentiel de classement MULCV — 2010 : Dossiers ACD (série 2000, Gestion des actes du foncier)." };
+/** Référentiel de classement (même fichier que l'application : src/lib/referentiel/classement.json). */
+export function loadReferentiel() {
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  const candidates = [path.join(here, "classement.json"), path.join(here, "..", "src", "lib", "referentiel", "classement.json")];
+  const file = candidates.find((candidate) => existsSync(candidate));
+  if (!file) throw new Error("Référentiel de classement introuvable (classement.json).");
+  return JSON.parse(readFileSync(file, "utf8"));
+}
+
+/** Natures du référentiel : une par rubrique (code = n° de rubrique). */
+export function referentielNatures(referentiel) {
+  return referentiel.flatMap((serie) => serie.rubriques.map((rubrique) => ({
+    code: rubrique.code,
+    libelle: rubrique.libelle,
+    description: `Référentiel de classement MULCV — ${serie.code} : ${serie.libelle}`,
+  })));
+}
 
 export async function assignCotes(db, { apply = false, nature = true } = {}) {
   const report = await inspect(db);
@@ -104,7 +121,13 @@ export async function assignCotes(db, { apply = false, nature = true } = {}) {
   const result = await db.$transaction(async (tx) => {
     let natureUpdated = 0;
     if (nature) {
-      const acd = await tx.natureDossier.upsert({ where: { code: NATURE_ACD.code }, update: { isActive: true }, create: NATURE_ACD });
+      // Liste des natures = rubriques du référentiel ; les autres ne sont plus proposées.
+      const natures = referentielNatures(loadReferentiel());
+      for (const item of natures) {
+        await tx.natureDossier.upsert({ where: { code: item.code }, update: { isActive: true, libelle: item.libelle, description: item.description }, create: item });
+      }
+      await tx.natureDossier.updateMany({ where: { code: { notIn: natures.map((item) => item.code) } }, data: { isActive: false } });
+      const acd = await tx.natureDossier.findUniqueOrThrow({ where: { code: CLASSEMENT_ACD }, select: { id: true } });
       natureUpdated = (await tx.dossier.updateMany({ where: { OR: [{ natureDossierId: null }, { natureDossierId: { not: acd.id } }] }, data: { natureDossierId: acd.id } })).count;
     }
     for (const [communeId, sigle] of report.sigles) {
@@ -147,7 +170,11 @@ function print(result) {
   const natureName = new Map(report.natures.map((n) => [n.id, `${n.libelle} (${n.code})`]));
   const communeName = new Map(report.communes.map((c) => [c.id, c.nom]));
   console.log(`Dossiers : ${report.total}`);
-  console.log("\nNatures actuelles (toutes passeront à « Dossiers ACD ») :");
+  const codes = new Set(referentielNatures(loadReferentiel()).map((item) => item.code));
+  console.log(`\nListe des natures harmonisée sur le référentiel : ${codes.size} rubriques (code = n° de rubrique).`);
+  const retired = report.natures.filter((n) => !codes.has(n.code));
+  if (retired.length) console.log(`Natures retirées de la liste (gardées pour l'historique) : ${retired.map((n) => `${n.libelle} (${n.code})`).join(", ")}`);
+  console.log("\nNatures actuelles des dossiers (toutes passeront à « 2010 · Dossiers ACD ») :");
   for (const row of [...report.natureCounts].sort((a, b) => b._count._all - a._count._all)) {
     console.log(`  - ${row.natureDossierId ? natureName.get(row.natureDossierId) ?? `nature ${row.natureDossierId}` : "non renseignée"} : ${row._count._all}`);
   }

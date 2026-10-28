@@ -1050,6 +1050,11 @@ model Dossier {
   numeroLot          String?  @map("numero_lot")
   superficie         Decimal? @db.Decimal(12, 2)
   numeroTitreFoncier String?  @map("numero_titre_foncier")
+  // Déclaré à l'inventaire quand le dossier n'a pas (encore) de titre foncier :
+  // le champ vide est alors voulu, jamais un oubli.
+  sansTitreFoncier   Boolean  @default(false) @map("sans_titre_foncier")
+  // Année de l'acte (référentiel MULCV, série 2000 : « Année »).
+  anneeActe          Int?     @map("annee_acte")
 
   communeId     Int? @map("commune_id")
   lotissementId Int? @map("lotissement_id")

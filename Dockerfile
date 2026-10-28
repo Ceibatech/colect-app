@@ -43,7 +43,7 @@ COPY --from=builder --chown=node:node /app/next.config.ts /app/tsconfig.json ./
 COPY --from=builder --chown=node:node /app/prisma ./prisma
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next ./.next
-COPY --from=builder --chown=node:node /app/deploy/healthcheck.mjs /app/deploy/validate-env.mjs /app/deploy/backup-database.mjs /app/deploy/email-report-scheduler.mjs /app/deploy/reset-transfers.mjs /app/deploy/export-carton-labels.mjs /app/deploy/regroup-cartons.mjs /app/deploy/align-dossier-salle.mjs /app/deploy/e2e-account.mjs /app/deploy/export-recuperation.mjs /app/deploy/send-report-email.mjs /app/deploy/assign-cotes.mjs ./deploy/
+COPY --from=builder --chown=node:node /app/deploy/healthcheck.mjs /app/deploy/validate-env.mjs /app/deploy/backup-database.mjs /app/deploy/email-report-scheduler.mjs /app/deploy/reset-transfers.mjs /app/deploy/export-carton-labels.mjs /app/deploy/regroup-cartons.mjs /app/deploy/align-dossier-salle.mjs /app/deploy/e2e-account.mjs /app/deploy/export-recuperation.mjs /app/deploy/send-report-email.mjs /app/deploy/assign-cotes.mjs /app/src/lib/referentiel/classement.json ./deploy/
 
 RUN mkdir -p /var/data/documents && chown node:node /var/data/documents
 USER node

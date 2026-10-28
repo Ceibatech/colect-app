@@ -147,6 +147,13 @@ export function CollecteWizard({
       const fieldsToValidate = [...stepFields] as (keyof DossierFormValues)[];
       const valid = await form.trigger(fieldsToValidate);
       if (!valid) return;
+      // Contrôle complet dès cette étape : un champ exigé ne passe pas vide.
+      const strict = dossierSubmitSchema.safeParse(form.getValues());
+      if (!strict.success) {
+        const issues = strict.error.issues.filter((issue) => (fieldsToValidate as string[]).includes(String(issue.path[0])));
+        for (const issue of issues) form.setError(issue.path[0] as keyof DossierFormValues, { message: issue.message });
+        if (issues.length) return;
+      }
     }
     setCurrentStep((s) => Math.min(s + 1, DOSSIER_STEPS.length));
   }

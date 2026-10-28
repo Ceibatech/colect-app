@@ -14,7 +14,7 @@ import {
 import { evaluateInventorySubmission } from "@/lib/workflow/automatic-validation";
 import { resolveCartonId } from "@/lib/cartons/persistence";
 import { assignDossierCote, findCartonByCote } from "@/lib/cartons/cote-assignment";
-import { findRubrique } from "@/lib/referentiel/classement";
+import { findRubrique, rubriqueOfCote, type Rubrique } from "@/lib/referentiel/classement";
 
 const MAX_REFERENCE_ATTEMPTS = 5;
 
@@ -76,10 +76,12 @@ function cleanForDb(values: DossierFormValues) {
     // description périmée si l'utilisateur repasse en "Bon état" après avoir
     // rédigé un texte puis changé d'avis (retour en arrière via "Modifier").
     etatCartonDescription: values.etatCarton === "DEGRADE" ? clean(values.etatCartonDescription) ?? null : null,
-    numeroIlot: clean(values.numeroIlot) ?? null,
-    numeroLot: clean(values.numeroLot) ?? null,
+    numeroIlot: clean(values.numeroIlot)?.trim().toUpperCase() ?? null,
+    numeroLot: clean(values.numeroLot)?.trim().toUpperCase() ?? null,
     superficie: toNullableNumber(values.superficie),
-    numeroTitreFoncier: clean(values.numeroTitreFoncier) ?? null,
+    numeroTitreFoncier: values.sansTitreFoncier ? null : clean(values.numeroTitreFoncier)?.trim() ?? null,
+    sansTitreFoncier: values.sansTitreFoncier === true,
+    anneeActe: toNullableNumber(values.anneeActe),
     communeId: toNullableNumber(values.communeId),
     etatDossier: clean(values.etatDossier) ?? null,
     etatDossierDescription: values.etatDossier === "DEGRADE" ? clean(values.etatDossierDescription) ?? null : null,
@@ -213,6 +215,17 @@ async function createDossierWithUniqueReference(
   throw lastError ?? new Error("Impossible de générer une référence de dossier unique.");
 }
 
+/** Nature correspondant à une rubrique du référentiel (code = n° de rubrique), créée au besoin. */
+async function natureForRubrique(rubrique: Rubrique): Promise<number> {
+  const nature = await prisma.natureDossier.upsert({
+    where: { code: rubrique.code },
+    update: {},
+    create: { code: rubrique.code, libelle: rubrique.libelle, description: "Référentiel de classement des archives du MULCV" },
+    select: { id: true },
+  });
+  return nature.id;
+}
+
 /** Carton désigné par sa cote dans le formulaire d'inventaire, avec son emplacement et son libellé. */
 async function chosenCarton(value: string | undefined) {
   if (!value?.trim()) return null;
@@ -252,6 +265,9 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
   const rubrique = values.modeCarton === "NOUVEAU" ? findRubrique(values.classement || "2010") : null;
   if (values.modeCarton === "NOUVEAU" && !rubrique) throw new Error("Choisissez la rubrique de classement du nouveau carton.");
   const chosen = values.modeCarton === "NOUVEAU" ? null : await chosenCarton(values.cartonCote);
+  // Règle du référentiel : la nature du dossier est la rubrique de son carton.
+  const cartonRubrique = rubrique ?? rubriqueOfCote(chosen?.cote);
+  if (cartonRubrique) data.natureDossierId = await natureForRubrique(cartonRubrique);
   if (chosen) {
     if (data.siteId && chosen.siteId && data.siteId !== chosen.siteId) {
       throw new Error(`Le carton ${chosen.cote} est rangé sur un autre site. Choisissez ce site ou un autre carton.`);

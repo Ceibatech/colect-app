@@ -52,6 +52,8 @@ export default async function CollectePage({
         numeroLot: dossier.numeroLot ?? undefined,
         superficie: dossier.superficie ? Number(dossier.superficie) : undefined,
         numeroTitreFoncier: dossier.numeroTitreFoncier ?? undefined,
+        sansTitreFoncier: dossier.sansTitreFoncier,
+        anneeActe: dossier.anneeActe ?? undefined,
         communeId: dossier.communeId ?? undefined,
         lotissementNom: dossier.lotissement?.nom ?? undefined,
         natureDossierId: dossier.natureDossierId ?? undefined,
