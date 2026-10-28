@@ -91,6 +91,7 @@ export async function searchTransferCartons(options: TransferCartonSearchOptions
       siteId: true,
       codeBarres: true,
       libelleCarton: true,
+      carton: { select: { cote: true } },
       transferLotDossiers: {
         where: {
           transferLotItem: {
@@ -237,7 +238,7 @@ export async function getTransferAuthorization(lotId: number) {
       authorizedBy: { select: { name: true } },
       items: {
         orderBy: { cartonCode: "asc" },
-        include: { dossiers: { include: { dossier: { select: { reference: true, nom: true, prenoms: true } } } } },
+        include: { carton: { select: { cote: true } }, dossiers: { include: { dossier: { select: { reference: true, cote: true, nom: true, prenoms: true } } } } },
       },
     },
   });
@@ -356,9 +357,10 @@ export async function getTransferLotDetail(id: number) {
       items: {
         orderBy: { cartonCode: "asc" },
         include: {
+          carton: { select: { cote: true } },
           dossiers: {
             orderBy: { dossier: { reference: "asc" } },
-            include: { dossier: { select: { id: true, reference: true, nom: true, prenoms: true } } },
+            include: { dossier: { select: { id: true, reference: true, cote: true, nom: true, prenoms: true } } },
           },
         },
       },

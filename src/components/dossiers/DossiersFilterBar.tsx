@@ -56,7 +56,7 @@ export function DossiersFilterBar({
           <Input
             name="q"
             defaultValue={current.q ?? ""}
-            placeholder="ID carton CTN-…, référence, code-barres, nom, prénoms..."
+            placeholder="Cote (2010-KOU-0001), référence, code-barres, nom, prénoms..."
             className="h-10 pl-9"
           />
         </div>

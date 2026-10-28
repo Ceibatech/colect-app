@@ -11,6 +11,7 @@ const PAGE_SIZE = 20;
 type GroupSeed = {
   token: string;
   cartonId: number | null;
+  cartonCote?: string | null;
   siteId: number | null;
   codeBarres: string | null;
   libelleCarton: string | null;
@@ -44,11 +45,22 @@ async function getCartonPage(where: Prisma.DossierWhereInput, page: number) {
     }
   }
   const groups = Array.from(merged.values());
+  const pageGroups = groups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  await attachCartonCotes(pageGroups);
   return {
-    groups: groups.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    groups: pageGroups,
     total: groups.length,
     totalPages: Math.max(1, Math.ceil(groups.length / PAGE_SIZE)),
   };
+}
+
+/** Cote du référentiel de chaque carton, pour l'affichage (à la place du CTN). */
+export async function attachCartonCotes<T extends { cartonId: number | null; cartonCote?: string | null }>(groups: T[]) {
+  const ids = [...new Set(groups.flatMap((group) => (group.cartonId ? [group.cartonId] : [])))];
+  if (!ids.length) return groups;
+  const cotes = new Map((await prisma.carton.findMany({ where: { id: { in: ids } }, select: { id: true, cote: true } })).map((c) => [c.id, c.cote]));
+  for (const group of groups) if (group.cartonId) group.cartonCote = cotes.get(group.cartonId) ?? null;
+  return groups;
 }
 
 function searchConstraint(q?: string): Prisma.DossierWhereInput[] {

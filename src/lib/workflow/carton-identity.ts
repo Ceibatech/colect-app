@@ -73,10 +73,14 @@ export function cartonWhereFromToken(token: string): Prisma.DossierWhereInput | 
   };
 }
 
-export function getCartonDisplay(identity: Pick<CartonIdentity, "cartonId" | "codeBarres" | "libelleCarton">) {
+export function getCartonDisplay(identity: Pick<CartonIdentity, "cartonId" | "codeBarres" | "libelleCarton"> & {
+  /** Cote du référentiel (2010-KOU-0001), affichée à la place de l'identifiant technique CTN. */
+  cartonCote?: string | null;
+  carton?: { cote: string | null } | null;
+}) {
   if (identity.cartonId != null) {
     return {
-      label: formatCartonReference(identity.cartonId),
+      label: identity.cartonCote ?? identity.carton?.cote ?? formatCartonReference(identity.cartonId),
       // Le libellé identifie le carton ; le code-barres appartient au dossier.
       description: identity.libelleCarton?.trim() || identity.codeBarres?.trim() || null,
     };

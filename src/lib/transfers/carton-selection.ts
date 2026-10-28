@@ -9,6 +9,7 @@ export interface TransferCartonSourceRow {
   siteId: number | null;
   codeBarres: string | null;
   libelleCarton: string | null;
+  carton?: { cote: string | null } | null;
   transferLotDossiers: Array<{ id: number }>;
 }
 
@@ -80,7 +81,7 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
 
 export function filterTransferCartons(items: TransferCartonItem[], query?: string) {
   const cartonId = parseCartonReference(query ?? "");
-  if (cartonId !== null) return items.filter((item) => item.code === formatCartonReference(cartonId));
+  if (cartonId !== null) return items.filter((item) => item.token === `carton:${cartonId}` || item.code === formatCartonReference(cartonId));
   const normalizedQuery = normalizeSearch(query ?? "");
   if (!normalizedQuery) return items;
   return items.filter((item) => normalizeSearch(`${item.code} ${item.label ?? ""} ${(item.codes ?? []).join(" ")}`).includes(normalizedQuery));

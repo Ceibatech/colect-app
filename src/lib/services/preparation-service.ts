@@ -3,6 +3,7 @@ import { Prisma, type StatutPreparation } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import type { PreparationSearch } from "@/lib/validation/preparation";
 import { buildCartonToken, cartonWhereFromToken, getCartonDisplay } from "@/lib/workflow/carton-identity";
+import { attachCartonCotes } from "@/lib/services/production-queue-service";
 import { parseCartonReference } from "@/lib/cartons/reference";
 
 export const PREPARATION_PAGE_SIZE = 20;
@@ -109,7 +110,8 @@ export async function getPreparationWorkspace(filters: PreparationSearch) {
 
   const allCartons = Array.from(mergedGroups.values());
   const total = allCartons.length;
-  const pageGroups = allCartons.slice((page - 1) * PREPARATION_PAGE_SIZE, page * PREPARATION_PAGE_SIZE);
+  const pageGroups: Array<(typeof allCartons)[number] & { cartonCote?: string | null }> = allCartons.slice((page - 1) * PREPARATION_PAGE_SIZE, page * PREPARATION_PAGE_SIZE);
+  await attachCartonCotes(pageGroups);
   const pageWheres = pageGroups
     .map((group) => cartonWhereFromToken(group.token))
     .filter((item): item is Prisma.DossierWhereInput => item !== null);

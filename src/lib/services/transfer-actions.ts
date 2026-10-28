@@ -349,7 +349,7 @@ export async function createTransferLot(
         // Fetch the entire carton, including members whose location is NULL.
         // SQL NOT(location) would miss those members because of NULL semantics.
         where: { OR: cartonFilters },
-        select: { id: true, reference: true, cartonId: true, siteId: true, entrepotId: true, codeBarres: true, libelleCarton: true },
+        select: { id: true, reference: true, cartonId: true, siteId: true, entrepotId: true, codeBarres: true, libelleCarton: true, carton: { select: { cote: true } } },
       });
       if (dossiers.some((dossier) => !(parsed.data.includeUnlocated && dossier.siteId === null)
         && !(dossier.siteId === parsed.data.sourceSiteId && dossier.entrepotId === (parsed.data.sourceEntrepotId ?? null)))) {

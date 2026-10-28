@@ -22,8 +22,8 @@ import {
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const dossier = await prisma.dossier.findUnique({ where: { id: Number(id) }, select: { reference: true } });
-  return { title: dossier ? `${dossier.reference} — Dossiers` : "Dossier — GeoArchives" };
+  const dossier = await prisma.dossier.findUnique({ where: { id: Number(id) }, select: { reference: true, cote: true } });
+  return { title: dossier ? `${dossier.cote ?? dossier.reference} — Dossiers` : "Dossier — GeoArchives" };
 }
 
 export default async function DossierDetailPage({
@@ -142,7 +142,8 @@ export default async function DossierDetailPage({
             <ArrowLeft className="mr-1 h-4 w-4" />
             {fromPreparation ? "Retour à la préparation" : "Retour à la liste"}
           </Link>
-          <h1 className="font-mono text-xl font-semibold">{dossier.reference}</h1>
+          <h1 className="font-mono text-xl font-semibold">{dossier.cote ?? dossier.reference}</h1>
+          {dossier.cote ? <p className="font-mono text-xs text-muted-foreground">{dossier.reference}</p> : null}
           <p className="text-sm text-muted-foreground">
             {[dossier.nom, dossier.prenoms].filter(Boolean).join(" ") || "Titulaire non renseigné"}
           </p>
