@@ -77,7 +77,6 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Préparation", href: "/preparation", icon: ClipboardCheck, permission: "PREPARATION_VIEW", tone: "preparation" },
   { title: "Numérisation", href: "/numerisation", icon: ScanLine, permission: "NUMERISATION_VIEW", tone: "numerisation" },
   { title: "Reconditionnement", href: "/conditionnement", icon: PackageCheck, permission: "CONDITIONNEMENT_VIEW", tone: "conditionnement" },
-  { title: "Caisses", href: "/caisses", icon: Container, permission: "CONDITIONNEMENT_VIEW", tone: "conditionnement" },
   { title: "Indexation", href: "/indexation", icon: ScanSearch, permission: "INDEXATION_VIEW", tone: "indexation" },
   { title: "Archivage", href: "/archivage", icon: Archive, permission: "ARCHIVAGE_VIEW", tone: "archivage" },
   {
@@ -86,6 +85,7 @@ export const NAV_ITEMS: NavItem[] = [
       { title: "Registre et bordereaux", href: "/transferts", icon: Truck, permission: "TRANSFER_VIEW" },
       { title: "Mon site", href: "/transferts/mon-site", icon: MapPinned, permission: "TRANSFER_OPERATE" },
       { title: "Mes convois", href: "/transferts/convois", icon: Navigation, permission: "TRANSFER_TRACK" },
+      { title: "Caisses de transport", href: "/caisses", icon: Container, permission: "TRANSFER_OPERATE" },
       { title: "Validation interne", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
       { title: "Validation SDA", href: "/transferts/validation", icon: ShieldCheck, permission: "TRANSFER_AUTHORIZE" },
     ],

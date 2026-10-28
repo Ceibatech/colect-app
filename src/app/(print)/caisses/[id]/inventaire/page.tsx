@@ -16,7 +16,7 @@ export const metadata = { title: "Inventaire de caisse — GeoArchives" };
  * et la liste de ses cartons par cote.
  */
 export default async function CaisseInventairePage({ params }: { params: Promise<{ id: string }> }) {
-  await requireAnyPermission("DOSSIER_READ", "CONDITIONNEMENT_VIEW");
+  await requireAnyPermission("TRANSFER_VIEW", "DOSSIER_READ");
   const id = Number((await params).id);
   if (!Number.isInteger(id) || id <= 0) notFound();
   const caisse = await getCaisse(id);
@@ -35,7 +35,7 @@ export default async function CaisseInventairePage({ params }: { params: Promise
       <header className="flex items-center gap-[6mm] border-b-2 border-black pb-[4mm]">
         <div className="qr size-[38mm] shrink-0" dangerouslySetInnerHTML={{ __html: qr }} />
         <div>
-          <p className="text-[10pt] uppercase tracking-wide">Caisse</p>
+          <p className="text-[10pt] uppercase tracking-wide">Caisse de transport{caisse.transferLot ? ` · lot ${caisse.transferLot.reference}` : ""}</p>
           <p className="font-mono text-[30pt] font-bold leading-none">{caisse.numero}</p>
           <p className="mt-[2mm] text-[11pt]">{caisse.site.nom} · {caisse.cartons.length}/{caisse.capacite} cartons · {dossiers} dossiers</p>
           <p className="text-[9pt] text-slate-700">Inventaire du {date}</p>

@@ -6,11 +6,11 @@ import { requireAnyPermission } from "@/lib/auth/current-user";
 import { listCaisses, listCeibaSites } from "@/lib/services/caisse-service";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Caisses de rangement — GeoArchives" };
+export const metadata = { title: "Caisses de transport — GeoArchives" };
 
-/** Caisses du site CEIBA : combien de cartons chacune contient, et lesquels. */
+/** Caisses de transport (enlèvement et retour) : lesquelles sont chargées, pour quel lot, avec quels cartons. */
 export default async function CaissesPage() {
-  const session = await requireAnyPermission("DOSSIER_READ", "CONDITIONNEMENT_VIEW");
+  const session = await requireAnyPermission("TRANSFER_VIEW", "DOSSIER_READ");
   const canManage = session.permissions.includes("REFERENTIEL_MANAGE");
   const [caisses, sites] = await Promise.all([listCaisses(), canManage ? listCeibaSites() : Promise.resolve([])]);
   const actives = caisses.filter((caisse) => caisse.isActive);
@@ -18,21 +18,21 @@ export default async function CaissesPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        tone="dossiers"
+        tone="transfer"
         icon={Archive}
-        eyebrow="Rangement après traitement"
-        title="Caisses"
-        description="Après le reconditionnement, chaque carton est rangé dans une caisse du site CEIBA. Scannez la caisse puis ses cartons : l'application sait à tout moment quel carton est dans quelle caisse."
+        eyebrow="Transferts d'archives"
+        title="Caisses de transport"
+        description="À l'enlèvement chez le client et au retour, les cartons du lot sont chargés caisse par caisse (40 au plus). L'application sait à tout moment quel carton voyage dans quelle caisse ; la caisse se vide à la réception."
         stats={[
           { label: "Caisses en service", value: actives.length },
-          { label: "Cartons rangés", value: actives.reduce((sum, caisse) => sum + caisse.cartons, 0) },
-          { label: "Places libres", value: actives.reduce((sum, caisse) => sum + Math.max(0, caisse.capacite - caisse.cartons), 0) },
+          { label: "Chargées", value: actives.filter((caisse) => caisse.cartons > 0).length },
+          { label: "Cartons en caisse", value: actives.reduce((sum, caisse) => sum + caisse.cartons, 0) },
         ]}
       />
 
       {caisses.length === 0 ? (
         <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-          Aucune caisse pour le moment. Créez-les avec la numérotation inscrite sur les caisses ; un numéro peut être corrigé plus tard sans toucher au contenu.
+          Aucune caisse pour le moment. Créez-les dès que leur numérotation est fixée ; un numéro peut être corrigé plus tard sans toucher au contenu.
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -45,7 +45,7 @@ export default async function CaissesPage() {
                   <div className="flex items-start justify-between gap-2">
                     <p className="font-mono text-lg font-semibold">{caisse.numero}</p>
                     <span className={cn("rounded px-2 py-0.5 text-xs font-medium", !caisse.isActive ? "bg-muted text-muted-foreground" : full ? "bg-amber-100 text-amber-900" : caisse.cartons ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground")}>
-                      {!caisse.isActive ? "Hors service" : full ? "Pleine" : caisse.cartons ? "En remplissage" : "Vide"}
+                      {!caisse.isActive ? "Hors service" : full ? "Pleine" : caisse.cartons ? "Chargée" : "Disponible"}
                     </span>
                   </div>
                   <div>
@@ -54,7 +54,7 @@ export default async function CaissesPage() {
                     </div>
                     <p className="mt-1.5 text-sm tabular-nums"><span className="font-semibold">{caisse.cartons}</span>/{caisse.capacite} cartons · {caisse.dossiers} dossiers</p>
                   </div>
-                  <p className="text-xs text-muted-foreground">{caisse.site.nom}{caisse.description ? ` · ${caisse.description}` : ""}</p>
+                  <p className="text-xs text-muted-foreground">{caisse.transferLot ? `Lot ${caisse.transferLot.reference} · ` : ""}Basée à {caisse.site.nom}{caisse.description ? ` · ${caisse.description}` : ""}</p>
                 </Link>
               </li>
             );
@@ -66,7 +66,7 @@ export default async function CaissesPage() {
         <section className="space-y-3 rounded-lg border bg-card p-4">
           <div>
             <h2 className="text-base font-semibold">Ajouter une caisse</h2>
-            <p className="text-sm text-muted-foreground">Saisissez le numéro tel qu&apos;il est écrit sur la caisse. Il ne fait pas partie des cotes des cartons.</p>
+            <p className="text-sm text-muted-foreground">Saisissez le numéro tel qu&apos;il est écrit sur la caisse, et son site CEIBA de rattachement. Il ne fait pas partie des cotes des cartons.</p>
           </div>
           {sites.length ? <CaisseForm sites={sites} /> : <p className="text-sm text-muted-foreground">Aucun site CEIBA actif : créez d&apos;abord le site dans Administration → Sites.</p>}
         </section>

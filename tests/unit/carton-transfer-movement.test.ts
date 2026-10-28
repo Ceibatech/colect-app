@@ -11,6 +11,7 @@ vi.mock("@/lib/prisma/client", () => ({ prisma: {
 vi.mock("@/lib/utils/server-request", () => ({ getClientIp: async () => "192.0.2.1" }));
 vi.mock("@/lib/services/transfer-notification-service", () => ({ notifyTransferWorkflow: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/services/caisse-service", () => ({ dechargerCartons: vi.fn(async () => 0) }));
 
 import { approveTransferMovementByMinistry } from "@/lib/services/transfer-actions";
 

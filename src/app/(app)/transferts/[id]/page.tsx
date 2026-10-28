@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Download, FileText,
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ApproveTransferLotByCeibacButton, AuthorizeTransferButton, ReceptionApprovalDialog, SubmitTransferButton, TransferMovementDialog, type TransferMovementItemOption } from "@/components/transferts/TransferActions";
 import { ConvoyTrackingPanel } from "@/components/transferts/ConvoyTrackingPanel";
+import { LotCaisses } from "@/components/caisses/LotCaisses";
+import { getCaissesDuLot } from "@/lib/services/caisse-service";
 import { TransferItemStatusBadge, TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -38,9 +40,10 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const [session, lot] = await Promise.all([
+  const [session, lot, caisses] = await Promise.all([
     requirePermission("TRANSFER_VIEW"),
     getTransferLotDetail(id),
+    getCaissesDuLot(id),
   ]);
   if (!lot) notFound();
 
@@ -149,6 +152,12 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
           </CardContent>
         </Card>
       ) : null}
+
+      <LotCaisses
+        caisses={caisses}
+        horsCaisse={lot.items.filter((item) => (item.status === "PREVU" || item.status === "RECU") && item.cartonId != null && !item.carton?.caisseId).length}
+        canLoad={session.permissions.includes("TRANSFER_OPERATE")}
+      />
 
       {lot.items.some((item) => item.departedAt !== null) ? <ConvoyTrackingPanel lotId={lot.id} canTrack={canTrack && stock.inTransit > 0} mapsKey={process.env.GOOGLE_MAPS_API_KEY ?? null} /> : null}
 

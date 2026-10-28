@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 /**
- * Mise en caisse : scanner (douchette ou appareil photo) ou saisir la cote de
- * chaque carton. L'application refuse un carton non reconditionné, déjà rangé
- * ailleurs, ou une caisse pleine.
+ * Chargement : scanner (douchette ou appareil photo) ou saisir la cote de
+ * chaque carton du lot. L'application refuse un carton hors lot, déjà dans une
+ * autre caisse, un carton d'un autre lot que celui de la caisse, ou une caisse pleine.
  */
-export function CaisseRangement({ caisseId, numero }: { caisseId: number; numero: string }) {
+export function CaisseChargement({ caisseId, numero }: { caisseId: number; numero: string }) {
   const router = useRouter();
   const [scan, setScan] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,14 +29,14 @@ export function CaisseRangement({ caisseId, numero }: { caisseId: number; numero
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scan: value }),
       });
-      const body = await response.json().catch(() => ({})) as { error?: string; cote?: string; dejaRange?: boolean; occupes?: number; capacite?: number };
-      if (!response.ok) throw new Error(body.error ?? "Rangement impossible.");
-      if (body.dejaRange) toast.info(`${body.cote} est déjà dans la caisse ${numero}.`);
-      else toast.success(`${body.cote} rangé dans ${numero} (${body.occupes}/${body.capacite}).`);
+      const body = await response.json().catch(() => ({})) as { error?: string; cote?: string; dejaCharge?: boolean; occupes?: number; capacite?: number; lot?: string };
+      if (!response.ok) throw new Error(body.error ?? "Chargement impossible.");
+      if (body.dejaCharge) toast.info(`${body.cote} est déjà dans la caisse ${numero}.`);
+      else toast.success(`${body.cote} chargé dans ${numero} (${body.occupes}/${body.capacite}) · lot ${body.lot}.`);
       setScan("");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Rangement impossible.");
+      toast.error(error instanceof Error ? error.message : "Chargement impossible.");
     } finally {
       setBusy(false);
     }
@@ -45,8 +45,8 @@ export function CaisseRangement({ caisseId, numero }: { caisseId: number; numero
   return (
     <div className="space-y-3">
       <form onSubmit={(event) => { event.preventDefault(); void ranger(scan); }} className="flex gap-2">
-        <Input value={scan} onChange={(event) => setScan(event.target.value)} placeholder="Scannez le QR du carton ou saisissez sa cote (2010-KOU-0001)" className="h-11 font-mono text-base" aria-label="Carton à ranger" autoComplete="off" autoFocus />
-        <Button type="submit" className="h-11" disabled={busy || !scan.trim()}>{busy ? <Loader2 className="animate-spin" /> : <PackagePlus />} Ranger</Button>
+        <Input value={scan} onChange={(event) => setScan(event.target.value)} placeholder="Scannez le QR du carton ou saisissez sa cote (2010-KOU-0001)" className="h-11 font-mono text-base" aria-label="Carton à charger" autoComplete="off" autoFocus />
+        <Button type="submit" className="h-11" disabled={busy || !scan.trim()}>{busy ? <Loader2 className="animate-spin" /> : <PackagePlus />} Charger</Button>
       </form>
       <QrCameraScanner onCode={(text) => { if (text !== last.current) { last.current = text; void ranger(text); window.setTimeout(() => { last.current = ""; }, 3000); } }} />
     </div>

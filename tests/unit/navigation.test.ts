@@ -69,7 +69,7 @@ describe("role-aware dashboard navigation", () => {
     ["AGENT_INVENTAIRE", ["/dashboard", "/collecte", "/dossiers", "/recherche", "/cartons", "/import"]],
     ["PREPARATEUR", ["/dashboard", "/cartons", "/preparation"]],
     ["NUMERISATEUR", ["/dashboard", "/cartons", "/numerisation"]],
-    ["CONDITIONNEUR", ["/dashboard", "/cartons", "/conditionnement", "/caisses"]],
+    ["CONDITIONNEUR", ["/dashboard", "/cartons", "/conditionnement"]],
     ["INDEXEUR", ["/dashboard", "/cartons", "/indexation"]],
     ["ARCHIVISTE", ["/dashboard", "/cartons", "/archivage"]],
   ] satisfies Array<[RoleCode, string[]]>)
@@ -90,12 +90,12 @@ describe("role-aware dashboard navigation", () => {
   it("shows each validation workspace only to its authorized actors", () => {
     const transfers = NAV_ITEMS.find((item) => item.href === "/transferts")!;
     const cases: Array<[RoleCode, string[]]> = [
-      ["ADMIN", ["/transferts", "/transferts/mon-site", "/transferts/convois", "/transferts/validation-ceibac", "/transferts/validation"]],
+      ["ADMIN", ["/transferts", "/transferts/mon-site", "/transferts/convois", "/caisses", "/transferts/validation-ceibac", "/transferts/validation"]],
       ["VALIDATEUR_CEIBAC", ["/transferts", "/transferts/validation-ceibac"]],
       ["VALIDATEUR_MINISTERE", ["/transferts", "/transferts/validation"]],
       ["SUPERVISEUR", ["/transferts", "/transferts/validation"]],
-      ["GESTIONNAIRE_TRANSFERT", ["/transferts", "/transferts/mon-site", "/transferts/convois"]],
-      ["RESPONSABLE_SITE", ["/transferts", "/transferts/mon-site"]],
+      ["GESTIONNAIRE_TRANSFERT", ["/transferts", "/transferts/mon-site", "/transferts/convois", "/caisses"]],
+      ["RESPONSABLE_SITE", ["/transferts", "/transferts/mon-site", "/caisses"]],
       ["CONVOYEUR", ["/transferts", "/transferts/convois"]],
       ["OPERATEUR", []],
     ];

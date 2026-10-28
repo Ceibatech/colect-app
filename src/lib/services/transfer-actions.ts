@@ -22,6 +22,7 @@ import { participantAllowedOnSide, type ParticipantUser } from "@/lib/transfers/
 import { resolveMultiChoice, resolveSingleChoice, SECURITY_MEASURES, TRANSFER_RISKS, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
 import { getRoleLabel, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
 import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
+import { dechargerCartons } from "@/lib/services/caisse-service";
 
 export interface TransferActionState {
   success?: boolean;
@@ -1075,6 +1076,8 @@ export async function approveTransferMovementByMinistry(
         data: { status: flow.after, ...flow.timestamp },
       });
       if (updatedItems.count !== itemIds.length) throw new TransferRuleError("Le stock a changé pendant la validation.");
+      // Réception ou retour finalisés : les caisses de transport de ces cartons sont vidées.
+      if (flow.after === "RECU" || flow.after === "RETOURNE") await dechargerCartons(tx, cartonIds, movement.transferLotId, session.userId);
 
       await tx.transferSignature.create({
         data: {
