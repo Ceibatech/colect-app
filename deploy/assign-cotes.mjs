@@ -48,7 +48,7 @@ export function planSigles(communes) {
     if (commune.sigle) { plan.set(commune.id, commune.sigle); continue; }
     const base = proposeSigle(commune.nom);
     let sigle = base;
-    for (let attempt = 1; taken.has(sigle) && attempt < 10; attempt++) sigle = `${base.slice(0, 2)}${attempt}`;
+    for (let attempt = 1; taken.has(sigle) && attempt < 27; attempt++) sigle = `${base.slice(0, 2)}${String.fromCharCode(64 + attempt)}`;
     taken.add(sigle);
     plan.set(commune.id, sigle);
   }

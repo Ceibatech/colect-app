@@ -65,6 +65,12 @@ export const dossierFormSchema = z.object({
   // ÉTAPE 2 — Identification
   operateurId: z.coerce.number().int().positive().optional(),
   libelleCarton: z.string().max(255).optional().or(z.literal("")),
+  // Question d'inventaire : le dossier rejoint un carton déjà commencé
+  // (désigné par sa cote) ou ouvre un nouveau carton.
+  modeCarton: z.enum(["EXISTANT", "NOUVEAU"]).optional(),
+  // Rubrique du référentiel de classement MULCV (2010 = Dossiers ACD) : ouvre
+  // la cote d'un nouveau carton.
+  classement: z.string().regex(/^\d{4}$/, "Rubrique de classement invalide").optional().or(z.literal("")),
   // Cote du carton (2010-KOU-0001) scannée ou saisie : range le dossier dans ce
   // carton existant, quel que soit le libellé. Vide : carton reconnu par son
   // libellé, ou nouveau carton.
@@ -150,8 +156,8 @@ export const dossierSubmitSchema = dossierFormSchema
   });
 
 export const DOSSIER_STEPS = [
-  { id: 1, title: "Site", fields: ["siteId", "entrepotId"] },
-  { id: 2, title: "Identification", fields: ["operateurId", "cartonCote", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
+  { id: 1, title: "Carton et site", fields: ["modeCarton", "cartonCote", "siteId", "entrepotId", "classement", "libelleCarton"] },
+  { id: 2, title: "Identification", fields: ["operateurId", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
   { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
   { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
   { id: 5, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },

@@ -4,6 +4,8 @@ export const CARTON_FIELD_KEYS = [
   "siteId",
   "entrepotId",
   "operateurId",
+  "modeCarton",
+  "classement",
   "cartonCote",
   "libelleCarton",
   "codeBarres",

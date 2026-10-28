@@ -18,7 +18,11 @@ export function CartonCotePreview({
   siteId,
   communeId,
   draftId,
+  nouveau = false,
+  classement,
 }: {
+  nouveau?: boolean;
+  classement?: string;
   cote?: string;
   libelle?: string;
   siteId?: number;
@@ -27,13 +31,15 @@ export function CartonCotePreview({
 }) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const query = new URLSearchParams();
-  if (cote?.trim()) query.set("cote", cote.trim());
+  if (!nouveau && cote?.trim()) query.set("cote", cote.trim());
   else if (libelle?.trim()) query.set("libelle", libelle.trim());
+  if (nouveau) query.set("nouveau", "1");
+  if (classement) query.set("classement", classement);
   if (siteId) query.set("site", String(siteId));
   if (communeId) query.set("commune", String(communeId));
   if (draftId) query.set("dossier", String(draftId));
   const search = query.toString();
-  const hasIdentity = Boolean(cote?.trim() || libelle?.trim());
+  const hasIdentity = nouveau || Boolean(cote?.trim() || libelle?.trim());
 
   useEffect(() => {
     if (!hasIdentity) return;

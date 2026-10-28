@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { Controller, useWatch } from "react-hook-form";
-import { CartonCotePreview } from "@/components/collecte/CartonCotePreview";
-import { QrCameraScanner } from "@/components/cartons/QrCameraScanner";
-import { coteFromScan } from "@/lib/cartons/scan";
+import { Controller } from "react-hook-form";
 import { DIRECTION_SERVICE_OPTIONS, type DossierFormValues } from "@/lib/validation/dossier";
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -35,18 +32,15 @@ export function StepIdentification({
   isOperateurRole,
   currentUserName,
   isCartonCarryOver = false,
-  draftId,
 }: {
   form: UseFormReturn<DossierFormValues>;
   operateurs: Operateur[];
   isOperateurRole: boolean;
   currentUserName: string;
   isCartonCarryOver?: boolean;
-  draftId?: number;
 }) {
   const { register, control, formState } = form;
   const errors = formState.errors;
-  const [cartonCote, libelleCarton, siteId, communeId] = useWatch({ control, name: ["cartonCote", "libelleCarton", "siteId", "communeId"] });
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -95,34 +89,6 @@ export function StepIdentification({
             />
           )}
           <FieldError errors={[errors.operateurId]} />
-        </FieldContent>
-      </Field>
-
-      <Field className="sm:col-span-2">
-        <FieldLabel>Cote du carton</FieldLabel>
-        <FieldContent>
-          <Input
-            {...register("cartonCote", {
-              setValueAs: (value: string) => (value ? coteFromScan(value) ?? value.trim().toUpperCase() : value),
-            })}
-            placeholder="Scannez le QR du carton ou saisissez sa cote (ex. 2010-KOU-0001). Vide : nouveau carton"
-            autoComplete="off"
-            className="font-mono"
-          />
-          <QrCameraScanner onCode={(text) => form.setValue("cartonCote", coteFromScan(text) ?? text.trim(), { shouldDirty: true })} />
-          <FieldError errors={[errors.cartonCote]} />
-        </FieldContent>
-      </Field>
-
-      <div className="sm:col-span-2">
-        <CartonCotePreview cote={cartonCote} libelle={libelleCarton} siteId={siteId} communeId={communeId} draftId={draftId} />
-      </div>
-
-      <Field>
-        <FieldLabel>Libellé du carton</FieldLabel>
-        <FieldContent>
-          <Input {...register("libelleCarton")} placeholder="Ex. Carton A-12" />
-          <FieldError errors={[errors.libelleCarton]} />
         </FieldContent>
       </Field>
 

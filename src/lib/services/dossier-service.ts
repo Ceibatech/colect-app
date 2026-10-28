@@ -14,6 +14,7 @@ import {
 import { evaluateInventorySubmission } from "@/lib/workflow/automatic-validation";
 import { resolveCartonId } from "@/lib/cartons/persistence";
 import { assignDossierCote, findCartonByCote } from "@/lib/cartons/cote-assignment";
+import { findRubrique } from "@/lib/referentiel/classement";
 
 const MAX_REFERENCE_ATTEMPTS = 5;
 
@@ -245,7 +246,12 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
   const lotissementId = await resolveLotissementId(cleaned.communeId, values.lotissementNom);
   const natureDossierId = await resolveNatureDossierId(values.natureDossierId ?? null, values.natureDossierAutre);
   const data = { ...cleaned, lotissementId, natureDossierId };
-  const chosen = await chosenCarton(values.cartonCote);
+  if (values.modeCarton === "EXISTANT" && !values.cartonCote?.trim()) {
+    throw new Error("Choisissez le carton auquel ajouter ce dossier (sa cote), ou répondez « Nouveau carton ».");
+  }
+  const rubrique = values.modeCarton === "NOUVEAU" ? findRubrique(values.classement || "2010") : null;
+  if (values.modeCarton === "NOUVEAU" && !rubrique) throw new Error("Choisissez la rubrique de classement du nouveau carton.");
+  const chosen = values.modeCarton === "NOUVEAU" ? null : await chosenCarton(values.cartonCote);
   if (chosen) {
     if (data.siteId && chosen.siteId && data.siteId !== chosen.siteId) {
       throw new Error(`Le carton ${chosen.cote} est rangé sur un autre site. Choisissez ce site ou un autre carton.`);
@@ -266,7 +272,7 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
       throw new Error("Vous ne pouvez modifier que vos propres brouillons.");
     }
     const updated = await prisma.$transaction(async (tx) => {
-      const cartonId = await resolveCartonId(tx, data, existing, chosen?.id);
+      const cartonId = await resolveCartonId(tx, data, existing, chosen?.id, values.modeCarton === "NOUVEAU");
       const updated = await tx.dossier.updateMany({
         // A transfer or another edit may have committed while we waited for
         // the carton lock. Never restore the stale form's previous location.
@@ -277,21 +283,21 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
         data: { ...data, operateurId, cartonId },
       });
       if (updated.count !== 1) throw new Error("Ce dossier a été modifié ou déplacé pendant la saisie. Rechargez sa fiche avant de l'enregistrer.");
-      await assignDossierCote(tx, existing.id);
+      await assignDossierCote(tx, existing.id, rubrique?.code);
       return { id: existing.id, reference: existing.reference };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 60_000 });
     return { id: updated.id, reference: updated.reference, ...(await cotesOf(updated.id)) };
   }
 
   const created = await prisma.$transaction(async (tx) => {
-    const cartonId = await resolveCartonId(tx, data, undefined, chosen?.id);
+    const cartonId = await resolveCartonId(tx, data, undefined, chosen?.id, values.modeCarton === "NOUVEAU");
     const dossier = await createDossierWithUniqueReference({
       ...data,
       operateurId,
       cartonId,
       statutCollecte: "BROUILLON",
     }, tx);
-    await assignDossierCote(tx, dossier.id);
+    await assignDossierCote(tx, dossier.id, rubrique?.code);
     return dossier;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 60_000 });
 
@@ -331,6 +337,9 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
   // S'assure qu'un brouillon existe (créé à la volée si l'utilisateur soumet
   // directement sans être passé par "Enregistrer brouillon").
   const draft = await saveDraft(values, draftId ?? undefined);
+  if (values.modeCarton && !draft.cartonCote) {
+    throw new Error("Le dossier n'a pas pu être rangé dans un carton. Revenez à la première étape.");
+  }
 
   const dossier = await prisma.dossier.findUnique({
     where: { id: draft.id },

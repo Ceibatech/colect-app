@@ -32,7 +32,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 import { StepIndicator } from "./StepIndicator";
-import { StepSite, type SiteOption } from "./steps/StepSite";
+import { type SiteOption } from "./steps/StepSite";
+import { StepCarton, checkCartonStep } from "./steps/StepCarton";
 import { StepIdentification } from "./steps/StepIdentification";
 import { StepFoncier } from "./steps/StepFoncier";
 import { StepDossier } from "./steps/StepDossier";
@@ -141,6 +142,7 @@ export function CollecteWizard({
   }, [activeCartonStorageKey, canRestoreActiveCarton, form]);
 
   async function goNext() {
+    if (currentStep === 1 && !(await checkCartonStep(form, sites))) return;
     if (stepFields.length > 0) {
       const fieldsToValidate = [...stepFields] as (keyof DossierFormValues)[];
       const valid = await form.trigger(fieldsToValidate);
@@ -203,18 +205,27 @@ export function CollecteWizard({
         const result = await saveDraft(values, draftId);
         if (mode === "stay") {
           setDraftId(result.id);
-          if (result.cartonCote) form.setValue("cartonCote", result.cartonCote);
+          if (result.cartonCote) {
+            // Le carton existe désormais : la suite de la saisie le désigne par sa cote.
+            form.setValue("modeCarton", "EXISTANT");
+            form.setValue("cartonCote", result.cartonCote);
+          }
           toast.success("Brouillon enregistré - " + (result.cote ?? result.reference));
         } else {
           // Le dossier suivant rejoint ce carton par sa cote : son rang sera n+1.
-          startNextDossier(mode, result.cartonCote ? { ...carton, cartonCote: result.cartonCote } : carton);
+          startNextDossier(mode, result.cartonCote ? { ...carton, modeCarton: "EXISTANT", cartonCote: result.cartonCote } : carton);
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de l'enregistrement du brouillon.");
       }
     });
   }
-  function handleSubmitFinal() {
+  async function handleSubmitFinal() {
+    if (!(await checkCartonStep(form, sites))) {
+      setCurrentStep(1);
+      toast.error("Indiquez le carton du dossier avant de soumettre.");
+      return;
+    }
     const values = form.getValues();
     const parsed = dossierSubmitSchema.safeParse(values);
     if (!parsed.success) {
@@ -240,7 +251,7 @@ export function CollecteWizard({
         setDone({
           reference: result.reference,
           cote: result.cote,
-          carton: result.cartonCote ? { ...extractActiveCartonValues(values), cartonCote: result.cartonCote } : extractActiveCartonValues(values),
+          carton: result.cartonCote ? { ...extractActiveCartonValues(values), modeCarton: "EXISTANT", cartonCote: result.cartonCote } : extractActiveCartonValues(values),
           autoValidated: result.autoValidated,
           anomalyCount: result.anomalyCount,
         });
@@ -364,7 +375,7 @@ export function CollecteWizard({
           </CardHeader>
           <CardContent className="space-y-6 p-4 sm:p-5">
             <form onSubmit={(e) => e.preventDefault()}>
-              {currentStep === 1 && <StepSite form={form} sites={sites} />}
+              {currentStep === 1 && <StepCarton form={form} sites={sites} communes={communes} draftId={draftId} />}
               {currentStep === 2 && (
                 <StepIdentification
                   form={form}
@@ -372,7 +383,6 @@ export function CollecteWizard({
                   isOperateurRole={isOperateurRole}
                   currentUserName={currentUserName}
                   isCartonCarryOver={isContinuingCarton}
-                  draftId={draftId}
                 />
               )}
               {currentStep === 3 && <StepFoncier form={form} communes={communes} />}

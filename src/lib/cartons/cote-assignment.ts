@@ -19,8 +19,9 @@ export async function ensureCommuneSigle(tx: Tx, communeId: number | null): Prom
   if (!commune) return SIGLE_INCONNU;
   if (commune.sigle) return commune.sigle;
   const base = proposeSigle(commune.nom);
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const sigle = attempt === 0 ? base : `${base.slice(0, 2)}${attempt}`;
+  for (let attempt = 0; attempt < 27; attempt++) {
+    // En cas de doublon : 2 premières lettres + une lettre libre (KOA, KOB…), jamais de chiffre.
+    const sigle = attempt === 0 ? base : `${base.slice(0, 2)}${String.fromCharCode(64 + attempt)}`;
     const taken = await tx.commune.findFirst({ where: { sigle, id: { not: communeId } }, select: { id: true } });
     if (taken) continue;
     await tx.commune.update({ where: { id: communeId }, data: { sigle } });
@@ -30,12 +31,12 @@ export async function ensureCommuneSigle(tx: Tx, communeId: number | null): Prom
 }
 
 /** Cote du carton : attribuée une fois (commune majoritaire de ses dossiers), puis stable. */
-export async function ensureCartonCote(tx: Tx, cartonId: number): Promise<string> {
+export async function ensureCartonCote(tx: Tx, cartonId: number, classement: string = CLASSEMENT_ACD): Promise<string> {
   const carton = await tx.carton.findUnique({ where: { id: cartonId }, select: { cote: true } });
   if (carton?.cote) return carton.cote;
   const dossiers = await tx.dossier.findMany({ where: { cartonId }, select: { communeId: true } });
   const sigle = await ensureCommuneSigle(tx, majorityCommune(dossiers.map((d) => d.communeId)));
-  const prefixe = cotePrefixe(sigle, CLASSEMENT_ACD);
+  const prefixe = cotePrefixe(sigle, /^\d{4}$/.test(classement) ? classement : CLASSEMENT_ACD);
   for (let attempt = 0; attempt < 5; attempt++) {
     const last = await tx.carton.aggregate({ where: { cotePrefixe: prefixe }, _max: { coteSequence: true } });
     const sequence = (last._max.coteSequence ?? 0) + 1;
@@ -56,14 +57,14 @@ export async function ensureCartonCote(tx: Tx, cartonId: number): Promise<string
  * rang suivant du nouveau carton. Hors carton : ni rang ni cote.
  * À appeler dans la transaction qui écrit le dossier (ligne carton verrouillée).
  */
-export async function assignDossierCote(tx: Tx, dossierId: number) {
+export async function assignDossierCote(tx: Tx, dossierId: number, classement?: string) {
   const dossier = await tx.dossier.findUnique({ where: { id: dossierId }, select: { cartonId: true, rangCarton: true, cote: true } });
   if (!dossier) return null;
   if (!dossier.cartonId) {
     if (dossier.rangCarton != null || dossier.cote) await tx.dossier.update({ where: { id: dossierId }, data: { rangCarton: null, cote: null } });
     return null;
   }
-  const cartonCote = await ensureCartonCote(tx, dossier.cartonId);
+  const cartonCote = await ensureCartonCote(tx, dossier.cartonId, classement);
   if (dossier.rangCarton != null && dossier.cote?.startsWith(`${cartonCote}-`)) return dossier.cote;
   const last = await tx.dossier.aggregate({ where: { cartonId: dossier.cartonId, id: { not: dossierId } }, _max: { rangCarton: true } });
   const rang = (last._max.rangCarton ?? 0) + 1;

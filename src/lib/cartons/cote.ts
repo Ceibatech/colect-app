@@ -43,7 +43,7 @@ export function formatDossierCote(cartonCote: string, rang: number) {
   return `${cartonCote}-${String(rang).padStart(3, "0")}`;
 }
 
-const COTE = /^(\d{4})-([A-Z]{2,6})-(\d{4,6})(?:-(\d{3,4}))?$/;
+const COTE = /^(\d{4})-([A-Z][A-Z0-9]{1,5})-(\d{4,6})(?:-(\d{3,4}))?$/;
 
 /** « 2010-kou-0001-012 » → { carton: "2010-KOU-0001", rang: 12 }. */
 export function parseCote(value: string): { carton: string; rang: number | null } | null {

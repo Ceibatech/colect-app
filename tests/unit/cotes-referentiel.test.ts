@@ -52,3 +52,11 @@ describe("cotes du référentiel MULCV", () => {
     expect(plan.map((c: { id: number; cote: string }) => [c.id, c.cote])).toEqual([[2, "2010-KOU-0001"], [5, "2010-KOU-0002"], [9, "2010-MAR-0008"]]);
   });
 });
+
+describe("sigles en doublon", () => {
+  it("restent en lettres", () => {
+    const sigles = planSigles([{ id: 1, nom: "Commune Nord", sigle: null }, { id: 2, nom: "Commune Sud", sigle: null }]);
+    expect([...sigles.values()]).toEqual(["COM", "COA"]);
+    expect(parseCote("2010-CO2-0056")?.carton).toBe("2010-CO2-0056");
+  });
+});
