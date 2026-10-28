@@ -28,7 +28,7 @@ export interface DossierSearchFilters {
   dateTo?: Date;
 }
 
-export type DossierSortKey = "createdAt" | "reference" | "nom" | "commune";
+export type DossierSortKey = "cote" | "createdAt" | "reference" | "nom" | "commune";
 
 export interface DossierSearchOptions {
   page: number;
@@ -37,7 +37,15 @@ export interface DossierSearchOptions {
   dir: "asc" | "desc";
 }
 
-const ORDER_BY_MAP: Record<DossierSortKey, (dir: "asc" | "desc") => Prisma.DossierOrderByWithRelationInput> = {
+const ORDER_BY_MAP: Record<DossierSortKey, (dir: "asc" | "desc") => Prisma.DossierOrderByWithRelationInput | Prisma.DossierOrderByWithRelationInput[]> = {
+  // Rubrique-commune, n° du carton (numérique), puis n° du dossier (numérique) :
+  // 2010-KOU-0001-001, -002 … -1303, puis 2010-KOU-0002-001. Dossiers sans carton à la fin.
+  cote: (dir) => [
+    { carton: { cotePrefixe: { sort: dir, nulls: "last" } } },
+    { carton: { coteSequence: { sort: dir, nulls: "last" } } },
+    { rangCarton: { sort: dir, nulls: "last" } },
+    { id: dir },
+  ],
   createdAt: (dir) => ({ createdAt: dir }),
   reference: (dir) => ({ reference: dir }),
   nom: (dir) => ({ nom: dir }),

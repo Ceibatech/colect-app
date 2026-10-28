@@ -42,7 +42,7 @@ describe("parseDossierSearchParams", () => {
   it("retourne les valeurs par défaut quand aucun paramètre n'est fourni", () => {
     const result = parseDossierSearchParams({});
     expect(result.page).toBe(1);
-    expect(result.sort).toBe("createdAt");
-    expect(result.dir).toBe("desc");
+    expect(result.sort).toBe("cote");
+    expect(result.dir).toBe("asc");
   });
 });
