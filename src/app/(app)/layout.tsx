@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { requireUser } from "@/lib/auth/current-user";
+import { ActivityTracker } from "@/components/layout/ActivityTracker";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { Header } from "@/components/layout/Header";
 import { CollecteFab } from "@/components/layout/CollecteFab";
@@ -25,6 +27,7 @@ export default async function AppShellLayout({ children }: { children: React.Rea
           </main>
         </SidebarInset>
         {session.permissions.includes("DOSSIER_CREATE") && <CollecteFab />}
+        <Suspense fallback={null}><ActivityTracker /></Suspense>
       </SidebarProvider>
     </WorkspaceTheme>
   );
