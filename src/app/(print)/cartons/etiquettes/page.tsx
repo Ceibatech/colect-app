@@ -59,7 +59,7 @@ export default async function CartonLabelsPage({ searchParams }: { searchParams:
               <p className="font-mono text-[16pt] font-bold leading-tight">{label.reference}</p>
               <p className="mt-[3mm] line-clamp-3 text-[14pt] font-semibold leading-snug">{label.label ?? "Sans libellé"}</p>
               <p className="mt-auto text-[8.5pt] leading-snug text-slate-700">{[label.site, label.salle].filter(Boolean).join(" · ")}</p>
-              <p className="text-[8.5pt] text-slate-700">{label.dossiers} dossier{label.dossiers > 1 ? "s" : ""}{label.cote ? ` · ${label.ctn}` : ""} · GeoArchives CEIBA</p>
+              <p className="text-[8.5pt] text-slate-700">{label.dossiers} dossier{label.dossiers > 1 ? "s" : ""} · GeoArchives CEIBA</p>
             </div>
           </article>
         ))}

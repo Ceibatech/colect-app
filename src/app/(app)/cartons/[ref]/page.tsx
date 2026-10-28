@@ -36,7 +36,7 @@ export default async function CartonSheetPage({ params }: { params: Promise<{ re
         icon={Package}
         eyebrow="Fiche carton"
         title={<span className="font-mono">{carton.reference}</span>}
-        description={`${carton.label ? `« ${carton.label} »` : "Carton sans libellé"}${carton.site ? `, ${[carton.site, carton.salle].filter(Boolean).join(" · ")}` : ""}${carton.cote ? ` · ancien identifiant ${carton.ctn}` : ""}`}
+        description={`${carton.label ? `« ${carton.label} »` : "Carton sans libellé"}${carton.site ? `, ${[carton.site, carton.salle].filter(Boolean).join(" · ")}` : ""}`}
         stats={[{ label: "Dossiers", value: total }]}
         actions={(
           <>
