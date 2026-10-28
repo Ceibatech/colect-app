@@ -127,6 +127,8 @@ model User {
   // Sites dont le compte est responsable (profil RESPONSABLE_SITE).
   responsibleSites                   UserSite[]
   caisseMouvements                   CaisseMouvement[]          @relation("CaisseMouvementUser")
+  activiteTemps                      ActiviteTemps[]            @relation("ActiviteTempsUser")
+  presence                           PresenceUtilisateur?       @relation("PresenceUser")
 
   @@index([roleId])
   @@map("users")
@@ -1862,4 +1864,30 @@ model ReconditionnementSession {
   @@index([dossierId])
   @@index([userId, finishedAt])
   @@map("reconditionnement_sessions")
+}
+
+/// Temps actif par personne, par jour et par activité (minutes), mesuré par la
+/// présence à l'écran : une minute comptée seulement si la personne a agi dans
+/// les 10 dernières minutes, onglet visible, une seule fois même avec plusieurs onglets.
+model ActiviteTemps {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  jour      DateTime @db.Date
+  activite  String   @db.VarChar(30)
+  minutes   Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation("ActiviteTempsUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jour, activite])
+  @@index([jour])
+  @@map("activite_temps")
+}
+
+/// Dernière minute comptée par personne (évite de compter deux fois avec deux onglets).
+model PresenceUtilisateur {
+  userId     Int      @id @map("user_id")
+  lastBeatAt DateTime @map("last_beat_at")
+  user       User     @relation("PresenceUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("presence_utilisateurs")
 }

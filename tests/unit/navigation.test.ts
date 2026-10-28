@@ -7,8 +7,8 @@ const dashboardChildren = dashboard.children!;
 
 describe("role-aware dashboard navigation", () => {
   const cases: Array<[RoleCode, string[]]> = [
-    ["ADMIN", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/geographie", "/dashboard/finance", "/dashboard/pmo"]],
-    ["SUPERVISEUR", ["/dashboard", "/dashboard/operateurs", "/dashboard/geographie"]],
+    ["ADMIN", ["/dashboard", "/dashboard/direction", "/dashboard/operateurs", "/dashboard/temps", "/dashboard/geographie", "/dashboard/finance", "/dashboard/pmo"]],
+    ["SUPERVISEUR", ["/dashboard", "/dashboard/operateurs", "/dashboard/temps", "/dashboard/geographie"]],
     ["OPERATEUR", ["/dashboard"]],
     ["AGENT_INVENTAIRE", ["/dashboard"]],
     ["PREPARATEUR", ["/dashboard"]],

@@ -192,6 +192,7 @@ export const TRANSFER_ROLE_CODES = [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFE
 export const ROLE_ONLY_ROUTE_PREFIXES: Array<{ prefix: string; roles: readonly RoleCode[] }> = [
   { prefix: "/dashboard/direction", roles: ["ADMIN", "EXECUTIF", "PMO", "CONSULTATION"] },
   { prefix: "/dashboard/operateurs", roles: ["ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR"] },
+  { prefix: "/dashboard/temps", roles: ["ADMIN", "SUPERVISEUR"] },
   { prefix: "/dashboard/geographie", roles: ["ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR", "CONSULTATION"] },
   { prefix: "/dashboard/finance", roles: ["ADMIN", "FINANCE"] },
   { prefix: "/dashboard/pmo", roles: ["ADMIN", "PMO"] },
