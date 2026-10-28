@@ -12,6 +12,7 @@ import {
   type DossierSuggestion,
   type SuggestStage,
 } from "@/lib/search/suggestions";
+import { parseCote } from "@/lib/cartons/cote";
 
 const LIMIT = 6;
 
@@ -24,15 +25,17 @@ const STAGE_SCOPE: Record<SuggestStage, Prisma.DossierWhereInput> = {
   archivage: { statutIndexation: "TERMINE" },
 };
 
-const wordInCarton = (word: string): Prisma.DossierWhereInput => ({ OR: [{ libelleCarton: { contains: word } }, { codeBarres: { contains: word } }] });
+const wordInCarton = (word: string): Prisma.DossierWhereInput => ({ OR: [{ libelleCarton: { contains: word } }, { codeBarres: { contains: word } }, { carton: { cote: { contains: word } } }] });
 const wordInDossier = (word: string): Prisma.DossierWhereInput => ({
-  OR: [{ reference: { contains: word } }, { nom: { contains: word } }, { prenoms: { contains: word } }, { codeBarres: { contains: word } }],
+  OR: [{ reference: { contains: word } }, { cote: { contains: word } }, { nom: { contains: word } }, { prenoms: { contains: word } }, { codeBarres: { contains: word } }],
 });
 
 async function cartonSuggestions(stage: SuggestStage, query: string, words: string[], all: boolean): Promise<CartonSuggestion[]> {
   const exactId = cartonIdFromQuery(query);
+  const cote = parseCote(query);
   const match: Prisma.DossierWhereInput = exactId
     ? { cartonId: exactId }
+    : cote ? { carton: { cote: cote.carton } }
     : all ? { AND: words.map(wordInCarton) } : { OR: words.map(wordInCarton) };
   const rows = await prisma.dossier.groupBy({
     by: ["cartonId", "libelleCarton"],
@@ -48,17 +51,20 @@ async function cartonSuggestions(stage: SuggestStage, query: string, words: stri
     if (current) current.dossiers += row._count._all;
     else cartons.set(row.cartonId, { label: row.libelleCarton, dossiers: row._count._all });
   }
-  return [...cartons.entries()]
+  const ranked = [...cartons.entries()]
     .map(([cartonId, carton]) => ({ cartonId, ...carton, score: matchScore(carton.label ?? "", words) }))
     .sort((a, b) => b.score - a.score || b.dossiers - a.dossiers)
-    .slice(0, LIMIT)
-    .map(({ cartonId, label, dossiers }) => ({ kind: "carton", cartonId, reference: formatCartonRef(cartonId), label, dossiers, href: cartonHref(stage, cartonId) }));
+    .slice(0, LIMIT);
+  const cotes = new Map((await prisma.carton.findMany({ where: { id: { in: ranked.map((c) => c.cartonId) } }, select: { id: true, cote: true } })).map((c) => [c.id, c.cote]));
+  return ranked.map(({ cartonId, label, dossiers }) => ({
+    kind: "carton", cartonId, reference: cotes.get(cartonId) ?? formatCartonRef(cartonId), label, dossiers, href: cartonHref(stage, cartonId),
+  }));
 }
 
 async function dossierSuggestions(stage: SuggestStage, words: string[], all: boolean): Promise<DossierSuggestion[]> {
   const rows = await prisma.dossier.findMany({
     where: { AND: [STAGE_SCOPE[stage], all ? { AND: words.map(wordInDossier) } : { OR: words.map(wordInDossier) }] },
-    select: { id: true, reference: true, nom: true, prenoms: true, cartonId: true, libelleCarton: true },
+    select: { id: true, reference: true, cote: true, nom: true, prenoms: true, cartonId: true, libelleCarton: true },
     orderBy: { reference: "asc" },
     take: all ? LIMIT : 40,
   });
@@ -69,9 +75,9 @@ async function dossierSuggestions(stage: SuggestStage, words: string[], all: boo
     .map(({ row }) => ({
       kind: "dossier",
       id: row.id,
-      reference: row.reference,
+      reference: row.cote ?? row.reference,
       titulaire: [row.nom, row.prenoms].filter(Boolean).join(" ") || null,
-      carton: row.cartonId ? `${formatCartonRef(row.cartonId)}${row.libelleCarton ? ` · ${row.libelleCarton}` : ""}` : row.libelleCarton,
+      carton: row.cote ? row.libelleCarton : row.cartonId ? `${formatCartonRef(row.cartonId)}${row.libelleCarton ? ` · ${row.libelleCarton}` : ""}` : row.libelleCarton,
       href: dossierHref(stage, row),
     }));
 }

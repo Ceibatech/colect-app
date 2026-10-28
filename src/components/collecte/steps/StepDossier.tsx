@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller } from "react-hook-form";
 import type { DossierFormValues } from "@/lib/validation/dossier";
@@ -11,6 +11,7 @@ import { EtatConservationField } from "./EtatConservationField";
 
 interface NatureDossier {
   id: number;
+  code: string;
   libelle: string;
 }
 
@@ -38,6 +39,13 @@ export function StepDossier({
   const items = [...natures.map((n) => ({ label: n.libelle, value: String(n.id) })), { label: "Autres (préciser)", value: AUTRES }];
 
   const [autres, setAutres] = useState(() => !form.getValues("natureDossierId") && !!form.getValues("natureDossierAutre"));
+
+  // Référentiel MULCV : les dossiers fonciers inventoriés sont des Dossiers ACD (2010).
+  useEffect(() => {
+    if (form.getValues("natureDossierId") || form.getValues("natureDossierAutre")) return;
+    const acd = natures.find((n) => n.code.toUpperCase() === "ACD");
+    if (acd) setValue("natureDossierId", acd.id);
+  }, [form, natures, setValue]);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">

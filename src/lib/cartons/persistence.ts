@@ -88,8 +88,21 @@ export async function resolveCartonId(
   tx: Prisma.TransactionClient,
   identity: CartonIntakeIdentity,
   existing?: CartonIntakeIdentity & { id: number; cartonId: number | null },
+  chosenCartonId?: number | null,
+  forceNew = false,
 ): Promise<number | null> {
+  // Carton désigné par sa cote (QR scanné ou saisi) : il prime sur le libellé.
+  if (chosenCartonId) {
+    await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id = ${chosenCartonId} FOR UPDATE`);
+    if (existing?.cartonId !== chosenCartonId) await assertOpenCarton(tx, chosenCartonId);
+    return chosenCartonId;
+  }
   const legacyKey = buildCartonLegacyKey(identity);
+  // « Nouveau carton » à l'inventaire : un carton neuf, jamais rapproché par son libellé.
+  if (forceNew && existing?.cartonId == null) {
+    const carton = await tx.carton.create({ data: {}, select: { id: true } });
+    return carton.id;
+  }
   if (existing?.cartonId != null) {
     await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id = ${existing.cartonId} FOR UPDATE`);
     const locationChanged = (existing.siteId ?? null) !== (identity.siteId ?? null)

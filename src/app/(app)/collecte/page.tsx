@@ -38,6 +38,8 @@ export default async function CollectePage({
         siteId: dossier.siteId ?? undefined,
         entrepotId: dossier.entrepotId ?? undefined,
         operateurId: dossier.operateurId,
+        modeCarton: dossier.carton?.cote ? "EXISTANT" : undefined,
+        cartonCote: dossier.carton?.cote ?? undefined,
         libelleCarton: dossier.libelleCarton ?? undefined,
         codeBarres: dossier.codeBarres ?? undefined,
         numeroGuichet: dossier.numeroGuichet ?? undefined,

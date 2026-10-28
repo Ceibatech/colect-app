@@ -564,6 +564,9 @@ model Commune {
   id          Int      @id @default(autoincrement())
   code        String   @unique
   nom         String
+  // Sigle de 3 lettres utilisé dans les cotes (2010-KOU-0001). Attribué une
+  // fois, puis stable : il est imprimé sur les étiquettes.
+  sigle       String?  @unique @db.VarChar(6)
   description String?  @db.Text
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -986,17 +989,27 @@ model Carton {
   // Clé technique d'admission concurrente, effacée lors d'un changement
   // d'emplacement/identification. Jamais utilisée comme référence publique.
   legacyKey        String?           @unique @map("legacy_key") @db.Char(64)
+  // Cote du référentiel de classement MULCV : <classement>-<commune>-<n°>,
+  // ex. 2010-KOU-0001 (2010 = Dossiers ACD). Attribuée une fois, puis stable.
+  cote             String?           @unique @db.VarChar(40)
+  cotePrefixe      String?           @map("cote_prefixe") @db.VarChar(20)
+  coteSequence     Int?              @map("cote_sequence")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
   dossiers         Dossier[]
   transferLotItems TransferLotItem[]
 
+  @@unique([cotePrefixe, coteSequence])
   @@map("cartons")
 }
 
 model Dossier {
   id       Int  @id @default(autoincrement())
   cartonId Int? @map("carton_id")
+  // Rang du dossier dans son carton (1, 2, … : le suivant est n+1) et sa cote
+  // complète, ex. 2010-KOU-0001-012.
+  rangCarton Int?    @map("rang_carton")
+  cote       String? @unique @db.VarChar(50)
 
   // Référence unique générée automatiquement : DOS-2026-000001
   reference String @unique
@@ -1127,6 +1140,7 @@ model Dossier {
   @@index([siteId])
   @@index([entrepotId])
   @@index([codeBarres])
+  @@unique([cartonId, rangCarton])
   @@index([cartonId])
   @@index([numeroDdu])
   @@index([numeroDirectionService])

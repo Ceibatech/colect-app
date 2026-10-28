@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { cartonIdFromScan } from "@/lib/cartons/scan";
+import { cartonIdFromScan, coteFromScan } from "@/lib/cartons/scan";
 
-export type LoadedCarton = { id: number; cartonId: number | null; code: string; label: string | null; dossiers: number };
+export type LoadedCarton = { id: number; cartonId: number | null; code: string; ctn: string | null; label: string | null; dossiers: number };
 
 function currentPosition(): Promise<GeolocationPosition | null> {
   return new Promise((resolve) => {
@@ -49,10 +49,13 @@ export function ConvoyDepartureForm({
 
   function handleScan(text: string) {
     const cartonId = cartonIdFromScan(text);
+    const cote = coteFromScan(text);
     const value = text.trim().toLowerCase();
-    const found = cartons.find((carton) => (cartonId !== null && carton.cartonId === cartonId) || carton.code.toLowerCase() === value);
+    const found = cartons.find((carton) => (cartonId !== null && carton.cartonId === cartonId)
+      || (cote !== null && carton.code === cote)
+      || carton.code.toLowerCase() === value);
     if (!found) {
-      toast.error(cartonId ? "Ce carton ne fait pas partie de ce lot." : "QR code non reconnu.");
+      toast.error(cartonId || cote ? "Ce carton ne fait pas partie de ce lot." : "QR code non reconnu.");
       return;
     }
     if (checked.includes(found.id)) {
@@ -124,7 +127,7 @@ export function ConvoyDepartureForm({
           onSubmit={(event) => { event.preventDefault(); if (scan.trim()) { handleScan(scan); setScan(""); } }}
           className="flex gap-2"
         >
-          <Input value={scan} onChange={(event) => setScan(event.target.value)} placeholder="Douchette ou saisie : CTN-…" className="h-11 text-base" aria-label="Scanner un carton" autoComplete="off" />
+          <Input value={scan} onChange={(event) => setScan(event.target.value)} placeholder="Douchette ou saisie : 2010-KOU-0001" className="h-11 text-base" aria-label="Scanner un carton" autoComplete="off" />
           <Button type="submit" variant="outline" className="h-11">Valider</Button>
         </form>
         <ul className="divide-y rounded-md border">

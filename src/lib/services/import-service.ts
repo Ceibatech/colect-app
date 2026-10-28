@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma/client";
 import { parseCsv } from "@/lib/utils/csv";
 import { IMPORT_COLUMNS } from "@/lib/validation/import-columns";
 import { buildCartonLegacyKey, resolveCartonId } from "@/lib/cartons/persistence";
+import { assignMissingCotes } from "@/lib/cartons/cote-assignment";
 import { dossierImportFingerprint, DOSSIER_IMPORT_IDENTITY_SELECT } from "@/lib/import/dossier-identity";
 import {
   canonicalizeCommuneLabel,
@@ -362,6 +363,10 @@ export async function confirmImport(userId: number, fileName: string, dataRows: 
           });
           if (created.length !== batch.length) {
             throw new Error(`Import incomplet : ${created.length}/${batch.length} dossiers créés dans un lot.`);
+          }
+
+          for (const cartonId of new Set(batch.flatMap((item) => (item.data.cartonId ? [item.data.cartonId] : [])))) {
+            await assignMissingCotes(tx, cartonId);
           }
 
           const idByReference = new Map(created.map((dossier) => [dossier.reference, dossier.id]));

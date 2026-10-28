@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { formatCartonReference } from "@/lib/cartons/reference";
+import { cartonCoteOf } from "@/lib/cartons/cote";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,8 @@ interface DossierDetail {
   id: number;
   reference: string;
   cartonId: number | null;
+  cote?: string | null;
+  rangCarton?: number | null;
   site: { nom: string; code: string } | null;
   entrepot: { nom: string; code: string; localisation: string | null } | null;
   libelleCarton: string | null;
@@ -215,12 +218,11 @@ export function DossierDetailTabs({
               <Field label="Salle / espace" value={dossier.entrepot ? `${dossier.entrepot.nom} (${dossier.entrepot.code})` : null} />
               <Field label="Localisation" value={dossier.entrepot?.localisation} />
               <Field label="Référence" value={dossier.reference} />
-              <Field label="Identifiant unique du carton" value={dossier.cartonId !== null ? (
-                permissions.includes("DOSSIER_READ") ? (
-                  <Link className="font-mono text-primary underline underline-offset-4" href={`/dossiers?q=${formatCartonReference(dossier.cartonId)}`}>
-                    {formatCartonReference(dossier.cartonId)} — voir les dossiers accessibles
-                  </Link>
-                ) : <span className="font-mono">{formatCartonReference(dossier.cartonId)}</span>
+              <Field label="Cote du dossier" value={dossier.cote ? <span className="font-mono">{dossier.cote}{dossier.rangCarton ? ` (n° ${dossier.rangCarton} du carton)` : ""}</span> : null} />
+              <Field label="Cote du carton" value={dossier.cartonId !== null ? (
+                <Link className="font-mono text-primary underline underline-offset-4" href={`/cartons/${cartonCoteOf(dossier.cote) ?? formatCartonReference(dossier.cartonId)}`}>
+                  {cartonCoteOf(dossier.cote) ?? formatCartonReference(dossier.cartonId)} — fiche du carton
+                </Link>
               ) : "Carton à identifier"} />
               <Field label="Libellé du carton" value={dossier.libelleCarton} />
               <Field label="Code-barres d'origine" value={dossier.codeBarres} />

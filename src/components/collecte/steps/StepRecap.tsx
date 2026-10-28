@@ -5,6 +5,7 @@ import { ETAT_CONSERVATION_OPTIONS, type DossierFormValues } from "@/lib/validat
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Pencil } from "lucide-react";
+import { CartonCotePreview } from "@/components/collecte/CartonCotePreview";
 
 interface Lookups {
   sites: { id: number; nom: string; code: string; entrepots: { id: number; nom: string; code: string; localisation: string | null }[] }[];
@@ -45,10 +46,12 @@ export function StepRecap({
   form,
   lookups,
   onEditStep,
+  draftId,
 }: {
   form: UseFormReturn<DossierFormValues>;
   lookups: Lookups;
   onEditStep: (step: number) => void;
+  draftId?: number;
 }) {
   const v = form.getValues();
   const site = lookups.sites.find((s) => s.id === v.siteId);
@@ -77,6 +80,10 @@ export function StepRecap({
 
       <Section title="Identification" onEdit={() => onEditStep(2)}>
         <Row label="Opérateur" value={operateur} />
+        <div className="py-2">
+          <CartonCotePreview cote={v.cartonCote} libelle={v.libelleCarton} siteId={v.siteId} communeId={v.communeId} draftId={draftId} />
+        </div>
+        <Row label="Cote du carton" value={v.cartonCote} />
         <Row label="Libellé du carton" value={v.libelleCarton} />
         <Row label="Code-barres" value={v.codeBarres} />
         <Row label="N° guichet" value={v.numeroGuichet} />

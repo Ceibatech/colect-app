@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { DossierListItem } from "@/lib/services/dossier-query-service";
 import { formatCartonReference } from "@/lib/cartons/reference";
+import { cartonCoteOf } from "@/lib/cartons/cote";
 import {
   STATUT_COLLECTE_LABELS,
   STATUT_VALIDATION_LABELS,
@@ -59,8 +60,8 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
               <TableCell className="font-mono text-xs font-semibold text-primary whitespace-nowrap">{d.reference}</TableCell>
               <TableCell className="whitespace-nowrap">
                 {d.cartonId !== null ? (
-                  <Link href={`/dossiers?q=${formatCartonReference(d.cartonId)}`} className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline" title="Voir les dossiers accessibles de ce carton">
-                    {formatCartonReference(d.cartonId)}
+                  <Link href={`/dossiers?q=${cartonCoteOf(d.cote) ?? formatCartonReference(d.cartonId)}`} className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline" title="Voir les dossiers accessibles de ce carton">
+                    {d.cote ?? formatCartonReference(d.cartonId)}
                   </Link>
                 ) : <span className="text-muted-foreground">Non identifié</span>}
                 {(d.codeBarres || d.libelleCarton) ? (

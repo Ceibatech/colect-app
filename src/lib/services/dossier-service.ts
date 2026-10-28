@@ -13,6 +13,8 @@ import {
 } from "@/lib/utils/locality-normalization";
 import { evaluateInventorySubmission } from "@/lib/workflow/automatic-validation";
 import { resolveCartonId } from "@/lib/cartons/persistence";
+import { assignDossierCote, findCartonByCote } from "@/lib/cartons/cote-assignment";
+import { findRubrique } from "@/lib/referentiel/classement";
 
 const MAX_REFERENCE_ATTEMPTS = 5;
 
@@ -211,9 +213,30 @@ async function createDossierWithUniqueReference(
   throw lastError ?? new Error("Impossible de générer une référence de dossier unique.");
 }
 
+/** Carton désigné par sa cote dans le formulaire d'inventaire, avec son emplacement et son libellé. */
+async function chosenCarton(value: string | undefined) {
+  if (!value?.trim()) return null;
+  const carton = await findCartonByCote(prisma, value);
+  if (!carton) throw new Error(`Aucun carton ne porte la cote « ${value.trim()} ». Vérifiez la cote ou laissez le champ vide pour un nouveau carton.`);
+  const sample = await prisma.dossier.findFirst({
+    where: { cartonId: carton.id },
+    orderBy: { id: "asc" },
+    select: { siteId: true, entrepotId: true, libelleCarton: true },
+  });
+  return { id: carton.id, cote: carton.cote ?? value.trim(), siteId: sample?.siteId ?? null, entrepotId: sample?.entrepotId ?? null, libelleCarton: sample?.libelleCarton ?? null };
+}
+
 export interface DraftResult {
   id: number;
   reference: string;
+  /** Cote du dossier (2010-KOU-0001-012) et de son carton, une fois rangé. */
+  cote: string | null;
+  cartonCote: string | null;
+}
+
+async function cotesOf(id: number) {
+  const dossier = await prisma.dossier.findUnique({ where: { id }, select: { cote: true, carton: { select: { cote: true } } } });
+  return { cote: dossier?.cote ?? null, cartonCote: dossier?.carton?.cote ?? null };
 }
 
 export async function saveDraft(values: DossierFormValues, draftId?: number | null): Promise<DraftResult> {
@@ -223,6 +246,21 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
   const lotissementId = await resolveLotissementId(cleaned.communeId, values.lotissementNom);
   const natureDossierId = await resolveNatureDossierId(values.natureDossierId ?? null, values.natureDossierAutre);
   const data = { ...cleaned, lotissementId, natureDossierId };
+  if (values.modeCarton === "EXISTANT" && !values.cartonCote?.trim()) {
+    throw new Error("Choisissez le carton auquel ajouter ce dossier (sa cote), ou répondez « Nouveau carton ».");
+  }
+  const rubrique = values.modeCarton === "NOUVEAU" ? findRubrique(values.classement || "2010") : null;
+  if (values.modeCarton === "NOUVEAU" && !rubrique) throw new Error("Choisissez la rubrique de classement du nouveau carton.");
+  const chosen = values.modeCarton === "NOUVEAU" ? null : await chosenCarton(values.cartonCote);
+  if (chosen) {
+    if (data.siteId && chosen.siteId && data.siteId !== chosen.siteId) {
+      throw new Error(`Le carton ${chosen.cote} est rangé sur un autre site. Choisissez ce site ou un autre carton.`);
+    }
+    // Le dossier prend l'emplacement et le libellé du carton choisi.
+    data.siteId = chosen.siteId ?? data.siteId;
+    data.entrepotId = chosen.entrepotId ?? data.entrepotId;
+    data.libelleCarton = chosen.libelleCarton ?? data.libelleCarton;
+  }
 
   if (draftId) {
     const existing = await prisma.dossier.findUnique({ where: { id: draftId } });
@@ -234,7 +272,7 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
       throw new Error("Vous ne pouvez modifier que vos propres brouillons.");
     }
     const updated = await prisma.$transaction(async (tx) => {
-      const cartonId = await resolveCartonId(tx, data, existing);
+      const cartonId = await resolveCartonId(tx, data, existing, chosen?.id, values.modeCarton === "NOUVEAU");
       const updated = await tx.dossier.updateMany({
         // A transfer or another edit may have committed while we waited for
         // the carton lock. Never restore the stale form's previous location.
@@ -245,19 +283,22 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
         data: { ...data, operateurId, cartonId },
       });
       if (updated.count !== 1) throw new Error("Ce dossier a été modifié ou déplacé pendant la saisie. Rechargez sa fiche avant de l'enregistrer.");
+      await assignDossierCote(tx, existing.id, rubrique?.code);
       return { id: existing.id, reference: existing.reference };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 60_000 });
-    return { id: updated.id, reference: updated.reference };
+    return { id: updated.id, reference: updated.reference, ...(await cotesOf(updated.id)) };
   }
 
   const created = await prisma.$transaction(async (tx) => {
-    const cartonId = await resolveCartonId(tx, data);
-    return createDossierWithUniqueReference({
+    const cartonId = await resolveCartonId(tx, data, undefined, chosen?.id, values.modeCarton === "NOUVEAU");
+    const dossier = await createDossierWithUniqueReference({
       ...data,
       operateurId,
       cartonId,
       statutCollecte: "BROUILLON",
     }, tx);
+    await assignDossierCote(tx, dossier.id, rubrique?.code);
+    return dossier;
   }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 60_000 });
 
   await prisma.dossierHistory.create({
@@ -273,12 +314,14 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
     },
   });
 
-  return { id: created.id, reference: created.reference };
+  return { id: created.id, reference: created.reference, ...(await cotesOf(created.id)) };
 }
 
 export interface SubmitResult {
   id: number;
   reference: string;
+  cote: string | null;
+  cartonCote: string | null;
   autoValidated: boolean;
   anomalyCount: number;
 }
@@ -294,6 +337,9 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
   // S'assure qu'un brouillon existe (créé à la volée si l'utilisateur soumet
   // directement sans être passé par "Enregistrer brouillon").
   const draft = await saveDraft(values, draftId ?? undefined);
+  if (values.modeCarton && !draft.cartonCote) {
+    throw new Error("Le dossier n'a pas pu être rangé dans un carton. Revenez à la première étape.");
+  }
 
   const dossier = await prisma.dossier.findUnique({
     where: { id: draft.id },
@@ -436,6 +482,8 @@ export async function submitDossier(values: DossierFormValues, draftId?: number 
   return {
     id: updated.id,
     reference: updated.reference,
+    cote: draft.cote,
+    cartonCote: draft.cartonCote,
     autoValidated: decision.autoValidated,
     anomalyCount: decision.issues.length,
   };
@@ -463,7 +511,7 @@ export async function listMyDrafts() {
 export async function getDraftById(id: number) {
   const session = await requirePermission("DOSSIER_CREATE");
   // `lotissement` inclus pour reconstituer le libellé sélectionné.
-  const dossier = await prisma.dossier.findUnique({ where: { id }, include: { lotissement: true } });
+  const dossier = await prisma.dossier.findUnique({ where: { id }, include: { lotissement: true, carton: { select: { cote: true } } } });
   if (!dossier || dossier.statutCollecte !== "BROUILLON") return null;
 
   if (session.roleCode === "OPERATEUR") {

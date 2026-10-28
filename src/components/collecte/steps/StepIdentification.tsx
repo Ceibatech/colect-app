@@ -93,14 +93,6 @@ export function StepIdentification({
       </Field>
 
       <Field>
-        <FieldLabel>Libellé du carton</FieldLabel>
-        <FieldContent>
-          <Input {...register("libelleCarton")} placeholder="Ex. Carton A-12" />
-          <FieldError errors={[errors.libelleCarton]} />
-        </FieldContent>
-      </Field>
-
-      <Field>
         <FieldLabel>Code-barres</FieldLabel>
         <FieldContent>
           <Input {...register("codeBarres")} placeholder="Code-barres du carton" />
