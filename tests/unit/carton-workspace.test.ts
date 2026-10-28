@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/prisma/client", () => ({ prisma: {
   dossier: { findMany: mocks.dossierFindMany, count: mocks.dossierCount, groupBy: mocks.dossierGroupBy },
   document: { findMany: mocks.documentFindMany, count: mocks.documentCount },
+  carton: { findMany: async () => [] },
   $queryRaw: mocks.queryRaw,
 } }));
 vi.mock("@/lib/auth/current-user", () => ({ requirePermission: mocks.requirePermission }));

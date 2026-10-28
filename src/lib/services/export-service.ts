@@ -20,8 +20,8 @@ export interface ExportFilters {
 const MAX_EXPORT_ROWS = 20_000;
 
 const EXPORT_COLUMNS = [
-  "Site", "Localisation", "Salle / espace", "Référence", "Code-barres", "N° guichet", "Direction/Service concerné(e)", "Numéro Direction/Service", "Référence classement",
-  "N° îlot", "N° lot", "Superficie", "N° titre foncier", "Commune", "Lotissement", "Nature dossier",
+  "Cote du dossier", "Cote du carton", "N° dans le carton", "Site", "Localisation", "Salle / espace", "Référence", "Code-barres", "N° guichet", "Direction/Service concerné(e)", "Numéro Direction/Service", "Référence classement",
+  "N° îlot", "N° lot", "Superficie", "N° titre foncier", "Année de l'acte", "Commune", "Lotissement", "Nature dossier",
   "Nombre de pièces", "Types de pièces", "Autres pièces",
   "Nom", "Prénoms", "Adresse", "Téléphone", "E-mail", "Personne à contacter", "Mobile", "Opérateur",
   "Statut collecte", "Statut validation", "Statut numérisation", "Statut indexation", "Statut archivage",
@@ -77,6 +77,7 @@ async function loadExportRows(filters: ExportFilters, session: SessionPayload) {
     orderBy: { createdAt: "desc" },
     include: {
       site: { select: { nom: true, code: true } },
+      carton: { select: { cote: true } },
       entrepot: { select: { nom: true, code: true, localisation: true } },
       commune: { select: { nom: true } },
       lotissement: { select: { nom: true } },
@@ -89,6 +90,9 @@ async function loadExportRows(filters: ExportFilters, session: SessionPayload) {
 
 function toRow(d: Awaited<ReturnType<typeof loadExportRows>>[number]): (string | number)[] {
   return [
+    d.cote ?? "",
+    d.carton?.cote ?? "",
+    d.rangCarton ?? "",
     d.site ? `${d.site.nom} (${d.site.code})` : "",
     d.entrepot?.localisation ?? "",
     d.entrepot ? `${d.entrepot.nom} (${d.entrepot.code})` : "",
@@ -101,7 +105,8 @@ function toRow(d: Awaited<ReturnType<typeof loadExportRows>>[number]): (string |
     d.numeroIlot ?? "",
     d.numeroLot ?? "",
     d.superficie ? Number(d.superficie) : "",
-    d.numeroTitreFoncier ?? "",
+    d.sansTitreFoncier ? "Pas de titre foncier" : d.numeroTitreFoncier ?? "",
+    d.anneeActe ?? "",
     d.commune?.nom ?? "",
     d.lotissement?.nom ?? "",
     d.natureDossier?.libelle ?? "",

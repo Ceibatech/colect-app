@@ -36,7 +36,7 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
       <Table className="min-w-[1280px]">
         <TableHeader>
           <TableRow className="bg-muted/60 hover:bg-muted/60">
-            <TableHead>Référence</TableHead>
+            <TableHead>Cote</TableHead>
             <TableHead>Carton</TableHead>
             <TableHead>Direction/Service</TableHead>
             <TableHead>Nom</TableHead>
@@ -57,11 +57,14 @@ export function DossiersTable({ items }: { items: DossierListItem[] }) {
         <TableBody>
           {items.map((d) => (
             <TableRow key={d.id} className="hover:bg-accent/30">
-              <TableCell className="font-mono text-xs font-semibold text-primary whitespace-nowrap">{d.reference}</TableCell>
+              <TableCell className="whitespace-nowrap">
+                <span className="block font-mono text-xs font-semibold text-primary">{d.cote ?? d.reference}</span>
+                {d.cote ? <span className="block font-mono text-[11px] text-muted-foreground">{d.reference}</span> : null}
+              </TableCell>
               <TableCell className="whitespace-nowrap">
                 {d.cartonId !== null ? (
                   <Link href={`/dossiers?q=${cartonCoteOf(d.cote) ?? formatCartonReference(d.cartonId)}`} className="font-mono text-xs font-semibold text-primary underline-offset-4 hover:underline" title="Voir les dossiers accessibles de ce carton">
-                    {d.cote ?? formatCartonReference(d.cartonId)}
+                    {cartonCoteOf(d.cote) ?? formatCartonReference(d.cartonId)}
                   </Link>
                 ) : <span className="text-muted-foreground">Non identifié</span>}
                 {(d.codeBarres || d.libelleCarton) ? (

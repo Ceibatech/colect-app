@@ -51,7 +51,7 @@ function movementOptions(lot: LotWithItems, status: TransferItemStatus) {
     .filter((item) => item.status === status && item.movementItems.length === 0)
     .map((item) => ({
       id: item.id,
-      cartonCode: item.cartonId == null ? item.cartonCode : formatCartonReference(item.cartonId),
+      cartonCode: item.carton?.cote ?? (item.cartonId == null ? item.cartonCode : formatCartonReference(item.cartonId)),
       cartonLabel: item.cartonLabel,
       dossierCount: item.dossierCountSnapshot,
     }));

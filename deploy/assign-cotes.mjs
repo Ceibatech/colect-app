@@ -157,10 +157,17 @@ export async function assignCotes(db, { apply = false, nature = true } = {}) {
       JOIN cartons c ON c.id = d.carton_id AND c.cote IS NOT NULL
       SET d.rang_carton = r.rang,
           d.cote = CONCAT(c.cote, '-', IF(r.rang < 1000, LPAD(r.rang, 3, '0'), r.rang))`);
+    // Lots encore en brouillon (aucun bordereau signé) : la cote remplace l'ancien CTN.
+    const lotItems = await tx.$executeRaw(Prisma.sql`
+      UPDATE transfer_lot_items i
+      JOIN transfer_lots l ON l.id = i.transfer_lot_id AND l.status = 'BROUILLON'
+      JOIN cartons c ON c.id = i.carton_id AND c.cote IS NOT NULL
+      SET i.carton_code = c.cote
+      WHERE i.carton_code <> c.cote`);
     await tx.auditLog.create({
-      data: { action: "COTES_REFERENTIEL", entity: "CARTON", newValue: { cartons: report.cartonPlan.length, dossiers, natureUpdated } },
+      data: { action: "COTES_REFERENTIEL", entity: "CARTON", newValue: { cartons: report.cartonPlan.length, dossiers, natureUpdated, lotItems } },
     });
-    return { cartons: report.cartonPlan.length, dossiers, natureUpdated };
+    return { cartons: report.cartonPlan.length, dossiers, natureUpdated, lotItems };
   }, { maxWait: 10_000, timeout: 900_000 });
   return { applied: true, report, ...result };
 }
@@ -190,7 +197,7 @@ function print(result) {
   console.log(`\nCartons dont les dossiers viennent de plusieurs communes (commune majoritaire retenue) : ${mixed.length}`);
   for (const carton of mixed.slice(0, 30)) console.log(`  - CTN-${String(carton.id).padStart(8, "0")} → ${carton.cote} : ${carton.majoritaire}/${carton.total} dossiers de la commune retenue`);
   console.log(`\nDossiers à numéroter dans leur carton : ${report.pendingDossiers}`);
-  if (result.applied) console.log(`\nAPPLIQUÉ : ${result.cartons} carton(s) cotés, ${result.dossiers} dossier(s) numérotés, nature ACD sur ${result.natureUpdated} dossier(s).`);
+  if (result.applied) console.log(`\nAPPLIQUÉ : ${result.cartons} carton(s) cotés, ${result.dossiers} dossier(s) numérotés, nature ACD sur ${result.natureUpdated} dossier(s), ${result.lotItems} carton(s) de lots en brouillon recotés.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
