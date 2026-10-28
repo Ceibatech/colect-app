@@ -388,7 +388,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
     imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, reconditionnementSessions, preparationPieceLines,
     financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
     transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints, transferConvoyEvents,
-    transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,
+    transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs, caisseMouvements,
     operateurDossiers, operateurNumerisations, operateurIndexations, operateurArchivages,
   ] = await Promise.all([
     db.dossierHistory.count({ where: { userId: id } }),
@@ -419,6 +419,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
     db.emailReportSubscription.count({ where: { createdById: id } }),
     db.emailReportDelivery.count({ where: { triggeredById: id } }),
     db.operateur.count({ where: { supervisorId: id } }),
+    db.caisseMouvement.count({ where: { userId: id } }),
     db.dossier.count({ where: { operateur: { userId: id } } }),
     db.numerisation.count({ where: { operateur: { userId: id } } }),
     db.indexation.count({ where: { operateur: { userId: id } } }),
@@ -429,7 +430,7 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
     imports, exports, qualityChecks, anomaliesCorrected, dossiersPrepared, dossiersConditioned, reconditionnementSessions, preparationPieceLines,
     financeRatesCreated, transferLotsCreated, transferLotsAuthorized, transferLotsCeibacValidated, transferMovementsCreated,
     transferMovementsCeibacValidated, transferMovementsMinistryValidated, transferSignaturesCaptured, transferTrackingPoints, transferConvoyEvents,
-    transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs,
+    transferLotParticipations, emailReportSubscriptionsCreated, emailReportsTriggered, supervisedOperateurs, caisseMouvements,
     operateurDossiers: operateurDossiers + operateurNumerisations + operateurIndexations + operateurArchivages,
   };
 }

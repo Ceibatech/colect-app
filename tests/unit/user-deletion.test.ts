@@ -36,6 +36,7 @@ describe("isDeletionConfirmed", () => {
  * Ajouter ici toute nouvelle relation après l'avoir comptée.
  */
 const SET_NULL_USER_RELATIONS_COUNTED = new Set([
+  "CaisseMouvement.userId",
   "Anomalie.corrigePar", "AuditLog.userId", "Document.preIndexedBy", "Document.uploadedBy",
   "DocumentIndexingJob.requestedBy", "DocumentIndexingRun.triggeredBy", "Dossier.conditionneurId",
   "Dossier.preparateurId", "DossierHistory.userId", "EmailReportDelivery.triggeredById", "FinanceRate.createdById",

@@ -126,6 +126,7 @@ model User {
   transferLotParticipations          TransferLotParticipant[]
   // Sites dont le compte est responsable (profil RESPONSABLE_SITE).
   responsibleSites                   UserSite[]
+  caisseMouvements                   CaisseMouvement[]          @relation("CaisseMouvementUser")
 
   @@index([roleId])
   @@map("users")
@@ -688,6 +689,7 @@ model Site {
   commune               Commune?           @relation(fields: [communeId], references: [id])
   dossiers              Dossier[]
   entrepots             Entrepot[]
+  caisses               Caisse[]
   transferLotsFrom      TransferLot[]      @relation("TransferSourceSite")
   transferLotsTo        TransferLot[]      @relation("TransferDestinationSite")
   transferMovementsFrom TransferMovement[] @relation("TransferMovementFromSite")
@@ -993,6 +995,11 @@ model Carton {
   // ex. 2010-KOU-0001 (2010 = Dossiers ACD). Attribuée une fois, puis stable.
   cote             String?           @unique @db.VarChar(40)
   cotePrefixe      String?           @map("cote_prefixe") @db.VarChar(20)
+  // Caisse de rangement (site CEIBA) dans laquelle le carton est rangé après traitement.
+  caisseId         Int?              @map("caisse_id")
+  misEnCaisseAt    DateTime?         @map("mis_en_caisse_at")
+  caisse           Caisse?           @relation(fields: [caisseId], references: [id], onDelete: Restrict)
+  caisseMouvements CaisseMouvement[]
   coteSequence     Int?              @map("cote_sequence")
   createdAt        DateTime          @default(now()) @map("created_at")
   updatedAt        DateTime          @updatedAt @map("updated_at")
@@ -1000,12 +1007,54 @@ model Carton {
   transferLotItems TransferLotItem[]
 
   @@unique([cotePrefixe, coteSequence])
+  @@index([caisseId])
   @@map("cartons")
 }
 
+/// Caisse de rangement des archives sur un site CEIBA (capacité : 40 cartons).
+/// Le numéro est saisi par l'utilisateur et peut changer sans toucher au contenu.
+model Caisse {
+  id          Int               @id @default(autoincrement())
+  numero      String            @unique @db.VarChar(40)
+  description String?           @db.VarChar(255)
+  capacite    Int               @default(40)
+  siteId      Int               @map("site_id")
+  isActive    Boolean           @default(true) @map("is_active")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  site        Site              @relation(fields: [siteId], references: [id])
+  cartons     Carton[]
+  mouvements  CaisseMouvement[]
+
+  @@index([siteId])
+  @@map("caisses")
+}
+
+/// Historique : quel carton est entré dans / sorti de quelle caisse, quand et par qui.
+model CaisseMouvement {
+  id        Int                 @id @default(autoincrement())
+  caisseId  Int                 @map("caisse_id")
+  cartonId  Int                 @map("carton_id")
+  type      CaisseMouvementType
+  userId    Int?                @map("user_id")
+  createdAt DateTime            @default(now()) @map("created_at")
+  caisse    Caisse              @relation(fields: [caisseId], references: [id], onDelete: Cascade)
+  carton    Carton              @relation(fields: [cartonId], references: [id], onDelete: Cascade)
+  user      User?               @relation("CaisseMouvementUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([caisseId, createdAt])
+  @@index([cartonId])
+  @@map("caisse_mouvements")
+}
+
+enum CaisseMouvementType {
+  RANGEMENT
+  RETRAIT
+}
+
 model Dossier {
-  id       Int  @id @default(autoincrement())
-  cartonId Int? @map("carton_id")
+  id         Int     @id @default(autoincrement())
+  cartonId   Int?    @map("carton_id")
   // Rang du dossier dans son carton (1, 2, … : le suivant est n+1) et sa cote
   // complète, ex. 2010-KOU-0001-012.
   rangCarton Int?    @map("rang_carton")
@@ -1142,10 +1191,10 @@ model Dossier {
   history             DossierHistory[]
   transferLotDossiers TransferLotDossier[]
 
+  @@unique([cartonId, rangCarton])
   @@index([siteId])
   @@index([entrepotId])
   @@index([codeBarres])
-  @@unique([cartonId, rangCarton])
   @@index([cartonId])
   @@index([numeroDdu])
   @@index([numeroDirectionService])

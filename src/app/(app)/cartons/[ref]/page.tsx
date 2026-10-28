@@ -67,6 +67,11 @@ export default async function CartonSheetPage({ params }: { params: Promise<{ re
               })}
             </ul>
           </div>
+          <p className="text-sm">
+            {carton.caisse ? (
+              <>Rangé dans la caisse <Link href={`/caisses/${carton.caisse.id}`} className="font-mono font-semibold text-primary underline-offset-4 hover:underline">{carton.caisse.numero}</Link>{carton.misEnCaisseAt ? ` depuis le ${new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Africa/Abidjan" }).format(carton.misEnCaisseAt)}` : ""}.</>
+            ) : <span className="text-muted-foreground">Pas encore rangé dans une caisse.</span>}
+          </p>
           {carton.labelVariants.length ? (
             <p className="text-sm text-muted-foreground">Autres écritures du libellé : {carton.labelVariants.join(" · ")}</p>
           ) : null}

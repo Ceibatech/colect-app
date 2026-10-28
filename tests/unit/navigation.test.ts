@@ -69,7 +69,7 @@ describe("role-aware dashboard navigation", () => {
     ["AGENT_INVENTAIRE", ["/dashboard", "/collecte", "/dossiers", "/recherche", "/cartons", "/import"]],
     ["PREPARATEUR", ["/dashboard", "/cartons", "/preparation"]],
     ["NUMERISATEUR", ["/dashboard", "/cartons", "/numerisation"]],
-    ["CONDITIONNEUR", ["/dashboard", "/cartons", "/conditionnement"]],
+    ["CONDITIONNEUR", ["/dashboard", "/cartons", "/conditionnement", "/caisses"]],
     ["INDEXEUR", ["/dashboard", "/cartons", "/indexation"]],
     ["ARCHIVISTE", ["/dashboard", "/cartons", "/archivage"]],
   ] satisfies Array<[RoleCode, string[]]>)
