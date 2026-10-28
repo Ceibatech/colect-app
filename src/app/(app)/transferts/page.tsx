@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, BookOpenCheck, Boxes, Building2, MapPin, Plus, Truck } from "lucide-react";
+import { ArrowRight, BookOpenCheck, Boxes, Building2, MapPin, Plus, Truck, Container } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
 import { TransferDocumentRegistry, type TransferDocumentItem } from "@/components/transferts/TransferDocumentRegistry";
@@ -119,6 +119,7 @@ export default async function TransfersPage() {
             <Link href="/transferts/procedure" className={buttonVariants({ variant: "outline" })}><BookOpenCheck /> Procédure</Link>
             {canApproveCeiba ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation interne</Link> : null}
             {canAuthorize ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation SDA</Link> : null}
+            {session.permissions.includes("TRANSFER_OPERATE") ? <Link href="/caisses" className={buttonVariants({ variant: "outline" })}><Container /> Caisses de transport</Link> : null}
             {canCreate ? (
               <Link href="/transferts/nouveau" className={buttonVariants()}>
                 <Plus /> Identifier un lot
