@@ -22,11 +22,16 @@ export function StepFoncier({
 }) {
   const { register, control, watch, setValue, formState } = form;
   const errors = formState.errors;
+  const sansTitreFoncier = watch("sansTitreFoncier");
   const communeId = watch("communeId");
   const selectedCommune = communes.find((c) => c.id === communeId);
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      <p className="text-xs text-muted-foreground sm:col-span-2">
+        Référentiel MULCV, série 2000 : îlot, lot, superficie, année, titre foncier, commune et lotissement sont exigés pour soumettre le dossier.
+      </p>
+
       <Field>
         <FieldLabel>N° îlot</FieldLabel>
         <FieldContent>
@@ -52,9 +57,30 @@ export function StepFoncier({
       </Field>
 
       <Field>
+        <FieldLabel>Année de l&apos;acte</FieldLabel>
+        <FieldContent>
+          <Input type="number" inputMode="numeric" min={1900} max={new Date().getFullYear()} placeholder="Ex. 1998" {...register("anneeActe")} />
+          <FieldError errors={[errors.anneeActe]} />
+        </FieldContent>
+      </Field>
+
+      <Field>
         <FieldLabel>N° titre foncier</FieldLabel>
         <FieldContent>
-          <Input {...register("numeroTitreFoncier")} />
+          <Input {...register("numeroTitreFoncier")} disabled={sansTitreFoncier === true} placeholder={sansTitreFoncier ? "Pas de titre foncier" : undefined} />
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={sansTitreFoncier === true}
+              onChange={(event) => {
+                setValue("sansTitreFoncier", event.target.checked, { shouldDirty: true });
+                if (event.target.checked) setValue("numeroTitreFoncier", "");
+                form.clearErrors("numeroTitreFoncier");
+              }}
+            />
+            Pas de titre foncier sur ce dossier
+          </label>
           <FieldError errors={[errors.numeroTitreFoncier]} />
         </FieldContent>
       </Field>

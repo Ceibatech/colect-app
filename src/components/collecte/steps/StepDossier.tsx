@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
-import { Controller } from "react-hook-form";
+import { Controller, useWatch } from "react-hook-form";
+import { findRubrique, rubriqueLabel, rubriqueOfCote } from "@/lib/referentiel/classement";
 import type { DossierFormValues } from "@/lib/validation/dossier";
 import { Field, FieldContent, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -39,13 +40,23 @@ export function StepDossier({
   const items = [...natures.map((n) => ({ label: n.libelle, value: String(n.id) })), { label: "Autres (préciser)", value: AUTRES }];
 
   const [autres, setAutres] = useState(() => !form.getValues("natureDossierId") && !!form.getValues("natureDossierAutre"));
+  const [modeCarton, classement, cartonCote] = useWatch({ control, name: ["modeCarton", "classement", "cartonCote"] });
+  const rubrique = modeCarton === "NOUVEAU" ? findRubrique(classement || "2010") : modeCarton === "EXISTANT" ? rubriqueOfCote(cartonCote) : null;
 
-  // Référentiel MULCV : les dossiers fonciers inventoriés sont des Dossiers ACD (2010).
-  useEffect(() => {
-    if (form.getValues("natureDossierId") || form.getValues("natureDossierAutre")) return;
-    const acd = natures.find((n) => n.code.toUpperCase() === "ACD");
-    if (acd) setValue("natureDossierId", acd.id);
-  }, [form, natures, setValue]);
+  if (rubrique) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field className="sm:col-span-2">
+          <FieldLabel>Nature du dossier</FieldLabel>
+          <FieldContent>
+            <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">{rubriqueLabel(rubrique)}</p>
+            <p className="text-xs text-muted-foreground">Fixée par la rubrique du carton (référentiel MULCV) : tous les dossiers d&apos;un carton ont la même nature.</p>
+          </FieldContent>
+        </Field>
+        <EtatConservationField form={form} label="État du dossier" etatField="etatDossier" descriptionField="etatDossierDescription" />
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">

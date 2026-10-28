@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Pencil } from "lucide-react";
 import { CartonCotePreview } from "@/components/collecte/CartonCotePreview";
+import { findRubrique, rubriqueLabel, rubriqueOfCote } from "@/lib/referentiel/classement";
 
 interface Lookups {
   sites: { id: number; nom: string; code: string; entrepots: { id: number; nom: string; code: string; localisation: string | null }[] }[];
@@ -57,7 +58,8 @@ export function StepRecap({
   const site = lookups.sites.find((s) => s.id === v.siteId);
   const entrepot = site?.entrepots.find((e) => e.id === v.entrepotId);
   const commune = lookups.communes.find((c) => c.id === v.communeId);
-  const nature = lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
+  const rubrique = v.modeCarton === "NOUVEAU" ? findRubrique(v.classement || "2010") : v.modeCarton === "EXISTANT" ? rubriqueOfCote(v.cartonCote) : null;
+  const nature = rubrique ? rubriqueLabel(rubrique) : lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
   const etatLabel = (value?: string) => ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label;
   const operateur = lookups.isOperateurRole
     ? lookups.currentUserName
@@ -98,7 +100,8 @@ export function StepRecap({
         <Row label="N° îlot" value={v.numeroIlot} />
         <Row label="N° lot" value={v.numeroLot} />
         <Row label="Superficie" value={v.superficie ? `${v.superficie} m²` : undefined} />
-        <Row label="N° titre foncier" value={v.numeroTitreFoncier} />
+        <Row label="Année de l'acte" value={v.anneeActe} />
+        <Row label="N° titre foncier" value={v.sansTitreFoncier ? "Pas de titre foncier" : v.numeroTitreFoncier} />
         <Row label="Commune" value={commune?.nom} />
         <Row label="Lotissement" value={v.lotissementNom} />
       </Section>

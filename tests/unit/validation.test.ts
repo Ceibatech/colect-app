@@ -150,7 +150,32 @@ describe("dossierSubmitSchema (soumission finale — champs obligatoires, §41)"
     natureDossierId: 1,
     nom: "Kouassi",
     prenoms: "Jean",
+    numeroIlot: "12",
+    numeroLot: "34 BIS",
+    superficie: 500,
+    anneeActe: 1998,
+    numeroTitreFoncier: "TF-1234",
   };
+
+  it("exige les métadonnées de la série 2000 (îlot, lot, superficie, année)", () => {
+    for (const field of ["numeroIlot", "numeroLot", "superficie", "anneeActe"] as const) {
+      const { [field]: _omit, ...rest } = validSubmission;
+      void _omit;
+      expect(dossierSubmitSchema.safeParse(rest).success, field).toBe(false);
+    }
+  });
+
+  it("exige le titre foncier, sauf absence déclarée", () => {
+    const { numeroTitreFoncier, ...rest } = validSubmission;
+    void numeroTitreFoncier;
+    expect(dossierSubmitSchema.safeParse(rest).success).toBe(false);
+    expect(dossierSubmitSchema.safeParse({ ...rest, sansTitreFoncier: true }).success).toBe(true);
+  });
+
+  it("refuse une année future et un îlot mal formé", () => {
+    expect(dossierSubmitSchema.safeParse({ ...validSubmission, anneeActe: new Date().getFullYear() + 1 }).success).toBe(false);
+    expect(dossierSubmitSchema.safeParse({ ...validSubmission, numeroIlot: "12;DROP" }).success).toBe(false);
+  });
 
   it("accepte une soumission avec tous les champs obligatoires renseignés", () => {
     expect(dossierSubmitSchema.safeParse(validSubmission).success).toBe(true);

@@ -50,6 +50,13 @@ export const ETAT_CONSERVATION_OPTIONS = [
  * est fait côté serveur dans dossier-service.ts, qui ne fait jamais
  * confiance à ce que le client envoie).
  */
+/** Îlot et lot : lettres, chiffres, espaces, / et - (ex. 12, 12 BIS, A-3). */
+const LOT_PATTERN = /^(?:[\p{L}\p{N}][\p{L}\p{N} /-]*)?$/u;
+/** Champ numérique exigé : vide → « requis », sinon nombre contrôlé. */
+const requiredNumber = (message: string, schema: z.ZodNumber) =>
+  z.preprocess((value) => (value === "" || value === null ? undefined : value), z.coerce.number({ message }).pipe(schema).optional())
+    .refine((value) => value !== undefined, { message });
+
 export const dossierFormSchema = z.object({
   // ÉTAPE 1 — Site
   // Site d'archivage physique (Phase 16+) — référentiel géré depuis
@@ -99,6 +106,14 @@ export const dossierFormSchema = z.object({
     .optional()
     .or(z.literal("")),
   numeroTitreFoncier: z.string().max(100).optional().or(z.literal("")),
+  sansTitreFoncier: z.boolean().optional(),
+  anneeActe: z.coerce
+    .number({ message: "L'année doit être un nombre" })
+    .int("L'année doit être un nombre entier")
+    .min(1900, "Année invraisemblable")
+    .max(new Date().getFullYear(), "L'année ne peut pas être dans le futur")
+    .optional()
+    .or(z.literal("")),
   communeId: z.coerce.number().int().positive().optional(),
   // L'opérateur peut sélectionner une valeur connue ou proposer une nouvelle
   // localité. Le serveur harmonise les alias avant de réutiliser/créer la fiche.
@@ -145,12 +160,23 @@ export const dossierSubmitSchema = dossierFormSchema
     lotissementNom: z.string().min(1, "Le lotissement est requis").max(150),
     nom: z.string().min(1, "Le nom du titulaire est requis").max(150),
     prenoms: z.string().min(1, "Le(s) prénom(s) du titulaire sont requis").max(150),
+    // Référentiel MULCV, série 2000 (actes du foncier) : métadonnées exigées.
+    numeroIlot: z.string().trim().min(1, "Le n° d'îlot est requis").max(50).regex(LOT_PATTERN, "N° d'îlot : lettres, chiffres, espaces, / ou - seulement"),
+    numeroLot: z.string().trim().min(1, "Le n° de lot est requis").max(50).regex(LOT_PATTERN, "N° de lot : lettres, chiffres, espaces, / ou - seulement"),
+    superficie: requiredNumber("La superficie est requise", z.number().positive("La superficie doit être positive").max(1_000_000, "Superficie invraisemblable")),
+    anneeActe: requiredNumber("L'année de l'acte est requise", z.number().int("L'année doit être un nombre entier").min(1900, "Année invraisemblable").max(new Date().getFullYear(), "L'année ne peut pas être dans le futur")),
+  })
+  // Titre foncier : renseigné, ou absence déclarée explicitement.
+  .refine((data) => !!data.numeroTitreFoncier?.trim() || data.sansTitreFoncier === true, {
+    message: "Saisissez le n° de titre foncier, ou cochez « Pas de titre foncier ».",
+    path: ["numeroTitreFoncier"],
   })
   // natureDossierId (liste fermée) OU natureDossierAutre (saisie "Autres")
   // — l'un des deux est requis, jamais les deux à la fois côté UI mais le
   // serveur ne fait confiance à aucun des deux isolément (dossier-service.ts
   // revérifie et résout la valeur finale).
-  .refine((data) => !!data.natureDossierId || !!data.natureDossierAutre?.trim(), {
+  // La nature vient de la rubrique du carton (fixée par le serveur) ; sinon, liste ou « Autres ».
+  .refine((data) => !!data.modeCarton || !!data.natureDossierId || !!data.natureDossierAutre?.trim(), {
     message: "La nature de dossier est requise",
     path: ["natureDossierId"],
   });
@@ -158,7 +184,7 @@ export const dossierSubmitSchema = dossierFormSchema
 export const DOSSIER_STEPS = [
   { id: 1, title: "Carton et site", fields: ["modeCarton", "cartonCote", "siteId", "entrepotId", "classement", "libelleCarton"] },
   { id: 2, title: "Identification", fields: ["operateurId", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
-  { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
+  { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "sansTitreFoncier", "anneeActe", "communeId", "lotissementNom"] },
   { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
   { id: 5, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
   { id: 6, title: "Contact", fields: ["personneContact", "mobile"] },
