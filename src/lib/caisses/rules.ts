@@ -1,28 +1,36 @@
-// Règles de rangement des cartons dans les caisses (site CEIBA). Pures, testées.
+// Règles de chargement des cartons dans les caisses de transport. Pures, testées.
+//
+// Une caisse sert à l'enlèvement chez le client (cartons du lot « prévus »,
+// avant la sortie) et au retour (cartons « reçus », avant le retour). Elle est
+// chargée pour un seul lot à la fois et vidée quand le mouvement est finalisé.
 
 export const CAPACITE_PAR_DEFAUT = 40;
 
-export type CartonPourCaisse = {
-  caisseId: number | null;
-  dossiers: Array<{ siteId: number | null; statutConditionnement: string }>;
-};
+/** Statuts d'un carton de lot qui attend un transport : enlèvement (PREVU) ou retour (RECU). */
+export const STATUTS_A_TRANSPORTER = ["PREVU", "RECU"] as const;
 
-/** Raison pour laquelle un carton ne peut pas entrer dans la caisse, ou null s'il le peut. */
-export function refusRangement(
-  carton: CartonPourCaisse,
-  caisse: { id: number; numero: string; siteId: number; capacite: number; occupes: number },
+export type LotEnAttente = { lotId: number; reference: string; statut: string } | null;
+
+/** Raison pour laquelle un carton ne peut pas être chargé dans la caisse, ou null s'il le peut. */
+export function refusChargement(
+  carton: { caisseId: number | null },
+  lot: LotEnAttente,
+  caisse: { id: number; numero: string; capacite: number; occupes: number; lotId: number | null; lotReference?: string | null },
   autreCaisse?: string | null,
 ): string | null {
   if (carton.caisseId === caisse.id) return null;
-  if (carton.caisseId != null) return `Ce carton est déjà rangé dans la caisse ${autreCaisse ?? ""}. Retirez-le d'abord de cette caisse.`.replace("  ", " ");
-  if (!carton.dossiers.length) return "Ce carton ne contient aucun dossier.";
-  if (carton.dossiers.some((dossier) => dossier.siteId !== caisse.siteId)) {
-    return "Ce carton n'est pas enregistré sur le site de la caisse : terminez d'abord son transfert.";
+  if (carton.caisseId != null) return `Ce carton est déjà dans la caisse ${autreCaisse ?? "d'un autre chargement"}. Retirez-le d'abord de cette caisse.`;
+  if (!lot) return "Ce carton ne fait partie d'aucun lot en attente d'enlèvement ou de retour.";
+  if (caisse.lotId != null && caisse.lotId !== lot.lotId) {
+    return `La caisse ${caisse.numero} est chargée pour le lot ${caisse.lotReference ?? caisse.lotId} : une caisse ne transporte qu'un lot à la fois.`;
   }
-  const restants = carton.dossiers.filter((dossier) => dossier.statutConditionnement !== "TERMINE").length;
-  if (restants) return `Reconditionnement non terminé : ${restants} dossier${restants > 1 ? "s" : ""} restant${restants > 1 ? "s" : ""}.`;
   if (caisse.occupes >= caisse.capacite) return `La caisse ${caisse.numero} est pleine (${caisse.capacite} cartons).`;
   return null;
+}
+
+/** Sens du transport d'après le statut du carton dans son lot. */
+export function sensTransport(statut: string) {
+  return statut === "RECU" ? "retour" : "enlèvement";
 }
 
 /** Numéro de caisse saisi : lettres, chiffres, espaces, - / . (ex. « CAISSE 01 », « C-1 »). */

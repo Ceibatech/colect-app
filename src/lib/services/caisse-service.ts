@@ -3,16 +3,17 @@ import { Prisma } from "@prisma/client";
 import { requireApiPermission } from "@/lib/auth/current-user";
 import { findCartonByCote } from "@/lib/cartons/cote-assignment";
 import { coteFromScan, cartonIdFromScan } from "@/lib/cartons/scan";
-import { CAPACITE_PAR_DEFAUT, normaliserNumero, refusRangement } from "@/lib/caisses/rules";
+import { CAPACITE_PAR_DEFAUT, normaliserNumero, refusChargement, STATUTS_A_TRANSPORTER } from "@/lib/caisses/rules";
 import { prisma } from "@/lib/prisma/client";
 import { ApiError } from "@/lib/utils/api-error";
 import { getClientIp } from "@/lib/utils/server-request";
 
 /**
- * Caisses de rangement du site CEIBA : après traitement, chaque carton est
- * rangé dans une caisse (40 cartons au plus). La caisse ne change ni la cote du
- * carton ni celle de ses dossiers ; seul le lien carton → caisse est tenu, avec
- * son historique.
+ * Caisses de transport (basées sur un site CEIBA) : à l'enlèvement chez le
+ * client et au retour, les cartons du lot sont chargés caisse par caisse
+ * (40 au plus). La caisse est vidée quand la réception (ou le retour) est
+ * finalisée. Elle ne change ni la cote du carton ni celle de ses dossiers ;
+ * seul le lien carton → caisse est tenu, avec son historique par lot.
  */
 
 const COTE_ORDER: Prisma.CartonOrderByWithRelationInput[] = [{ cotePrefixe: "asc" }, { coteSequence: "asc" }, { id: "asc" }];
@@ -20,7 +21,7 @@ const COTE_ORDER: Prisma.CartonOrderByWithRelationInput[] = [{ cotePrefixe: "asc
 export async function listCaisses() {
   const caisses = await prisma.caisse.findMany({
     orderBy: [{ isActive: "desc" }, { numero: "asc" }],
-    include: { site: { select: { nom: true } }, _count: { select: { cartons: true } } },
+    include: { site: { select: { nom: true } }, transferLot: { select: { id: true, reference: true } }, _count: { select: { cartons: true } } },
   });
   const dossiers = await prisma.dossier.groupBy({
     by: ["cartonId"],
@@ -41,6 +42,7 @@ export async function getCaisse(id: number) {
     where: { id },
     include: {
       site: { select: { id: true, nom: true } },
+      transferLot: { select: { id: true, reference: true, status: true } },
       cartons: {
         orderBy: COTE_ORDER,
         select: {
@@ -52,7 +54,7 @@ export async function getCaisse(id: number) {
       mouvements: {
         orderBy: { createdAt: "desc" },
         take: 30,
-        select: { id: true, type: true, createdAt: true, user: { select: { name: true } }, carton: { select: { id: true, cote: true } } },
+        select: { id: true, type: true, createdAt: true, user: { select: { name: true } }, carton: { select: { id: true, cote: true } }, transferLot: { select: { id: true, reference: true } } },
       },
     },
   });
@@ -111,9 +113,19 @@ export async function updateCaisse(id: number, input: CaisseInput) {
   return caisse;
 }
 
-/** Range un carton (cote, QR ou CTN) dans la caisse. La caisse est verrouillée : deux agents ne la dépassent pas. */
-export async function rangerCarton(caisseId: number, scan: string) {
-  const session = await requireApiPermission("CONDITIONNEMENT_UPDATE");
+/** Lot ouvert dans lequel le carton attend un transport (enlèvement ou retour). */
+async function lotEnAttente(tx: Prisma.TransactionClient, cartonId: number) {
+  const item = await tx.transferLotItem.findFirst({
+    where: { cartonId, status: { in: [...STATUTS_A_TRANSPORTER] }, transferLot: { status: { notIn: ["CLOTURE", "ANNULE"] } } },
+    orderBy: { id: "desc" },
+    select: { status: true, transferLot: { select: { id: true, reference: true } } },
+  });
+  return item ? { lotId: item.transferLot.id, reference: item.transferLot.reference, statut: item.status } : null;
+}
+
+/** Charge un carton du lot (cote, QR ou CTN) dans la caisse. La caisse est verrouillée : deux agents ne la dépassent pas. */
+export async function chargerCarton(caisseId: number, scan: string) {
+  const session = await requireApiPermission("TRANSFER_OPERATE");
   const ref = coteFromScan(scan) ?? (cartonIdFromScan(scan) ? `CTN-${String(cartonIdFromScan(scan)).padStart(8, "0")}` : scan.trim());
   const found = await findCartonByCote(prisma, ref);
   if (!found) throw new ApiError(`Aucun carton ne porte la cote « ${scan.trim()} ».`, 404);
@@ -121,30 +133,82 @@ export async function rangerCarton(caisseId: number, scan: string) {
     const [locked] = await tx.$queryRaw<Array<{ id: number }>>(Prisma.sql`SELECT id FROM caisses WHERE id = ${caisseId} FOR UPDATE`);
     if (!locked) throw new ApiError("Caisse introuvable.", 404);
     await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id = ${found.id} FOR UPDATE`);
-    const [caisse, carton, occupes] = await Promise.all([
-      tx.caisse.findUniqueOrThrow({ where: { id: caisseId }, select: { id: true, numero: true, siteId: true, capacite: true, isActive: true } }),
-      tx.carton.findUniqueOrThrow({
-        where: { id: found.id },
-        select: { id: true, cote: true, caisseId: true, caisse: { select: { numero: true } }, dossiers: { select: { siteId: true, statutConditionnement: true } } },
-      }),
+    const [caisse, carton, occupes, lot] = await Promise.all([
+      tx.caisse.findUniqueOrThrow({ where: { id: caisseId }, select: { id: true, numero: true, capacite: true, isActive: true, transferLotId: true, transferLot: { select: { reference: true } } } }),
+      tx.carton.findUniqueOrThrow({ where: { id: found.id }, select: { id: true, cote: true, caisseId: true, caisse: { select: { numero: true } } } }),
       tx.carton.count({ where: { caisseId } }),
+      lotEnAttente(tx, found.id),
     ]);
     if (!caisse.isActive) throw new ApiError("Cette caisse est retirée du service.", 400);
-    const refus = refusRangement(carton, { ...caisse, occupes }, carton.caisse?.numero);
+    const refus = refusChargement(carton, lot, { ...caisse, occupes, lotId: caisse.transferLotId, lotReference: caisse.transferLot?.reference }, carton.caisse?.numero);
     if (refus) throw new ApiError(refus, 409);
-    if (carton.caisseId === caisseId) return { cote: carton.cote, dejaRange: true, occupes, capacite: caisse.capacite };
+    if (carton.caisseId === caisseId) return { cote: carton.cote, dejaCharge: true, occupes, capacite: caisse.capacite, lot: lot?.reference ?? null };
     await tx.carton.update({ where: { id: carton.id }, data: { caisseId, misEnCaisseAt: new Date() } });
-    await tx.caisseMouvement.create({ data: { caisseId, cartonId: carton.id, type: "RANGEMENT", userId: session.userId } });
-    return { cote: carton.cote, dejaRange: false, occupes: occupes + 1, capacite: caisse.capacite };
+    if (caisse.transferLotId !== lot!.lotId) await tx.caisse.update({ where: { id: caisseId }, data: { transferLotId: lot!.lotId } });
+    await tx.caisseMouvement.create({ data: { caisseId, cartonId: carton.id, type: "CHARGEMENT", transferLotId: lot!.lotId, userId: session.userId } });
+    return { cote: carton.cote, dejaCharge: false, occupes: occupes + 1, capacite: caisse.capacite, lot: lot!.reference };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted, maxWait: 10_000, timeout: 30_000 });
 }
 
+/**
+ * Vide les caisses des cartons dont le transport est finalisé (réception ou
+ * retour signés). Appelé dans la transaction du bordereau.
+ */
+export async function dechargerCartons(tx: Prisma.TransactionClient, cartonIds: number[], transferLotId: number, userId: number | null) {
+  if (!cartonIds.length) return 0;
+  const charges = await tx.carton.findMany({ where: { id: { in: cartonIds }, caisseId: { not: null } }, select: { id: true, caisseId: true } });
+  if (!charges.length) return 0;
+  await tx.carton.updateMany({ where: { id: { in: charges.map((c) => c.id) } }, data: { caisseId: null, misEnCaisseAt: null } });
+  await tx.caisseMouvement.createMany({ data: charges.map((c) => ({ caisseId: c.caisseId!, cartonId: c.id, type: "DECHARGEMENT" as const, transferLotId, userId })) });
+  const caisseIds = [...new Set(charges.map((c) => c.caisseId!))];
+  for (const id of caisseIds) {
+    if (!(await tx.carton.count({ where: { caisseId: id } }))) await tx.caisse.update({ where: { id }, data: { transferLotId: null } });
+  }
+  return charges.length;
+}
+
 export async function retirerCarton(caisseId: number, cartonId: number) {
-  const session = await requireApiPermission("CONDITIONNEMENT_UPDATE");
+  const session = await requireApiPermission("TRANSFER_OPERATE");
   return prisma.$transaction(async (tx) => {
+    const caisse = await tx.caisse.findUnique({ where: { id: caisseId }, select: { transferLotId: true } });
     const moved = await tx.carton.updateMany({ where: { id: cartonId, caisseId }, data: { caisseId: null, misEnCaisseAt: null } });
     if (!moved.count) throw new ApiError("Ce carton n'est pas dans cette caisse.", 404);
-    await tx.caisseMouvement.create({ data: { caisseId, cartonId, type: "RETRAIT", userId: session.userId } });
+    await tx.caisseMouvement.create({ data: { caisseId, cartonId, type: "RETRAIT", transferLotId: caisse?.transferLotId ?? null, userId: session.userId } });
+    if (!(await tx.carton.count({ where: { caisseId } }))) await tx.caisse.update({ where: { id: caisseId }, data: { transferLotId: null } });
     return { ok: true };
   });
+}
+
+/** Caisses chargées pour un lot, avec leurs cartons (fiche du lot, bordereaux). */
+export async function getCaissesDuLot(transferLotId: number) {
+  const caisses = await prisma.caisse.findMany({
+    where: { transferLotId },
+    orderBy: { numero: "asc" },
+    select: { id: true, numero: true, capacite: true, cartons: { orderBy: COTE_ORDER, select: { id: true, cote: true } } },
+  });
+  return caisses;
+}
+
+/**
+ * Caisse dans laquelle chaque carton a voyagé pour ce mouvement (bordereau),
+ * d'après l'historique : reste exacte après le déchargement. Enlèvement : dernier
+ * chargement avant la réception ; retour : dernier chargement après la réception.
+ */
+export async function caissesDuMouvement(transferLotId: number, type: string, items: Array<{ cartonId: number | null; receivedAt: Date | null }>) {
+  const ids = items.flatMap((item) => (item.cartonId ? [item.cartonId] : []));
+  if (!ids.length) return new Map<number, string>();
+  const chargements = await prisma.caisseMouvement.findMany({
+    where: { transferLotId, type: "CHARGEMENT", cartonId: { in: ids } },
+    orderBy: { createdAt: "desc" },
+    select: { cartonId: true, createdAt: true, caisse: { select: { numero: true } } },
+  });
+  const receivedAt = new Map(items.flatMap((item) => (item.cartonId ? [[item.cartonId, item.receivedAt] as const] : [])));
+  const result = new Map<number, string>();
+  for (const chargement of chargements) {
+    if (result.has(chargement.cartonId)) continue;
+    const recu = receivedAt.get(chargement.cartonId);
+    const retour = type === "RETOUR";
+    if (retour ? recu && chargement.createdAt >= recu : !recu || chargement.createdAt <= recu) result.set(chargement.cartonId, chargement.caisse.numero);
+  }
+  return result;
 }

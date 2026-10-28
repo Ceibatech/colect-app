@@ -357,7 +357,7 @@ export async function getTransferLotDetail(id: number) {
       items: {
         orderBy: { cartonCode: "asc" },
         include: {
-          carton: { select: { cote: true } },
+          carton: { select: { cote: true, caisseId: true } },
           dossiers: {
             orderBy: { dossier: { reference: "asc" } },
             include: { dossier: { select: { id: true, reference: true, cote: true, nom: true, prenoms: true } } },
