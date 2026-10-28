@@ -61,12 +61,7 @@ export function StepRecap({
   const rubrique = v.modeCarton === "NOUVEAU" ? findRubrique(v.classement || "2010") : v.modeCarton === "EXISTANT" ? rubriqueOfCote(v.cartonCote) : null;
   const nature = rubrique ? rubriqueLabel(rubrique) : lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
   const etatLabel = (value?: string) => ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label;
-  const operateur = lookups.isOperateurRole
-    ? lookups.currentUserName
-    : (() => {
-        const op = lookups.operateurs.find((o) => o.id === v.operateurId);
-        return op ? `${op.nom} ${op.prenoms ?? ""}` : undefined;
-      })();
+  const operateur = lookups.currentUserName;
 
   return (
     <div className="space-y-3">

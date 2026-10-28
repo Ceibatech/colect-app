@@ -386,8 +386,6 @@ export function CollecteWizard({
               {currentStep === 2 && (
                 <StepIdentification
                   form={form}
-                  operateurs={operateurs}
-                  isOperateurRole={isOperateurRole}
                   currentUserName={currentUserName}
                   isCartonCarryOver={isContinuingCarton}
                 />

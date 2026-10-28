@@ -19,27 +19,16 @@ const DIRECTION_SERVICE_ITEMS = [
   { label: "Autres (préciser)", value: AUTRES },
 ];
 
-interface Operateur {
-  id: number;
-  nom: string;
-  prenoms: string | null;
-  matricule: string;
-}
-
 export function StepIdentification({
   form,
-  operateurs,
-  isOperateurRole,
   currentUserName,
   isCartonCarryOver = false,
 }: {
   form: UseFormReturn<DossierFormValues>;
-  operateurs: Operateur[];
-  isOperateurRole: boolean;
   currentUserName: string;
   isCartonCarryOver?: boolean;
 }) {
-  const { register, control, formState } = form;
+  const { register, formState } = form;
   const errors = formState.errors;
 
   return (
@@ -62,33 +51,8 @@ export function StepIdentification({
       <Field className="sm:col-span-2">
         <FieldLabel>Opérateur</FieldLabel>
         <FieldContent>
-          {isOperateurRole ? (
-            <Input value={currentUserName} disabled readOnly />
-          ) : (
-            <Controller
-              control={control}
-              name="operateurId"
-              render={({ field }) => (
-                <Select
-                  items={operateurs.map((op) => ({ label: `${op.nom} ${op.prenoms ?? ""} (${op.matricule})`, value: op.id }))}
-                  value={field.value ?? null}
-                  onValueChange={field.onChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Sélectionner l'opérateur ayant réalisé la collecte" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {operateurs.map((op) => (
-                      <SelectItem key={op.id} value={op.id}>
-                        {op.nom} {op.prenoms ?? ""} ({op.matricule})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          )}
-          <FieldError errors={[errors.operateurId]} />
+          <Input value={currentUserName} disabled readOnly />
+          <p className="text-xs text-muted-foreground">Enregistré automatiquement : la personne connectée qui renseigne le dossier.</p>
         </FieldContent>
       </Field>
 
