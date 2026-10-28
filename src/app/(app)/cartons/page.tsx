@@ -42,7 +42,7 @@ export default async function CartonsPage({ searchParams }: { searchParams: Prom
         icon={Boxes}
         eyebrow="Identification physique"
         title="Cartons et QR codes"
-        description="Chaque carton a un identifiant unique (CTN) tiré de son libellé. Imprimez son étiquette QR et collez-la sur le carton : un scan ouvre sa fiche."
+        description="Chaque carton porte sa cote du référentiel MULCV (2010-KOU-0001 : rubrique, commune, n°). Imprimez son étiquette QR et collez-la sur le carton : un scan ouvre sa fiche."
         stats={[{ label: "Cartons", value: data.total }]}
         actions={<Link href={printHref} className={buttonVariants()}><Printer /> Imprimer les étiquettes{data.total > LABEL_PRINT_LIMIT ? ` (${LABEL_PRINT_LIMIT} premières)` : ""}</Link>}
       />
