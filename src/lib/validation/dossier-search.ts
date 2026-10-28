@@ -3,7 +3,7 @@ import { z } from "zod";
 const statutCollecteEnum = z.enum(["BROUILLON", "SOUMIS"]);
 const statutValidationEnum = z.enum(["EN_ATTENTE", "EN_CONTROLE", "VALIDE", "REJETE"]);
 const statutTermineEnum = z.enum(["EN_ATTENTE", "EN_COURS", "A_VALIDER", "TERMINE", "REJETE"]);
-const sortEnum = z.enum(["createdAt", "reference", "nom", "commune"]);
+const sortEnum = z.enum(["cote", "createdAt", "reference", "nom", "commune"]);
 const dirEnum = z.enum(["asc", "desc"]);
 
 /** Parse et valide les `searchParams` de /dossiers — jamais de confiance dans une URL. */
@@ -22,8 +22,9 @@ export const dossierSearchParamsSchema = z.object({
   from: z.coerce.date().optional(),
   to: z.coerce.date().optional(),
   page: z.coerce.number().int().positive().default(1),
-  sort: sortEnum.default("createdAt"),
-  dir: dirEnum.default("desc"),
+  // Par défaut : ordre des cotes (carton par carton, dossier 001, 002…), comme dans les rayonnages.
+  sort: sortEnum.default("cote"),
+  dir: dirEnum.default("asc"),
 });
 
 export type DossierSearchParams = z.infer<typeof dossierSearchParamsSchema>;

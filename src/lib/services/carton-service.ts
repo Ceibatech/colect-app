@@ -68,6 +68,9 @@ function filterSql({ q, siteId, entrepotId }: CartonFilters) {
   return clauses.length ? Prisma.sql`WHERE ${Prisma.join(clauses, " AND ")}` : Prisma.empty;
 }
 
+/** Ordre des cotes : rubrique-commune, puis n° du carton ; cartons sans cote à la fin. */
+const COTE_ORDER = Prisma.sql`c.cote_prefixe IS NULL, c.cote_prefixe, c.cote_sequence, c.id`;
+
 function cartonSelect(where: Prisma.Sql, tail: Prisma.Sql) {
   // Libellé le plus fréquent parmi les dossiers du carton.
   return Prisma.sql`
@@ -80,7 +83,7 @@ function cartonSelect(where: Prisma.Sql, tail: Prisma.Sql) {
     LEFT JOIN sites s ON s.id = d.site_id
     LEFT JOIN entrepots e ON e.id = d.entrepot_id
     ${where}
-    GROUP BY c.id, c.cote
+    GROUP BY c.id, c.cote, c.cote_prefixe, c.cote_sequence
     ${tail}`;
 }
 
@@ -88,7 +91,7 @@ export async function listCartons(filters: CartonFilters & { page?: number }) {
   const page = Math.max(1, filters.page ?? 1);
   const where = filterSql(filters);
   const [rows, [count]] = await Promise.all([
-    prisma.$queryRaw<RawRow[]>(cartonSelect(where, Prisma.sql`ORDER BY c.id LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`)),
+    prisma.$queryRaw<RawRow[]>(cartonSelect(where, Prisma.sql`ORDER BY ${COTE_ORDER} LIMIT ${PAGE_SIZE} OFFSET ${(page - 1) * PAGE_SIZE}`)),
     prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
       SELECT COUNT(*) AS total FROM (SELECT c.id FROM cartons c JOIN dossiers d ON d.carton_id = c.id ${where} GROUP BY c.id) x`),
   ]);
@@ -101,7 +104,7 @@ export async function getLabelCartons(input: CartonFilters & { ids?: number[] })
   const where = input.ids?.length
     ? Prisma.sql`WHERE c.id IN (${Prisma.join(input.ids.slice(0, LABEL_PRINT_LIMIT))})`
     : filterSql(input);
-  const rows = await prisma.$queryRaw<RawRow[]>(cartonSelect(where, Prisma.sql`ORDER BY site, salle, c.id LIMIT ${LABEL_PRINT_LIMIT + 1}`));
+  const rows = await prisma.$queryRaw<RawRow[]>(cartonSelect(where, Prisma.sql`ORDER BY site, salle, ${COTE_ORDER} LIMIT ${LABEL_PRINT_LIMIT + 1}`));
   return { rows: rows.slice(0, LABEL_PRINT_LIMIT).map(toRow), truncated: rows.length > LABEL_PRINT_LIMIT };
 }
 
