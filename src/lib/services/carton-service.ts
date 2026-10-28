@@ -115,6 +115,8 @@ export async function getCartonSheet(id: number) {
       id: true,
       cote: true,
       createdAt: true,
+      misEnCaisseAt: true,
+      caisse: { select: { id: true, numero: true } },
       dossiers: {
         orderBy: [{ rangCarton: "asc" }, { id: "asc" }],
         select: {

@@ -23,6 +23,7 @@ export const USER_DELETION_BLOCKERS = {
   dossiersPrepared: "dossiers préparés",
   dossiersConditioned: "dossiers reconditionnés",
   reconditionnementSessions: "temps de reconditionnement enregistrés",
+  caisseMouvements: "rangements en caisse",
   preparationPieceLines: "lignes de préparation",
   financeRatesCreated: "barèmes financiers créés",
   transferLotsCreated: "lots de transfert créés",

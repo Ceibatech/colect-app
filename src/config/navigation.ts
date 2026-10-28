@@ -31,6 +31,7 @@ import {
   ScanLine,
   PackageCheck,
   Archive,
+  Container,
   Navigation,
   QrCode,
 } from "lucide-react";
@@ -76,6 +77,7 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Préparation", href: "/preparation", icon: ClipboardCheck, permission: "PREPARATION_VIEW", tone: "preparation" },
   { title: "Numérisation", href: "/numerisation", icon: ScanLine, permission: "NUMERISATION_VIEW", tone: "numerisation" },
   { title: "Reconditionnement", href: "/conditionnement", icon: PackageCheck, permission: "CONDITIONNEMENT_VIEW", tone: "conditionnement" },
+  { title: "Caisses", href: "/caisses", icon: Container, permission: "CONDITIONNEMENT_VIEW", tone: "conditionnement" },
   { title: "Indexation", href: "/indexation", icon: ScanSearch, permission: "INDEXATION_VIEW", tone: "indexation" },
   { title: "Archivage", href: "/archivage", icon: Archive, permission: "ARCHIVAGE_VIEW", tone: "archivage" },
   {
