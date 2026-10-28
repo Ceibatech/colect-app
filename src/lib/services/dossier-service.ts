@@ -24,23 +24,29 @@ const MAX_REFERENCE_ATTEMPTS = 5;
  * - ADMIN / SUPERVISEUR : opérateur choisi dans le formulaire (saisie pour
  *   le compte d'un opérateur terrain).
  */
-async function resolveOperateurId(session: SessionPayload, formOperateurId?: number): Promise<number> {
-  if (session.roleCode === "OPERATEUR") {
-    const operateur = await prisma.operateur.findUnique({ where: { userId: session.userId } });
-    if (!operateur) {
-      throw new Error("Aucune fiche opérateur n'est associée à votre compte. Contactez un administrateur.");
+/**
+ * L'opérateur d'un dossier est toujours la personne connectée qui le
+ * renseigne : jamais choisi dans une liste. Sa fiche opérateur est créée au
+ * premier dossier si elle n'existe pas (matricule OP-xxx).
+ */
+async function resolveOperateurId(session: SessionPayload): Promise<number> {
+  const existing = await prisma.operateur.findUnique({ where: { userId: session.userId }, select: { id: true } });
+  if (existing) return existing.id;
+  const user = await prisma.user.findUnique({ where: { id: session.userId }, select: { name: true, email: true } });
+  if (!user) throw new Error("Compte introuvable : reconnectez-vous.");
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const count = await prisma.operateur.count();
+    const matricule = `OP-${String(count + 1 + attempt).padStart(3, "0")}`;
+    try {
+      const created = await prisma.operateur.create({ data: { userId: session.userId, matricule, nom: user.name, email: user.email, isActive: true }, select: { id: true } });
+      return created.id;
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002")) throw error;
+      const raced = await prisma.operateur.findUnique({ where: { userId: session.userId }, select: { id: true } });
+      if (raced) return raced.id;
     }
-    return operateur.id;
   }
-
-  if (!formOperateurId) {
-    throw new Error("Veuillez sélectionner l'opérateur ayant réalisé la collecte.");
-  }
-  const operateur = await prisma.operateur.findUnique({ where: { id: formOperateurId } });
-  if (!operateur || !operateur.isActive) {
-    throw new Error("Opérateur invalide ou inactif.");
-  }
-  return operateur.id;
+  throw new Error("Impossible de créer votre fiche opérateur. Réessayez.");
 }
 
 /**
@@ -254,7 +260,7 @@ async function cotesOf(id: number) {
 
 export async function saveDraft(values: DossierFormValues, draftId?: number | null): Promise<DraftResult> {
   const session = await requirePermission("DOSSIER_CREATE");
-  const operateurId = await resolveOperateurId(session, values.operateurId);
+  const operateurId = await resolveOperateurId(session);
   const cleaned = cleanForDb(values);
   const lotissementId = await resolveLotissementId(cleaned.communeId, values.lotissementNom);
   const natureDossierId = await resolveNatureDossierId(values.natureDossierId ?? null, values.natureDossierAutre);
@@ -296,7 +302,8 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
           id: draftId, updatedAt: existing.updatedAt, statutCollecte: "BROUILLON",
           cartonId: existing.cartonId, siteId: existing.siteId, entrepotId: existing.entrepotId,
         },
-        data: { ...data, operateurId, cartonId },
+        // Le brouillon garde l'opérateur qui l'a créé.
+        data: { ...data, operateurId: existing.operateurId, cartonId },
       });
       if (updated.count !== 1) throw new Error("Ce dossier a été modifié ou déplacé pendant la saisie. Rechargez sa fiche avant de l'enregistrer.");
       await assignDossierCote(tx, existing.id, rubrique?.code);

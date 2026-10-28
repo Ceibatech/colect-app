@@ -183,7 +183,7 @@ export const dossierSubmitSchema = dossierFormSchema
 
 export const DOSSIER_STEPS = [
   { id: 1, title: "Carton et site", fields: ["modeCarton", "cartonCote", "siteId", "entrepotId", "classement", "libelleCarton"] },
-  { id: 2, title: "Identification", fields: ["operateurId", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
+  { id: 2, title: "Identification", fields: ["codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
   { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "sansTitreFoncier", "anneeActe", "communeId", "lotissementNom"] },
   { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
   { id: 5, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
