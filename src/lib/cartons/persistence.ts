@@ -88,7 +88,14 @@ export async function resolveCartonId(
   tx: Prisma.TransactionClient,
   identity: CartonIntakeIdentity,
   existing?: CartonIntakeIdentity & { id: number; cartonId: number | null },
+  chosenCartonId?: number | null,
 ): Promise<number | null> {
+  // Carton désigné par sa cote (QR scanné ou saisi) : il prime sur le libellé.
+  if (chosenCartonId) {
+    await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id = ${chosenCartonId} FOR UPDATE`);
+    if (existing?.cartonId !== chosenCartonId) await assertOpenCarton(tx, chosenCartonId);
+    return chosenCartonId;
+  }
   const legacyKey = buildCartonLegacyKey(identity);
   if (existing?.cartonId != null) {
     await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id = ${existing.cartonId} FOR UPDATE`);

@@ -14,6 +14,7 @@ vi.mock("@/lib/prisma/client", () => ({ prisma: {
 } }));
 vi.mock("@/lib/cartons/persistence", () => ({ resolveCartonId: mocks.resolveCartonId }));
 vi.mock("@/lib/utils/server-request", () => ({ getClientIp: async () => "192.0.2.1" }));
+vi.mock("@/lib/cartons/cote-assignment", () => ({ assignDossierCote: async () => null, findCartonByCote: async () => null }));
 
 import { saveDraft } from "@/lib/services/dossier-service";
 
@@ -59,7 +60,7 @@ beforeEach(() => {
 
 describe("carton draft concurrency", () => {
   it("saves a current draft while preserving its physical carton ID", async () => {
-    await expect(saveDraft(values, 10)).resolves.toEqual({ id: 10, reference: "DOS-2026-000010" });
+    await expect(saveDraft(values, 10)).resolves.toMatchObject({ id: 10, reference: "DOS-2026-000010" });
     expect(stored).toMatchObject({ cartonId: 11, siteId: 2, entrepotId: 3, nom: "Correction" });
   });
 

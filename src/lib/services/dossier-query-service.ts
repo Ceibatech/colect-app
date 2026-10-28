@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma/client";
 import { Prisma } from "@prisma/client";
 import { parseCartonReference } from "@/lib/cartons/reference";
+import { formatDossierCote, parseCote } from "@/lib/cartons/cote";
 import type {
   StatutCollecte,
   StatutValidation,
@@ -52,7 +53,11 @@ export async function searchDossiers(filters: DossierSearchFilters, options: Dos
     const q = filters.q.trim();
     if (q) {
       const cartonId = parseCartonReference(q);
-      where.OR = cartonId !== null ? [{ cartonId }] : [
+      const cote = parseCote(q);
+      where.OR = cartonId !== null ? [{ cartonId }] : cote ? [
+        cote.rang !== null ? { cote: formatDossierCote(cote.carton, cote.rang) } : { carton: { cote: cote.carton } },
+      ] : [
+        { cote: { contains: q } },
         { reference: { contains: q } },
         { codeBarres: { contains: q } },
         { libelleCarton: { contains: q } },

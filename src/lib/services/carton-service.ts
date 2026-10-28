@@ -6,12 +6,13 @@ import { prisma } from "@/lib/prisma/client";
 import { formatCartonReference, parseCartonReference } from "@/lib/cartons/reference";
 import { normalizeCartonLabel, tidyCartonText } from "@/lib/cartons/identity-normalization";
 import { cartonLabelKeySql } from "@/lib/cartons/persistence";
+import { parseCote } from "@/lib/cartons/cote";
 
 /**
- * Cartons et QR codes. Chaque carton physique porte un identifiant permanent
- * (CTN-00000123) généré à partir de son libellé ; le QR code imprimé sur le
- * carton encode l'adresse de sa fiche (…/c/CTN-00000123), lisible par
- * l'appareil photo d'un téléphone ou par une douchette.
+ * Cartons et QR codes. Chaque carton physique porte la cote du référentiel
+ * MULCV (2010-KOU-0001) ; le QR code imprimé encode l'adresse de sa fiche
+ * (…/c/2010-KOU-0001), lisible par un téléphone ou une douchette. L'ancien
+ * identifiant technique (CTN-00000123) reste reconnu.
  */
 
 export const LABEL_PRINT_LIMIT = 400;
@@ -19,19 +20,24 @@ const PAGE_SIZE = 50;
 
 export type CartonRow = {
   id: number;
+  /** Cote du référentiel (2010-KOU-0001), ou l'identifiant CTN tant qu'elle n'est pas attribuée. */
   reference: string;
+  ctn: string;
+  cote: string | null;
   label: string | null;
   site: string | null;
   salle: string | null;
   dossiers: number;
 };
 
-type RawRow = { id: number; label: string | null; site: string | null; salle: string | null; dossiers: bigint | number };
+type RawRow = { id: number; cote: string | null; label: string | null; site: string | null; salle: string | null; dossiers: bigint | number };
 
 function toRow(row: RawRow): CartonRow {
   return {
     id: Number(row.id),
-    reference: formatCartonReference(Number(row.id)),
+    reference: row.cote ?? formatCartonReference(Number(row.id)),
+    ctn: formatCartonReference(Number(row.id)),
+    cote: row.cote,
     label: tidyCartonText(row.label),
     site: row.site,
     salle: row.salle,
@@ -51,6 +57,8 @@ function filterSql({ q, siteId, entrepotId }: CartonFilters) {
     const key = normalizeCartonLabel(query);
     const options: Prisma.Sql[] = [];
     if (id) options.push(Prisma.sql`c.id = ${id}`);
+    const cote = parseCote(query);
+    options.push(cote ? Prisma.sql`c.cote = ${cote.carton}` : Prisma.sql`c.cote LIKE ${`%${query}%`}`);
     if (key) {
       options.push(Prisma.sql`CONVERT(${cartonLabelKeySql(Prisma.sql`d.libelle_carton`)} USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE CONVERT(${`%${key}%`} USING utf8mb4) COLLATE utf8mb4_unicode_ci`);
     }
@@ -63,7 +71,7 @@ function filterSql({ q, siteId, entrepotId }: CartonFilters) {
 function cartonSelect(where: Prisma.Sql, tail: Prisma.Sql) {
   // Libellé le plus fréquent parmi les dossiers du carton.
   return Prisma.sql`
-    SELECT c.id,
+    SELECT c.id, c.cote,
       (SELECT d2.libelle_carton FROM dossiers d2 WHERE d2.carton_id = c.id AND d2.libelle_carton IS NOT NULL AND TRIM(d2.libelle_carton) <> ''
         GROUP BY d2.libelle_carton ORDER BY COUNT(*) DESC, MIN(d2.id) LIMIT 1) AS label,
       MIN(s.nom) AS site, MIN(e.nom) AS salle, COUNT(d.id) AS dossiers
@@ -72,7 +80,7 @@ function cartonSelect(where: Prisma.Sql, tail: Prisma.Sql) {
     LEFT JOIN sites s ON s.id = d.site_id
     LEFT JOIN entrepots e ON e.id = d.entrepot_id
     ${where}
-    GROUP BY c.id
+    GROUP BY c.id, c.cote
     ${tail}`;
 }
 
@@ -102,11 +110,12 @@ export async function getCartonSheet(id: number) {
     where: { id },
     select: {
       id: true,
+      cote: true,
       createdAt: true,
       dossiers: {
-        orderBy: { id: "asc" },
+        orderBy: [{ rangCarton: "asc" }, { id: "asc" }],
         select: {
-          id: true, reference: true, nom: true, prenoms: true, libelleCarton: true, codeBarres: true,
+          id: true, reference: true, cote: true, rangCarton: true, nom: true, prenoms: true, libelleCarton: true, codeBarres: true,
           statutPreparation: true, statutNumerisation: true, statutConditionnement: true, statutIndexation: true, statutArchivage: true,
           site: { select: { nom: true } },
           entrepot: { select: { nom: true, localisation: true } },
@@ -129,7 +138,8 @@ export async function getCartonSheet(id: number) {
   const first = carton.dossiers[0];
   return {
     ...carton,
-    reference: formatCartonReference(carton.id),
+    reference: carton.cote ?? formatCartonReference(carton.id),
+    ctn: formatCartonReference(carton.id),
     label: labels[0] ?? null,
     labelVariants: labels.slice(1),
     site: first?.site?.nom ?? null,
@@ -145,8 +155,20 @@ export async function getPublicOrigin(): Promise<string> {
   return `${proto.split(",")[0].trim()}://${host.split(",")[0].trim()}`;
 }
 
-export function cartonScanUrl(origin: string, id: number) {
-  return `${origin}/c/${formatCartonReference(id)}`;
+/** Adresse encodée dans le QR : la cote du carton (ou son CTN tant qu'elle n'existe pas). */
+export function cartonScanUrl(origin: string, reference: string) {
+  return `${origin}/c/${encodeURIComponent(reference)}`;
+}
+
+/** Carton désigné dans une adresse : cote (2010-KOU-0001, ou celle d'un de ses dossiers) ou CTN. */
+export async function resolveCartonRef(ref: string): Promise<number | null> {
+  const text = decodeURIComponent(ref).trim().toUpperCase();
+  const id = parseCartonReference(text);
+  if (id) return id;
+  const cote = parseCote(text);
+  if (!cote) return null;
+  const carton = await prisma.carton.findUnique({ where: { cote: cote.carton }, select: { id: true } });
+  return carton?.id ?? null;
 }
 
 /** QR code SVG (correction d'erreur Q : reste lisible avec une étiquette un peu abîmée). */

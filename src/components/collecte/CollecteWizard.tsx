@@ -48,6 +48,7 @@ interface CommuneWithLotissements {
 }
 interface NatureDossier {
   id: number;
+  code: string;
   libelle: string;
 }
 interface Operateur {
@@ -88,6 +89,7 @@ export function CollecteWizard({
   const [isPending, startTransition] = useTransition();
   const [done, setDone] = useState<{
     reference: string;
+    cote: string | null;
     carton: ActiveCartonValues;
     autoValidated: boolean;
     anomalyCount: number;
@@ -201,9 +203,11 @@ export function CollecteWizard({
         const result = await saveDraft(values, draftId);
         if (mode === "stay") {
           setDraftId(result.id);
-          toast.success("Brouillon enregistré - " + result.reference);
+          if (result.cartonCote) form.setValue("cartonCote", result.cartonCote);
+          toast.success("Brouillon enregistré - " + (result.cote ?? result.reference));
         } else {
-          startNextDossier(mode, carton);
+          // Le dossier suivant rejoint ce carton par sa cote : son rang sera n+1.
+          startNextDossier(mode, result.cartonCote ? { ...carton, cartonCote: result.cartonCote } : carton);
         }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Erreur lors de l'enregistrement du brouillon.");
@@ -235,7 +239,8 @@ export function CollecteWizard({
         const result = await submitDossier(values, draftId);
         setDone({
           reference: result.reference,
-          carton: extractActiveCartonValues(values),
+          cote: result.cote,
+          carton: result.cartonCote ? { ...extractActiveCartonValues(values), cartonCote: result.cartonCote } : extractActiveCartonValues(values),
           autoValidated: result.autoValidated,
           anomalyCount: result.anomalyCount,
         });
@@ -267,6 +272,11 @@ export function CollecteWizard({
             <p className="text-sm text-muted-foreground">
               Référence : <span className="font-mono font-semibold text-foreground">{done.reference}</span>
             </p>
+            {done.cote ? (
+              <p className="text-sm text-muted-foreground">
+                Cote : <span className="font-mono font-semibold text-foreground">{done.cote}</span>
+              </p>
+            ) : null}
             <p className="text-sm text-muted-foreground">
               {done.autoValidated
                 ? "Aucune anomalie bloquante : le dossier est déjà disponible pour la préparation."
@@ -362,6 +372,7 @@ export function CollecteWizard({
                   isOperateurRole={isOperateurRole}
                   currentUserName={currentUserName}
                   isCartonCarryOver={isContinuingCarton}
+                  draftId={draftId}
                 />
               )}
               {currentStep === 3 && <StepFoncier form={form} communes={communes} />}
@@ -373,6 +384,7 @@ export function CollecteWizard({
                 <StepRecap
                   form={form}
                   onEditStep={setCurrentStep}
+                  draftId={draftId}
                   lookups={{ sites, communes, natures, operateurs, isOperateurRole, currentUserName }}
                 />
               )}

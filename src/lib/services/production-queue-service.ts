@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma/client";
 import type { ProductionQueueSearch } from "@/lib/validation/production-queue";
 import { buildCartonToken, cartonWhereFromToken, getCartonDisplay } from "@/lib/workflow/carton-identity";
 import { parseCartonReference } from "@/lib/cartons/reference";
+import { parseCote } from "@/lib/cartons/cote";
 
 const PAGE_SIZE = 20;
 
@@ -52,9 +53,11 @@ async function getCartonPage(where: Prisma.DossierWhereInput, page: number) {
 
 function searchConstraint(q?: string): Prisma.DossierWhereInput[] {
   const cartonId = q ? parseCartonReference(q) : null;
+  const cote = q ? parseCote(q) : null;
   return [
     { OR: [{ cartonId: { not: null } }, { codeBarres: { not: null } }, { libelleCarton: { not: null } }] },
-    ...(q ? [cartonId !== null ? { cartonId } : { OR: [
+    ...(q ? [cartonId !== null ? { cartonId } : cote ? { carton: { cote: cote.carton } } : { OR: [
+      { cote: { contains: q } },
       { reference: { contains: q } },
       { codeBarres: { contains: q } },
       { libelleCarton: { contains: q } },

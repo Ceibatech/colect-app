@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { QrCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cartonIdFromScan } from "@/lib/cartons/scan";
+import { cartonIdFromScan, coteFromScan } from "@/lib/cartons/scan";
 import { formatCartonReference } from "@/lib/cartons/reference";
 
 /**
@@ -22,10 +22,11 @@ export function CartonScanBox({ defaultValue = "" }: { defaultValue?: string }) 
     event.preventDefault();
     const text = value.trim();
     if (!text) return;
+    const cote = coteFromScan(text);
     const id = cartonIdFromScan(text);
-    if (id) {
+    if (cote || id) {
       setValue("");
-      router.push(`/cartons/${formatCartonReference(id)}`);
+      router.push(`/cartons/${cote ?? formatCartonReference(id!)}`);
       return;
     }
     router.push(`/cartons?q=${encodeURIComponent(text)}`);
@@ -41,7 +42,7 @@ export function CartonScanBox({ defaultValue = "" }: { defaultValue?: string }) 
           value={value}
           onChange={(event) => setValue(event.target.value)}
           className="h-11 pl-9 text-base"
-          placeholder="Scanner le QR code, ou saisir CTN, libellé ou code-barres"
+          placeholder="Scanner le QR code, ou saisir la cote (2010-KOU-0001), le libellé ou le code-barres"
           aria-label="Scanner ou rechercher un carton"
           autoComplete="off"
         />

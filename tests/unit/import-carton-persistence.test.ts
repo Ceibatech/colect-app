@@ -20,6 +20,7 @@ vi.mock("@/lib/prisma/client", () => ({ prisma: {
   $transaction: mocks.transaction,
 } }));
 
+vi.mock("@/lib/cartons/cote-assignment", () => ({ assignMissingCotes: async () => 0 }));
 vi.mock("@/lib/cartons/persistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/cartons/persistence")>();
   return { ...actual, resolveCartonId: mocks.resolveCartonId };

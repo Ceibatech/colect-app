@@ -28,6 +28,7 @@ import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { assignCotes } from "./assign-cotes.mjs";
 import { PrismaClient } from "@prisma/client";
 
 export const CONFIRMATION = "REGROUPER-CARTONS";
@@ -317,7 +318,7 @@ export async function regroupCartons(db, { apply = false, maxDossiers = DEFAULT_
     for (const merge of locked.merges) {
       const dossierIds = merge.moves.flatMap((move) => move.dossierIds);
       if (dossierIds.length) {
-        const count = await tx.dossier.updateMany({ where: { id: { in: dossierIds }, cartonId: { in: merge.moves.map((move) => move.from) } }, data: { cartonId: merge.target } });
+        const count = await tx.dossier.updateMany({ where: { id: { in: dossierIds }, cartonId: { in: merge.moves.map((move) => move.from) } }, data: { cartonId: merge.target, rangCarton: null, cote: null } });
         moved += count.count;
       }
       for (const move of merge.moves) {
@@ -429,7 +430,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     const log = csvPath === "-" ? console.error : console.log;
     log(apply ? "REGROUPEMENT APPLIQUÉ :" : "SIMULATION — aucune donnée modifiée. Le regroupement ferait :");
     await printReport(prisma, result.plan, csvPath, log);
-    if (result.applied) log(`\n  ${result.moved} dossier(s) déplacé(s), ${result.deleted} carton(s) vide(s) supprimé(s).`);
+    if (result.applied) {
+      log(`\n  ${result.moved} dossier(s) déplacé(s), ${result.deleted} carton(s) vide(s) supprimé(s).`);
+      // Les dossiers déplacés reprennent un n° à la suite dans leur nouveau carton.
+      const cotes = await assignCotes(prisma, { apply: true, nature: false });
+      log(`  Cotes : ${cotes.cartons} carton(s) coté(s), ${cotes.dossiers} dossier(s) renuméroté(s).`);
+    }
   } catch (error) {
     console.error(`Regroupement des cartons échoué : ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;

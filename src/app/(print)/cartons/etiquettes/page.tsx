@@ -19,7 +19,7 @@ function positiveInt(value: string | undefined) {
 
 /**
  * Planche A4 d'étiquettes : 8 par page (2 × 4, environ 95 × 66 mm), QR code de
- * 40 mm, référence CTN et libellé en clair pour une lecture sans téléphone.
+ * 40 mm, cote du référentiel (2010-KOU-0001) et libellé en clair pour une lecture sans téléphone.
  */
 export default async function CartonLabelsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   await requireAnyPermission("DOSSIER_READ", "TRANSFER_VIEW");
@@ -32,7 +32,7 @@ export default async function CartonLabelsPage({ searchParams }: { searchParams:
     entrepotId: positiveInt(single(params.salle)),
   });
   const origin = await getPublicOrigin();
-  const labels = await Promise.all(rows.map(async (row) => ({ ...row, qr: await cartonQrSvg(cartonScanUrl(origin, row.id)) })));
+  const labels = await Promise.all(rows.map(async (row) => ({ ...row, qr: await cartonQrSvg(cartonScanUrl(origin, row.reference)) })));
 
   return (
     <div className="mx-auto max-w-[210mm]">
@@ -59,7 +59,7 @@ export default async function CartonLabelsPage({ searchParams }: { searchParams:
               <p className="font-mono text-[16pt] font-bold leading-tight">{label.reference}</p>
               <p className="mt-[3mm] line-clamp-3 text-[14pt] font-semibold leading-snug">{label.label ?? "Sans libellé"}</p>
               <p className="mt-auto text-[8.5pt] leading-snug text-slate-700">{[label.site, label.salle].filter(Boolean).join(" · ")}</p>
-              <p className="text-[8.5pt] text-slate-700">{label.dossiers} dossier{label.dossiers > 1 ? "s" : ""} · GeoArchives CEIBA</p>
+              <p className="text-[8.5pt] text-slate-700">{label.dossiers} dossier{label.dossiers > 1 ? "s" : ""}{label.cote ? ` · ${label.ctn}` : ""} · GeoArchives CEIBA</p>
             </div>
           </article>
         ))}

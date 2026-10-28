@@ -7,7 +7,9 @@ export function safeReturnPath(value: unknown): string {
   if (typeof value !== "string") return "/dashboard";
   const path = value.trim();
   // L'adresse courte du QR code mène directement à la fiche.
-  const short = /^\/c\/(CTN-\d{8,10})$/i.exec(path);
+  // Référence : ancien CTN-00000123 ou cote du référentiel 2010-KOU-0001(-012).
+  const ref = "(CTN-\\d{8,10}|\\d{4}-[A-Z]{2,6}-\\d{4,6}(?:-\\d{3,4})?)";
+  const short = new RegExp(`^/c/${ref}$`, "i").exec(path);
   if (short) return `/cartons/${short[1].toUpperCase()}`;
-  return /^\/cartons(\/CTN-\d{8,10})?$/i.test(path) ? path : "/dashboard";
+  return new RegExp(`^/cartons(/${ref})?$`, "i").test(path) ? path : "/dashboard";
 }

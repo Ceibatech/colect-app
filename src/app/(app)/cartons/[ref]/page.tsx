@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireAnyPermission } from "@/lib/auth/current-user";
-import { parseCartonReference } from "@/lib/cartons/reference";
-import { cartonQrSvg, cartonScanUrl, getCartonSheet, getPublicOrigin } from "@/lib/services/carton-service";
+import { cartonQrSvg, cartonScanUrl, getCartonSheet, getPublicOrigin, resolveCartonRef } from "@/lib/services/carton-service";
 
 export const metadata = { title: "Fiche carton — GeoArchives" };
 
@@ -22,11 +21,11 @@ const STAGES = [
 
 export default async function CartonSheetPage({ params }: { params: Promise<{ ref: string }> }) {
   const session = await requireAnyPermission("DOSSIER_READ", "TRANSFER_VIEW");
-  const id = parseCartonReference(decodeURIComponent((await params).ref));
+  const id = await resolveCartonRef((await params).ref);
   if (!id) notFound();
   const carton = await getCartonSheet(id);
   if (!carton) notFound();
-  const qr = await cartonQrSvg(cartonScanUrl(await getPublicOrigin(), carton.id));
+  const qr = await cartonQrSvg(cartonScanUrl(await getPublicOrigin(), carton.reference));
   const total = carton.dossiers.length;
   const canOpenDossiers = session.permissions.includes("DOSSIER_READ");
 
@@ -37,11 +36,12 @@ export default async function CartonSheetPage({ params }: { params: Promise<{ re
         icon={Package}
         eyebrow="Fiche carton"
         title={<span className="font-mono">{carton.reference}</span>}
-        description={carton.label ? `« ${carton.label} »${carton.site ? `, ${[carton.site, carton.salle].filter(Boolean).join(" · ")}` : ""}` : "Carton sans libellé"}
+        description={`${carton.label ? `« ${carton.label} »` : "Carton sans libellé"}${carton.site ? `, ${[carton.site, carton.salle].filter(Boolean).join(" · ")}` : ""}${carton.cote ? ` · ancien identifiant ${carton.ctn}` : ""}`}
         stats={[{ label: "Dossiers", value: total }]}
         actions={(
           <>
             <Link href="/cartons" className={buttonVariants({ variant: "outline" })}>Tous les cartons</Link>
+            <Link href={`/cartons/etiquettes-dossiers?carton=${carton.id}`} className={buttonVariants({ variant: "outline" })}><Printer /> Étiquettes des dossiers</Link>
             <Link href={`/cartons/etiquettes?ids=${carton.id}`} className={buttonVariants()}><Printer /> Imprimer l&apos;étiquette</Link>
           </>
         )}
@@ -86,12 +86,14 @@ export default async function CartonSheetPage({ params }: { params: Promise<{ re
 
       <section className="overflow-hidden rounded-lg border bg-card">
         <div className="overflow-x-auto">
-          <Table className="min-w-[860px]">
-            <TableHeader><TableRow><TableHead className="pl-5">Dossier</TableHead><TableHead>Titulaire</TableHead>{STAGES.map((stage) => <TableHead key={stage.key}>{stage.label}</TableHead>)}</TableRow></TableHeader>
+          <Table className="min-w-[1040px]">
+            <TableHeader><TableRow><TableHead className="pl-5">N°</TableHead><TableHead>Cote</TableHead><TableHead>Dossier</TableHead><TableHead>Titulaire</TableHead>{STAGES.map((stage) => <TableHead key={stage.key}>{stage.label}</TableHead>)}</TableRow></TableHeader>
             <TableBody>
               {carton.dossiers.map((dossier) => (
                 <TableRow key={dossier.id}>
-                  <TableCell className="pl-5 font-mono text-xs font-semibold">
+                  <TableCell className="pl-5 tabular-nums">{dossier.rangCarton ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs font-semibold">{dossier.cote ?? "—"}</TableCell>
+                  <TableCell className="font-mono text-xs">
                     {canOpenDossiers ? <Link href={`/dossiers/${dossier.id}`} className="text-primary underline-offset-4 hover:underline">{dossier.reference}</Link> : dossier.reference}
                   </TableCell>
                   <TableCell>{[dossier.nom, dossier.prenoms].filter(Boolean).join(" ") || "Non renseigné"}</TableCell>

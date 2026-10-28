@@ -4,6 +4,7 @@ export const CARTON_FIELD_KEYS = [
   "siteId",
   "entrepotId",
   "operateurId",
+  "cartonCote",
   "libelleCarton",
   "codeBarres",
   "numeroGuichet",
@@ -28,9 +29,9 @@ export function extractActiveCartonValues(values: DossierFormValues): ActiveCart
 }
 
 export function hasActiveCartonIdentity(values: ActiveCartonValues): boolean {
-  return Boolean(values.codeBarres?.trim() || values.libelleCarton?.trim());
+  return Boolean(values.cartonCote?.trim() || values.codeBarres?.trim() || values.libelleCarton?.trim());
 }
 
 export function getActiveCartonLabel(values: ActiveCartonValues): string {
-  return values.libelleCarton?.trim() || values.codeBarres?.trim() || "Carton en cours";
+  return values.cartonCote?.trim() || values.libelleCarton?.trim() || values.codeBarres?.trim() || "Carton en cours";
 }

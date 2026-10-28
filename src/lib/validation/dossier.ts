@@ -65,6 +65,10 @@ export const dossierFormSchema = z.object({
   // ÉTAPE 2 — Identification
   operateurId: z.coerce.number().int().positive().optional(),
   libelleCarton: z.string().max(255).optional().or(z.literal("")),
+  // Cote du carton (2010-KOU-0001) scannée ou saisie : range le dossier dans ce
+  // carton existant, quel que soit le libellé. Vide : carton reconnu par son
+  // libellé, ou nouveau carton.
+  cartonCote: z.string().trim().max(50).optional().or(z.literal("")),
   codeBarres: z.string().max(100).optional().or(z.literal("")),
   numeroGuichet: z.string().max(50).optional().or(z.literal("")),
   // Direction/Service concerné(e) — valeur de DIRECTION_SERVICE_OPTIONS ou
@@ -147,7 +151,7 @@ export const dossierSubmitSchema = dossierFormSchema
 
 export const DOSSIER_STEPS = [
   { id: 1, title: "Site", fields: ["siteId", "entrepotId"] },
-  { id: 2, title: "Identification", fields: ["operateurId", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
+  { id: 2, title: "Identification", fields: ["operateurId", "cartonCote", "libelleCarton", "codeBarres", "numeroGuichet", "numeroDdu", "numeroDirectionService", "referenceClassement", "etatCarton", "etatCartonDescription"] },
   { id: 3, title: "Informations foncières", fields: ["numeroIlot", "numeroLot", "superficie", "numeroTitreFoncier", "communeId", "lotissementNom"] },
   { id: 4, title: "Dossier", fields: ["natureDossierId", "natureDossierAutre", "etatDossier", "etatDossierDescription"] },
   { id: 5, title: "Titulaire", fields: ["nom", "prenoms", "adresse", "telephone", "email"] },
