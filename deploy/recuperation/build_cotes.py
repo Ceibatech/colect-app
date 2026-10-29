@@ -164,7 +164,11 @@ def dossier_labels(path):
             for label, value in reperes:
                 if not value: continue
                 c.setFont("Helvetica", 6.5); c.drawString(tx, line_y, label)
-                c.setFont("Helvetica-Bold", 8.5); c.drawString(tx + 7 * mm, line_y, pdf_text(value)[:22])
+                # Valeur ajustée à la largeur de l'étiquette (titres fonciers longs).
+                text, size, room = pdf_text(value), 8.5, tw - 7 * mm
+                while size > 5.5 and c.stringWidth(text, "Helvetica-Bold", size) > room: size -= 0.5
+                while c.stringWidth(text, "Helvetica-Bold", size) > room and len(text) > 4: text = text[:-2] + "."
+                c.setFont("Helvetica-Bold", size); c.drawString(tx + 7 * mm, line_y, text)
                 line_y -= 4.2 * mm
             if line_y == y + lh - 15 * mm:
                 c.setFont("Helvetica", 7); c.drawString(tx, line_y, "Sans îlot ni lot : voir la liste")
