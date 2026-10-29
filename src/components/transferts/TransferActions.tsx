@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/transferts/SignaturePad";
+import { SignataireIdentite } from "@/components/transferts/Signataire";
 
 const initialState: TransferActionState = {};
 
@@ -172,10 +173,7 @@ function SignatureApprovalDialog({
         <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
         <form key={formVersion} action={formAction} className="space-y-5">
           {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2"><Label htmlFor={`${signatureLabel}-name`}>Nom complet</Label><Input id={`${signatureLabel}-name`} name="signatoryName" required maxLength={120} disabled={pending} /></div>
-            <div className="space-y-2"><Label htmlFor={`${signatureLabel}-title`}>Fonction habilitée</Label><Input id={`${signatureLabel}-title`} name="signatoryTitle" required maxLength={120} disabled={pending} /></div>
-          </div>
+          <SignataireIdentite />
           <SignaturePad name="signature" label={signatureLabel} disabled={pending} />
           <DialogFooter><Button type="submit" disabled={pending}>{pending ? <Loader2 className="animate-spin" /> : <Check />} {submitLabel}</Button></DialogFooter>
         </form>
@@ -298,7 +296,7 @@ export function TransferMovementDialog({
           <div className="grid gap-5 border-t pt-5">
             <section className="space-y-4 rounded-lg border bg-muted/20 p-4">
               <div><h3 className="font-semibold">{isReception ? "Signature de l'agent CEIBA au déchargement" : "Signature du gestionnaire CEIBA"}</h3><p className="text-xs text-muted-foreground">L&apos;agent confirme la prise en charge, la remise ou le constat physique du chargement. Le SDA apposera sa validation dans l&apos;étape suivante.</p></div>
-              <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor={`${type}-ceibacName`}>Nom complet</Label><Input id={`${type}-ceibacName`} name="ceibacName" required maxLength={120} disabled={pending} /></div><div className="space-y-2"><Label htmlFor={`${type}-ceibacTitle`}>Fonction habilitée</Label><Input id={`${type}-ceibacTitle`} name="ceibacTitle" required maxLength={120} disabled={pending} /></div></div>
+              <SignataireIdentite />
               <SignaturePad name="ceibacSignature" label="CEIBA" disabled={pending} />
             </section>
           </div>

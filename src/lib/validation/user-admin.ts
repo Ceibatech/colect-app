@@ -7,8 +7,11 @@ const personNameSchema = z.string()
   .transform(normalizePersonName)
   .pipe(z.string().min(1, "Le nom est requis").max(150));
 
+const fonctionSchema = z.string().trim().max(120, "La fonction ne dépasse pas 120 caractères.").optional().or(z.literal("")).transform((value) => value?.trim() || null);
+
 export const createUserSchema = z.object({
   name: personNameSchema,
+  fonction: fonctionSchema,
   email: z.string().min(1, "L'e-mail est requis").email("Format d'e-mail invalide").max(150),
   roleId: z.coerce.number({ message: "Le rôle est requis" }).int().positive("Le rôle est requis"),
   telephone: z.string().max(30).optional().or(z.literal("")),
@@ -20,6 +23,7 @@ export type CreateUserInput = z.infer<typeof createUserSchema>;
 
 export const updateUserSchema = z.object({
   name: personNameSchema,
+  fonction: fonctionSchema,
   roleId: z.coerce.number({ message: "Le rôle est requis" }).int().positive("Le rôle est requis"),
   isActive: z.coerce.boolean().default(true),
   // Phase 16+ : opérateurs affectés à ce compte, uniquement pertinent si le

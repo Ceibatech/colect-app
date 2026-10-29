@@ -19,6 +19,7 @@ export default async function AdminUtilisateursPage() {
   const serialized = users.map((u) => ({
     id: u.id,
     name: u.name,
+    fonction: u.fonction,
     email: u.email,
     isActive: u.isActive,
     lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,

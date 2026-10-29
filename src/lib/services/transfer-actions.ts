@@ -23,6 +23,7 @@ import { resolveMultiChoice, resolveSingleChoice, SECURITY_MEASURES, TRANSFER_RI
 import { getRoleLabel, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
 import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 import { dechargerCartons } from "@/lib/services/caisse-service";
+import { signataireDe } from "@/lib/transfers/signataire";
 
 export interface TransferActionState {
   success?: boolean;
@@ -188,6 +189,12 @@ function movementNotificationDetails(movement: NonNullable<Awaited<ReturnType<ty
     { label: "Cartons", value: String(movement.cartonCount) },
     { label: "Dossiers", value: String(movement.dossierCount) },
   ];
+}
+
+/** Nom et fonction du compte connecté, imprimés sous sa signature. */
+async function signataireConnecte(userId: number) {
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true, fonction: true, role: { select: { code: true } } } });
+  return signataireDe({ name: user.name, fonction: user.fonction, roleCode: user.role.code });
 }
 
 /**
@@ -572,8 +579,7 @@ export async function approveTransferLotByCeibac(
   const session = await requirePermission("TRANSFER_CEIBAC_APPROVE");
   if (!Number.isInteger(id) || id <= 0) return { error: "Lot invalide." };
   const parsed = transferApprovalSchema.safeParse({
-    signatoryName: formData.get("signatoryName"),
-    signatoryTitle: formData.get("signatoryTitle"),
+    ...await signataireConnecte(session.userId).then((signataire) => ({ signatoryName: signataire.name, signatoryTitle: signataire.title })),
     signature: formData.get("signature"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };
@@ -641,8 +647,7 @@ export async function authorizeTransferLot(
   const session = await requirePermission("TRANSFER_AUTHORIZE");
   if (!Number.isInteger(id) || id <= 0) return { error: "Lot invalide." };
   const parsed = authorizeTransferLotSchema.safeParse({
-    signatoryName: formData.get("signatoryName"),
-    signatoryTitle: formData.get("signatoryTitle"),
+    ...await signataireConnecte(session.userId).then((signataire) => ({ signatoryName: signataire.name, signatoryTitle: signataire.title })),
     signature: formData.get("signature"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };
@@ -736,8 +741,7 @@ export async function recordTransferMovement(
     ministryName: formData.get("ministryName"),
     ministryTitle: formData.get("ministryTitle"),
     ministrySignature: formData.get("ministrySignature"),
-    ceibacName: formData.get("ceibacName"),
-    ceibacTitle: formData.get("ceibacTitle"),
+    ...await signataireConnecte(session.userId).then((signataire) => ({ ceibacName: signataire.name, ceibacTitle: signataire.title })),
     ceibacSignature: formData.get("ceibacSignature"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Mouvement invalide." };
@@ -947,8 +951,7 @@ export async function approveReceptionByCeiba(
   const session = await requirePermission("TRANSFER_CEIBAC_VALIDATE");
   if (!Number.isInteger(movementId) || movementId <= 0) return { error: "Constat invalide." };
   const parsed = transferApprovalSchema.safeParse({
-    signatoryName: formData.get("signatoryName"),
-    signatoryTitle: formData.get("signatoryTitle"),
+    ...await signataireConnecte(session.userId).then((signataire) => ({ signatoryName: signataire.name, signatoryTitle: signataire.title })),
     signature: formData.get("signature"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };
@@ -1021,8 +1024,7 @@ export async function approveTransferMovementByMinistry(
   const session = await requirePermission("TRANSFER_AUTHORIZE");
   if (!Number.isInteger(movementId) || movementId <= 0) return { error: "Bordereau invalide." };
   const parsed = transferApprovalSchema.safeParse({
-    signatoryName: formData.get("signatoryName"),
-    signatoryTitle: formData.get("signatoryTitle"),
+    ...await signataireConnecte(session.userId).then((signataire) => ({ signatoryName: signataire.name, signatoryTitle: signataire.title })),
     signature: formData.get("signature"),
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Visa invalide." };

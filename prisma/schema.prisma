@@ -73,6 +73,8 @@ model RolePermission {
 model User {
   id             Int       @id @default(autoincrement())
   name           String
+  /// Fonction habilitée, reprise automatiquement sur les signatures (ex. « Chef de service archives »).
+  fonction       String?   @db.VarChar(120)
   email          String    @unique
   passwordHash   String    @map("password_hash")
   roleId         Int       @map("role_id")

@@ -13,7 +13,15 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/current-user", () => ({ requirePermission: mocks.requirePermission }));
-vi.mock("@/lib/prisma/client", () => ({ prisma: { $transaction: mocks.transaction } }));
+// Le signataire est le compte connecté : son nom et sa fonction viennent de la base, jamais du formulaire.
+const signataires: Record<number, { name: string; fonction: string; role: { code: string } }> = {
+  27: { name: "Responsable CEIBA", fonction: "Chef du service archives", role: { code: "VALIDATEUR_CEIBAC" } },
+  31: { name: "Responsable Ministère", fonction: "Directeur des archives", role: { code: "VALIDATEUR_MINISTERE" } },
+};
+vi.mock("@/lib/prisma/client", () => ({ prisma: {
+  $transaction: mocks.transaction,
+  user: { findUniqueOrThrow: async ({ where }: { where: { id: number } }) => signataires[where.id] ?? { name: "Agent", fonction: null, role: { code: "ADMIN" } } },
+} }));
 vi.mock("@/lib/utils/server-request", () => ({ getClientIp: async () => "192.0.2.1" }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 
@@ -144,7 +152,7 @@ describe("pre-departure transfer approvals", () => {
     expect(await approveTransferLotByCeibac(12, {}, approvalForm())).toMatchObject({ success: true });
     expect(lot).toMatchObject({
       status: "VALIDE_CEIBAC", ceibacValidatedAt: now, ceibacValidatedById: 27,
-      ceibacSignatoryName: "Responsable CEIBA", ceibacSignatureData: drawnSignature,
+      ceibacSignatoryName: "RESPONSABLE CEIBA", ceibacSignatureData: drawnSignature,
     });
     expect(lot.authorizedAt).toBeUndefined();
 
@@ -152,8 +160,8 @@ describe("pre-departure transfer approvals", () => {
     expect(await authorizeTransferLot(12, {}, approvalForm("Responsable Ministère"))).toMatchObject({ success: true });
     expect(lot).toMatchObject({
       status: "AUTORISE", authorizedAt: now, authorizedById: 31,
-      approvalSignatoryName: "Responsable Ministère", approvalSignatureData: drawnSignature,
-      ceibacSignatoryName: "Responsable CEIBA", ceibacValidatedById: 27,
+      approvalSignatoryName: "RESPONSABLE MINISTÈRE", approvalSignatureData: drawnSignature,
+      ceibacSignatoryName: "RESPONSABLE CEIBA", ceibacValidatedById: 27,
     });
     expect(audits.map(({ action, userId, entityId }) => ({ action, userId, entityId }))).toEqual([
       { action: "TRANSFER_LOT_SUBMIT", userId: 27, entityId: 12 },
