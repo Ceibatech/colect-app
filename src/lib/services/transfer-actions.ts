@@ -166,6 +166,7 @@ async function getReadyTransferOperationSummary(lotId: number) {
     lotCount: lots.length,
     cartonCount: lots.reduce((total, lot) => total + lot.items.length, 0),
     dossierCount: lots.reduce((total, lot) => total + lot.items.reduce((subtotal, item) => subtotal + item.dossierCountSnapshot, 0), 0),
+    sourceSiteId: selected.sourceSiteId,
     createdByIds: [...new Set(lots.map((lot) => lot.createdById))],
   };
 }
@@ -187,6 +188,22 @@ function movementNotificationDetails(movement: NonNullable<Awaited<ReturnType<ty
     { label: "Cartons", value: String(movement.cartonCount) },
     { label: "Dossiers", value: String(movement.dossierCount) },
   ];
+}
+
+/**
+ * Chaque avis ne part qu'à l'acteur de l'étape suivante : les autres ne sont
+ * pas « dans la boucle ». Sans destinataire désigné, l'auteur du lot est prévenu.
+ */
+function nextActor(userIds: number[], fallbackUserIds: number[]) {
+  return userIds.length ? [...new Set(userIds)] : [...new Set(fallbackUserIds)];
+}
+
+async function getLotConvoyeurIds(lotId: number): Promise<number[]> {
+  const rows = await prisma.transferLotParticipant.findMany({
+    where: { transferLotId: lotId, roleCode: "CONVOYEUR", user: { isActive: true } },
+    select: { userId: true },
+  });
+  return rows.map((row) => row.userId);
 }
 
 /**
@@ -667,8 +684,9 @@ export async function authorizeTransferLot(
         event: "AUTHORIZATION_F01_READY",
         entityType: "TRANSFER_OPERATION",
         entityId: id,
-        recipientRoleCodes: ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC"],
-        recipientUserIds: operation.createdByIds,
+        // Autorisation signée par le SDA : seul le responsable du site SDA de départ est alerté.
+        recipientRoleCodes: [],
+        recipientUserIds: nextActor(await getSiteResponsibleUserIds([operation.sourceSiteId]), operation.createdByIds),
         title: `Autorisation ${operation.reference} disponible`,
         message: "Tous les lots prévus pour cette date et ce trajet sont autorisés. La F01 consolidée est signée et prête pour la préparation du transfert.",
         reference: operation.reference,
@@ -879,8 +897,8 @@ export async function recordTransferMovement(
         entityType: "TRANSFER_MOVEMENT",
         entityId: movement.id,
         recipientRoleCodes: [...recipientRoleCodes],
-        // Les responsables des sites de départ et d'arrivée suivent chaque bordereau.
-        recipientUserIds: [...(incident ? [movement.transferLot.createdById] : []), ...await getSiteResponsibleUserIds([movement.fromSiteId, movement.toSiteId])],
+        // Seul le valideur de l'étape suivante reçoit le bordereau (l'auteur du lot en cas d'incident).
+        recipientUserIds: incident ? [movement.transferLot.createdById] : [],
         title: incident
           ? `Incident déclaré sur ${movement.reference}`
           : movement.type === "RECEPTION"
@@ -1076,7 +1094,7 @@ export async function approveTransferMovementByMinistry(
         data: { status: flow.after, ...flow.timestamp },
       });
       if (updatedItems.count !== itemIds.length) throw new TransferRuleError("Le stock a changé pendant la validation.");
-      // Réception ou retour finalisés : les caisses de transport de ces cartons sont vidées.
+      // Réception ou retour finalisés : les conteneurs de transport de ces cartons sont vidés.
       if (flow.after === "RECU" || flow.after === "RETOURNE") await dechargerCartons(tx, cartonIds, movement.transferLotId, session.userId);
 
       await tx.transferSignature.create({
@@ -1147,8 +1165,17 @@ export async function approveTransferMovementByMinistry(
         event: "MOVEMENT_SIGNED",
         entityType: "TRANSFER_MOVEMENT",
         entityId: movement.id,
-        recipientRoleCodes: ["GESTIONNAIRE_TRANSFERT", "VALIDATEUR_CEIBAC"],
-        recipientUserIds: [movement.transferLot.createdById, ...await getSiteResponsibleUserIds([movement.fromSiteId, movement.toSiteId])],
+        // Étape suivante : sortie signée → le convoyeur part ; retour signé → le site
+        // qui récupère ses archives ; réception signée → le gestionnaire du lot.
+        recipientRoleCodes: [],
+        recipientUserIds: nextActor(
+          movement.type === "SORTIE"
+            ? await getLotConvoyeurIds(movement.transferLot.id)
+            : movement.type === "RETOUR"
+              ? await getSiteResponsibleUserIds([movement.toSiteId])
+              : [movement.transferLot.createdById],
+          [movement.transferLot.createdById],
+        ),
         title: `Bordereau ${movement.reference} signé`,
         message: "Le visa final du ministère est enregistré. Le bordereau signé est disponible et le stock documentaire a été mis à jour.",
         reference: movement.reference,

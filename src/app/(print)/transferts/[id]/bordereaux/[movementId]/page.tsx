@@ -30,7 +30,7 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
   const movementFrom = movement.type === "RETOUR" ? destination : source;
   const movementTo = movement.type === "RETOUR" ? source : destination;
   const dossierCount = movement.items.reduce((sum, entry) => sum + entry.transferLotItem.dossierCountSnapshot, 0);
-  // Caisse de transport de chaque carton (regroupement par caisse sur le bordereau).
+  // Conteneur de transport de chaque carton (regroupement par caisse sur le bordereau).
   const caisseOf = await caissesDuMouvement(movement.transferLotId, movement.type, movement.items.map((entry) => entry.transferLotItem));
   const withCaisse = caisseOf.size > 0;
   const items = withCaisse
@@ -82,12 +82,12 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
           </div>
           <div className="overflow-hidden border border-slate-300">
             <table className="w-full border-collapse text-left text-sm">
-              <thead className="bg-slate-100"><tr><th className="border-b border-slate-300 p-3">N°</th>{withCaisse ? <th className="border-b border-slate-300 p-3">Caisse</th> : null}<th className="border-b border-slate-300 p-3">Code carton</th><th className="border-b border-slate-300 p-3">Libellé</th><th className="border-b border-slate-300 p-3">Dossiers rattachés</th><th className="border-b border-slate-300 p-3 text-center">Volume</th></tr></thead>
+              <thead className="bg-slate-100"><tr><th className="border-b border-slate-300 p-3">N°</th>{withCaisse ? <th className="border-b border-slate-300 p-3">Conteneur</th> : null}<th className="border-b border-slate-300 p-3">Code carton</th><th className="border-b border-slate-300 p-3">Libellé</th><th className="border-b border-slate-300 p-3">Dossiers rattachés</th><th className="border-b border-slate-300 p-3 text-center">Volume</th></tr></thead>
               <tbody>
                 {items.map((entry, index) => (
                   <tr key={entry.id} className="align-top">
                     <td className="border-b border-slate-200 p-3 tabular-nums">{index + 1}</td>
-                    {withCaisse ? <td className="border-b border-slate-200 p-3 font-mono">{caisseOf.get(entry.transferLotItem.cartonId ?? 0) ?? "Hors caisse"}</td> : null}
+                    {withCaisse ? <td className="border-b border-slate-200 p-3 font-mono">{caisseOf.get(entry.transferLotItem.cartonId ?? 0) ?? "Hors conteneur"}</td> : null}
                     <td className="border-b border-slate-200 p-3 font-mono font-semibold">{entry.transferLotItem.cartonCode}</td>
                     <td className="border-b border-slate-200 p-3">{entry.transferLotItem.cartonLabel ?? "-"}</td>
                     <td className="border-b border-slate-200 p-3 text-xs leading-5 text-slate-600">{entry.transferLotItem.dossiers.map((link) => link.dossier.reference).join(" · ")}</td>

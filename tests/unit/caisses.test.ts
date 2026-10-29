@@ -15,13 +15,13 @@ describe("chargement des cartons dans les caisses de transport", () => {
     expect(refusChargement({ caisseId: null }, null, caisse)).toMatch(/aucun lot/);
     expect(refusChargement({ caisseId: 9 }, lot, caisse, "C-09")).toMatch(/C-09/);
     expect(refusChargement({ caisseId: null }, lot, { ...caisse, lotId: 3, lotReference: "LOT-2026-000003" })).toMatch(/LOT-2026-000003.*un lot à la fois/);
-    expect(refusChargement({ caisseId: null }, lot, { ...caisse, occupes: 40 })).toMatch(/pleine \(40 cartons\)/);
+    expect(refusChargement({ caisseId: null }, lot, { ...caisse, occupes: 40 })).toMatch(/plein \(40 cartons\)/);
   });
   it("un carton déjà dans cette caisse n'est pas un refus", () => {
     expect(refusChargement({ caisseId: 1 }, lot, { ...caisse, occupes: 40 })).toBeNull();
   });
   it("normalise le numéro saisi", () => {
-    expect(normaliserNumero("  caisse   01 ")).toBe("CAISSE 01");
+    expect(normaliserNumero("  conteneur   01 ")).toBe("CONTENEUR 01");
     expect(normaliserNumero("C-1/A")).toBe("C-1/A");
     expect(normaliserNumero("")).toBeNull();
     expect(normaliserNumero("<script>")).toBeNull();

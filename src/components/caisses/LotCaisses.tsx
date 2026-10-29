@@ -5,8 +5,8 @@ import { buttonVariants } from "@/components/ui/button";
 type CaisseDuLot = { id: number; numero: string; capacite: number; cartons: Array<{ id: number; cote: string | null }> };
 
 /**
- * Caisses de transport chargées pour ce lot et leurs cartons. Les cartons en
- * attente d'enlèvement ou de retour qui ne sont dans aucune caisse sont comptés.
+ * Conteneurs de transport chargés pour ce lot et leurs cartons. Les cartons en
+ * attente d'enlèvement ou de retour qui ne sont dans aucun conteneur sont comptés.
  */
 export function LotCaisses({ caisses, horsCaisse, canLoad }: { caisses: CaisseDuLot[]; horsCaisse: number; canLoad: boolean }) {
   if (!caisses.length && !horsCaisse) return null;
@@ -14,13 +14,13 @@ export function LotCaisses({ caisses, horsCaisse, canLoad }: { caisses: CaisseDu
     <section className="space-y-3 rounded-lg border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 text-base font-semibold"><Container className="size-4 text-muted-foreground" /> Caisses de transport</h2>
+          <h2 className="flex items-center gap-2 text-base font-semibold"><Container className="size-4 text-muted-foreground" /> Conteneurs de transport</h2>
           <p className="text-sm text-muted-foreground">
-            {caisses.length ? `${caisses.length} caisse${caisses.length > 1 ? "s" : ""} chargée${caisses.length > 1 ? "s" : ""} pour ce lot.` : "Aucune caisse chargée pour ce lot."}
-            {horsCaisse ? ` ${horsCaisse} carton${horsCaisse > 1 ? "s" : ""} à transporter ${horsCaisse > 1 ? "ne sont" : "n'est"} dans aucune caisse.` : ""}
+            {caisses.length ? `${caisses.length} conteneur${caisses.length > 1 ? "s" : ""} chargé${caisses.length > 1 ? "s" : ""} pour ce lot.` : "Aucun conteneur chargé pour ce lot."}
+            {horsCaisse ? ` ${horsCaisse} carton${horsCaisse > 1 ? "s" : ""} à transporter ${horsCaisse > 1 ? "ne sont" : "n'est"} dans aucun conteneur.` : ""}
           </p>
         </div>
-        {canLoad ? <Link href="/caisses" className={buttonVariants({ size: "sm", variant: "outline" })}>Charger une caisse</Link> : null}
+        {canLoad ? <Link href="/caisses" className={buttonVariants({ size: "sm", variant: "outline" })}>Charger un conteneur</Link> : null}
       </div>
       {caisses.length ? (
         <ul className="grid gap-3 md:grid-cols-2">

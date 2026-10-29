@@ -3,7 +3,7 @@ import { retirerCarton } from "@/lib/services/caisse-service";
 import { apiErrorResponse } from "@/lib/utils/api-response";
 import { ApiError } from "@/lib/utils/api-error";
 
-/** Retirer un carton de la caisse (l'historique le garde). */
+/** Retirer un carton du conteneur (l'historique le garde). */
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string; cartonId: string }> }) {
   try {
     const { id, cartonId } = await params;

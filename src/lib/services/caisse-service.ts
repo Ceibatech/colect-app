@@ -9,9 +9,9 @@ import { ApiError } from "@/lib/utils/api-error";
 import { getClientIp } from "@/lib/utils/server-request";
 
 /**
- * Caisses de transport (basées sur un site CEIBA) : à l'enlèvement chez le
- * client et au retour, les cartons du lot sont chargés caisse par caisse
- * (40 au plus). La caisse est vidée quand la réception (ou le retour) est
+ * Conteneurs de transport (basés sur un site CEIBA) : à l'enlèvement chez le
+ * client et au retour, les cartons du lot sont chargés conteneur par conteneur
+ * (40 au plus). Le conteneur est vidé quand la réception (ou le retour) est
  * finalisée. Elle ne change ni la cote du carton ni celle de ses dossiers ;
  * seul le lien carton → caisse est tenu, avec son historique par lot.
  */
@@ -79,13 +79,13 @@ type CaisseInput = { numero: string; description?: string | null; capacite?: num
 
 async function checkInput(input: CaisseInput, id?: number) {
   const numero = normaliserNumero(input.numero);
-  if (!numero) throw new ApiError("Numéro de caisse invalide : lettres, chiffres, espaces, - / . (40 caractères au plus).", 400);
+  if (!numero) throw new ApiError("Numéro de conteneur invalide : lettres, chiffres, espaces, - / . (40 caractères au plus).", 400);
   const capacite = input.capacite ?? CAPACITE_PAR_DEFAUT;
   if (!Number.isInteger(capacite) || capacite < 1 || capacite > 500) throw new ApiError("Capacité invalide (1 à 500 cartons).", 400);
   const site = await prisma.site.findUnique({ where: { id: input.siteId }, select: { organisation: true } });
-  if (site?.organisation !== "CEIBA") throw new ApiError("Une caisse appartient à un site CEIBA.", 400);
+  if (site?.organisation !== "CEIBA") throw new ApiError("Un conteneur appartient à un site CEIBA.", 400);
   const taken = await prisma.caisse.findFirst({ where: { numero, ...(id ? { id: { not: id } } : {}) }, select: { id: true } });
-  if (taken) throw new ApiError(`Le numéro ${numero} est déjà utilisé par une autre caisse.`, 409);
+  if (taken) throw new ApiError(`Le numéro ${numero} est déjà utilisé par un autre conteneur.`, 409);
   return { numero, capacite, siteId: input.siteId, description: input.description?.trim() || null };
 }
 
@@ -97,15 +97,15 @@ export async function createCaisse(input: CaisseInput) {
   return caisse;
 }
 
-/** Renuméroter ou modifier une caisse : son contenu et son historique restent attachés. */
+/** Renuméroter ou modifier un conteneur : son contenu et son historique restent attachés. */
 export async function updateCaisse(id: number, input: CaisseInput) {
   const session = await requireApiPermission("REFERENTIEL_MANAGE");
   const current = await prisma.caisse.findUnique({ where: { id }, include: { _count: { select: { cartons: true } } } });
-  if (!current) throw new ApiError("Caisse introuvable.", 404);
+  if (!current) throw new ApiError("Conteneur introuvable.", 404);
   const data = await checkInput(input, id);
-  if (data.capacite < current._count.cartons) throw new ApiError(`La caisse contient déjà ${current._count.cartons} cartons : capacité trop faible.`, 400);
-  if (data.siteId !== current.siteId && current._count.cartons) throw new ApiError("Videz la caisse avant de la rattacher à un autre site.", 400);
-  if (input.isActive === false && current._count.cartons) throw new ApiError("Videz la caisse avant de la retirer du service.", 400);
+  if (data.capacite < current._count.cartons) throw new ApiError(`Le conteneur contient déjà ${current._count.cartons} cartons : capacité trop faible.`, 400);
+  if (data.siteId !== current.siteId && current._count.cartons) throw new ApiError("Videz le conteneur avant de le rattacher à un autre site.", 400);
+  if (input.isActive === false && current._count.cartons) throw new ApiError("Videz le conteneur avant de le retirer du service.", 400);
   const caisse = await prisma.caisse.update({ where: { id }, data: { ...data, isActive: input.isActive ?? current.isActive } });
   await prisma.auditLog.create({
     data: { userId: session.userId, action: "CAISSE_UPDATE", entity: "CAISSE", entityId: id, oldValue: { numero: current.numero, capacite: current.capacite, siteId: current.siteId }, newValue: data, ipAddress: await getClientIp() },
@@ -123,7 +123,7 @@ async function lotEnAttente(tx: Prisma.TransactionClient, cartonId: number) {
   return item ? { lotId: item.transferLot.id, reference: item.transferLot.reference, statut: item.status } : null;
 }
 
-/** Charge un carton du lot (cote, QR ou CTN) dans la caisse. La caisse est verrouillée : deux agents ne la dépassent pas. */
+/** Charge un carton du lot (cote, QR ou CTN) dans le conteneur. Le conteneur est verrouillé : deux agents ne le dépassent pas. */
 export async function chargerCarton(caisseId: number, scan: string) {
   const session = await requireApiPermission("TRANSFER_OPERATE");
   const ref = coteFromScan(scan) ?? (cartonIdFromScan(scan) ? `CTN-${String(cartonIdFromScan(scan)).padStart(8, "0")}` : scan.trim());
@@ -131,7 +131,7 @@ export async function chargerCarton(caisseId: number, scan: string) {
   if (!found) throw new ApiError(`Aucun carton ne porte la cote « ${scan.trim()} ».`, 404);
   return prisma.$transaction(async (tx) => {
     const [locked] = await tx.$queryRaw<Array<{ id: number }>>(Prisma.sql`SELECT id FROM caisses WHERE id = ${caisseId} FOR UPDATE`);
-    if (!locked) throw new ApiError("Caisse introuvable.", 404);
+    if (!locked) throw new ApiError("Conteneur introuvable.", 404);
     await tx.$queryRaw(Prisma.sql`SELECT id FROM cartons WHERE id = ${found.id} FOR UPDATE`);
     const [caisse, carton, occupes, lot] = await Promise.all([
       tx.caisse.findUniqueOrThrow({ where: { id: caisseId }, select: { id: true, numero: true, capacite: true, isActive: true, transferLotId: true, transferLot: { select: { reference: true } } } }),
@@ -151,7 +151,7 @@ export async function chargerCarton(caisseId: number, scan: string) {
 }
 
 /**
- * Vide les caisses des cartons dont le transport est finalisé (réception ou
+ * Vide les conteneurs des cartons dont le transport est finalisé (réception ou
  * retour signés). Appelé dans la transaction du bordereau.
  */
 export async function dechargerCartons(tx: Prisma.TransactionClient, cartonIds: number[], transferLotId: number, userId: number | null) {
@@ -172,7 +172,7 @@ export async function retirerCarton(caisseId: number, cartonId: number) {
   return prisma.$transaction(async (tx) => {
     const caisse = await tx.caisse.findUnique({ where: { id: caisseId }, select: { transferLotId: true } });
     const moved = await tx.carton.updateMany({ where: { id: cartonId, caisseId }, data: { caisseId: null, misEnCaisseAt: null } });
-    if (!moved.count) throw new ApiError("Ce carton n'est pas dans cette caisse.", 404);
+    if (!moved.count) throw new ApiError("Ce carton n'est pas dans ce conteneur.", 404);
     await tx.caisseMouvement.create({ data: { caisseId, cartonId, type: "RETRAIT", transferLotId: caisse?.transferLotId ?? null, userId: session.userId } });
     if (!(await tx.carton.count({ where: { caisseId } }))) await tx.caisse.update({ where: { id: caisseId }, data: { transferLotId: null } });
     return { ok: true };
