@@ -23,10 +23,16 @@ import { PrismaClient, Prisma } from "@prisma/client";
 export const CONFIRMATION = "RECOUPER-CARTONS";
 export const PREFIXE = "2010-KOU";
 
+/**
+ * Clé de boîte : « lots 424-1700 », « Lots 424 - 1700 » et « 424-1700 »
+ * désignent la même boîte ; « 18 B-1780 » = « 18B-1780 ».
+ */
 export function norm(value) {
   return (value ?? "").normalize("NFKD").replace(/\p{M}+/gu, "").toLowerCase()
-    .replace(/\bilots?\b/g, "ilot").replace(/\blots?\b/g, "lot")
-    .replace(/[^a-z0-9]+/g, " ").trim();
+    .replace(/\bilots?\b/g, "ilot").replace(/^\s*lots?\b\s*/, "").replace(/\blots?\b/g, "lot")
+    .replace(/(\d)\s+([a-z])\b/g, "$1$2")
+    .replace(/\s*-+\s*/g, "-")
+    .replace(/[^a-z0-9-]+/g, " ").trim();
 }
 
 export const formatCote = (sequence) => `${PREFIXE}-${String(sequence).padStart(4, "0")}`;
@@ -83,10 +89,14 @@ async function charger(db) {
 
 async function references(db) {
   const [lots, caisses] = await Promise.all([
-    db.$queryRaw(Prisma.sql`SELECT COUNT(*) AS n FROM transfer_lot_items i JOIN cartons c ON c.id = i.carton_id WHERE c.cote_prefixe = ${PREFIXE}`),
+    db.$queryRaw(Prisma.sql`
+      SELECT l.reference, l.status, COUNT(*) AS n
+      FROM transfer_lot_items i JOIN cartons c ON c.id = i.carton_id JOIN transfer_lots l ON l.id = i.transfer_lot_id
+      WHERE c.cote_prefixe = ${PREFIXE} GROUP BY l.id, l.reference, l.status`),
     db.$queryRaw(Prisma.sql`SELECT COUNT(*) AS n FROM cartons c WHERE c.cote_prefixe = ${PREFIXE} AND (c.caisse_id IS NOT NULL OR EXISTS (SELECT 1 FROM caisse_mouvements m WHERE m.carton_id = c.id))`),
   ]);
-  return { lots: Number(lots[0].n), caisses: Number(caisses[0].n) };
+  const detail = lots.map((row) => ({ reference: row.reference, status: row.status, cartons: Number(row.n) }));
+  return { lots: detail.reduce((sum, row) => sum + row.cartons, 0), lotsDetail: detail, caisses: Number(caisses[0].n) };
 }
 
 export async function recouper(db, { apply = false } = {}) {
@@ -148,11 +158,12 @@ function print(result) {
   const tailles = report.boites.map((b) => b.dossiers.length).sort((a, b) => b - a);
   console.log(`Plus grosses boîtes : ${tailles.slice(0, 10).join(", ")}`);
   console.log(`Cartons KOU engagés dans un transfert : ${report.refs.lots} ; dans un conteneur : ${report.refs.caisses}`);
+  for (const lot of report.refs.lotsDetail) console.log(`  - lot ${lot.reference} (${lot.status}) : ${lot.cartons} carton(s)`);
   if (result.applied) console.log(`\nAPPLIQUÉ : ${report.boites.length} cartons cotés, ${result.crees} créés, ${result.supprimes} anciens cartons vides supprimés.`);
   else console.log("\nSIMULATION : rien n'a été modifié.");
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const apply = process.argv.includes("--apply");
   if (apply && !process.argv.includes(`--confirm=${CONFIRMATION}`)) {
     console.error(`Confirmation requise : --confirm=${CONFIRMATION}`);
