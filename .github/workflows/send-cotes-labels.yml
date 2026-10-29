@@ -43,6 +43,11 @@ on:
         required: true
         default: "320"
         type: string
+      liste:
+        description: "Nom de la liste (ex. « d'Ismaël »), facultatif"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -71,6 +76,7 @@ jobs:
           PREFIXE: ${{ inputs.prefixe }}
           DE: ${{ inputs.de }}
           A: ${{ inputs.a }}
+          LISTE: ${{ inputs.liste }}
           REMPLACE: ${{ inputs.remplace && '1' || '0' }}
           CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
           CONTABO_USER: ${{ secrets.CONTABO_USER }}
@@ -112,7 +118,7 @@ jobs:
           # 2. Tableur, rapport et étiquettes.
           python3 -m venv "$RUNNER_TEMP/venv"
           "$RUNNER_TEMP/venv/bin/pip" install --quiet reportlab==4.2.5 openpyxl==3.1.5
-          "$RUNNER_TEMP/venv/bin/python" -I deploy/recuperation/build_cotes.py export/cartons.json rapport
+          "$RUNNER_TEMP/venv/bin/python" -I deploy/recuperation/build_cotes.py export/cartons.json rapport "$LISTE"
           rm -f export/cartons.json
 
           # 3. Envoi depuis le serveur, avec la configuration e-mail de l'application.

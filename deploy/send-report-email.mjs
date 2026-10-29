@@ -24,17 +24,22 @@ const nf = (value) => new Intl.NumberFormat("fr-FR").format(value);
 
 /** Liste et étiquettes QR d'une plage de cartons cotés (ex. 2010-KOU-0001 à 0320). */
 export function buildCotesMessage(summary, files, { replaces = false } = {}) {
-  const subject = `Archives MULCV – liste et étiquettes QR des cartons ${summary.first} à ${summary.last}`;
+  const name = summary.listName ? `la liste ${summary.listName}` : null;
+  const subject = name
+    ? `Archives MULCV – liste ${summary.listName} : étiquettes QR des cartons ${summary.first} à ${summary.last}`
+    : `Archives MULCV – liste et étiquettes QR des cartons ${summary.first} à ${summary.last}`;
   const labels = {
     "liste-cartons": "Liste des cartons et de leurs dossiers (Excel)",
     "etiquettes-cartons": "Étiquettes QR des cartons (PDF, 8 par page A4)",
     "etiquettes-dossiers": "Étiquettes QR des dossiers (PDF, 24 par page A4)",
   };
   const documents = files.map((file) => labels[Object.keys(labels).find((key) => file.startsWith(key))] ?? file);
-  const intro = `Nous vous transmettons la liste des ${nf(summary.boxes)} cartons ${summary.first} à ${summary.last} et les étiquettes QR à apposer sur les cartons et sur chaque dossier.`;
+  const intro = name
+    ? `Nous vous transmettons ${name} : ${nf(summary.boxes)} cartons, ${summary.first} à ${summary.last}, qui ne figurent pas dans la liste d'enlèvement tirée par Kably, ainsi que les étiquettes QR à apposer sur les cartons et sur chaque dossier.`
+    : `Nous vous transmettons la liste des ${nf(summary.boxes)} cartons ${summary.first} à ${summary.last} et les étiquettes QR à apposer sur les cartons et sur chaque dossier.`;
   const points = [
     `${nf(summary.boxes)} cartons, contenant au total ${nf(summary.dossiers)} dossiers ;`,
-    `les ${nf(summary.listBoxes)} premiers cartons suivent l'ordre de la liste d'enlèvement${summary.listAuthor ? ` tirée par ${summary.listAuthor}` : ""} (références provisoires 1 à ${nf(summary.listBoxes)}) ;`,
+    ...(summary.listBoxes ? [`les ${nf(summary.listBoxes)} premiers cartons suivent l'ordre de la liste d'enlèvement${summary.listAuthor ? ` tirée par ${summary.listAuthor}` : ""} (références provisoires 1 à ${nf(summary.listBoxes)}) ;`] : []),
     "chaque carton porte sa cote du référentiel de classement (exemple\u00a0: 2010\u2011KOU\u20110001 = Dossiers ACD, Koumassi, carton n°\u00a01) ;",
     "chaque dossier porte la cote de son carton suivie de son numéro (exemple\u00a0: 2010\u2011KOU\u20110001\u2011012), sans trou dans la numérotation ;",
     "l'étiquette d'un dossier ne porte aucun nom : on la colle sur la chemise qui porte le même îlot, le même lot et, le cas échéant, le même titre foncier ;",
