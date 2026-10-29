@@ -51,15 +51,13 @@ export async function assertConvoyActor(session: ConvoyActor, lotId: number) {
   if (!assigned) throw new ApiError("Vous n'êtes pas désigné comme convoyeur de ce lot.", 403);
 }
 
-async function recipients(lot: { createdById: number; sourceSiteId: number; destinationSiteId: number }, lotId: number) {
-  const [responsibles, participants] = await Promise.all([
-    prisma.userSite.findMany({
-      where: { siteId: { in: [lot.sourceSiteId, lot.destinationSiteId] }, user: { isActive: true, role: { code: SITE_RESPONSIBLE_ROLE_CODE } } },
-      select: { userId: true },
-    }),
-    prisma.transferLotParticipant.findMany({ where: { transferLotId: lotId, roleCode: "GESTIONNAIRE_TRANSFERT" }, select: { userId: true } }),
-  ]);
-  return [...new Set([lot.createdById, ...responsibles.map((row) => row.userId), ...participants.map((row) => row.userId)])];
+/** Seul le responsable du site d'arrivée est alerté (l'auteur du lot s'il n'y en a pas). */
+async function recipients(lot: { createdById: number; destinationSiteId: number }) {
+  const responsibles = await prisma.userSite.findMany({
+    where: { siteId: lot.destinationSiteId, user: { isActive: true, role: { code: SITE_RESPONSIBLE_ROLE_CODE } } },
+    select: { userId: true },
+  });
+  return responsibles.length ? [...new Set(responsibles.map((row) => row.userId))] : [lot.createdById];
 }
 
 async function notify(eventId: number, type: "DEPART" | "ARRIVEE", lot: NonNullable<Awaited<ReturnType<typeof loadLot>>>, at: Date, by: string, automatic: boolean) {
@@ -72,7 +70,7 @@ async function notify(eventId: number, type: "DEPART" | "ARRIVEE", lot: NonNulla
       entityType: "TRANSFER_CONVOY",
       entityId: eventId,
       recipientRoleCodes: [],
-      recipientUserIds: await recipients(lot, lot.id),
+      recipientUserIds: await recipients(lot),
       title: type === "DEPART" ? `Convoi ${lot.reference} en route` : `Convoi ${lot.reference} arrivé à ${lot.destinationSite.nom}`,
       message: type === "DEPART"
         ? `Le convoi a quitté ${lot.sourceSite.nom} et se dirige vers ${lot.destinationSite.nom}. Son trajet est suivi en direct.`

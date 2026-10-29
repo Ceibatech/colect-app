@@ -69,7 +69,7 @@ export default async function CartonSheetPage({ params }: { params: Promise<{ re
           </div>
           {carton.caisse ? (
             <p className="text-sm">
-              Dans la caisse de transport <Link href={`/caisses/${carton.caisse.id}`} className="font-mono font-semibold text-primary underline-offset-4 hover:underline">{carton.caisse.numero}</Link>
+              Dans le conteneur de transport <Link href={`/caisses/${carton.caisse.id}`} className="font-mono font-semibold text-primary underline-offset-4 hover:underline">{carton.caisse.numero}</Link>
               {carton.caisse.transferLot ? <> pour le lot <Link href={`/transferts/${carton.caisse.transferLot.id}`} className="font-mono text-primary underline-offset-4 hover:underline">{carton.caisse.transferLot.reference}</Link></> : null}
               {carton.misEnCaisseAt ? `, chargé le ${new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeZone: "Africa/Abidjan" }).format(carton.misEnCaisseAt)}` : ""}.
             </p>

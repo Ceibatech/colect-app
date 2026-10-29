@@ -6,9 +6,9 @@ import { requireAnyPermission } from "@/lib/auth/current-user";
 import { listCaisses, listCeibaSites } from "@/lib/services/caisse-service";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Caisses de transport — GeoArchives" };
+export const metadata = { title: "Conteneurs de transport — GeoArchives" };
 
-/** Caisses de transport (enlèvement et retour) : lesquelles sont chargées, pour quel lot, avec quels cartons. */
+/** Conteneurs de transport (enlèvement et retour) : lesquels sont chargés, pour quel lot, avec quels cartons. */
 export default async function CaissesPage() {
   const session = await requireAnyPermission("TRANSFER_VIEW", "DOSSIER_READ");
   const canManage = session.permissions.includes("REFERENTIEL_MANAGE");
@@ -21,18 +21,18 @@ export default async function CaissesPage() {
         tone="transfer"
         icon={Archive}
         eyebrow="Transferts d'archives"
-        title="Caisses de transport"
-        description="À l'enlèvement chez le client et au retour, les cartons du lot sont chargés caisse par caisse (40 au plus). L'application sait à tout moment quel carton voyage dans quelle caisse ; la caisse se vide à la réception."
+        title="Conteneurs de transport"
+        description="À l'enlèvement chez le client et au retour, les cartons du lot sont chargés conteneur par conteneur (40 au plus). L'application sait à tout moment quel carton voyage dans quel conteneur ; le conteneur se vide à la réception."
         stats={[
-          { label: "Caisses en service", value: actives.length },
+          { label: "Conteneurs en service", value: actives.length },
           { label: "Chargées", value: actives.filter((caisse) => caisse.cartons > 0).length },
-          { label: "Cartons en caisse", value: actives.reduce((sum, caisse) => sum + caisse.cartons, 0) },
+          { label: "Cartons en conteneur", value: actives.reduce((sum, caisse) => sum + caisse.cartons, 0) },
         ]}
       />
 
       {caisses.length === 0 ? (
         <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-          Aucune caisse pour le moment. Créez-les dès que leur numérotation est fixée ; un numéro peut être corrigé plus tard sans toucher au contenu.
+          Aucun conteneur pour le moment. Créez-les dès que leur numérotation est fixée ; un numéro peut être corrigé plus tard sans toucher au contenu.
         </p>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -49,7 +49,7 @@ export default async function CaissesPage() {
                     </span>
                   </div>
                   <div>
-                    <div className="h-2 overflow-hidden rounded-full bg-muted" role="meter" aria-valuemin={0} aria-valuemax={caisse.capacite} aria-valuenow={caisse.cartons} aria-label={`Remplissage de la caisse ${caisse.numero}`}>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted" role="meter" aria-valuemin={0} aria-valuemax={caisse.capacite} aria-valuenow={caisse.cartons} aria-label={`Remplissage du conteneur ${caisse.numero}`}>
                       <div className={cn("h-full rounded-full", full ? "bg-amber-500" : "bg-primary")} style={{ width: `${ratio * 100}%` }} />
                     </div>
                     <p className="mt-1.5 text-sm tabular-nums"><span className="font-semibold">{caisse.cartons}</span>/{caisse.capacite} cartons · {caisse.dossiers} dossiers</p>
@@ -65,8 +65,8 @@ export default async function CaissesPage() {
       {canManage ? (
         <section className="space-y-3 rounded-lg border bg-card p-4">
           <div>
-            <h2 className="text-base font-semibold">Ajouter une caisse</h2>
-            <p className="text-sm text-muted-foreground">Saisissez le numéro tel qu&apos;il est écrit sur la caisse, et son site CEIBA de rattachement. Il ne fait pas partie des cotes des cartons.</p>
+            <h2 className="text-base font-semibold">Ajouter un conteneur</h2>
+            <p className="text-sm text-muted-foreground">Saisissez le numéro tel qu&apos;il est écrit sur le conteneur, et son site CEIBA de rattachement. Il ne fait pas partie des cotes des cartons.</p>
           </div>
           {sites.length ? <CaisseForm sites={sites} /> : <p className="text-sm text-muted-foreground">Aucun site CEIBA actif : créez d&apos;abord le site dans Administration → Sites.</p>}
         </section>

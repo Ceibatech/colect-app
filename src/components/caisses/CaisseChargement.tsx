@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 /**
  * Chargement : scanner (douchette ou appareil photo) ou saisir la cote de
  * chaque carton du lot. L'application refuse un carton hors lot, déjà dans une
- * autre caisse, un carton d'un autre lot que celui de la caisse, ou une caisse pleine.
+ * autre conteneur, un carton d'un autre lot que celui du conteneur, ou un conteneur plein.
  */
 export function CaisseChargement({ caisseId, numero }: { caisseId: number; numero: string }) {
   const router = useRouter();
@@ -31,7 +31,7 @@ export function CaisseChargement({ caisseId, numero }: { caisseId: number; numer
       });
       const body = await response.json().catch(() => ({})) as { error?: string; cote?: string; dejaCharge?: boolean; occupes?: number; capacite?: number; lot?: string };
       if (!response.ok) throw new Error(body.error ?? "Chargement impossible.");
-      if (body.dejaCharge) toast.info(`${body.cote} est déjà dans la caisse ${numero}.`);
+      if (body.dejaCharge) toast.info(`${body.cote} est déjà dans le conteneur ${numero}.`);
       else toast.success(`${body.cote} chargé dans ${numero} (${body.occupes}/${body.capacite}) · lot ${body.lot}.`);
       setScan("");
       router.refresh();
@@ -57,13 +57,13 @@ export function RetirerCarton({ caisseId, cartonId, cote }: { caisseId: number; 
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   async function retirer() {
-    if (!window.confirm(`Retirer ${cote} de la caisse ?`)) return;
+    if (!window.confirm(`Retirer ${cote} du conteneur ?`)) return;
     setBusy(true);
     const response = await fetch(`/api/caisses/${caisseId}/cartons/${cartonId}`, { method: "DELETE" });
     const body = await response.json().catch(() => ({})) as { error?: string };
     setBusy(false);
     if (!response.ok) { toast.error(body.error ?? "Retrait impossible."); return; }
-    toast.success(`${cote} retiré de la caisse.`);
+    toast.success(`${cote} retiré du conteneur.`);
     router.refresh();
   }
   return <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void retirer()}>Retirer</Button>;

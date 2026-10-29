@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { requireAnyPermission } from "@/lib/auth/current-user";
 import { getCaisse, listCeibaSites } from "@/lib/services/caisse-service";
 
-export const metadata = { title: "Caisse — GeoArchives" };
+export const metadata = { title: "Conteneur — GeoArchives" };
 
 const dateFormat = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short", timeZone: "Africa/Abidjan" });
 
@@ -30,9 +30,9 @@ export default async function CaissePage({ params }: { params: Promise<{ id: str
       <PageHeader
         tone="dossiers"
         icon={Archive}
-        eyebrow={`Caisse de transport · basée à ${caisse.site.nom}`}
+        eyebrow={`Conteneur de transport · basé à ${caisse.site.nom}`}
         title={<span className="font-mono">{caisse.numero}</span>}
-        description={caisse.transferLot ? `Chargée pour le lot ${caisse.transferLot.reference}. Elle sera vidée à la réception du lot.` : caisse.description ?? "Caisse vide, disponible pour un enlèvement ou un retour."}
+        description={caisse.transferLot ? `Chargé pour le lot ${caisse.transferLot.reference}. Il sera vidé à la réception du lot.` : caisse.description ?? "Conteneur vide, disponible pour un enlèvement ou un retour."}
         stats={[
           { label: "Cartons", value: `${total}/${caisse.capacite}` },
           { label: "Dossiers", value: dossiers },
@@ -40,7 +40,7 @@ export default async function CaissePage({ params }: { params: Promise<{ id: str
         ]}
         actions={(
           <>
-            <Link href="/caisses" className={buttonVariants({ variant: "outline" })}>Toutes les caisses</Link>
+            <Link href="/caisses" className={buttonVariants({ variant: "outline" })}>Tous les conteneurs</Link>
             {caisse.transferLot ? <Link href={`/transferts/${caisse.transferLot.id}`} className={buttonVariants({ variant: "outline" })}>Lot {caisse.transferLot.reference}</Link> : null}
             <Link href={`/caisses/${caisse.id}/inventaire`} className={buttonVariants()}><Printer /> Étiquette et inventaire</Link>
           </>
@@ -51,7 +51,7 @@ export default async function CaissePage({ params }: { params: Promise<{ id: str
         <section className="space-y-3 rounded-lg border bg-card p-4">
           <div>
             <h2 className="text-base font-semibold">Charger des cartons</h2>
-            <p className="text-sm text-muted-foreground">Scannez les cartons d&apos;un lot en attente d&apos;enlèvement (chez le client) ou de retour. Une caisse transporte un seul lot à la fois. {caisse.capacite - total > 0 ? `Il reste ${caisse.capacite - total} place${caisse.capacite - total > 1 ? "s" : ""}.` : "La caisse est pleine."}</p>
+            <p className="text-sm text-muted-foreground">Scannez les cartons d&apos;un lot en attente d&apos;enlèvement (chez le client) ou de retour. Un conteneur transporte un seul lot à la fois. {caisse.capacite - total > 0 ? `Il reste ${caisse.capacite - total} place${caisse.capacite - total > 1 ? "s" : ""}.` : "Le conteneur est pleine."}</p>
           </div>
           {total < caisse.capacite ? <CaisseChargement caisseId={caisse.id} numero={caisse.numero} /> : null}
         </section>
@@ -59,10 +59,10 @@ export default async function CaissePage({ params }: { params: Promise<{ id: str
 
       <section className="overflow-hidden rounded-lg border bg-card">
         <div className="border-b p-4">
-          <h2 className="text-base font-semibold">Contenu de la caisse</h2>
-          <p className="text-sm text-muted-foreground">Dans l&apos;ordre des cotes. La caisse se vide d&apos;elle-même quand la réception (ou le retour) du lot est finalisée.</p>
+          <h2 className="text-base font-semibold">Contenu du conteneur</h2>
+          <p className="text-sm text-muted-foreground">Dans l&apos;ordre des cotes. Le conteneur se vide de lui-même quand la réception (ou le retour) du lot est finalisée.</p>
         </div>
-        {total === 0 ? <p className="p-4 text-sm text-muted-foreground">La caisse est vide.</p> : (
+        {total === 0 ? <p className="p-4 text-sm text-muted-foreground">Le conteneur est vide.</p> : (
           <div className="overflow-x-auto">
             <Table className="min-w-[640px]">
               <TableHeader><TableRow><TableHead className="pl-5">N°</TableHead><TableHead>Cote du carton</TableHead><TableHead>Libellé</TableHead><TableHead>Dossiers</TableHead><TableHead>Chargé le</TableHead>{canRanger ? <TableHead className="text-right pr-5">Action</TableHead> : null}</TableRow></TableHeader>
@@ -102,7 +102,7 @@ export default async function CaissePage({ params }: { params: Promise<{ id: str
         <section className="space-y-3 rounded-lg border bg-card p-4">
           <div>
             <h2 className="text-base font-semibold">Numéro et réglages</h2>
-            <p className="text-sm text-muted-foreground">Changer le numéro ne modifie ni le contenu ni les cotes des cartons. Le QR de la caisse reste valable.</p>
+            <p className="text-sm text-muted-foreground">Changer le numéro ne modifie ni le contenu ni les cotes des cartons. Le QR du conteneur reste valable.</p>
           </div>
           <CaisseForm sites={sites} caisse={{ id: caisse.id, numero: caisse.numero, capacite: caisse.capacite, siteId: caisse.siteId, description: caisse.description, isActive: caisse.isActive }} />
         </section>

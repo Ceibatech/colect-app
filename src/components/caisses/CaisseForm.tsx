@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 
 type Values = { numero: string; capacite: number; siteId: number | ""; description: string; isActive: boolean };
 
-/** Créer ou renuméroter une caisse. Le contenu d'une caisse renumérotée ne change pas. */
+/** Créer ou renuméroter un conteneur. Le contenu d'un conteneur renuméroté ne change pas. */
 export function CaisseForm({ sites, caisse }: { sites: { id: number; nom: string }[]; caisse?: { id: number; numero: string; capacite: number; siteId: number; description: string | null; isActive: boolean } }) {
   const router = useRouter();
   const [values, setValues] = useState<Values>({
@@ -34,7 +34,7 @@ export function CaisseForm({ sites, caisse }: { sites: { id: number; nom: string
       });
       const body = await response.json().catch(() => ({})) as { error?: string; numero?: string };
       if (!response.ok) throw new Error(body.error ?? "Enregistrement impossible.");
-      toast.success(caisse ? `Caisse ${body.numero} enregistrée.` : `Caisse ${body.numero} créée.`);
+      toast.success(caisse ? `Conteneur ${body.numero} enregistré.` : `Conteneur ${body.numero} créé.`);
       if (!caisse) setValues((current) => ({ ...current, numero: "", description: "" }));
       router.refresh();
     } catch (error) {
@@ -48,8 +48,8 @@ export function CaisseForm({ sites, caisse }: { sites: { id: number; nom: string
   return (
     <form onSubmit={submit} className="grid gap-4 sm:grid-cols-[1fr_8rem_1fr]">
       <div className="space-y-1.5">
-        <Label htmlFor={id("numero")}>Numéro de la caisse</Label>
-        <Input id={id("numero")} value={values.numero} onChange={(event) => set("numero", event.target.value)} placeholder="Tel qu'écrit sur la caisse" required maxLength={40} className="font-mono uppercase" />
+        <Label htmlFor={id("numero")}>Numéro du conteneur</Label>
+        <Input id={id("numero")} value={values.numero} onChange={(event) => set("numero", event.target.value)} placeholder="Tel qu'écrit sur le conteneur" required maxLength={40} className="font-mono uppercase" />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor={id("capacite")}>Capacité</Label>
@@ -64,7 +64,7 @@ export function CaisseForm({ sites, caisse }: { sites: { id: number; nom: string
       </div>
       <div className="space-y-1.5 sm:col-span-3">
         <Label htmlFor={id("description")}>Description (facultatif)</Label>
-        <Input id={id("description")} value={values.description} onChange={(event) => set("description", event.target.value)} placeholder="Ex. caisse grise 160 gallons, rangée près de la salle 1" maxLength={255} />
+        <Input id={id("description")} value={values.description} onChange={(event) => set("description", event.target.value)} placeholder="Ex. conteneur gris 160 gallons, rangé près de la salle 1" maxLength={255} />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-3">
         {caisse ? (
@@ -73,7 +73,7 @@ export function CaisseForm({ sites, caisse }: { sites: { id: number; nom: string
             Caisse en service
           </label>
         ) : <span />}
-        <Button type="submit" disabled={busy}>{busy ? <Loader2 className="animate-spin" /> : null}{caisse ? "Enregistrer" : "Créer la caisse"}</Button>
+        <Button type="submit" disabled={busy}>{busy ? <Loader2 className="animate-spin" /> : null}{caisse ? "Enregistrer" : "Créer le conteneur"}</Button>
       </div>
     </form>
   );

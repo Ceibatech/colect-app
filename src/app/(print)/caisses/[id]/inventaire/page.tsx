@@ -8,11 +8,11 @@ import { getCaisse } from "@/lib/services/caisse-service";
 import { cartonQrSvg, getPublicOrigin } from "@/lib/services/carton-service";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Inventaire de caisse — GeoArchives" };
+export const metadata = { title: "Inventaire du conteneur — GeoArchives" };
 
 /**
- * À coller sur la caisse : son numéro, un QR qui ouvre sa fiche (lié à la
- * caisse, pas à son numéro : il reste valable si la caisse est renumérotée)
+ * À coller sur le conteneur : son numéro, un QR qui ouvre sa fiche (lié à la
+ * caisse, pas à son numéro : il reste valable si le conteneur est renuméroté)
  * et la liste de ses cartons par cote.
  */
 export default async function CaisseInventairePage({ params }: { params: Promise<{ id: string }> }) {
@@ -29,13 +29,13 @@ export default async function CaisseInventairePage({ params }: { params: Promise
     <div className="mx-auto max-w-[210mm] text-black">
       <style>{`@page { size: A4 portrait; margin: 10mm; } .qr svg { width: 100%; height: 100%; display: block; }`}</style>
       <div className="mb-5 flex items-center justify-between gap-3 print:hidden">
-        <Link href={`/caisses/${caisse.id}`} className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Retour à la caisse</Link>
+        <Link href={`/caisses/${caisse.id}`} className={cn(buttonVariants({ variant: "outline" }))}><ArrowLeft /> Retour au conteneur</Link>
         <PrintButton />
       </div>
       <header className="flex items-center gap-[6mm] border-b-2 border-black pb-[4mm]">
         <div className="qr size-[38mm] shrink-0" dangerouslySetInnerHTML={{ __html: qr }} />
         <div>
-          <p className="text-[10pt] uppercase tracking-wide">Caisse de transport{caisse.transferLot ? ` · lot ${caisse.transferLot.reference}` : ""}</p>
+          <p className="text-[10pt] uppercase tracking-wide">Conteneur de transport{caisse.transferLot ? ` · lot ${caisse.transferLot.reference}` : ""}</p>
           <p className="font-mono text-[30pt] font-bold leading-none">{caisse.numero}</p>
           <p className="mt-[2mm] text-[11pt]">{caisse.site.nom} · {caisse.cartons.length}/{caisse.capacite} cartons · {dossiers} dossiers</p>
           <p className="text-[9pt] text-slate-700">Inventaire du {date}</p>
@@ -54,7 +54,7 @@ export default async function CaisseInventairePage({ params }: { params: Promise
           ))}
         </tbody>
       </table>
-      {caisse.cartons.length === 0 ? <p className="mt-4 text-sm">Caisse vide.</p> : null}
+      {caisse.cartons.length === 0 ? <p className="mt-4 text-sm">Conteneur vide.</p> : null}
     </div>
   );
 }
