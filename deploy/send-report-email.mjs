@@ -22,7 +22,48 @@ const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 
 const nf = (value) => new Intl.NumberFormat("fr-FR").format(value);
 
+/** Liste et étiquettes QR d'une plage de cartons cotés (ex. 2010-KOU-0001 à 0320). */
+export function buildCotesMessage(summary, files) {
+  const subject = `Archives MULCV – liste et étiquettes QR des cartons ${summary.first} à ${summary.last}`;
+  const labels = {
+    "liste-cartons": "Liste des cartons et de leurs dossiers (Excel)",
+    "etiquettes-cartons": "Étiquettes QR des cartons (PDF, 8 par page A4)",
+    "etiquettes-dossiers": "Étiquettes QR des dossiers (PDF, 24 par page A4)",
+  };
+  const documents = files.map((file) => labels[Object.keys(labels).find((key) => file.startsWith(key))] ?? file);
+  const intro = `Nous vous transmettons la liste des ${nf(summary.boxes)} cartons ${summary.first} à ${summary.last} et les étiquettes QR à apposer sur les cartons et sur chaque dossier.`;
+  const points = [
+    `${nf(summary.boxes)} cartons, contenant au total ${nf(summary.dossiers)} dossiers ;`,
+    `les ${nf(summary.listBoxes)} premiers cartons suivent l'ordre de la liste d'enlèvement (références provisoires 1 à ${nf(summary.listBoxes)}) ;`,
+    "chaque carton porte sa cote du référentiel de classement (exemple\u00a0: 2010\u2011KOU\u20110001 = Dossiers ACD, Koumassi, carton n°\u00a01) ;",
+    "chaque dossier porte la cote de son carton suivie de son numéro (exemple\u00a0: 2010\u2011KOU\u20110001\u2011012), sans trou dans la numérotation ;",
+    "le QR code de chaque étiquette ouvre directement la fiche correspondante dans GeoArchives.",
+  ];
+  const notes = summary.empty
+    ? [`${nf(summary.empty)} carton${summary.empty > 1 ? "s n'ont" : " n'a"} pas encore de dossier enregistré : ${summary.empty > 1 ? "leurs dossiers seront rattachés" : "ses dossiers seront rattachés"} lors de l'inventaire, en scannant le QR du carton. ${summary.empty > 1 ? "Ils sont signalés" : "Il est signalé"} en couleur dans la liste.`]
+    : [];
+  const p = (text) => `<p style="margin:0 0 12px">${text}</p>`;
+  const ul = (items, tag = "ul") => `<${tag} style="margin:0 0 14px;padding-left:22px">${items.map((item) => `<li style="margin-bottom:4px">${esc(item)}</li>`).join("")}</${tag}>`;
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2937;line-height:1.55;max-width:680px">
+${p("Bonjour à tous,")}
+${p(esc(intro))}
+${p("En synthèse :")}${ul(points)}
+${notes.length ? `${p("Point à noter :")}${ul(notes)}` : ""}
+${p("Documents joints :")}${ul(documents, "ol")}
+${p("Nous restons à votre disposition pour tout complément.")}
+<p style="margin:16px 0 0">Cordialement,<br><b>L'équipe GeoArchives</b><br><span style="color:#6b7280">CEIBA Analytics</span></p></div>`;
+  const text = [
+    "Bonjour à tous,", "", intro, "",
+    "En synthèse :", ...points.map((x) => `- ${x}`), "",
+    ...(notes.length ? ["Point à noter :", ...notes.map((x) => `- ${x}`), ""] : []),
+    "Documents joints :", ...documents.map((x, i) => `${i + 1}. ${x}`), "",
+    "Nous restons à votre disposition pour tout complément.", "", "Cordialement,", "L'équipe GeoArchives", "CEIBA Analytics",
+  ].join("\n");
+  return { subject, html, text };
+}
+
 export function buildMessage(summary, files, { replaces = false } = {}) {
+  if (summary.kind === "cotes") return buildCotesMessage(summary, files);
   const subject = `Récupération des archives MULCV – liste des ${nf(summary.boxes)} premiers cartons et étiquettes`;
   const labels = {
     "liste-cartons": "Liste des cartons et de leurs dossiers (Excel)",
@@ -76,7 +117,7 @@ async function main() {
   const order = ["liste-cartons", "rapport-cartons", "etiquettes-cartons", "etiquettes-dossiers"];
   const files = readdirSync(dir).filter((file) => /\.(xlsx|pdf)$/.test(file))
     .sort((a, b) => order.findIndex((k) => a.startsWith(k)) - order.findIndex((k) => b.startsWith(k)));
-  if (files.length < 4) throw new Error(`Pièces jointes incomplètes : ${files.join(", ")}`);
+  if (files.length < (summary.kind === "cotes" ? 3 : 4)) throw new Error(`Pièces jointes incomplètes : ${files.join(", ")}`);
   const total = files.reduce((sum, file) => sum + statSync(path.join(dir, file)).size, 0);
   if (total > 30 * 1024 * 1024) throw new Error("Pièces jointes trop volumineuses (plus de 30 Mo).");
   const { subject, html, text } = buildMessage(summary, files, { replaces: args.replaces === "1" });

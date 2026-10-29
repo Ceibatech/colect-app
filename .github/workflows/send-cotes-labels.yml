@@ -1,0 +1,134 @@
+name: Envoyer la liste et les étiquettes QR des cartons cotés (Contabo)
+
+# Lancement manuel. Extrait une plage de cartons cotés et leurs dossiers
+# (lecture seule), produit le tableur et les planches d'étiquettes QR des
+# cartons et des dossiers (deploy/recuperation/build_cotes.py), puis les envoie
+# par e-mail avec le service d'envoi de l'application. « apercu » produit
+# seulement les fichiers (artefact) sans rien envoyer.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "apercu (fichiers seulement) ou envoyer"
+        required: true
+        default: apercu
+        type: choice
+        options: [apercu, envoyer]
+      destinataires:
+        description: "Destinataires, séparés par des virgules (obligatoire)"
+        required: true
+        type: string
+      copie:
+        description: "Copie, séparée par des virgules, ou « aucune »"
+        required: true
+        default: "aucune"
+        type: string
+      remplace:
+        description: "Ajouter une mention indiquant que ce message remplace un envoi précédent"
+        required: false
+        default: false
+        type: boolean
+      prefixe:
+        description: "Préfixe des cotes (ex. 2010-KOU)"
+        required: true
+        default: "2010-KOU"
+        type: string
+      de:
+        description: "Premier n° de carton"
+        required: true
+        default: "1"
+        type: string
+      a:
+        description: "Dernier n° de carton"
+        required: true
+        default: "320"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-send-cotes
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Liste et étiquettes QR (${{ inputs.mode }})
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Préparer, produire et envoyer
+        env:
+          MODE: ${{ inputs.mode }}
+          TO: ${{ inputs.destinataires }}
+          CC: ${{ inputs.copie }}
+          PREFIXE: ${{ inputs.prefixe }}
+          DE: ${{ inputs.de }}
+          A: ${{ inputs.a }}
+          REMPLACE: ${{ inputs.remplace && '1' || '0' }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$MODE" == apercu || "$MODE" == envoyer ]] || { echo "Mode invalide." >&2; exit 1; }
+          [[ "$PREFIXE" =~ ^[0-9]{4}-[A-Z][A-Z0-9]{1,5}$ ]] || { echo "Préfixe invalide." >&2; exit 1; }
+          [[ "$DE" =~ ^[0-9]{1,5}$ && "$A" =~ ^[0-9]{1,5}$ ]] || { echo "Plage invalide." >&2; exit 1; }
+          [[ "$TO" =~ ^[A-Za-z0-9._%+@,\ -]{3,600}$ && "$CC" =~ ^[A-Za-z0-9._%+@,\ -]{0,600}$ ]] || { echo "Adresses invalides." >&2; exit 1; }
+          TO="${TO// /}"; CC="${CC// /}"
+          if [[ "$CC" == aucune ]]; then CC=""; fi
+          [[ -n "$TO" ]] || { echo "Destinataires obligatoires." >&2; exit 1; }
+          echo "Destinataires : $TO — copie : ${CC:-aucune}"
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-report.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+          ssh_options=(-F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o GlobalKnownHostsFile=/dev/null
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
+          destination="$CONTABO_USER@$CONTABO_HOST"
+
+          # 1. Extraction en lecture seule.
+          mkdir -p export rapport
+          ssh "${ssh_options[@]}" "$destination" "bash /opt/colect-app/current/deploy/export-cotes.sh $PREFIXE $DE $A" > export/cartons.json
+
+          # 2. Tableur, rapport et étiquettes.
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet reportlab==4.2.5 openpyxl==3.1.5
+          "$RUNNER_TEMP/venv/bin/python" -I deploy/recuperation/build_cotes.py export/cartons.json rapport
+          rm -f export/cartons.json
+
+          # 3. Envoi depuis le serveur, avec la configuration e-mail de l'application.
+          if [[ "$MODE" == envoyer ]]; then
+            id="$GITHUB_RUN_ID"
+            ssh "${ssh_options[@]}" "$destination" "umask 022; mkdir -p /opt/colect-app/shared/outbox/$id"
+            for file in rapport/*.xlsx rapport/*.pdf rapport/summary.json; do
+              ssh "${ssh_options[@]}" "$destination" "umask 022; set -C; cat > '/opt/colect-app/shared/outbox/$id/$(basename "$file")'" < "$file"
+            done
+            ssh "${ssh_options[@]}" "$destination" "bash /opt/colect-app/current/deploy/send-report-email.sh $id '$TO' '$CC' $REMPLACE"
+          fi
+
+      - name: Conserver les fichiers produits (3 jours)
+        uses: actions/upload-artifact@v4
+        with:
+          name: liste-etiquettes-qr
+          path: rapport/
+          retention-days: 1
+          if-no-files-found: error

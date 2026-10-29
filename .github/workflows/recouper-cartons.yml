@@ -1,0 +1,85 @@
+name: Recouper les cartons de Koumassi (Contabo)
+
+# Lancement manuel uniquement. Recoupe des cartons 2010-KOU sur les boîtes
+# physiques (référence de classement des dossiers, liste d'enlèvement en tête) :
+# voir deploy/recouper-cartons.mjs.
+# « simulation » n'écrit rien ; « appliquer » sauvegarde d'abord la base.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "simulation (aucune écriture) ou appliquer"
+        required: true
+        default: simulation
+        type: choice
+        options: [simulation, appliquer]
+      confirmation:
+        description: "Pour appliquer, saisir exactement RECOUPER-CARTONS"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-recouper-cartons
+  cancel-in-progress: false
+
+jobs:
+  recoupe:
+    name: Recoupe des cartons KOU (${{ inputs.mode }})
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 45
+    steps:
+      - name: Exécuter sur le VPS en SSH vérifié
+        env:
+          MODE: ${{ inputs.mode }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          [[ "$MODE" == simulation || "$MODE" == appliquer ]] || { echo "Mode invalide." >&2; exit 1; }
+          if [[ "$MODE" == appliquer ]]; then
+            [[ "$CONFIRMATION" == RECOUPER-CARTONS ]] || { echo "Confirmation absente ou incorrecte : saisir RECOUPER-CARTONS." >&2; exit 1; }
+          else
+            CONFIRMATION=none
+          fi
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-recoupe.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            "$CONTABO_USER@$CONTABO_HOST" bash -s -- "$MODE" "$CONFIRMATION" <<'REMOTE'
+          set -euo pipefail
+          mode="$1"
+          confirmation="$2"
+          script=/opt/colect-app/current/deploy/recouper-cartons.sh
+          test -f "$script" || { echo "La release en service ne contient pas encore le script de recoupe." >&2; exit 1; }
+          if [[ "$mode" == appliquer ]]; then
+            bash "$script" appliquer "$confirmation"
+          else
+            bash "$script" simulation
+          fi
+          REMOTE
