@@ -186,6 +186,7 @@ summary = {
     "listBoxes": len(liste), "listFound": sum(1 for c in liste if c["dossiers"]), "empty": len(vides),
     "listDossiers": sum(len(c["dossiers"]) for c in liste),
     "listAuthor": data.get("listeEtabliePar"),
+    "listName": (sys.argv[3].strip() if len(sys.argv) > 3 else "") or None,
     "emptyList": [f'n° {c["listeRef"]} « {c["listeLibelle"]} » ({c["cote"]})' for c in liste if not c["dossiers"]],
     "exportedAt": data["exportedAt"],
 }
