@@ -45,6 +45,13 @@ export function buildCotesMessage(summary, files, { replaces = false } = {}) {
     ...(summary.listBoxes ? [`dossiers retrouvés en base pour ${nf(summary.listFound)} des ${nf(summary.listBoxes)} cartons de la liste d'enlèvement (${nf(summary.listDossiers ?? summary.dossiers)} dossiers) ;`] : []),
     ...(summary.empty ? [`${nf(summary.empty)} carton${summary.empty > 1 ? "s n'ont" : " n'a"} pas encore de dossier enregistré : ${summary.empty > 1 ? "leurs dossiers seront rattachés" : "ses dossiers seront rattachés"} lors de l'inventaire, en scannant le QR du carton${summary.emptyList?.length ? ` (${summary.emptyList.join(", ")})` : ""}. ${summary.empty > 1 ? "Ils sont signalés" : "Il est signalé"} en couleur dans la liste.`] : []),
   ];
+  const procedure = summary.empty ? [
+    "coller l'étiquette QR sur le carton, comme pour les autres ;",
+    "dans GeoArchives, ouvrir Collecte, répondre « Un carton déjà commencé » puis scanner le QR du carton (ou saisir sa cote) ;",
+    "saisir chaque dossier présent dans le carton : il reçoit automatiquement le numéro suivant (…-001, …-002) et reste lié à ce carton ;",
+    "imprimer les étiquettes de ces dossiers depuis la fiche du carton (bouton « Étiquettes des dossiers ») et les coller sur les chemises ;",
+    "si un dossier figure déjà dans la base sous un autre carton, le signaler à l'équipe GeoArchives qui le rattachera, pour éviter un doublon.",
+  ] : [];
   const p = (text) => `<p style="margin:0 0 12px">${text}</p>`;
   const ul = (items, tag = "ul") => `<${tag} style="margin:0 0 14px;padding-left:22px">${items.map((item) => `<li style="margin-bottom:4px">${esc(item)}</li>`).join("")}</${tag}>`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2937;line-height:1.55;max-width:680px">
@@ -52,6 +59,7 @@ ${replaces ? p(`<i>${esc(replaceNote)}</i>`) : ""}${p("Bonjour à tous,")}
 ${p(esc(intro))}
 ${p("En synthèse :")}${ul(points)}
 ${notes.length ? `${p("Points à noter :")}${ul(notes)}` : ""}
+${procedure.length ? `${p("Pour les cartons sans dossier enregistré, sur place :")}${ul(procedure, "ol")}` : ""}
 ${p("Documents joints :")}${ul(documents, "ol")}
 ${p("Nous restons à votre disposition pour tout complément.")}
 <p style="margin:16px 0 0">Cordialement,<br><b>L'équipe GeoArchives</b><br><span style="color:#6b7280">CEIBA Analytics</span></p></div>`;
@@ -60,6 +68,7 @@ ${p("Nous restons à votre disposition pour tout complément.")}
     "Bonjour à tous,", "", intro, "",
     "En synthèse :", ...points.map((x) => `- ${x}`), "",
     ...(notes.length ? ["Points à noter :", ...notes.map((x) => `- ${x}`), ""] : []),
+    ...(procedure.length ? ["Pour les cartons sans dossier enregistré, sur place :", ...procedure.map((x, i) => `${i + 1}. ${x}`), ""] : []),
     "Documents joints :", ...documents.map((x, i) => `${i + 1}. ${x}`), "",
     "Nous restons à votre disposition pour tout complément.", "", "Cordialement,", "L'équipe GeoArchives", "CEIBA Analytics",
   ].join("\n");
