@@ -26,7 +26,7 @@ const nf = (value) => new Intl.NumberFormat("fr-FR").format(value);
 export function buildCotesMessage(summary, files, { replaces = false } = {}) {
   const name = summary.listName ? `la liste ${summary.listName}` : null;
   const subject = name
-    ? `Archives MULCV – liste ${summary.listName} : étiquettes QR des cartons ${summary.first} à ${summary.last}`
+    ? `Archives MULCV – liste ${summary.listName} et complément à ${nf(summary.boxes + 200)} cartons : étiquettes QR ${summary.first} à ${summary.last}`
     : `Archives MULCV – liste et étiquettes QR des cartons ${summary.first} à ${summary.last}`;
   const labels = {
     "liste-cartons": "Liste des cartons et de leurs dossiers (Excel)",
@@ -34,8 +34,9 @@ export function buildCotesMessage(summary, files, { replaces = false } = {}) {
     "etiquettes-dossiers": "Étiquettes QR des dossiers (PDF, 24 par page A4)",
   };
   const documents = files.map((file) => labels[Object.keys(labels).find((key) => file.startsWith(key))] ?? file);
+  // Liste nommée : celle reçue a été comparée à la liste de Kably ; ce qui est déjà tiré n'est pas refait.
   const intro = name
-    ? `Nous vous transmettons ${name} : ${nf(summary.boxes)} cartons, ${summary.first} à ${summary.last}, qui ne figurent pas dans la liste d'enlèvement tirée par Kably, ainsi que les étiquettes QR à apposer sur les cartons et sur chaque dossier.`
+    ? `${name[0].toUpperCase()}${name.slice(1)} nous a été transmise : nous l'avons comparée à la liste d'enlèvement tirée par Kably pour nous assurer qu'elle n'était pas identique. Elle reprend les mêmes 200 cartons, déjà étiquetés : aucune étiquette n'est à refaire pour elle. Pour compléter la liste à ${nf(summary.boxes + 200)} cartons, nous vous transmettons les ${nf(summary.boxes)} cartons suivants, ${summary.first} à ${summary.last}, avec leurs étiquettes QR à apposer sur les cartons et sur chaque dossier.`
     : `Nous vous transmettons la liste des ${nf(summary.boxes)} cartons ${summary.first} à ${summary.last} et les étiquettes QR à apposer sur les cartons et sur chaque dossier.`;
   const points = [
     `${nf(summary.boxes)} cartons, contenant au total ${nf(summary.dossiers)} dossiers ;`,
