@@ -108,33 +108,54 @@ export async function recouper(db, { apply = false } = {}) {
   if (!apply) return { applied: false, report };
   if (refs.lots || refs.caisses) throw new Error("Des cartons KOU sont engagés dans un transfert ou un conteneur : recoupe refusée.");
 
+  const started = Date.now();
+  const step = (label) => console.error(`  … ${label} (${Math.round((Date.now() - started) / 1000)} s)`);
+  // Cartons à créer : clé technique provisoire pour retrouver leurs identifiants.
+  const disponibles = [...anciensCartons].sort((a, b) => a - b);
+  const manquants = Math.max(0, plan.boites.length - disponibles.length);
   const result = await db.$transaction(async (tx) => {
-    // Libère les cotes et rangs KOU (contraintes d'unicité), puis réattribue.
-    await tx.$executeRaw(Prisma.sql`UPDATE dossiers d JOIN cartons c ON c.id = d.carton_id SET d.rang_carton = NULL, d.cote = NULL WHERE c.cote_prefixe = ${PREFIXE}`);
-    await tx.$executeRaw(Prisma.sql`UPDATE cartons SET cote = NULL, cote_sequence = NULL WHERE cote_prefixe = ${PREFIXE}`);
-    // Réutilise d'abord les cartons existants, dans l'ordre, puis en crée.
-    const disponibles = [...anciensCartons].sort((a, b) => a - b);
-    let crees = 0;
-    for (const boite of plan.boites) {
-      let cartonId = disponibles.shift();
-      if (cartonId == null) { cartonId = (await tx.carton.create({ data: {}, select: { id: true } })).id; crees += 1; }
-      boite.cartonId = cartonId;
-      await tx.carton.update({ where: { id: cartonId }, data: { cote: boite.cote, cotePrefixe: PREFIXE, coteSequence: boite.sequence, legacyKey: null } });
-      for (let i = 0; i < boite.dossiers.length; i += 500) {
-        const chunk = boite.dossiers.slice(i, i + 500).map((dossier, j) => ({ id: dossier.id, rang: i + j + 1 }));
-        const caseOf = (value) => Prisma.join(chunk.map((c) => Prisma.sql`WHEN ${c.id} THEN ${value(c)}`), " ");
-        await tx.$executeRaw(Prisma.sql`
-          UPDATE dossiers SET carton_id = ${cartonId},
-            rang_carton = CASE id ${caseOf((c) => c.rang)} END,
-            cote = CASE id ${caseOf((c) => formatDossierCote(boite.cote, c.rang))} END
-          WHERE id IN (${Prisma.join(chunk.map((c) => c.id))})`);
-      }
+    const marque = `recoupe-${Date.now()}-`;
+    if (manquants) {
+      await tx.carton.createMany({ data: Array.from({ length: manquants }, (_, i) => ({ legacyKey: `${marque}${i}` })) });
+      const crees = await tx.carton.findMany({ where: { legacyKey: { startsWith: marque } }, orderBy: { id: "asc" }, select: { id: true } });
+      disponibles.push(...crees.map((row) => row.id));
     }
+    step(`${manquants} carton(s) créé(s)`);
+    plan.boites.forEach((boite, index) => { boite.cartonId = disponibles[index]; });
+    const restants = disponibles.slice(plan.boites.length);
+
+    // Libère les cotes et rangs KOU (contraintes d'unicité), puis réattribue en masse.
+    await tx.$executeRaw(Prisma.sql`UPDATE dossiers SET rang_carton = NULL, cote = NULL WHERE id IN (SELECT id FROM (SELECT d.id FROM dossiers d JOIN cartons c ON c.id = d.carton_id WHERE c.cote_prefixe = ${PREFIXE}) x)`);
+    await tx.$executeRaw(Prisma.sql`UPDATE cartons SET cote = NULL, cote_sequence = NULL, cote_prefixe = NULL WHERE cote_prefixe = ${PREFIXE}`);
+    step("anciennes cotes libérées");
+    for (let i = 0; i < plan.boites.length; i += 500) {
+      const chunk = plan.boites.slice(i, i + 500);
+      const caseOf = (value) => Prisma.join(chunk.map((b) => Prisma.sql`WHEN ${b.cartonId} THEN ${value(b)}`), " ");
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE cartons SET cote = CASE id ${caseOf((b) => b.cote)} END,
+          cote_prefixe = ${PREFIXE},
+          cote_sequence = CASE id ${caseOf((b) => b.sequence)} END,
+          legacy_key = NULL
+        WHERE id IN (${Prisma.join(chunk.map((b) => b.cartonId))})`);
+    }
+    step("cartons cotés");
+    const lignes = plan.boites.flatMap((boite) => boite.dossiers.map((dossier, index) => ({ id: dossier.id, cartonId: boite.cartonId, rang: index + 1, cote: formatDossierCote(boite.cote, index + 1) })));
+    for (let i = 0; i < lignes.length; i += 1000) {
+      const chunk = lignes.slice(i, i + 1000);
+      const caseOf = (value) => Prisma.join(chunk.map((l) => Prisma.sql`WHEN ${l.id} THEN ${value(l)}`), " ");
+      await tx.$executeRaw(Prisma.sql`
+        UPDATE dossiers SET carton_id = CASE id ${caseOf((l) => l.cartonId)} END,
+          rang_carton = CASE id ${caseOf((l) => l.rang)} END,
+          cote = CASE id ${caseOf((l) => l.cote)} END
+        WHERE id IN (${Prisma.join(chunk.map((l) => l.id))})`);
+    }
+    step(`${lignes.length} dossiers renumérotés`);
     // Anciens cartons vidés et sans historique : supprimés.
-    const vides = disponibles.length ? await tx.carton.deleteMany({ where: { id: { in: disponibles }, dossiers: { none: {} }, transferLotItems: { none: {} }, caisseMouvements: { none: {} } } }) : { count: 0 };
-    await tx.auditLog.create({ data: { action: "RECOUPE_CARTONS", entity: "CARTON", newValue: { prefixe: PREFIXE, boites: plan.boites.length, dossiers: dossiers.length, crees, supprimes: vides.count } } });
-    return { crees, supprimes: vides.count };
-  }, { maxWait: 10_000, timeout: 900_000 });
+    const vides = restants.length ? await tx.carton.deleteMany({ where: { id: { in: restants }, dossiers: { none: {} }, transferLotItems: { none: {} }, caisseMouvements: { none: {} } } }) : { count: 0 };
+    await tx.auditLog.create({ data: { action: "RECOUPE_CARTONS", entity: "CARTON", newValue: { prefixe: PREFIXE, boites: plan.boites.length, dossiers: dossiers.length, crees: manquants, supprimes: vides.count } } });
+    step("terminé");
+    return { crees: manquants, supprimes: vides.count };
+  }, { maxWait: 10_000, timeout: 600_000 });
   return { applied: true, report, ...result };
 }
 
