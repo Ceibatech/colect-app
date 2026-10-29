@@ -23,7 +23,7 @@ function currentPosition(): Promise<GeolocationPosition | null> {
 /**
  * Fiche de départ du convoyeur : véhicule, contrôle des cartons chargés
  * (scan du QR code ou coche), scellés. « Démarrer le trajet » enregistre la
- * fiche, prévient les deux sites et lance le suivi.
+ * fiche et lance le suivi : le site d'arrivée est prévenu dès que le véhicule roule.
  */
 export function ConvoyDepartureForm({
   lotId,
@@ -89,7 +89,7 @@ export function ConvoyDepartureForm({
       });
       const body = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Impossible de démarrer le trajet.");
-      toast.success("Trajet démarré : les deux sites sont prévenus.");
+      toast.success("Fiche de départ enregistrée : le site d'arrivée sera prévenu dès que le véhicule roule.");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossible de démarrer le trajet.");

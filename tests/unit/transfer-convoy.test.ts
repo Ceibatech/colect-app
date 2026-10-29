@@ -59,3 +59,53 @@ describe("carte OpenStreetMap du trajet", () => {
     expect(osmTrackLayout([], null)).toBeNull();
   });
 });
+
+import { hasLeft, minutesBetween, nextSiteStep, refusEtape, type ConvoyEvent } from "@/lib/transfers/convoy";
+
+describe("étapes du convoi : chargement, mouvement, déchargement", () => {
+  const at = (minute: number) => new Date(Date.UTC(2026, 10, 2, 8, minute));
+  const ev = (type: ConvoyEvent["type"], minute: number, details?: unknown): ConvoyEvent => ({ type, occurredAt: at(minute), details });
+
+  it("suit le cycle complet et mesure chaque phase", () => {
+    const events = [
+      ev("CHARGEMENT_DEBUT", 0), ev("CHARGEMENT_FIN", 25), ev("DEPART", 30),
+      ev("EN_ROUTE", 34, { etaAt: at(59).toISOString() }), ev("ARRIVEE", 58), ev("DECHARGEMENT_DEBUT", 60), ev("DECHARGEMENT_FIN", 80),
+    ];
+    const state = convoyState(events);
+    expect(state.arrived).toBe(true);
+    expect(minutesBetween(state.loadingStartedAt, state.loadingEndedAt)).toBe(25);
+    expect(minutesBetween(state.movingAt, state.arrivedAt)).toBe(24);
+    expect(minutesBetween(state.unloadingStartedAt, state.unloadingEndedAt)).toBe(20);
+    expect(state.etaAt?.toISOString()).toBe(at(59).toISOString());
+  });
+
+  it("refuse les étapes dans le désordre", () => {
+    expect(refusEtape([], "CHARGEMENT_FIN")).toMatch(/début du chargement/);
+    expect(refusEtape([ev("CHARGEMENT_DEBUT", 0)], "DEPART")).toMatch(/chargement n'est pas terminé/);
+    expect(refusEtape([ev("CHARGEMENT_DEBUT", 0), ev("CHARGEMENT_FIN", 5)], "DEPART")).toBeNull();
+    expect(refusEtape([], "EN_ROUTE")).toMatch(/départ n'est pas déclaré/);
+    expect(refusEtape([ev("DEPART", 0)], "DECHARGEMENT_DEBUT")).toMatch(/pas encore arrivé/);
+    expect(refusEtape([ev("DEPART", 0), ev("EN_ROUTE", 2)], "EN_ROUTE")).toMatch(/déjà signalé/);
+  });
+
+  it("propose au site la prochaine étape à horodater", () => {
+    expect(nextSiteStep("source", convoyState([]))).toBe("chargement-debut");
+    expect(nextSiteStep("source", convoyState([ev("CHARGEMENT_DEBUT", 0)]))).toBe("chargement-fin");
+    expect(nextSiteStep("source", convoyState([ev("CHARGEMENT_DEBUT", 0), ev("CHARGEMENT_FIN", 5), ev("DEPART", 6)]))).toBeNull();
+    expect(nextSiteStep("destination", convoyState([ev("DEPART", 0), ev("ARRIVEE", 20)]))).toBe("dechargement-debut");
+    expect(nextSiteStep("destination", convoyState([ev("DEPART", 0), ev("ARRIVEE", 20), ev("DECHARGEMENT_DEBUT", 21)]))).toBe("dechargement-fin");
+  });
+
+  it("un nouveau chargement après une arrivée ouvre un nouveau cycle", () => {
+    const state = convoyState([ev("CHARGEMENT_DEBUT", 0), ev("CHARGEMENT_FIN", 5), ev("DEPART", 6), ev("ARRIVEE", 30), ev("CHARGEMENT_DEBUT", 40)]);
+    expect(state.loadingStartedAt?.toISOString()).toBe(at(40).toISOString());
+    expect(state.loadingEndedAt).toBeNull();
+  });
+
+  it("le véhicule roule quand il s'éloigne de plus de 300 m avec une précision suffisante", () => {
+    const start = { latitude: 5.3200, longitude: -4.0200 };
+    expect(hasLeft({ latitude: 5.3210, longitude: -4.0200 }, start)).toBe(false);
+    expect(hasLeft({ latitude: 5.3240, longitude: -4.0200 }, start)).toBe(true);
+    expect(hasLeft({ latitude: 5.3240, longitude: -4.0200, accuracy: 500 }, start)).toBe(false);
+  });
+});

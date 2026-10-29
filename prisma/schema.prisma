@@ -464,9 +464,16 @@ model TransferSignature {
 // Jalons du convoi : départ (le convoyeur lance le suivi) et arrivée (bouton
 // du convoyeur, ou détection automatique à l'approche du site d'arrivée). Ils
 // déclenchent la notification des responsables des deux sites.
+// Étapes du convoi : chargement au départ, fiche de départ, véhicule en
+// mouvement (GPS), arrivée, déchargement au site d'arrivée.
 enum TransferConvoyEventType {
+  CHARGEMENT_DEBUT
+  CHARGEMENT_FIN
   DEPART
+  EN_ROUTE
   ARRIVEE
+  DECHARGEMENT_DEBUT
+  DECHARGEMENT_FIN
 }
 
 model TransferConvoyEvent {

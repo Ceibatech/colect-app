@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Download, FileText, MapPinned } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { ConvoySteps } from "@/components/transferts/ConvoySteps";
 import { FieldLotStrip } from "@/components/transferts/FieldLotStrip";
+import { SiteStepButton } from "@/components/transferts/SiteStepButton";
+import { nextSiteStep } from "@/lib/transfers/convoy";
 import { TransferMovementDialog } from "@/components/transferts/TransferActions";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -28,7 +31,7 @@ const conditionLabel: Record<string, string> = {
 };
 
 export default async function SiteWorkspacePage() {
-  const { sites, departures, arrivals, bordereaux } = await getSiteWorkspace();
+  const { sites, departures, loadings, arrivals, bordereaux } = await getSiteWorkspace();
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -42,6 +45,7 @@ export default async function SiteWorkspacePage() {
           : "Aucun site ne vous est encore rattaché."}
         stats={[
           { label: "À remettre", value: departures.length },
+          { label: "Chargements", value: loadings.length },
           { label: "Arrivées attendues", value: arrivals.length, tone: arrivals.length ? "warning" : "default" },
           { label: "Bordereaux d'arrivée", value: bordereaux.length },
         ]}
@@ -54,15 +58,19 @@ export default async function SiteWorkspacePage() {
       <section aria-labelledby="arrivees" className="space-y-3">
         <div>
           <h2 id="arrivees" className="text-lg font-semibold">Arrivées attendues</h2>
-          <p className="text-sm text-muted-foreground">Quand le convoi arrive, contrôlez les cartons et signez l&apos;état des lieux (PV F03).</p>
+          <p className="text-sm text-muted-foreground">Vous êtes prévenu dès que le véhicule roule, avec l&apos;heure d&apos;arrivée estimée. À l&apos;arrivée, indiquez le début et la fin du déchargement, contrôlez les cartons et signez l&apos;état des lieux (PV F03).</p>
         </div>
         {arrivals.length ? arrivals.map((lot) => (
           <FieldLotStrip key={lot.id} lot={lot} highlight="destination">
             {lot.convoy.arrived ? (
               <p className="w-full rounded-md bg-brand-green/10 px-3 py-2 text-sm font-medium text-brand-green">Véhicule arrivé à {timeFormatter.format(lot.convoy.arrivedAt!)}{lot.convoy.arrivalAutomatic ? " (détecté par GPS)" : ""}</p>
+            ) : lot.convoy.movingAt ? (
+              <p className="w-full rounded-md bg-brand-gold/10 px-3 py-2 text-sm font-medium text-brand-gold">En route depuis {timeFormatter.format(lot.convoy.movingAt)}{lot.convoy.etaAt ? `, arrivée estimée vers ${timeFormatter.format(lot.convoy.etaAt)}` : ""} · <Link href={`/transferts/${lot.id}`} className="underline underline-offset-4">suivre le trajet</Link></p>
             ) : lot.convoy.onTheRoad ? (
-              <p className="w-full rounded-md bg-brand-gold/10 px-3 py-2 text-sm font-medium text-brand-gold">En route depuis {timeFormatter.format(lot.convoy.departedAt!)} · <Link href={`/transferts/${lot.id}`} className="underline underline-offset-4">suivre le trajet</Link></p>
+              <p className="w-full rounded-md bg-muted px-3 py-2 text-sm font-medium">Fiche de départ remplie à {timeFormatter.format(lot.convoy.departedAt!)} : le véhicule n&apos;a pas encore quitté le site de départ.</p>
             ) : null}
+            {lot.convoy.onTheRoad || lot.convoy.arrived ? <ConvoySteps state={lot.convoy} className="w-full rounded-md border p-3" /> : null}
+            {(() => { const step = nextSiteStep("destination", lot.convoy); return step ? <SiteStepButton lotId={lot.id} step={step} /> : null; })()}
             {lot.items.length ? (
               <TransferMovementDialog lotId={lot.id} type="RECEPTION" items={lot.items} escortSuggestions={lot.escorts} sourceLabel={lot.source} destinationLabel={lot.destination} />
             ) : (
@@ -82,6 +90,24 @@ export default async function SiteWorkspacePage() {
             <TransferMovementDialog lotId={lot.id} type="SORTIE" items={lot.items} escortSuggestions={lot.escorts} sourceLabel={lot.source} destinationLabel={lot.destination} />
           </FieldLotStrip>
         )) : <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Aucun lot autorisé au départ de vos sites.</p>}
+      </section>
+
+      <section aria-labelledby="chargements" className="space-y-3">
+        <div>
+          <h2 id="chargements" className="text-lg font-semibold">Chargement et départ</h2>
+          <p className="text-sm text-muted-foreground">Après l&apos;état des lieux de sortie, indiquez le début puis la fin du chargement : le convoyeur est prévenu, et le site d&apos;arrivée l&apos;est dès que le véhicule roule.</p>
+        </div>
+        {loadings.length ? loadings.map((lot) => {
+          const step = nextSiteStep("source", lot.convoy);
+          return (
+            <FieldLotStrip key={lot.id} lot={lot} highlight="source">
+              <ConvoySteps state={lot.convoy} className="w-full rounded-md border p-3" />
+              {step ? <SiteStepButton lotId={lot.id} step={step} /> : (
+                <p className="text-sm text-muted-foreground">{lot.convoy.onTheRoad ? "Fiche de départ remplie : en attente du mouvement du véhicule." : "Chargement terminé : le convoyeur remplit la fiche de départ."}</p>
+              )}
+            </FieldLotStrip>
+          );
+        }) : <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Aucun chargement en cours sur vos sites.</p>}
       </section>
 
       <Card className="bg-card/95">
