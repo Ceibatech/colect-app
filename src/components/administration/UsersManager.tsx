@@ -23,6 +23,7 @@ import { normalizePersonName, personInitials } from "@/lib/utils/person-name";
 export interface UserRow {
   id: number;
   name: string;
+  fonction: string | null;
   email: string;
   isActive: boolean;
   lastLoginAt: string | null;
@@ -311,6 +312,11 @@ function CreateUserForm({ roles, supervisors, sites, onSuccess }: { roles: RoleO
         <p className="text-xs text-muted-foreground">Le nom est automatiquement harmonisé en majuscules.</p>
       </div>
       <div className="space-y-2">
+        <Label htmlFor="fonction">Fonction</Label>
+        <Input id="fonction" name="fonction" maxLength={120} disabled={isPending} placeholder="Ex. Chef du service des archives" />
+        <p className="text-xs text-muted-foreground">Reprise automatiquement sous son nom à chaque signature. À défaut, le rôle est indiqué.</p>
+      </div>
+      <div className="space-y-2">
         <Label htmlFor="email">E-mail</Label>
         <Input id="email" name="email" type="email" maxLength={150} required disabled={isPending} autoComplete="off" />
       </div>
@@ -402,6 +408,11 @@ function EditUserForm({
       <div className="space-y-2">
         <Label htmlFor="edit-name">Nom complet</Label>
         <Input id="edit-name" name="name" defaultValue={normalizePersonName(user.name)} maxLength={150} required disabled={isPending} className="uppercase" />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="edit-fonction">Fonction</Label>
+        <Input id="edit-fonction" name="fonction" defaultValue={user.fonction ?? ""} maxLength={120} disabled={isPending} placeholder="Ex. Chef du service des archives" />
+        <p className="text-xs text-muted-foreground">Reprise automatiquement sous son nom à chaque signature. À défaut, le rôle est indiqué.</p>
       </div>
       <div className="space-y-2">
         <Label>E-mail</Label>

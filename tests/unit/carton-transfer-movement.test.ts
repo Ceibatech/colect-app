@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth/current-user", () => ({ requirePermission: async () => ({ userId: 7 }) }));
 vi.mock("@/lib/prisma/client", () => ({ prisma: {
   $transaction: mocks.transaction, transferMovement: { findUnique: async () => null },
+  user: { findUniqueOrThrow: async () => ({ name: "Responsable ministère", fonction: "Directeur des archives", role: { code: "VALIDATEUR_MINISTERE" } }) },
 } }));
 vi.mock("@/lib/utils/server-request", () => ({ getClientIp: async () => "192.0.2.1" }));
 vi.mock("@/lib/services/transfer-notification-service", () => ({ notifyTransferWorkflow: vi.fn() }));

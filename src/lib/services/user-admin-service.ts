@@ -127,6 +127,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
   const session = await requirePermission("USER_MANAGE");
   const parsed = createUserSchema.safeParse({
     name: formData.get("name"),
+    fonction: formData.get("fonction") ?? "",
     email: formData.get("email"),
     roleId: formData.get("roleId"),
     telephone: formData.get("telephone"),
@@ -166,7 +167,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
 
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
-      data: { name: parsed.data.name, email, passwordHash, roleId: role.id },
+      data: { name: parsed.data.name, fonction: parsed.data.fonction, email, passwordHash, roleId: role.id },
     });
 
     if (needsOperateurProfile(role.code) && matricule) {
@@ -232,6 +233,7 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
   const session = await requirePermission("USER_MANAGE");
   const parsed = updateUserSchema.safeParse({
     name: formData.get("name"),
+    fonction: formData.get("fonction") ?? "",
     roleId: formData.get("roleId"),
     isActive: formData.get("isActive") === "on",
     operateurIds: formData.getAll("operateurIds"),
@@ -291,6 +293,7 @@ export async function updateUser(id: number, _prevState: ActionResult, formData:
       where: { id },
       data: {
         name: parsed.data.name,
+        fonction: parsed.data.fonction,
         roleId: newRole.id,
         isActive: parsed.data.isActive,
         ...(before.roleId !== newRole.id || before.isActive !== parsed.data.isActive || sitesChanged
