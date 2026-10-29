@@ -491,7 +491,7 @@ export function NewTransferForm({ sites, inventory, creatorId }: {
       <section className="overflow-hidden rounded-lg border bg-card shadow-sm">
         <div className="flex flex-col gap-4 border-b p-4 lg:flex-row lg:items-end lg:justify-between lg:p-5">
           <div><h2 className="font-semibold">Cartons disponibles au site d&apos;origine</h2><p className="text-sm text-muted-foreground">Un carton sélectionné inclut automatiquement tous les dossiers qu&apos;il contient.</p></div>
-          <div className="relative w-full lg:w-96"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="ID carton, code-barres ou libellé" className="pl-9" disabled={!sourceSiteId} /></div>
+          <div className="relative w-full lg:w-96"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Cote, libellé ou plage : 2010-KOU-0001 à 0200" className="pl-9" disabled={!sourceSiteId} /></div>
         </div>
 
         <div className="space-y-3 border-b bg-muted/20 px-4 py-3 lg:px-5">
