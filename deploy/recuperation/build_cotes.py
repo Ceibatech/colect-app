@@ -158,11 +158,16 @@ def dossier_labels(path):
             tx, tw = x + 30.5 * mm, lw - 32 * mm
             c.setFont("Helvetica-Bold", 7.6); c.drawString(tx, y + lh - 6 * mm, pdf_text(d["cote"]))
             c.setFont("Helvetica", 7); c.drawString(tx, y + lh - 10 * mm, f"Dossier {d['rang']}/{n}")
-            for j, line in enumerate(wrap(d["titulaire"] or "Titulaire non renseigné", tw, "Helvetica-Bold", 7, c, 3)):
-                c.setFont("Helvetica-Bold", 7); c.drawString(tx, y + lh - 15 * mm - j * 3.3 * mm, line)
-            place = " ".join(x for x in [f"Îlot {d['ilot']}" if d["ilot"] else "", f"lot {d['lot']}" if d["lot"] else ""] if x)
-            c.setFont("Helvetica", 6.3)
-            if place: c.drawString(tx, y + 3.2 * mm, pdf_text(place)[:30])
+            # Repères de collage sans nom : îlot, lot et titre foncier, tels qu'écrits sur la chemise.
+            reperes = [("Îlot", d["ilot"]), ("Lot", d["lot"]), ("TF", d["titreFoncier"])]
+            line_y = y + lh - 15 * mm
+            for label, value in reperes:
+                if not value: continue
+                c.setFont("Helvetica", 6.5); c.drawString(tx, line_y, label)
+                c.setFont("Helvetica-Bold", 8.5); c.drawString(tx + 7 * mm, line_y, pdf_text(value)[:22])
+                line_y -= 4.2 * mm
+            if line_y == y + lh - 15 * mm:
+                c.setFont("Helvetica", 7); c.drawString(tx, line_y, "Sans îlot ni lot : voir la liste")
             i += 1
     if i == 0:
         c.setFont("Helvetica", 11); c.drawString(20 * mm, height - 30 * mm, "Aucun dossier dans cette plage de cartons.")
