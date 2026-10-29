@@ -1,15 +1,16 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ExternalLink, ListChecks, Loader2, LocateFixed, PackageCheck, Route, Search } from "lucide-react";
+import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ExternalLink, History, ListChecks, Loader2, PackageCheck, Route, Search, ShieldCheck, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { createTransferLot, type TransferActionState } from "@/lib/services/transfer-actions";
 import { suggestTransferRoute } from "@/lib/services/transfer-route-service";
 import { buildGoogleMapsDirectionsUrl, formatRouteText, isValidGeoPoint, type GeoPoint } from "@/lib/transfers/route-suggestion";
+import { designerIntervenants, type CandidateUser } from "@/lib/transfers/participants";
 import { MAX_TRANSFER_CARTONS, type TransferCartonItem } from "@/lib/transfers/carton-selection";
 import { TRANSFER_DIRECTIONS, type TransferDirection } from "@/lib/transfers/direction";
-import { OTHER_OPTION, SECURITY_MEASURES, TRANSFER_RISKS, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
+import { OTHER_OPTION, referentielSecurisation, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
 import type { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +31,44 @@ interface SiteOption {
   entrepots: Array<{ id: number; code: string; nom: string; localisation: string | null }>;
 }
 
-interface ParticipantOption {
-  id: number;
-  name: string;
-  roleCode: string;
-  roleLabel: string;
+type Candidate = CandidateUser & { roleLabel: string };
+
+/** Saisie en cours, gardée dans ce navigateur pour la reprendre après une erreur ou une coupure. */
+interface TransferDraft {
+  savedAt: string;
+  direction: TransferDirection;
+  sourceSiteId: string;
+  sourceEntrepotId: string;
+  destinationSiteId: string;
+  destinationEntrepotId: string;
+  includeUnlocated: boolean;
+  selected: TransferCartonItem[];
+  plannedAt: string;
+  archiveSupport: string;
+  transportMethod: string;
+  transportMethodOther: string;
+  plannedRoute: string;
+  motif: string;
+}
+
+const draftKey = (userId: number) => `geoarchives:transfert-brouillon:${userId}`;
+const draftListeners = new Set<() => void>();
+function readDraftRaw(key: string): string | null {
+  try { return window.localStorage.getItem(key); } catch { return null; }
+}
+function writeDraft(key: string, draft: TransferDraft | null) {
+  try {
+    if (draft) window.localStorage.setItem(key, JSON.stringify(draft));
+    else window.localStorage.removeItem(key);
+  } catch { /* stockage indisponible : la saisie reste à l'écran */ }
+}
+function subscribeDraft(listener: () => void) {
+  draftListeners.add(listener);
+  return () => { draftListeners.delete(listener); };
+}
+function parseDraft(raw: string | null): TransferDraft | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as TransferDraft; } catch { return null; }
 }
 
 interface TransferCartonPage {
@@ -57,13 +91,16 @@ function warehouseLabel(warehouse: SiteOption["entrepots"][number]) {
   return [warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ");
 }
 
-export function NewTransferForm({ sites, inventory, participants }: {
+export function NewTransferForm({ sites, inventory, candidates, creatorId }: {
   sites: SiteOption[];
   inventory: ReturnType<typeof summarizeInventoryLocations>;
-  participants: { ceiba: ParticipantOption[]; sda: ParticipantOption[] };
+  candidates: Candidate[];
+  creatorId: number;
 }) {
   const router = useRouter();
-  const [state, formAction, pending] = useActionState(createTransferLot, initialState);
+  const [state, formAction, actionPending] = useActionState(createTransferLot, initialState);
+  const [submitting, startSubmit] = useTransition();
+  const pending = actionPending || submitting;
   const [direction, setDirection] = useState<TransferDirection>("PRISE_EN_CHARGE");
   const route = TRANSFER_DIRECTIONS[direction];
   const sourceSites = useMemo(() => sites.filter((site) => site.organisation === route.source), [sites, route.source]);
@@ -77,12 +114,12 @@ export function NewTransferForm({ sites, inventory, participants }: {
   });
   const [transportMethod, setTransportMethod] = useState("");
   const [plannedRoute, setPlannedRoute] = useState("");
-  const [myPosition, setMyPosition] = useState<GeoPoint | null>(null);
-  const [locating, setLocating] = useState(false);
+  const [plannedAt, setPlannedAt] = useState("");
+  const [archiveSupport, setArchiveSupport] = useState("PHYSIQUE");
+  const [transportMethodOther, setTransportMethodOther] = useState("");
+  const [motif, setMotif] = useState("");
   const [routing, setRouting] = useState(false);
   const [routeNote, setRouteNote] = useState("");
-  const [risks, setRisks] = useState<Set<string>>(new Set());
-  const [measures, setMeasures] = useState<Set<string>>(new Set());
   const [destinationEntrepotId, setDestinationEntrepotId] = useState("none");
   const [includeUnlocated, setIncludeUnlocated] = useState(false);
   const [selected, setSelected] = useState<Map<string, TransferCartonItem>>(new Map());
@@ -93,11 +130,60 @@ export function NewTransferForm({ sites, inventory, participants }: {
   const [proposing, setProposing] = useState(false);
   const [loadError, setLoadError] = useState("");
 
+  const storageKey = draftKey(creatorId);
+  const savedDraft = parseDraft(useSyncExternalStore(subscribeDraft, () => readDraftRaw(storageKey), () => null));
+  // Le brouillon n'est proposé qu'à l'ouverture ; ensuite, la saisie à l'écran le remplace.
+  const [draftOffered, setDraftOffered] = useState(true);
+  const touchedRef = useRef(false);
+
   useEffect(() => {
     if (!state.success || !state.lotId) return;
+    writeDraft(storageKey, null);
     toast.success(state.message ?? "Opération créée.");
     router.push(`/transferts/${state.lotId}`);
-  }, [state, router]);
+  }, [state, router, storageKey]);
+
+  // Sauvegarde continue de la saisie (sans attendre la validation).
+  useEffect(() => {
+    if (!touchedRef.current) return;
+    const timer = window.setTimeout(() => writeDraft(storageKey, {
+      savedAt: new Date().toISOString(), direction, sourceSiteId, sourceEntrepotId, destinationSiteId, destinationEntrepotId,
+      includeUnlocated, selected: [...selected.values()], plannedAt, archiveSupport, transportMethod, transportMethodOther, plannedRoute, motif,
+    }), 400);
+    return () => window.clearTimeout(timer);
+  }, [storageKey, direction, sourceSiteId, sourceEntrepotId, destinationSiteId, destinationEntrepotId, includeUnlocated, selected, plannedAt, archiveSupport, transportMethod, transportMethodOther, plannedRoute, motif]);
+
+  function resumeDraft(draft: TransferDraft) {
+    touchedRef.current = true;
+    setDraftOffered(false);
+    setDirection(draft.direction);
+    setSourceSiteId(draft.sourceSiteId);
+    setSourceEntrepotId(draft.sourceEntrepotId);
+    setDestinationSiteId(draft.destinationSiteId);
+    setDestinationEntrepotId(draft.destinationEntrepotId);
+    setIncludeUnlocated(draft.includeUnlocated);
+    setSelected(new Map(draft.selected.map((item) => [item.token, item])));
+    setPlannedAt(draft.plannedAt);
+    setArchiveSupport(draft.archiveSupport);
+    setTransportMethod(draft.transportMethod);
+    setTransportMethodOther(draft.transportMethodOther);
+    setPlannedRoute(draft.plannedRoute);
+    routeEditedRef.current = Boolean(draft.plannedRoute);
+    setMotif(draft.motif);
+    setPage(1);
+    toast.success("Saisie reprise : complétez ce qui manquait.");
+  }
+
+  function discardDraft() {
+    setDraftOffered(false);
+    writeDraft(storageKey, null);
+  }
+
+  // Toute modification marque la saisie comme à sauvegarder.
+  function touch() {
+    touchedRef.current = true;
+    if (draftOffered) setDraftOffered(false);
+  }
 
   useEffect(() => {
     if (!sourceSiteId) return;
@@ -142,26 +228,26 @@ export function NewTransferForm({ sites, inventory, participants }: {
     const point = site ? { latitude: site.latitude ?? Number.NaN, longitude: site.longitude ?? Number.NaN } : null;
     return isValidGeoPoint(point) ? point : null;
   };
-  const knownOrigin = myPosition ?? sitePoint(sourceSite);
+  const knownOrigin = sitePoint(sourceSite);
   const knownDestination = sitePoint(destinationSite);
   const googleMapsUrl = resolvedMapsUrl ?? (knownOrigin && knownDestination ? buildGoogleMapsDirectionsUrl(knownOrigin, knownDestination) : null);
 
-  type RouteEnds = { sourceId: number | null; destinationId: number | null; position: GeoPoint | null };
+  type RouteEnds = { sourceId: number | null; destinationId: number | null };
   async function proposeRoute(ends: RouteEnds, automatic = false) {
     const origin = sites.find((site) => site.id === ends.sourceId);
     const destination = sites.find((site) => site.id === ends.destinationId);
-    if (!destination || (!ends.position && !origin)) {
-      if (!automatic) toast.error(!destination ? "Choisissez d'abord le site de destination." : "Choisissez le site d'origine ou utilisez « Partir de ma position ».");
+    if (!destination || !origin) {
+      if (!automatic) toast.error(!destination ? "Choisissez d'abord le site de destination." : "Choisissez d'abord le site d'origine.");
       return;
     }
     if (automatic && routeEditedRef.current) return;
     setRouting(true);
     setRouteNote("");
     try {
-      const result = await suggestTransferRoute({ fromSiteId: origin?.id ?? null, fromPosition: ends.position, toSiteId: destination.id });
+      const result = await suggestTransferRoute({ fromSiteId: origin.id, fromPosition: null, toSiteId: destination.id });
       setResolvedMapsUrl(result.googleMapsUrl ?? null);
       if (result.summary) {
-        setPlannedRoute(formatRouteText(ends.position ? "Position actuelle" : origin?.nom ?? "Départ", destination.nom, result.summary));
+        setPlannedRoute(formatRouteText(origin.nom, destination.nom, result.summary));
         routeEditedRef.current = false;
         const located = [result.from?.source === "adresse" ? "départ" : null, result.to?.source === "adresse" ? "destination" : null].filter(Boolean);
         setRouteNote(`Trajet le plus rapide selon le réseau routier (OpenStreetMap), hors trafic.${located.length ? ` Position du site de ${located.join(" et du site de ")} estimée depuis son adresse : renseignez ses coordonnées GPS pour plus de précision.` : ""} Vérifiez le trafic sur Google Maps avant le départ.`);
@@ -175,42 +261,29 @@ export function NewTransferForm({ sites, inventory, participants }: {
     }
   }
 
+  function editRoute(value: string) {
+    touch();
+    routeEditedRef.current = true;
+    setPlannedRoute(value);
+  }
+
+  function recalculateRoute() {
+    routeEditedRef.current = false;
+    void proposeRoute({ sourceId: sourceSite?.id ?? null, destinationId: destinationSite?.id ?? null });
+  }
+
   /** Proposition automatique dès que le départ et la destination sont connus. */
   function routeEndsChanged(next: Partial<RouteEnds>) {
     setResolvedMapsUrl(null);
     void proposeRoute({
       sourceId: next.sourceId !== undefined ? next.sourceId : sourceSite?.id ?? null,
       destinationId: next.destinationId !== undefined ? next.destinationId : destinationSite?.id ?? null,
-      position: next.position !== undefined ? next.position : myPosition,
     }, true);
-  }
-
-  function locateMe() {
-    if (!("geolocation" in navigator)) {
-      toast.error("La géolocalisation n'est pas disponible sur cet appareil.");
-      return;
-    }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const point = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-        setLocating(false);
-        routeEditedRef.current = false;
-        setMyPosition(point);
-        // L'itinéraire vers la destination est recalculé automatiquement.
-        routeEndsChanged({ position: point });
-        toast.success(destinationSite ? `Itinéraire calculé depuis votre position vers ${destinationSite.nom}.` : "Position retenue : choisissez le site de destination.");
-      },
-      () => {
-        setLocating(false);
-        toast.error("Position refusée ou indisponible. Autorisez la localisation dans le navigateur.");
-      },
-      { enableHighAccuracy: true, timeout: 15_000 },
-    );
   }
 
   function changeDirection(next: TransferDirection) {
     if (next === direction) return;
+    touch();
     setDirection(next);
     setSourceSiteId("");
     setSourceEntrepotId("none");
@@ -219,10 +292,10 @@ export function NewTransferForm({ sites, inventory, participants }: {
     setDestinationEntrepotId("none");
     resetSourceSelection();
     setResolvedMapsUrl(null);
-    if (myPosition && destinations.length === 1) routeEndsChanged({ sourceId: null, destinationId: destinations[0].id });
   }
 
   function changeSourceSite(value: string | null) {
+    touch();
     setSourceSiteId(value ?? "");
     setSourceEntrepotId("none");
     resetSourceSelection();
@@ -236,6 +309,7 @@ export function NewTransferForm({ sites, inventory, participants }: {
 
   function selectInventoryLocation(siteId: number, entrepotId: number | null) {
     if (sourceSiteId === String(siteId) && sourceEntrepotId === String(entrepotId ?? "none")) return;
+    touch();
     const siteChanged = sourceSiteId !== String(siteId);
     setSourceSiteId(String(siteId));
     setSourceEntrepotId(entrepotId === null ? "none" : String(entrepotId));
@@ -260,6 +334,7 @@ export function NewTransferForm({ sites, inventory, participants }: {
   }
 
   function toggleCarton(item: TransferCartonItem, checked: boolean) {
+    touch();
     setSelected((current) => {
       const next = new Map(current);
       if (checked) {
@@ -276,6 +351,7 @@ export function NewTransferForm({ sites, inventory, participants }: {
   }
 
   function toggleCurrentPage() {
+    touch();
     setSelected((current) => {
       const next = new Map(current);
       if (allPageSelected) {
@@ -296,6 +372,7 @@ export function NewTransferForm({ sites, inventory, participants }: {
     setLoadError("");
     try {
       const proposal = await fetchCartons({ sourceSiteId, sourceEntrepotId, includeUnlocated, search, page: 1, proposal: true });
+      touch();
       setSelected(new Map(proposal.items.map((item) => [item.token, item])));
       const dossiers = proposal.items.reduce((sum, item) => sum + item.dossierCount, 0);
       toast.success(`${proposal.items.length} carton${proposal.items.length > 1 ? "s" : ""} proposé${proposal.items.length > 1 ? "s" : ""}, soit ${dossiers} dossiers.`);
@@ -306,8 +383,36 @@ export function NewTransferForm({ sites, inventory, participants }: {
     }
   }
 
+  const ceibaEnd = [sourceSite, destinationSite].find((site) => site?.organisation === "CEIBA") ?? null;
+  const ministryEnd = [sourceSite, destinationSite].find((site) => site?.organisation === "MINISTERE") ?? null;
+  const designes = designerIntervenants(candidates, { creatorId, ceibaSiteId: ceibaEnd?.id ?? null, ministrySiteId: ministryEnd?.id ?? null });
+  const referentiel = referentielSecurisation(archiveSupport);
+
+  // Envoi sans réinitialiser le formulaire : en cas d'erreur, rien n'est perdu.
+  function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    writeDraft(storageKey, {
+      savedAt: new Date().toISOString(), direction, sourceSiteId, sourceEntrepotId, destinationSiteId, destinationEntrepotId,
+      includeUnlocated, selected: [...selected.values()], plannedAt, archiveSupport, transportMethod, transportMethodOther, plannedRoute, motif,
+    });
+    startSubmit(() => formAction(formData));
+  }
+
   return (
-    <form action={formAction} className="space-y-6">
+    <form onSubmit={submit} className="space-y-6">
+      {draftOffered && savedDraft && savedDraft.selected?.length + Number(Boolean(savedDraft.plannedAt)) > 0 ? (
+        <Alert>
+          <History />
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span>Une saisie non envoyée du {new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" }).format(new Date(savedDraft.savedAt))} est gardée sur cet appareil ({savedDraft.selected.length} carton{savedDraft.selected.length > 1 ? "s" : ""}).</span>
+            <span className="flex shrink-0 gap-2">
+              <Button type="button" size="sm" onClick={() => resumeDraft(savedDraft)}>Reprendre ma saisie</Button>
+              <Button type="button" size="sm" variant="ghost" onClick={discardDraft}>Repartir de zéro</Button>
+            </span>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       <input type="hidden" name="cartonTokens" value={JSON.stringify(selectedTokens)} />
       <input type="hidden" name="includeUnlocated" value={String(includeUnlocated)} />
       {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
@@ -361,7 +466,7 @@ export function NewTransferForm({ sites, inventory, participants }: {
           </div>
           <div className="space-y-2">
             <Label>Entrepôt / salle d&apos;origine</Label>
-            <Select name="sourceEntrepotId" items={[{ label: "Uniquement les dossiers sans salle renseignée", value: "none" }, ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: sourceWarehouseLabel(warehouse), value: String(warehouse.id) }))]} value={sourceEntrepotId} onValueChange={changeSourceWarehouse} disabled={pending || !sourceSite}>
+            <Select name="sourceEntrepotId" items={[{ label: "Uniquement les dossiers sans salle renseignée", value: "none" }, ...(sourceSite?.entrepots ?? []).map((warehouse) => ({ label: sourceWarehouseLabel(warehouse), value: String(warehouse.id) }))]} value={sourceEntrepotId} onValueChange={(value) => { touch(); changeSourceWarehouse(value); }} disabled={pending || !sourceSite}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="none">Uniquement les dossiers sans salle renseignée</SelectItem>{sourceSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{sourceWarehouseLabel(warehouse)}</SelectItem>)}</SelectContent>
             </Select>
@@ -374,14 +479,14 @@ export function NewTransferForm({ sites, inventory, participants }: {
           <div><h2 className="font-semibold">{sourceIsMinistry ? "Site CEIBA" : "Site du ministère"} · destination</h2><p className="text-sm text-muted-foreground">Site qui intégrera le stock après réception signée.</p></div>
           <div className="space-y-2">
             <Label>{sourceIsMinistry ? "Site CEIBA" : "Site du ministère"}</Label>
-            <Select name="destinationSiteId" items={destinationSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={destinationSiteId} onValueChange={(value) => { setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); routeEndsChanged({ destinationId: value ? Number(value) : null }); }} disabled={pending}>
+            <Select name="destinationSiteId" items={destinationSites.map((site) => ({ label: `${site.nom} · ${site.code}`, value: String(site.id) }))} value={destinationSiteId} onValueChange={(value) => { touch(); setDestinationSiteId(value ?? ""); setDestinationEntrepotId("none"); routeEndsChanged({ destinationId: value ? Number(value) : null }); }} disabled={pending}>
               <SelectTrigger className="w-full"><SelectValue placeholder={sourceIsMinistry ? "Choisir le site CEIBA" : "Choisir le site du ministère"} /></SelectTrigger>
               <SelectContent>{destinationSites.map((site) => <SelectItem key={site.id} value={String(site.id)}>{site.nom} · {site.code}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
             <Label>Entrepôt / salle de destination</Label>
-            <Select name="destinationEntrepotId" items={[{ label: "Sans entrepôt précisé", value: "none" }, ...(destinationSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) }))]} value={destinationEntrepotId} onValueChange={(value) => setDestinationEntrepotId(value ?? "none")} disabled={pending || !destinationSite}>
+            <Select name="destinationEntrepotId" items={[{ label: "Sans entrepôt précisé", value: "none" }, ...(destinationSite?.entrepots ?? []).map((warehouse) => ({ label: warehouseLabel(warehouse), value: String(warehouse.id) }))]} value={destinationEntrepotId} onValueChange={(value) => { touch(); setDestinationEntrepotId(value ?? "none"); }} disabled={pending || !destinationSite}>
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent><SelectItem value="none">Sans entrepôt précisé</SelectItem>{destinationSite?.entrepots.map((warehouse) => <SelectItem key={warehouse.id} value={String(warehouse.id)}>{warehouseLabel(warehouse)}</SelectItem>)}</SelectContent>
             </Select>
@@ -411,7 +516,7 @@ export function NewTransferForm({ sites, inventory, participants }: {
             </div>
           </div>
           <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-border/70 bg-background/70 p-3 text-sm">
-            <Checkbox checked={includeUnlocated} onCheckedChange={(value) => changeIncludeUnlocated(value === true)} disabled={pending} />
+            <Checkbox checked={includeUnlocated} onCheckedChange={(value) => { touch(); changeIncludeUnlocated(value === true); }} disabled={pending} />
             <span><span className="block font-medium">Inclure le stock historique sans emplacement</span><span className="mt-0.5 block text-xs text-muted-foreground">Ces dossiers ne sont retenus que s&apos;ils appartiennent à un carton identifié; ils seront rattachés au site d&apos;origine à la validation.</span></span>
           </label>
         </div>
@@ -451,41 +556,40 @@ export function NewTransferForm({ sites, inventory, participants }: {
       <section className="space-y-5 rounded-lg border bg-card p-4 shadow-sm lg:p-5">
         <div><h2 className="font-semibold">Planification et sécurisation</h2><p className="mt-1 text-sm text-muted-foreground">Renseignez les dispositions validées avec le SDA avant de soumettre l&apos;opération.</p></div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required disabled={pending} /></div>
-          <div className="space-y-2"><Label htmlFor="archiveSupport">Support des archives</Label><select id="archiveSupport" name="archiveSupport" defaultValue="PHYSIQUE" required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="PHYSIQUE">Physique</option><option value="ELECTRONIQUE">Électronique</option><option value="HYBRIDE">Hybride</option></select></div>
+          <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required value={plannedAt} onChange={(event) => { touch(); setPlannedAt(event.target.value); }} disabled={pending} /></div>
+          <div className="space-y-2"><Label htmlFor="archiveSupport">Support des archives</Label><select id="archiveSupport" name="archiveSupport" value={archiveSupport} onChange={(event) => { touch(); setArchiveSupport(event.target.value); }} required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="PHYSIQUE">Physique</option><option value="ELECTRONIQUE">Électronique</option><option value="HYBRIDE">Hybride</option></select></div>
           <div className="space-y-2">
             <Label htmlFor="transportMethod">Moyen de transport prévu</Label>
-            <select id="transportMethod" name="transportMethod" value={transportMethod} onChange={(event) => setTransportMethod(event.target.value)} required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <select id="transportMethod" name="transportMethod" value={transportMethod} onChange={(event) => { touch(); setTransportMethod(event.target.value); }} required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm">
               <option value="" disabled>Choisir le moyen de transport</option>
               {TRANSPORT_METHODS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               <option value={OTHER_OPTION}>Autre (préciser)</option>
             </select>
-            {transportMethod === OTHER_OPTION ? <Input name="transportMethodOther" required minLength={2} maxLength={300} placeholder="Préciser le moyen de transport" disabled={pending} /> : null}
+            {transportMethod === OTHER_OPTION ? <Input name="transportMethodOther" required minLength={2} maxLength={300} placeholder="Préciser le moyen de transport" value={transportMethodOther} onChange={(event) => { touch(); setTransportMethodOther(event.target.value); }} disabled={pending} /> : null}
           </div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-3">
             <Label htmlFor="plannedRoute">Itinéraire prévu</Label>
-            <Input id="plannedRoute" name="plannedRoute" required maxLength={2000} value={plannedRoute} onChange={(event) => { routeEditedRef.current = true; setPlannedRoute(event.target.value); }} placeholder="Site de départ, trajet autorisé et site de destination" disabled={pending} />
+            <Input id="plannedRoute" name="plannedRoute" required maxLength={2000} value={plannedRoute} onChange={(event) => editRoute(event.target.value)} placeholder="Site de départ, trajet autorisé et site de destination" disabled={pending} />
             <div className="flex flex-wrap items-center gap-2">
-              <Button type="button" size="sm" variant="outline" onClick={() => { routeEditedRef.current = false; void proposeRoute({ sourceId: sourceSite?.id ?? null, destinationId: destinationSite?.id ?? null, position: myPosition }); }} disabled={pending || routing || !destinationSite || (!sourceSite && !myPosition)}>
+              <Button type="button" size="sm" variant="outline" onClick={recalculateRoute} disabled={pending || routing || !destinationSite || !sourceSite}>
                 {routing ? <Loader2 className="animate-spin" /> : <Route />} Recalculer l&apos;itinéraire
-              </Button>
-              <Button type="button" size="sm" variant={myPosition ? "secondary" : "ghost"} onClick={locateMe} disabled={pending || locating}>
-                {locating ? <Loader2 className="animate-spin" /> : <LocateFixed />} {myPosition ? "Départ : ma position" : "Partir de ma position"}
               </Button>
               {googleMapsUrl ? <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline">Voir sur Google Maps (trafic en temps réel) <ExternalLink className="h-3.5 w-3.5" /></a> : null}
             </div>
             {routeNote ? <p className="text-xs text-muted-foreground">{routeNote}</p> : null}
           </div>
-          <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="motif">Objet / contexte</Label><Input id="motif" name="motif" maxLength={2000} placeholder={sourceIsMinistry ? "Numérisation, indexation, garde temporaire..." : "Restitution après numérisation, réintégration au site..."} disabled={pending} /></div>
+          <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="motif">Objet / contexte</Label><Input id="motif" name="motif" maxLength={2000} value={motif} onChange={(event) => { touch(); setMotif(event.target.value); }} placeholder={sourceIsMinistry ? "Numérisation, indexation, garde temporaire..." : "Restitution après numérisation, réintégration au site..."} disabled={pending} /></div>
         </div>
         <div className="grid gap-4 lg:grid-cols-2">
-          <ParticipantPicker name="ceibaParticipantIds" title="Intervenants CEIBA habilités" options={participants.ceiba} disabled={pending} emptyHint="Aucun compte CEIBA actif avec un profil de transfert (gestionnaire, validateur interne, convoyeur)." />
-          <ParticipantPicker name="sdaParticipantIds" title="Intervenants SDA habilités" options={participants.sda} disabled={pending} emptyHint="Aucun compte SDA actif avec un profil de transfert (gestionnaire SDA, responsable validation SDA)." />
+          <DesignatedList title="Intervenants CEIBA" users={designes.ceiba} siteName={ceibaEnd?.nom ?? null} emptyHint="Aucun compte CEIBA actif avec un profil de transfert." />
+          <DesignatedList title="Intervenants SDA" users={designes.sda} siteName={ministryEnd?.nom ?? null} emptyHint="Aucun responsable validation SDA actif." />
         </div>
+        <p className="-mt-2 text-xs text-muted-foreground">Désignés d&apos;office selon les responsabilités attribuées (rôles et sites) : rien à choisir. Les profils se gèrent dans Administration → Utilisateurs.</p>
         <div className="grid gap-4 lg:grid-cols-2">
-          <ChoiceGroup name="risks" otherName="riskOther" title="Risques identifiés" options={TRANSFER_RISKS} selected={risks} onChange={setRisks} disabled={pending} />
-          <ChoiceGroup name="securityMeasures" otherName="securityMeasureOther" title="Mesures de sécurisation" options={SECURITY_MEASURES} selected={measures} onChange={setMeasures} disabled={pending} />
+          <ReferenceList title="Risques couverts" items={referentiel.risks} />
+          <ReferenceList title="Mesures de sécurisation" items={referentiel.securityMeasures} />
         </div>
+        <p className="-mt-2 text-xs text-muted-foreground">Référentiel harmonisé appliqué à toutes les opérations : le lot peut être préparé hors site. Ce qui se passe réellement est consigné à l&apos;état des lieux sur site.</p>
         <p className="text-xs leading-5 text-muted-foreground">Après création, l&apos;opération est soumise à la validation interne, puis transmise à la validation SDA. Le stock du site d&apos;origine diminue uniquement après le bon de sortie contre-signé ; celui du site de destination augmente après l&apos;attestation de réception validée. Les administrateurs attribuent les profils de transfert dans Administration → Utilisateurs.</p>
       </section>
 
@@ -505,51 +609,29 @@ async function fetchCartons(options: { sourceSiteId: string; sourceEntrepotId: s
   return payload;
 }
 
-function ParticipantPicker({ name, title, options, disabled, emptyHint }: { name: string; title: string; options: ParticipantOption[]; disabled: boolean; emptyHint: string }) {
+function DesignatedList({ title, users, siteName, emptyHint }: { title: string; users: Candidate[]; siteName: string | null; emptyHint: string }) {
   return (
-    <fieldset className="space-y-2 rounded-md border p-3">
-      <legend className="px-1 text-sm font-medium">{title}</legend>
-      {options.length === 0 ? <p className="text-xs text-muted-foreground">{emptyHint}</p> : (
-        <div className="max-h-56 space-y-1 overflow-y-auto">
-          {options.map((option) => (
-            <label key={option.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40">
-              <Checkbox name={name} value={String(option.id)} disabled={disabled} />
-              <span className="min-w-0 flex-1"><span className="font-medium">{option.name}</span><span className="ml-2 text-xs text-muted-foreground">{option.roleLabel}</span></span>
-            </label>
+    <section className="space-y-2 rounded-md border p-3">
+      <h3 className="flex items-center gap-2 text-sm font-medium"><UsersRound className="size-4 text-muted-foreground" aria-hidden /> {title}{siteName ? <span className="font-normal text-muted-foreground">· {siteName}</span> : null}</h3>
+      {users.length === 0 ? <p className="text-xs text-muted-foreground">{emptyHint}</p> : (
+        <ul className="space-y-1">
+          {users.map((user) => (
+            <li key={user.id} className="flex items-baseline gap-2 px-1 py-1 text-sm"><span className="font-medium">{user.name}</span><span className="text-xs text-muted-foreground">{user.roleLabel}</span></li>
           ))}
-        </div>
+        </ul>
       )}
-    </fieldset>
+    </section>
   );
 }
 
-function ChoiceGroup({ name, otherName, title, options, selected, onChange, disabled }: {
-  name: string;
-  otherName: string;
-  title: string;
-  options: readonly { value: string; label: string }[];
-  selected: Set<string>;
-  onChange: (next: Set<string>) => void;
-  disabled: boolean;
-}) {
-  function toggle(value: string, checked: boolean) {
-    const next = new Set(selected);
-    if (checked) next.add(value); else next.delete(value);
-    onChange(next);
-  }
+function ReferenceList({ title, items }: { title: string; items: string[] }) {
   return (
-    <fieldset className="space-y-2 rounded-md border p-3">
-      <legend className="px-1 text-sm font-medium">{title}</legend>
-      <div className="grid gap-1 sm:grid-cols-2">
-        {[...options, { value: OTHER_OPTION, label: "Autre (préciser)" }].map((option) => (
-          <label key={option.value} className="flex cursor-pointer items-start gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-muted/40">
-            <Checkbox name={name} value={option.value} checked={selected.has(option.value)} onCheckedChange={(value) => toggle(option.value, value === true)} disabled={disabled} />
-            <span>{option.label}</span>
-          </label>
-        ))}
-      </div>
-      {selected.has(OTHER_OPTION) ? <Input name={otherName} required minLength={2} maxLength={300} placeholder="Préciser" disabled={disabled} /> : null}
-    </fieldset>
+    <section className="space-y-2 rounded-md border p-3">
+      <h3 className="flex items-center gap-2 text-sm font-medium"><ShieldCheck className="size-4 text-muted-foreground" aria-hidden /> {title}</h3>
+      <ul className="grid gap-1 text-sm sm:grid-cols-2">
+        {items.map((item) => <li key={item} className="px-1 py-0.5">{item}</li>)}
+      </ul>
+    </section>
   );
 }
 

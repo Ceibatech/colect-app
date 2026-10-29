@@ -4,7 +4,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
 import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
-import { participantAllowedOnSide } from "@/lib/transfers/participants";
 import { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import {
   getTransferDossierStockSummary,
@@ -25,7 +24,7 @@ export interface TransferCartonSearchOptions {
 }
 
 export async function getTransferCreateData() {
-  await requirePermission("TRANSFER_CREATE");
+  const session = await requirePermission("TRANSFER_CREATE");
   const [sites, totalDossiers, inventoryGroups, participantUsers] = await Promise.all([
     prisma.site.findMany({
       where: { isActive: true },
@@ -52,22 +51,20 @@ export async function getTransferCreateData() {
     prisma.user.findMany({
       where: { isActive: true, role: { code: { in: [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE] } } },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, role: { select: { code: true } }, responsibleSites: { select: { site: { select: { nom: true, organisation: true } } } } },
+      select: { id: true, name: true, role: { select: { code: true } }, responsibleSites: { select: { site: { select: { id: true, nom: true, organisation: true } } } } },
     }),
   ]);
 
   const inventory = summarizeInventoryLocations(inventoryGroups);
-  const toOption = (organisation: "CEIBA" | "MINISTERE") => (user: (typeof participantUsers)[number]) => {
-    const siteNames = user.role.code === SITE_RESPONSIBLE_ROLE_CODE
-      ? user.responsibleSites.filter((row) => row.site.organisation === organisation).map((row) => row.site.nom) : [];
-    const roleLabel = getRoleLabel(user.role.code as RoleCode);
-    return { id: user.id, name: user.name, roleCode: user.role.code, roleLabel: siteNames.length ? `${roleLabel} · ${siteNames.join(", ")}` : roleLabel };
-  };
-  const participants = {
-    ceiba: participantUsers.filter((user) => participantAllowedOnSide(user, "CEIBA")).map(toOption("CEIBA")),
-    sda: participantUsers.filter((user) => participantAllowedOnSide(user, "SDA")).map(toOption("MINISTERE")),
-  };
-  return { sites, totalDossiers, inventory, participants };
+  // Candidats aux rôles de transfert : le formulaire montre qui sera désigné d'office.
+  const candidates = participantUsers.map((user) => ({
+    id: user.id,
+    name: user.name,
+    role: { code: user.role.code },
+    roleLabel: getRoleLabel(user.role.code as RoleCode),
+    responsibleSites: user.responsibleSites,
+  }));
+  return { sites, totalDossiers, inventory, candidates, creatorId: session.userId };
 }
 
 export async function searchTransferCartons(options: TransferCartonSearchOptions) {

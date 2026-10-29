@@ -18,9 +18,9 @@ import { getClientIp } from "@/lib/utils/server-request";
 import { buildTransferCartonToken, MAX_TRANSFER_CARTONS } from "@/lib/transfers/carton-selection";
 import { resolveTransferDirection } from "@/lib/transfers/direction";
 import { canSignMovementAtSite, movementEnds } from "@/lib/transfers/site-scope";
-import { participantAllowedOnSide, type ParticipantUser } from "@/lib/transfers/participants";
-import { resolveMultiChoice, resolveSingleChoice, SECURITY_MEASURES, TRANSFER_RISKS, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
-import { getRoleLabel, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
+import { designerIntervenants, participantAllowedOnSide, type ParticipantUser } from "@/lib/transfers/participants";
+import { referentielSecurisation, resolveSingleChoice, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
+import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
 import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 import { dechargerCartons } from "@/lib/services/caisse-service";
 import { signataireDe } from "@/lib/transfers/signataire";
@@ -279,12 +279,6 @@ export async function createTransferLot(
     plannedRoute: formData.get("plannedRoute"),
     transportMethod: formData.get("transportMethod"),
     transportMethodOther: formData.get("transportMethodOther"),
-    ceibaParticipantIds: formData.getAll("ceibaParticipantIds"),
-    sdaParticipantIds: formData.getAll("sdaParticipantIds"),
-    risks: formData.getAll("risks"),
-    riskOther: formData.get("riskOther"),
-    securityMeasures: formData.getAll("securityMeasures"),
-    securityMeasureOther: formData.get("securityMeasureOther"),
     motif: formData.get("motif"),
     cartonTokens: parseStringList(formData.get("cartonTokens")),
   });
@@ -292,10 +286,8 @@ export async function createTransferLot(
 
   const transportMethod = resolveSingleChoice(TRANSPORT_METHODS, parsed.data.transportMethod, parsed.data.transportMethodOther);
   if (!transportMethod) return { error: "Choisissez le moyen de transport (précisez-le si « Autre »)." };
-  const risks = resolveMultiChoice(TRANSFER_RISKS, parsed.data.risks, parsed.data.riskOther);
-  if (!risks?.length) return { error: "Cochez les risques identifiés (précisez-les si « Autre »)." };
-  const securityMeasures = resolveMultiChoice(SECURITY_MEASURES, parsed.data.securityMeasures, parsed.data.securityMeasureOther);
-  if (!securityMeasures?.length) return { error: "Cochez les mesures de sécurisation (précisez-les si « Autre »)." };
+  // Référentiel harmonisé : le lot peut être préparé hors site, sans connaître les risques du terrain.
+  const { risks, securityMeasures } = referentielSecurisation(parsed.data.archiveSupport);
 
   if (
     parsed.data.sourceSiteId === parsed.data.destinationSiteId
@@ -330,8 +322,8 @@ export async function createTransferLot(
       ? prisma.entrepot.findFirst({ where: { id: parsed.data.destinationEntrepotId, siteId: parsed.data.destinationSiteId, isActive: true }, select: { id: true } })
       : Promise.resolve(null),
     prisma.user.findMany({
-      where: { id: { in: [...parsed.data.ceibaParticipantIds, ...parsed.data.sdaParticipantIds] }, isActive: true },
-      select: { id: true, name: true, role: { select: { code: true } }, responsibleSites: { select: { site: { select: { nom: true, organisation: true } } } } },
+      where: { isActive: true, role: { code: { in: [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE] } } },
+      select: { id: true, name: true, role: { select: { code: true } }, responsibleSites: { select: { site: { select: { id: true, nom: true, organisation: true } } } } },
     }),
   ]);
   if (!sourceSite || !destinationSite) return { error: "Le site de départ et le site de destination doivent être actifs." };
@@ -339,7 +331,13 @@ export async function createTransferLot(
   if (!direction) {
     return { error: "Une opération relie un site du ministère et un site CEIBA, dans un sens ou dans l'autre." };
   }
-  const participants = resolveParticipants(participantUsers, parsed.data.ceibaParticipantIds, parsed.data.sdaParticipantIds);
+  // Les intervenants découlent des responsabilités attribuées : rien n'est choisi à la main.
+  const ceibaSiteId = sourceSite.organisation === "CEIBA" ? sourceSite.id : destinationSite.id;
+  const ministrySiteId = sourceSite.organisation === "CEIBA" ? destinationSite.id : sourceSite.id;
+  const designes = designerIntervenants(participantUsers, { creatorId: session.userId, ceibaSiteId, ministrySiteId });
+  if (!designes.ceiba.length) return { error: "Aucun intervenant CEIBA habilité : attribuez les profils de transfert dans Administration → Utilisateurs." };
+  if (!designes.sda.length) return { error: "Aucun intervenant SDA habilité : attribuez le profil « Responsable validation SDA » dans Administration → Utilisateurs." };
+  const participants = resolveParticipants(participantUsers, designes.ceiba.map((user) => user.id), designes.sda.map((user) => user.id));
   if ("error" in participants) return { error: participants.error };
   if (parsed.data.sourceEntrepotId && !sourceEntrepot) return { error: "L'entrepôt de départ est invalide." };
   if (parsed.data.destinationEntrepotId && !destinationEntrepot) return { error: "L'entrepôt de destination est invalide." };
