@@ -35,7 +35,7 @@ export function TransferValidationWorkspace({ data, filters, stage }: {
       <PageHeader
         eyebrow="Transferts d’archives"
         icon={ShieldCheck}
-        title={ministry ? "Validation SDA" : "Validation"}
+        title={ministry ? "Validation SDA" : "Valider"}
         description={ministry
           ? "Examinez les opérations validées en interne, autorisez leur sortie et consultez les bordereaux de réception à contre-signer."
           : "Contrôlez les opérations soumises par le gestionnaire avant leur transmission au SDA, puis les constats d’arrivée."}

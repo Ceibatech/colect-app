@@ -2,15 +2,14 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ExternalLink, History, ListChecks, Loader2, PackageCheck, Route, Search, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowRight, Boxes, ChevronLeft, ChevronRight, ExternalLink, History, ListChecks, Loader2, PackageCheck, Route, Search } from "lucide-react";
 import { toast } from "sonner";
 import { createTransferLot, type TransferActionState } from "@/lib/services/transfer-actions";
 import { suggestTransferRoute } from "@/lib/services/transfer-route-service";
 import { buildGoogleMapsDirectionsUrl, formatRouteText, isValidGeoPoint, type GeoPoint } from "@/lib/transfers/route-suggestion";
-import { designerIntervenants, type CandidateUser } from "@/lib/transfers/participants";
 import { MAX_TRANSFER_CARTONS, type TransferCartonItem } from "@/lib/transfers/carton-selection";
 import { TRANSFER_DIRECTIONS, type TransferDirection } from "@/lib/transfers/direction";
-import { OTHER_OPTION, referentielSecurisation, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
+import { OTHER_OPTION, TRANSPORT_METHODS } from "@/lib/transfers/planning-options";
 import type { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +30,6 @@ interface SiteOption {
   entrepots: Array<{ id: number; code: string; nom: string; localisation: string | null }>;
 }
 
-type Candidate = CandidateUser & { roleLabel: string };
 
 /** Saisie en cours, gardée dans ce navigateur pour la reprendre après une erreur ou une coupure. */
 interface TransferDraft {
@@ -91,10 +89,10 @@ function warehouseLabel(warehouse: SiteOption["entrepots"][number]) {
   return [warehouse.nom, warehouse.localisation].filter(Boolean).join(" · ");
 }
 
-export function NewTransferForm({ sites, inventory, candidates, creatorId }: {
+export function NewTransferForm({ sites, inventory, creatorId }: {
   sites: SiteOption[];
   inventory: ReturnType<typeof summarizeInventoryLocations>;
-  candidates: Candidate[];
+  /** Compte connecté : sa saisie en cours est gardée sur l'appareil. */
   creatorId: number;
 }) {
   const router = useRouter();
@@ -383,10 +381,6 @@ export function NewTransferForm({ sites, inventory, candidates, creatorId }: {
     }
   }
 
-  const ceibaEnd = [sourceSite, destinationSite].find((site) => site?.organisation === "CEIBA") ?? null;
-  const ministryEnd = [sourceSite, destinationSite].find((site) => site?.organisation === "MINISTERE") ?? null;
-  const designes = designerIntervenants(candidates, { creatorId, ceibaSiteId: ceibaEnd?.id ?? null, ministrySiteId: ministryEnd?.id ?? null });
-  const referentiel = referentielSecurisation(archiveSupport);
 
   // Envoi sans réinitialiser le formulaire : en cas d'erreur, rien n'est perdu.
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -554,7 +548,7 @@ export function NewTransferForm({ sites, inventory, candidates, creatorId }: {
       </section>
 
       <section className="space-y-5 rounded-lg border bg-card p-4 shadow-sm lg:p-5">
-        <div><h2 className="font-semibold">Planification et sécurisation</h2><p className="mt-1 text-sm text-muted-foreground">Renseignez les dispositions validées avec le SDA avant de soumettre l&apos;opération.</p></div>
+        <div><h2 className="font-semibold">Planification et sécurisation</h2><p className="mt-1 text-sm text-muted-foreground">Date, moyen de transport et itinéraire de l&apos;opération.</p></div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2"><Label htmlFor="plannedAt">Date de transfert prévue</Label><Input id="plannedAt" name="plannedAt" type="datetime-local" required value={plannedAt} onChange={(event) => { touch(); setPlannedAt(event.target.value); }} disabled={pending} /></div>
           <div className="space-y-2"><Label htmlFor="archiveSupport">Support des archives</Label><select id="archiveSupport" name="archiveSupport" value={archiveSupport} onChange={(event) => { touch(); setArchiveSupport(event.target.value); }} required disabled={pending} className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"><option value="PHYSIQUE">Physique</option><option value="ELECTRONIQUE">Électronique</option><option value="HYBRIDE">Hybride</option></select></div>
@@ -580,17 +574,7 @@ export function NewTransferForm({ sites, inventory, candidates, creatorId }: {
           </div>
           <div className="space-y-2 sm:col-span-2 lg:col-span-3"><Label htmlFor="motif">Objet / contexte</Label><Input id="motif" name="motif" maxLength={2000} value={motif} onChange={(event) => { touch(); setMotif(event.target.value); }} placeholder={sourceIsMinistry ? "Numérisation, indexation, garde temporaire..." : "Restitution après numérisation, réintégration au site..."} disabled={pending} /></div>
         </div>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <DesignatedList title="Intervenants CEIBA" users={designes.ceiba} siteName={ceibaEnd?.nom ?? null} emptyHint="Aucun compte CEIBA actif avec un profil de transfert." />
-          <DesignatedList title="Intervenants SDA" users={designes.sda} siteName={ministryEnd?.nom ?? null} emptyHint="Aucun responsable validation SDA actif." />
-        </div>
-        <p className="-mt-2 text-xs text-muted-foreground">Désignés d&apos;office selon les responsabilités attribuées (rôles et sites) : rien à choisir. Les profils se gèrent dans Administration → Utilisateurs.</p>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ReferenceList title="Risques couverts" items={referentiel.risks} />
-          <ReferenceList title="Mesures de sécurisation" items={referentiel.securityMeasures} />
-        </div>
-        <p className="-mt-2 text-xs text-muted-foreground">Référentiel harmonisé appliqué à toutes les opérations : le lot peut être préparé hors site. Ce qui se passe réellement est consigné à l&apos;état des lieux sur site.</p>
-        <p className="text-xs leading-5 text-muted-foreground">Après création, l&apos;opération est soumise à la validation interne, puis transmise à la validation SDA. Le stock du site d&apos;origine diminue uniquement après le bon de sortie contre-signé ; celui du site de destination augmente après l&apos;attestation de réception validée. Les administrateurs attribuent les profils de transfert dans Administration → Utilisateurs.</p>
+        
       </section>
 
       <div className="flex justify-end"><Button type="submit" disabled={pending || selected.size === 0 || !sourceSiteId || !destinationSiteId}>{pending ? <Loader2 className="animate-spin" /> : <PackageCheck />}Valider la sélection · {selected.size} carton{selected.size > 1 ? "s" : ""} / {selectedDossierCount} dossiers</Button></div>
@@ -607,32 +591,6 @@ async function fetchCartons(options: { sourceSiteId: string; sourceEntrepotId: s
   const payload = await response.json() as TransferCartonPage | { error?: string };
   if (!response.ok || !("items" in payload)) throw new Error("error" in payload ? payload.error : "Chargement impossible.");
   return payload;
-}
-
-function DesignatedList({ title, users, siteName, emptyHint }: { title: string; users: Candidate[]; siteName: string | null; emptyHint: string }) {
-  return (
-    <section className="space-y-2 rounded-md border p-3">
-      <h3 className="flex items-center gap-2 text-sm font-medium"><UsersRound className="size-4 text-muted-foreground" aria-hidden /> {title}{siteName ? <span className="font-normal text-muted-foreground">· {siteName}</span> : null}</h3>
-      {users.length === 0 ? <p className="text-xs text-muted-foreground">{emptyHint}</p> : (
-        <ul className="space-y-1">
-          {users.map((user) => (
-            <li key={user.id} className="flex items-baseline gap-2 px-1 py-1 text-sm"><span className="font-medium">{user.name}</span><span className="text-xs text-muted-foreground">{user.roleLabel}</span></li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function ReferenceList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className="space-y-2 rounded-md border p-3">
-      <h3 className="flex items-center gap-2 text-sm font-medium"><ShieldCheck className="size-4 text-muted-foreground" aria-hidden /> {title}</h3>
-      <ul className="grid gap-1 text-sm sm:grid-cols-2">
-        {items.map((item) => <li key={item} className="px-1 py-0.5">{item}</li>)}
-      </ul>
-    </section>
-  );
 }
 
 function EmptyState({ title, description }: { title: string; description: string }) {

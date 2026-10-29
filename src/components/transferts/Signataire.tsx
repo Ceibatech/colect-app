@@ -3,12 +3,17 @@
 import { createContext, useContext } from "react";
 import { UserRoundCheck } from "lucide-react";
 
-type Signataire = { name: string; title: string };
+type Signataire = { name: string; title: string; signature?: string | null };
 
 const SignataireContext = createContext<Signataire | null>(null);
 
 export function SignataireProvider({ value, children }: { value: Signataire; children: React.ReactNode }) {
   return <SignataireContext.Provider value={value}>{children}</SignataireContext.Provider>;
+}
+
+/** Signataire connecté (nom, fonction, signature enregistrée), ou null hors de l'application. */
+export function useSignataire() {
+  return useContext(SignataireContext);
 }
 
 /**

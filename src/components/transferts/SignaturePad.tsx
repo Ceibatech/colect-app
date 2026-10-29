@@ -2,16 +2,26 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Eraser, PenLine } from "lucide-react";
+import { useSignataire } from "@/components/transferts/Signataire";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type Point = { x: number; y: number };
 
-export function SignaturePad({ name, label, disabled }: { name: string; label: string; disabled?: boolean }) {
+/**
+ * Signature dessinée au doigt ou au stylet, comme sur papier. Si l'utilisateur
+ * a enregistré sa signature (Mon compte), elle est apposée d'office ; il peut
+ * toujours signer à la main à la place.
+ */
+export function SignaturePad({ name, label, disabled, useSaved = true }: { name: string; label: string; disabled?: boolean; useSaved?: boolean }) {
+  const saved = useSignataire()?.signature ?? null;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strokesRef = useRef<Point[][]>([]);
   const currentStrokeRef = useRef<Point[] | null>(null);
-  const [value, setValue] = useState("");
+  const [manual, setManual] = useState(!useSaved || !saved);
+  const [drawn, setDrawn] = useState("");
+  const value = manual ? drawn : saved ?? "";
+  const setValue = setDrawn;
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -44,7 +54,7 @@ export function SignaturePad({ name, label, disabled }: { name: string; label: s
     observer.observe(canvas);
     draw();
     return () => observer.disconnect();
-  }, [draw]);
+  }, [draw, manual]);
 
   function normalizedPoint(event: ReactPointerEvent<HTMLCanvasElement>): Point {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -83,13 +93,31 @@ export function SignaturePad({ name, label, disabled }: { name: string; label: s
     draw();
   }
 
+  if (!manual && saved) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <span className="flex items-center gap-2 text-sm font-medium"><PenLine className="h-4 w-4" />{label}</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => setManual(true)} disabled={disabled}>Signer à la main</Button>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- image en data URL, sans optimisation possible */}
+        <img src={saved} alt="Votre signature enregistrée" className="h-36 w-full rounded-md border bg-white object-contain p-2" />
+        <input type="hidden" name={name} value={value} />
+        <p className="text-xs text-muted-foreground">Votre signature enregistrée sera apposée et horodatée avec le bordereau.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
         <span className="flex items-center gap-2 text-sm font-medium"><PenLine className="h-4 w-4" />{label}</span>
-        <Button type="button" variant="ghost" size="sm" onClick={clear} disabled={disabled || !value}>
-          <Eraser /> Effacer
-        </Button>
+        <span className="flex gap-1">
+          {useSaved && saved ? <Button type="button" variant="ghost" size="sm" onClick={() => setManual(false)} disabled={disabled}>Ma signature enregistrée</Button> : null}
+          <Button type="button" variant="ghost" size="sm" onClick={clear} disabled={disabled || !value}>
+            <Eraser /> Effacer
+          </Button>
+        </span>
       </div>
       <canvas
         ref={canvasRef}
@@ -101,7 +129,7 @@ export function SignaturePad({ name, label, disabled }: { name: string; label: s
         aria-label={`Zone de signature ${label}`}
       />
       <input type="hidden" name={name} value={value} />
-      <p className="text-xs text-muted-foreground">Signature manuscrite recue sur place et horodatée avec le bordereau.</p>
+      {useSaved ? <p className="text-xs text-muted-foreground">Signature manuscrite reçue sur place et horodatée avec le bordereau.</p> : null}
     </div>
   );
 }

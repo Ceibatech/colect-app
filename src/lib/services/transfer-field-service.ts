@@ -151,7 +151,7 @@ export async function getConvoyWorkspace() {
     ? await prisma.transferMovement.findMany({
         where: { transferLotId: { in: lots.map((lot) => lot.id) }, type: "SORTIE" },
         orderBy: { occurredAt: "desc" },
-        select: { transferLotId: true, vehicleRegistration: true, vehicleDescription: true, driverName: true, driverPhone: true, sealReferences: true },
+        select: { transferLotId: true, vehicleRegistration: true, vehicleDescription: true, driverName: true, driverPhone: true, sealReferences: true, vehiclePhoto: true },
       })
     : [];
   return lots.map((lot) => {
@@ -176,6 +176,7 @@ export async function getConvoyWorkspace() {
         driverName: sortie?.driverName ?? "",
         driverPhone: sortie?.driverPhone ?? "",
         sealReferences: sortie?.sealReferences ?? "",
+        vehiclePhoto: !!sortie?.vehiclePhoto,
       },
     };
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
 import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -35,7 +36,9 @@ function CommuneForm({
   defaultValues?: Partial<CommuneRow>;
   onSuccess: () => void;
 }) {
-  const [state, formAction, isPending] = useActionState(action, initialState);
+  const [state, formAction, isPendingAction] = useActionState(action, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
 
   // `onSuccess` doit être mémoïsé (useCallback) côté appelant — sinon une
   // identité changeant à chaque rendu (ex. re-rendu déclenché par
@@ -46,7 +49,7 @@ function CommuneForm({
   }, [state.success, onSuccess]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={keepFormAction} className="space-y-4">
       {state.error ? (
         <Alert variant="destructive">
           <AlertDescription>{state.error}</AlertDescription>

@@ -3,7 +3,6 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { requirePermission } from "@/lib/auth/current-user";
-import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
 import { summarizeInventoryLocations } from "@/lib/transfers/inventory-locations";
 import {
   getTransferDossierStockSummary,
@@ -25,7 +24,7 @@ export interface TransferCartonSearchOptions {
 
 export async function getTransferCreateData() {
   const session = await requirePermission("TRANSFER_CREATE");
-  const [sites, totalDossiers, inventoryGroups, participantUsers] = await Promise.all([
+  const [sites, totalDossiers, inventoryGroups] = await Promise.all([
     prisma.site.findMany({
       where: { isActive: true },
       orderBy: { nom: "asc" },
@@ -48,23 +47,10 @@ export async function getTransferCreateData() {
       by: ["cartonId", "siteId", "entrepotId", "codeBarres", "libelleCarton"],
       _count: { _all: true },
     }),
-    prisma.user.findMany({
-      where: { isActive: true, role: { code: { in: [...CEIBA_TRANSFER_ROLE_CODES, ...SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE] } } },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, role: { select: { code: true } }, responsibleSites: { select: { site: { select: { id: true, nom: true, organisation: true } } } } },
-    }),
   ]);
 
   const inventory = summarizeInventoryLocations(inventoryGroups);
-  // Candidats aux rôles de transfert : le formulaire montre qui sera désigné d'office.
-  const candidates = participantUsers.map((user) => ({
-    id: user.id,
-    name: user.name,
-    role: { code: user.role.code },
-    roleLabel: getRoleLabel(user.role.code as RoleCode),
-    responsibleSites: user.responsibleSites,
-  }));
-  return { sites, totalDossiers, inventory, candidates, creatorId: session.userId };
+  return { sites, totalDossiers, inventory, creatorId: session.userId };
 }
 
 export async function searchTransferCartons(options: TransferCartonSearchOptions) {

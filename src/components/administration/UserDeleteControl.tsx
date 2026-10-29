@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Trash2 } from "lucide-react";
@@ -19,7 +20,9 @@ export function UserDeleteControl({ userId, name, email }: { userId: number; nam
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const boundAction = deleteUser.bind(null, userId);
-  const [state, formAction, isPending] = useActionState(boundAction, initialState);
+  const [state, formAction, isPendingAction] = useActionState(boundAction, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
 
   // La ligne disparaît au rafraîchissement : le composant est démonté, la boîte n'a pas à être refermée.
   useEffect(() => {
@@ -38,7 +41,7 @@ export function UserDeleteControl({ userId, name, email }: { userId: number; nam
         }
       />
       <DialogContent>
-        <form action={formAction} className="space-y-4">
+        <form onSubmit={keepFormAction} className="space-y-4">
           <DialogHeader>
             <DialogTitle>Supprimer le compte</DialogTitle>
             <DialogDescription>

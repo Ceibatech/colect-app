@@ -17,8 +17,8 @@ import { signataireDe } from "@/lib/transfers/signataire";
 // ici (fine, exécutée côté serveur à chaque rendu — cahier des charges §60).
 export default async function AppShellLayout({ children }: { children: React.ReactNode }) {
   const session = await requireUser();
-  const me = await prisma.user.findUnique({ where: { id: session.userId }, select: { fonction: true } });
-  const signataire = signataireDe({ name: session.name, fonction: me?.fonction ?? null, roleCode: session.roleCode });
+  const me = await prisma.user.findUnique({ where: { id: session.userId }, select: { fonction: true, signatureData: true } });
+  const signataire = { ...signataireDe({ name: session.name, fonction: me?.fonction ?? null, roleCode: session.roleCode }), signature: me?.signatureData ?? null };
 
   return (
     <WorkspaceTheme roleCode={session.roleCode} permissions={session.permissions}>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
 import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -46,11 +47,13 @@ function FieldForm({
   field?: FieldRow;
   onSuccess: () => void;
 }) {
-  const [state, formAction, isPending] = useActionState(action, initialState);
+  const [state, formAction, isPendingAction] = useActionState(action, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
   useEffect(() => { if (state.success) onSuccess(); }, [state.success, onSuccess]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={keepFormAction} className="space-y-4">
       {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">

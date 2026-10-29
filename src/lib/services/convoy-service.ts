@@ -133,7 +133,7 @@ async function notify(eventId: number, type: ConvoyEventType, lot: NonNullable<A
 /** Les étapes du trajet exigent des cartons sortis (F02 contre-signé). */
 const NEEDS_CARTONS_IN_TRANSIT = new Set<ConvoyEventType>(["DEPART", "EN_ROUTE", "ARRIVEE"]);
 
-export async function recordConvoyEvent(session: ConvoyActor, lotId: number, type: ConvoyEventType, position?: GeoPoint | null, automatic = false, details?: Prisma.InputJsonValue) {
+export async function recordConvoyEvent(session: ConvoyActor, lotId: number, type: ConvoyEventType, position?: GeoPoint | null, automatic = false, details?: Prisma.InputJsonValue, occurredAt?: Date) {
   const lot = await loadLot(lotId);
   if (!lot) throw new ApiError("Lot introuvable.", 404);
   if (NEEDS_CARTONS_IN_TRANSIT.has(type) && lot.items.length === 0) throw new ApiError("Aucun carton n'est en transit sur ce lot : la remise au départ (F02) doit d'abord être contre-signée.", 409);
@@ -141,6 +141,12 @@ export async function recordConvoyEvent(session: ConvoyActor, lotId: number, typ
   // Une étape déjà franchie (double clic, détection répétée) n'est pas une erreur.
   const alreadyDone = (type === "DEPART" && state.onTheRoad) || (type === "ARRIVEE" && state.arrived) || (type === "EN_ROUTE" && !!state.movingAt);
   if (alreadyDone) return { created: false, state };
+  // Heure saisie à la main (GPS indisponible) : ni dans le futur, ni avant l'étape précédente.
+  if (occurredAt) {
+    if (occurredAt.getTime() > Date.now() + 5 * 60_000) throw new ApiError("L'heure ne peut pas être dans le futur.", 400);
+    const previous = lot.convoyEvents.at(-1);
+    if (previous && occurredAt.getTime() < new Date(previous.occurredAt).getTime()) throw new ApiError("L'heure doit suivre l'étape précédente.", 400);
+  }
   const refusal = refusEtape(lot.convoyEvents, type);
   if (refusal) {
     if (automatic) return { created: false, state };
@@ -153,7 +159,7 @@ export async function recordConvoyEvent(session: ConvoyActor, lotId: number, typ
     const current = await tx.transferConvoyEvent.findMany({ where: { transferLotId: lotId }, orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, details: true } });
     if (refusEtape(current, type)) return null;
     return tx.transferConvoyEvent.create({
-      data: { transferLotId: lotId, type, userId: session.userId, latitude: position?.latitude, longitude: position?.longitude, automatic, details },
+      data: { transferLotId: lotId, type, userId: session.userId, latitude: position?.latitude, longitude: position?.longitude, automatic, details, ...(occurredAt ? { occurredAt } : {}) },
       select: { id: true, occurredAt: true },
     });
   });
@@ -188,11 +194,13 @@ export async function estimateArrival(from: GeoPoint, to: GeoPoint | null, now =
 }
 
 /** Le véhicule roule : étape « en route » et alerte du site d'arrivée avec l'heure estimée. */
-export async function declareMoving(session: ConvoyActor, lotId: number, point: GeoPoint | null, automatic: boolean) {
-  const lot = await prisma.transferLot.findUnique({ where: { id: lotId }, select: { destinationSite: { select: { latitude: true, longitude: true } } } });
+export async function declareMoving(session: ConvoyActor, lotId: number, point: GeoPoint | null, automatic: boolean, occurredAt?: Date) {
+  const lot = await prisma.transferLot.findUnique({ where: { id: lotId }, select: { sourceSite: { select: { latitude: true, longitude: true } }, destinationSite: { select: { latitude: true, longitude: true } } } });
   if (!lot) throw new ApiError("Lot introuvable.", 404);
-  const eta = point ? await estimateArrival(point, siteGeoPoint(lot.destinationSite)) : null;
-  return recordConvoyEvent(session, lotId, "EN_ROUTE", point, automatic, eta ?? undefined);
+  // Sans position (GPS indisponible), l'estimation part du site de départ.
+  const from = point ?? siteGeoPoint(lot.sourceSite);
+  const eta = from ? await estimateArrival(from, siteGeoPoint(lot.destinationSite), occurredAt ?? new Date()) : null;
+  return recordConvoyEvent(session, lotId, "EN_ROUTE", point, automatic, eta ?? undefined, occurredAt);
 }
 
 /**

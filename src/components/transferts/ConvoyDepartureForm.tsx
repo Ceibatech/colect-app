@@ -32,16 +32,16 @@ export function ConvoyDepartureForm({
 }: {
   lotId: number;
   cartons: LoadedCarton[];
-  prefill: { vehicleRegistration: string; driverName: string; driverPhone: string; sealReferences: string };
+  prefill: { vehicleRegistration: string; driverName: string; driverPhone: string; sealReferences: string; vehiclePhoto?: boolean };
 }) {
   const router = useRouter();
-  const [form, setForm] = useState(prefill);
+  const [form, setForm] = useState({ vehicleRegistration: prefill.vehicleRegistration, driverName: prefill.driverName, driverPhone: prefill.driverPhone, sealReferences: prefill.sealReferences });
   const [checked, setChecked] = useState<number[]>([]);
   const [scan, setScan] = useState("");
   const [missingNote, setMissingNote] = useState("");
   const [busy, setBusy] = useState(false);
   const missing = cartons.filter((carton) => !checked.includes(carton.id));
-  const ready = form.vehicleRegistration.trim().length >= 2 && form.driverName.trim().length >= 2 && (missing.length === 0 || missingNote.trim().length > 0);
+  const ready = (form.vehicleRegistration.trim().length >= 2 || !!prefill.vehiclePhoto) && form.driverName.trim().length >= 2 && (missing.length === 0 || missingNote.trim().length > 0);
 
   function check(id: number, on = true) {
     setChecked((current) => (on ? [...new Set([...current, id])] : current.filter((value) => value !== id)));
@@ -114,7 +114,7 @@ export function ConvoyDepartureForm({
 
       <fieldset className="grid gap-3 sm:grid-cols-2">
         <legend className="mb-2 text-sm font-medium">1. Véhicule</legend>
-        {field("vehicleRegistration", "Immatriculation", { autoCapitalize: "characters" })}
+        {field("vehicleRegistration", prefill.vehiclePhoto ? "Immatriculation (facultatif : véhicule photographié)" : "Immatriculation", { autoCapitalize: "characters" })}
         {field("driverName", "Chauffeur")}
         {field("driverPhone", "Téléphone du chauffeur", { type: "tel", inputMode: "tel" })}
         {field("sealReferences", "Scellés posés", { placeholder: "Numéros séparés par des virgules" })}

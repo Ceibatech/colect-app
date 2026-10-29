@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
 import { useActionState, useEffect, useState } from "react";
 import { Loader2, MailCheck, Save, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -67,7 +68,9 @@ function displayRoleName(role: RecipientRow["role"]) {
 function RecipientConfiguration({ recipient }: { recipient: RecipientRow }) {
   const [frequency, setFrequency] = useState(recipient.subscription?.frequency ?? "WEEKLY");
   const [saveState, saveAction, saving] = useActionState(updateEmailReportConfiguration, initialState);
-  const [sendState, sendAction, sending] = useActionState(sendEmailReportNowAction, initialState);
+  const [sendState, sendAction, sendingAction] = useActionState(sendEmailReportNowAction, initialState);
+  const { onSubmit: keepSendAction, pending: sendingSubmit } = useKeepForm(sendAction);
+  const sending = sendingAction || sendingSubmit;
 
   useEffect(() => {
     if (saveState.success) toast.success(saveState.message);
@@ -135,7 +138,7 @@ function RecipientConfiguration({ recipient }: { recipient: RecipientRow }) {
         <p className="mt-2"><span className="text-muted-foreground">Dernier :</span> {formatDate(recipient.subscription?.lastSentAt ?? null)}</p>
       </TableCell>
       <TableCell className="py-4 text-right">
-        <form action={sendAction}>
+        <form onSubmit={keepSendAction}>
           <input type="hidden" name="userId" value={recipient.id} />
           <Button type="submit" size="sm" variant="outline" disabled={sending || !recipient.subscription || !recipient.isActive} title="Envoyer le rapport maintenant">
             {sending ? <Loader2 className="animate-spin" /> : <Send />}

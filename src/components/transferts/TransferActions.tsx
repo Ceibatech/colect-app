@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
 import { useActionState, useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, ClipboardSignature, Loader2, Send, ShieldCheck } from "lucide-react";
@@ -23,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/transferts/SignaturePad";
 import { SignataireIdentite } from "@/components/transferts/Signataire";
+import { VehiclePhotoInput } from "@/components/transferts/VehiclePhotoInput";
 
 const initialState: TransferActionState = {};
 
@@ -164,14 +166,16 @@ function SignatureApprovalDialog({
     }
     return result;
   }, [action, router]);
-  const [state, formAction, pending] = useActionState(wrappedAction, initialState);
+  const [state, formAction, pendingAction] = useActionState(wrappedAction, initialState);
+  const { onSubmit: keepFormAction, pending: pendingSubmit } = useKeepForm(formAction);
+  const pending = pendingAction || pendingSubmit;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant={variant} />}><ShieldCheck /> {triggerLabel}</DialogTrigger>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-xl">
         <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
-        <form key={formVersion} action={formAction} className="space-y-5">
+        <form key={formVersion} onSubmit={keepFormAction} className="space-y-5">
           {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
           <SignataireIdentite />
           <SignaturePad name="signature" label={signatureLabel} disabled={pending} />
@@ -202,7 +206,20 @@ export function TransferMovementDialog({
   const [open, setOpen] = useState(false);
   const [formVersion, setFormVersion] = useState(0);
   const [selected, setSelected] = useState<number[]>([]);
+  const [hasPhoto, setHasPhoto] = useState(false);
+  const [vehicles, setVehicles] = useState<{ registrations: string[]; descriptions: string[]; drivers: Array<{ name: string; phone: string | null }> }>({ registrations: [], descriptions: [], drivers: [] });
+  const [driverPhone, setDriverPhone] = useState("");
   const label = getTransferMovementLabel(type);
+
+  // Véhicules et chauffeurs déjà connus : proposés en liste à l'ouverture.
+  async function loadVehicles() {
+    try {
+      const response = await fetch("/api/transferts/vehicules", { cache: "no-store" });
+      if (response.ok) setVehicles(await response.json());
+    } catch {
+      // Saisie libre si la liste n'est pas disponible.
+    }
+  }
   const isReception = type === "RECEPTION";
   const action = useCallback(async (previous: TransferActionState, formData: FormData) => {
     const result = await recordTransferMovement(lotId, previous, formData);
@@ -215,7 +232,9 @@ export function TransferMovementDialog({
     }
     return result;
   }, [lotId, router]);
-  const [state, formAction, pending] = useActionState(action, initialState);
+  const [state, formAction, pendingAction] = useActionState(action, initialState);
+  const { onSubmit: keepFormAction, pending: pendingSubmit } = useKeepForm(formAction);
+  const pending = pendingAction || pendingSubmit;
 
   function toggle(id: number, checked: boolean) {
     setSelected((current) => checked
@@ -225,7 +244,7 @@ export function TransferMovementDialog({
 
   const allSelected = items.length > 0 && selected.length === items.length;
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) void loadVehicles(); }}>
       <DialogTrigger render={<Button variant={type === "SORTIE" ? "default" : "outline"} />} disabled={items.length === 0}>
         <ClipboardSignature /> {isReception ? "Constat de déchargement" : label}
       </DialogTrigger>
@@ -238,7 +257,7 @@ export function TransferMovementDialog({
               : `Sélectionnez les cartons réellement concernés. CEIBA signe le F02 puis le transmet au SDA. Le stock de ${sourceLabel} ne changera qu'après la contre-signature du SDA.`}
           </DialogDescription>
         </DialogHeader>
-        <form key={formVersion} action={formAction} className="space-y-5">
+        <form key={formVersion} onSubmit={keepFormAction} className="space-y-5">
           <input type="hidden" name="type" value={type} />
           {selected.map((id) => <input key={id} type="hidden" name="itemIds" value={id} />)}
           {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
@@ -266,10 +285,11 @@ export function TransferMovementDialog({
           <section className="space-y-4 border-t pt-5">
             <div><h3 className="font-semibold">Transport sécurisé</h3><p className="text-xs text-muted-foreground">Ces informations identifient le transport au départ et lors du contrôle à l&apos;arrivée.</p></div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2"><Label htmlFor={`${type}-vehicleRegistration`}>Immatriculation</Label><Input id={`${type}-vehicleRegistration`} name="vehicleRegistration" required maxLength={80} disabled={pending} /></div>
-              <div className="space-y-2"><Label htmlFor={`${type}-vehicleDescription`}>Véhicule sécurisé</Label><Input id={`${type}-vehicleDescription`} name="vehicleDescription" required maxLength={160} placeholder="Type, couleur ou identification" disabled={pending} /></div>
-              <div className="space-y-2"><Label htmlFor={`${type}-driverName`}>Chauffeur</Label><Input id={`${type}-driverName`} name="driverName" required maxLength={120} disabled={pending} /></div>
-              <div className="space-y-2"><Label htmlFor={`${type}-driverPhone`}>Téléphone du chauffeur</Label><Input id={`${type}-driverPhone`} name="driverPhone" type="tel" maxLength={40} disabled={pending} /></div>
+              <div className="space-y-2 sm:col-span-2"><Label>Photo du véhicule</Label><VehiclePhotoInput name="vehiclePhoto" disabled={pending} onChange={setHasPhoto} /></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-vehicleRegistration`}>Immatriculation{hasPhoto ? " (facultatif)" : ""}</Label><Input id={`${type}-vehicleRegistration`} name="vehicleRegistration" required={!hasPhoto} maxLength={80} disabled={pending} list={`${type}-registrations`} autoComplete="off" /><datalist id={`${type}-registrations`}>{vehicles.registrations.map((value) => <option key={value} value={value} />)}</datalist></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-vehicleDescription`}>Véhicule sécurisé{hasPhoto ? " (facultatif)" : ""}</Label><Input id={`${type}-vehicleDescription`} name="vehicleDescription" required={!hasPhoto} maxLength={160} placeholder="Type, couleur ou identification" disabled={pending} list={`${type}-descriptions`} autoComplete="off" /><datalist id={`${type}-descriptions`}>{vehicles.descriptions.map((value) => <option key={value} value={value} />)}</datalist></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-driverName`}>Chauffeur</Label><Input id={`${type}-driverName`} name="driverName" required maxLength={120} disabled={pending} list={`${type}-drivers`} autoComplete="off" onChange={(event) => { const known = vehicles.drivers.find((driver) => driver.name === event.target.value); if (known?.phone) setDriverPhone(known.phone); }} /><datalist id={`${type}-drivers`}>{vehicles.drivers.map((driver) => <option key={driver.name} value={driver.name} />)}</datalist></div>
+              <div className="space-y-2"><Label htmlFor={`${type}-driverPhone`}>Téléphone du chauffeur</Label><Input id={`${type}-driverPhone`} name="driverPhone" type="tel" maxLength={40} value={driverPhone} onChange={(event) => setDriverPhone(event.target.value)} disabled={pending} /></div>
               <div className="space-y-2"><Label htmlFor={`${type}-ceibaEscortName`}>Convoyeur CEIBA</Label><Input id={`${type}-ceibaEscortName`} name="ceibaEscortName" required maxLength={120} disabled={pending} list={escortSuggestions.length ? `${type}-escort-options` : undefined} defaultValue={escortSuggestions.length === 1 ? escortSuggestions[0] : undefined} />{escortSuggestions.length ? <datalist id={`${type}-escort-options`}>{escortSuggestions.map((name) => <option key={name} value={name} />)}</datalist> : null}</div>
               {!isReception ? <div className="space-y-2"><Label htmlFor={`${type}-sealReferences`}>Références des scellés</Label><Input id={`${type}-sealReferences`} name="sealReferences" maxLength={2000} placeholder="Numéros séparés par des virgules" disabled={pending} /></div> : null}
             </div>

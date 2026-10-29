@@ -11,6 +11,8 @@ const schema = z.object({
   latitude: z.number().min(-90).max(90).optional(),
   longitude: z.number().min(-180).max(180).optional(),
   departure: convoyDepartureSchema.optional(),
+  /** Heure saisie à la main quand le GPS ne suit pas le trajet. */
+  occurredAt: z.string().datetime({ offset: true }).optional(),
 });
 
 /**
@@ -24,13 +26,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!Number.isInteger(lotId) || lotId <= 0) throw new ApiError("Lot invalide.", 400);
     const input = schema.parse(await request.json());
     await assertConvoyActor(session, lotId);
+    const occurredAt = input.occurredAt ? new Date(input.occurredAt) : undefined;
     const position = input.latitude != null && input.longitude != null ? { latitude: input.latitude, longitude: input.longitude } : null;
     if (input.action === "depart" && !input.departure) throw new ApiError("Remplissez la fiche de départ avant de démarrer le trajet.", 400);
     const result = input.action === "depart"
       ? await startConvoy(session, lotId, input.departure!, position)
       : input.action === "en-route"
-        ? await declareMoving(session, lotId, position, false)
-        : await recordConvoyEvent(session, lotId, "ARRIVEE", position);
+        ? await declareMoving(session, lotId, position, false, occurredAt)
+        : await recordConvoyEvent(session, lotId, "ARRIVEE", position, false, undefined, occurredAt);
     return NextResponse.json(result, { status: result.created ? 201 : 200 });
   } catch (error) {
     return apiErrorResponse(error);

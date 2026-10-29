@@ -24,7 +24,7 @@ export function Header({ name, email, roleCode }: { name: string; email: string;
   const workspace = useWorkspaceTheme();
   const crumbs = buildBreadcrumb(pathname).map((crumb) =>
     roleCode === "VALIDATEUR_CEIBAC" && crumb.href === "/transferts"
-      ? { ...crumb, title: "Validation" }
+      ? { ...crumb, title: "Valider" }
       : crumb
   );
 

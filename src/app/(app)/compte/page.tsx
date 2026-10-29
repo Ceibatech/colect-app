@@ -1,4 +1,5 @@
-import { KeyRound, ShieldCheck, UserRound } from "lucide-react";
+import { KeyRound, PenLine, ShieldCheck, UserRound } from "lucide-react";
+import { SignatureSettings } from "@/components/account/SignatureSettings";
 import { requireUser } from "@/lib/auth/current-user";
 import { ChangePasswordForm } from "@/components/account/ChangePasswordForm";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRoleLabel } from "@/lib/permissions/constants";
 
-export const metadata = { title: "Sécurité du compte - GeoArchives" };
+export const metadata = { title: "Mon compte - GeoArchives" };
 
 export default async function ComptePage() {
   const session = await requireUser();
@@ -16,7 +17,7 @@ export default async function ComptePage() {
       <PageHeader
         eyebrow="Compte personnel"
         icon={UserRound}
-        title="Sécurité du compte"
+        title="Mon compte"
         description="Gérez vos informations de connexion dans votre espace sécurisé."
         actions={<Badge variant="outline" className="rounded-md bg-background/80">Compte actif</Badge>}
         stats={[
@@ -25,6 +26,23 @@ export default async function ComptePage() {
           { label: "Adresse de connexion", value: session.email },
         ]}
       />
+
+      <Card className="bg-card/95">
+        <CardHeader className="border-b border-border/60 pb-4">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/20">
+              <PenLine className="h-5 w-5" />
+            </span>
+            <div>
+              <CardTitle>Ma signature</CardTitle>
+              <CardDescription className="mt-1">Dessinez votre signature une fois : elle sera apposée d&apos;office sur les bordereaux, avec votre nom et votre fonction. Vous pourrez toujours signer à la main.</CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-5">
+          <SignatureSettings />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Card className="bg-card/95">

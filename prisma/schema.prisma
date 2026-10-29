@@ -75,6 +75,8 @@ model User {
   name           String
   /// Fonction habilitée, reprise automatiquement sur les signatures (ex. « Chef de service archives »).
   fonction       String?   @db.VarChar(120)
+  /// Signature enregistrée (PNG en data URL), apposée d'office si l'utilisateur ne signe pas à la main.
+  signatureData  String?   @map("signature_data") @db.MediumText
   email          String    @unique
   passwordHash   String    @map("password_hash")
   roleId         Int       @map("role_id")
@@ -390,6 +392,8 @@ model TransferMovement {
   conditionStatus       TransferConditionStatus? @map("condition_status")
   vehicleRegistration   String?                  @map("vehicle_registration") @db.VarChar(80)
   vehicleDescription    String?                  @map("vehicle_description") @db.VarChar(160)
+  // Photo du véhicule (plaque visible) prise sur place, JPEG en data URL.
+  vehiclePhoto          String?                  @map("vehicle_photo") @db.MediumText
   driverName            String?                  @map("driver_name") @db.VarChar(120)
   driverPhone           String?                  @map("driver_phone") @db.VarChar(40)
   ceibaEscortName       String?                  @map("ceiba_escort_name") @db.VarChar(120)
