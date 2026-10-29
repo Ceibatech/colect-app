@@ -1,5 +1,7 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
+import { FonctionField } from "@/components/administration/FonctionField";
 import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -283,7 +285,9 @@ function useToggleList(initial: number[]) {
 }
 
 function CreateUserForm({ roles, supervisors, sites, onSuccess }: { roles: RoleOption[]; supervisors: SupervisorOption[]; sites: SiteOption[]; onSuccess: (message?: string, warning?: string) => void }) {
-  const [state, formAction, isPending] = useActionState(createUser, initialState);
+  const [state, formAction, isPendingAction] = useActionState(createUser, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
   const [roleId, setRoleId] = useState("");
   const isPmo = roles.find((role) => String(role.id) === roleId)?.code === "PMO";
   const isSiteResponsible = roles.find((role) => String(role.id) === roleId)?.code === "RESPONSABLE_SITE";
@@ -300,7 +304,7 @@ function CreateUserForm({ roles, supervisors, sites, onSuccess }: { roles: RoleO
   }, [state.success, state.message, state.warning, onSuccess]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={keepFormAction} className="space-y-4">
       {state.error ? (
         <Alert variant="destructive">
           <AlertDescription>{state.error}</AlertDescription>
@@ -311,11 +315,7 @@ function CreateUserForm({ roles, supervisors, sites, onSuccess }: { roles: RoleO
         <Input id="name" name="name" maxLength={150} required disabled={isPending} className="uppercase" />
         <p className="text-xs text-muted-foreground">Le nom est automatiquement harmonisé en majuscules.</p>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="fonction">Fonction</Label>
-        <Input id="fonction" name="fonction" maxLength={120} disabled={isPending} placeholder="Ex. Chef du service des archives" />
-        <p className="text-xs text-muted-foreground">Reprise automatiquement sous son nom à chaque signature. À défaut, le rôle est indiqué.</p>
-      </div>
+      <FonctionField id="fonction" disabled={isPending} />
       <div className="space-y-2">
         <Label htmlFor="email">E-mail</Label>
         <Input id="email" name="email" type="email" maxLength={150} required disabled={isPending} autoComplete="off" />
@@ -372,7 +372,9 @@ function EditUserForm({
   canDeactivate: boolean;
 }) {
   const boundAction = updateUser.bind(null, user.id);
-  const [state, formAction, isPending] = useActionState(boundAction, initialState);
+  const [state, formAction, isPendingAction] = useActionState(boundAction, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
 
   const [roleId, setRoleId] = useState(String(user.role.id));
   const selectedRoleCode = roles.find((r) => String(r.id) === roleId)?.code;
@@ -399,7 +401,7 @@ function EditUserForm({
   }, [state.success, onSuccess]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={keepFormAction} className="space-y-4">
       {state.error ? (
         <Alert variant="destructive">
           <AlertDescription>{state.error}</AlertDescription>
@@ -409,11 +411,7 @@ function EditUserForm({
         <Label htmlFor="edit-name">Nom complet</Label>
         <Input id="edit-name" name="name" defaultValue={normalizePersonName(user.name)} maxLength={150} required disabled={isPending} className="uppercase" />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="edit-fonction">Fonction</Label>
-        <Input id="edit-fonction" name="fonction" defaultValue={user.fonction ?? ""} maxLength={120} disabled={isPending} placeholder="Ex. Chef du service des archives" />
-        <p className="text-xs text-muted-foreground">Reprise automatiquement sous son nom à chaque signature. À défaut, le rôle est indiqué.</p>
-      </div>
+      <FonctionField id="edit-fonction" defaultValue={user.fonction} disabled={isPending} />
       <div className="space-y-2">
         <Label>E-mail</Label>
         <Input value={user.email} disabled />

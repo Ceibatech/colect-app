@@ -30,7 +30,7 @@ export default async function NewTransferPage() {
           { label: "Chaîne de garde", value: "Traçabilité active", tone: "success" },
         ]}
       />
-      <NewTransferForm sites={data.sites} inventory={data.inventory} candidates={data.candidates} creatorId={data.creatorId} />
+      <NewTransferForm sites={data.sites} inventory={data.inventory} creatorId={data.creatorId} />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
 import { useActionState, useEffect, useState } from "react";
 import { CheckCircle2, Loader2, Mail, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -16,7 +17,9 @@ const initialState: ActionResult = {};
 
 export function SendUserAccessButton({ userId, email, disabled }: { userId: number; email: string; disabled?: boolean }) {
   const boundAction = sendUserAccessEmail.bind(null, userId);
-  const [state, formAction, isPending] = useActionState(boundAction, initialState);
+  const [state, formAction, isPendingAction] = useActionState(boundAction, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
 
   useEffect(() => {
     if (state.success && state.message) toast.success(state.message);
@@ -24,7 +27,7 @@ export function SendUserAccessButton({ userId, email, disabled }: { userId: numb
   }, [state]);
 
   return (
-    <form action={formAction}>
+    <form onSubmit={keepFormAction}>
       <Button
         type="submit"
         size="icon-sm"
@@ -66,7 +69,9 @@ export function SendPendingUsersAccessDialog({ pendingCount }: { pendingCount: n
 }
 
 function PendingUsersAccessForm({ onClose }: { onClose: () => void }) {
-  const [state, formAction, isPending] = useActionState(sendPendingUsersAccessEmails, initialState);
+  const [state, formAction, isPendingAction] = useActionState(sendPendingUsersAccessEmails, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
 
   if (state.success) {
     return (
@@ -86,7 +91,7 @@ function PendingUsersAccessForm({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={keepFormAction} className="space-y-4">
       {state.error ? (
         <Alert variant="destructive" aria-live="polite">
           <AlertDescription>{state.error}</AlertDescription>

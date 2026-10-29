@@ -110,14 +110,14 @@ export default async function TransfersPage() {
       <PageHeader
         eyebrow={isCeibaValidator ? "Transferts d'archives" : "Chaîne de garde"}
         icon={Truck}
-        title={isCeibaValidator ? "Validation" : "Registre des transferts"}
+        title={isCeibaValidator ? "Valider" : "Registre des transferts"}
         description={isCeibaValidator
           ? "Contrôlez les opérations soumises et les constats d'arrivée avant leur transmission au SDA."
           : "Vue consolidée du stock documentaire entre les sites d'inventaire du ministère et les sites de traitement CEIBA."}
         actions={(
           <>
             <Link href="/transferts/procedure" className={buttonVariants({ variant: "outline" })}><BookOpenCheck /> Procédure</Link>
-            {canApproveCeiba ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Validation</Link> : null}
+            {canApproveCeiba ? <Link href="/transferts/validation-ceibac" className={buttonVariants({ variant: "outline" })}>Valider</Link> : null}
             {canAuthorize ? <Link href="/transferts/validation" className={buttonVariants({ variant: "outline" })}>Validation SDA</Link> : null}
             {session.permissions.includes("TRANSFER_OPERATE") ? <Link href="/caisses" className={buttonVariants({ variant: "outline" })}><Container /> Conteneurs de transport</Link> : null}
             {canCreate ? (

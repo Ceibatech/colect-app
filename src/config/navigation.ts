@@ -88,7 +88,7 @@ export const NAV_ITEMS: NavItem[] = [
       { title: "Mon site", href: "/transferts/mon-site", icon: MapPinned, permission: "TRANSFER_OPERATE" },
       { title: "Mes convois", href: "/transferts/convois", icon: Navigation, permission: "TRANSFER_TRACK" },
       { title: "Conteneurs de transport", href: "/caisses", icon: Container, permission: "TRANSFER_OPERATE" },
-      { title: "Validation", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
+      { title: "Valider", href: "/transferts/validation-ceibac", icon: ClipboardCheck, permission: "TRANSFER_CEIBAC_APPROVE" },
       { title: "Validation SDA", href: "/transferts/validation", icon: ShieldCheck, permission: "TRANSFER_AUTHORIZE" },
     ],
   },

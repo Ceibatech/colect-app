@@ -1,5 +1,6 @@
 "use client";
 
+import { useKeepForm } from "@/hooks/use-keep-form";
 import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -35,7 +36,9 @@ function NatureForm({
   defaultValues?: Partial<NatureRow>;
   onSuccess: () => void;
 }) {
-  const [state, formAction, isPending] = useActionState(action, initialState);
+  const [state, formAction, isPendingAction] = useActionState(action, initialState);
+  const { onSubmit: keepFormAction, pending: isPendingSubmit } = useKeepForm(formAction);
+  const isPending = isPendingAction || isPendingSubmit;
 
   // `onSuccess` doit être mémoïsé (useCallback) côté appelant — voir
   // CommunesManager.tsx pour le détail.
@@ -44,7 +47,7 @@ function NatureForm({
   }, [state.success, onSuccess]);
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form onSubmit={keepFormAction} className="space-y-4">
       {state.error ? (
         <Alert variant="destructive">
           <AlertDescription>{state.error}</AlertDescription>

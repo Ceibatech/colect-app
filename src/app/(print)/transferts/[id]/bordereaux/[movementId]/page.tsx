@@ -74,6 +74,13 @@ export default async function TransferSlipPage({ params }: { params: Promise<{ i
           <SlipField label="Chauffeur" value={[movement.driverName, movement.driverPhone].filter(Boolean).join(" · ") || "Non renseigné"} />
           <SlipField label="Convoyeur CEIBA" value={movement.ceibaEscortName ?? "Non renseigné"} />
         </section>
+        {movement.vehiclePhoto ? (
+          <section className="flex items-center gap-4 border-b border-slate-300 px-6 py-4 sm:px-8">
+            {/* eslint-disable-next-line @next/next/no-img-element -- photo stockée en data URL */}
+            <img src={movement.vehiclePhoto} alt="Photo du véhicule" className="h-32 w-auto rounded border border-slate-300 object-cover" />
+            <p className="text-sm text-slate-600">Photo du véhicule prise sur place au moment du bordereau.</p>
+          </section>
+        ) : null}
 
         <section className="p-6 sm:p-8">
           <div className="mb-4 flex items-end justify-between gap-4">

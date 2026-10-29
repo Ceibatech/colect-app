@@ -79,6 +79,7 @@ export const recordTransferMovementSchema = z.object({
   vehicleDescription: optionalShortText,
   driverName: optionalShortText,
   driverPhone: optionalShortText,
+  vehiclePhoto: z.preprocess((value) => value === "" || value === null ? undefined : value, z.string().max(3_000_000, "La photo du véhicule est trop lourde.").regex(/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/, "La photo du véhicule est invalide.").optional()),
   ceibaEscortName: optionalShortText,
   sealReferences: optionalLongText,
   sealStatus: z.enum(["INTACTS", "ANOMALIE", "NON_APPLICABLE"]).optional(),
@@ -91,8 +92,9 @@ export const recordTransferMovementSchema = z.object({
   ceibacTitle: z.string().trim().min(2, "La fonction du signataire CEIBA est requise.").max(120),
   ceibacSignature: signatureData,
 }).superRefine((value, context) => {
-  if (!value.vehicleRegistration) context.addIssue({ code: "custom", path: ["vehicleRegistration"], message: "L'immatriculation du véhicule est requise." });
-  if (!value.vehicleDescription) context.addIssue({ code: "custom", path: ["vehicleDescription"], message: "La description du véhicule sécurisé est requise." });
+  // Une photo du véhicule (plaque visible) remplace la saisie de l'immatriculation et de sa description.
+  if (!value.vehicleRegistration && !value.vehiclePhoto) context.addIssue({ code: "custom", path: ["vehicleRegistration"], message: "Photographiez le véhicule (plaque visible) ou saisissez son immatriculation." });
+  if (!value.vehicleDescription && !value.vehiclePhoto) context.addIssue({ code: "custom", path: ["vehicleDescription"], message: "Photographiez le véhicule ou décrivez-le." });
   if (!value.driverName) context.addIssue({ code: "custom", path: ["driverName"], message: "Le nom du chauffeur est requis." });
   if (!value.ceibaEscortName) context.addIssue({ code: "custom", path: ["ceibaEscortName"], message: "Le nom du convoyeur CEIBA est requis." });
   if (value.type === "RECEPTION") {
@@ -112,7 +114,8 @@ export type RecordTransferMovementInput = z.infer<typeof recordTransferMovementS
 
 /** Fiche de départ du convoyeur, remplie avant « Démarrer le trajet ». */
 export const convoyDepartureSchema = z.object({
-  vehicleRegistration: z.string().trim().min(2, "Indiquez l'immatriculation du véhicule.").max(80),
+  // Facultative quand le véhicule a été photographié au bordereau de sortie.
+  vehicleRegistration: z.string().trim().max(80).default(""),
   driverName: z.string().trim().min(2, "Indiquez le nom du chauffeur.").max(120),
   driverPhone: z.string().trim().max(40).optional(),
   sealReferences: z.string().trim().max(1000).optional(),

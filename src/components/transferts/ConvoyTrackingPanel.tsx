@@ -146,14 +146,31 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
     return () => window.clearTimeout(timer);
   }, [autoWatch, canTrack, onTheRoadNow, watch]);
 
-  async function declare(action: "en-route" | "arrivee") {
+  // Petit formulaire d'heure, au cas où le GPS ne suit pas le trajet.
+  const [pendingStep, setPendingStep] = useState<"en-route" | "arrivee" | null>(null);
+  const [stepTime, setStepTime] = useState("");
+
+  function askTime(action: "en-route" | "arrivee") {
+    const now = new Date();
+    setStepTime(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`);
+    setPendingStep(action);
+  }
+
+  async function declare(action: "en-route" | "arrivee", time?: string) {
     setBusy(true);
     try {
       const position = await currentPosition();
+      let occurredAt: string | undefined;
+      if (time) {
+        const [hours, minutes] = time.split(":").map(Number);
+        const at = new Date();
+        at.setHours(hours, minutes, 0, 0);
+        occurredAt = at.toISOString();
+      }
       const response = await fetch(`/api/transferts/${lotId}/convoi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, latitude: position?.coords.latitude, longitude: position?.coords.longitude }),
+        body: JSON.stringify({ action, latitude: position?.coords.latitude, longitude: position?.coords.longitude, occurredAt }),
       });
       const body = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Impossible d'enregistrer ce jalon.");
@@ -164,6 +181,7 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
         stopWatching();
         toast.success("Arrivée enregistrée : le responsable du site d'arrivée est prévenu.");
       }
+      setPendingStep(null);
       await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossible d'enregistrer ce jalon.");
@@ -210,15 +228,25 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
               <Button variant={state.arrived ? "outline" : "default"} render={<Link href="/transferts/convois" />}><Navigation /> {state.arrived ? "Nouveau trajet" : "Préparer le départ"}</Button>
             ) : null}
             {canTrack && state.onTheRoad && !state.movingAt ? (
-              <Button disabled={busy} onClick={() => void declare("en-route")}>{busy ? <Loader2 className="animate-spin" /> : <Truck />} Le véhicule roule</Button>
+              <Button disabled={busy} onClick={() => askTime("en-route")}><Truck /> Le véhicule roule</Button>
             ) : null}
             {canTrack && state.onTheRoad && !tracking ? <Button variant="outline" onClick={watch}><Navigation /> Reprendre le suivi</Button> : null}
             {canTrack && state.onTheRoad ? (
-              <Button disabled={busy} onClick={() => void declare("arrivee")}>{busy ? <Loader2 className="animate-spin" /> : <Flag />} Je suis arrivé</Button>
+              <Button disabled={busy} onClick={() => askTime("arrivee")}><Flag /> Je suis arrivé</Button>
             ) : null}
             {canTrack && tracking ? <Button variant="ghost" onClick={stopWatching}><Pause /> Suspendre l&apos;envoi</Button> : null}
             {googleLink ? <Button variant="outline" render={<a href={googleLink} target="_blank" rel="noreferrer" />}><ExternalLink /> Ouvrir dans Google Maps</Button> : null}
           </div>
+          {pendingStep ? (
+            <form className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3" onSubmit={(event) => { event.preventDefault(); void declare(pendingStep, stepTime); }}>
+              <div className="space-y-1">
+                <label htmlFor={`${lotId}-step-time`} className="text-sm font-medium">{pendingStep === "en-route" ? "Heure de départ du véhicule" : "Heure d'arrivée"}</label>
+                <input id={`${lotId}-step-time`} type="time" required value={stepTime} onChange={(event) => setStepTime(event.target.value)} className="h-11 rounded-md border border-input bg-background px-3 text-base" />
+              </div>
+              <Button type="submit" disabled={busy}>{busy ? <Loader2 className="animate-spin" /> : null} Enregistrer</Button>
+              <Button type="button" variant="ghost" onClick={() => setPendingStep(null)} disabled={busy}>Annuler</Button>
+            </form>
+          ) : null}
           {canTrack ? <p className="text-xs leading-5 text-muted-foreground">Gardez cette page ouverte (ou Traccar actif) pendant le trajet : le départ du véhicule est détecté dès qu&apos;il s&apos;éloigne de 300 m du site, et l&apos;arrivée à moins de 150 m du site d&apos;arrivée lorsque sa position GPS est renseignée.</p> : null}
           {events.length ? <ConvoySteps state={state} className="rounded-md border p-3" /> : null}
         </div>
