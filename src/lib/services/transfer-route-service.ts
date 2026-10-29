@@ -84,7 +84,7 @@ export async function suggestTransferRoute(input: {
     Number.isInteger(input.toSiteId) && input.toSiteId > 0 ? resolveSitePoint(input.toSiteId) : Promise.resolve(null),
   ]);
   if (!to) return { error: "Position du site de destination introuvable. Renseignez sa position GPS ou son adresse dans Administration → Sites." };
-  if (!from) return { to, error: "Position de départ introuvable : utilisez « Partir de ma position » ou renseignez la position du site d'origine." };
+  if (!from) return { to, error: "Position du site d'origine introuvable : renseignez sa position GPS ou son adresse dans Administration → Sites." };
 
   const googleMapsUrl = buildGoogleMapsDirectionsUrl(from, to);
   try {

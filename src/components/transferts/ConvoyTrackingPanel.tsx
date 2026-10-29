@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CheckCircle2, ExternalLink, Flag, Loader2, LocateFixed, Navigation, Pause } from "lucide-react";
+import { CheckCircle2, ExternalLink, Flag, Loader2, LocateFixed, Navigation, Pause, PackageCheck, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { convoyState, type GeoPoint } from "@/lib/transfers/convoy";
+import { convoyState, type ConvoyEventType, type GeoPoint } from "@/lib/transfers/convoy";
+import { ConvoySteps } from "@/components/transferts/ConvoySteps";
 import { ConvoyTrackMap } from "@/components/transferts/ConvoyTrackMap";
 
 interface TrackingPoint {
@@ -21,11 +22,22 @@ interface TrackingPoint {
 }
 
 interface ConvoyEventView {
-  type: "DEPART" | "ARRIVEE";
+  type: ConvoyEventType;
   occurredAt: string;
   automatic: boolean;
+  details?: unknown;
   user: { name: string } | null;
 }
+
+const EVENT_LABELS: Record<ConvoyEventType, string> = {
+  CHARGEMENT_DEBUT: "Début du chargement",
+  CHARGEMENT_FIN: "Fin du chargement",
+  DEPART: "Fiche de départ",
+  EN_ROUTE: "Véhicule en route",
+  ARRIVEE: "Arrivée",
+  DECHARGEMENT_DEBUT: "Début du déchargement",
+  DECHARGEMENT_FIN: "Fin du déchargement",
+};
 
 const timeFormatter = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short", timeZone: "Africa/Abidjan" });
 const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "medium", timeZone: "Africa/Abidjan" });
@@ -38,10 +50,11 @@ function currentPosition(): Promise<GeolocationPosition | null> {
 }
 
 /**
- * Suivi du convoi. Le convoyeur appuie sur « Démarrer le trajet » : le départ
- * est déclaré (les deux sites sont prévenus) et sa position est envoyée toutes
- * les 15 s. À l'arrivée — bouton « Je suis arrivé » ou position à moins de
- * 150 m du site d'arrivée — les responsables des deux sites sont notifiés.
+ * Suivi du convoi. Après la fiche de départ, la position du convoyeur est
+ * envoyée toutes les 15 s ; dès que le véhicule quitte le site, le responsable
+ * du site d'arrivée est alerté avec l'heure d'arrivée estimée (bouton « Le
+ * véhicule roule » si le GPS ne l'a pas vu). À l'arrivée — bouton « Je suis
+ * arrivé » ou position à moins de 150 m du site — il est de nouveau prévenu.
  */
 export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = false }: { lotId: number; canTrack: boolean; mapsKey?: string | null; autoWatch?: boolean }) {
   const [points, setPoints] = useState<TrackingPoint[]>([]);
@@ -133,7 +146,7 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
     return () => window.clearTimeout(timer);
   }, [autoWatch, canTrack, onTheRoadNow, watch]);
 
-  async function declare(action: "depart" | "arrivee") {
+  async function declare(action: "en-route" | "arrivee") {
     setBusy(true);
     try {
       const position = await currentPosition();
@@ -144,12 +157,12 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
       });
       const body = await response.json().catch(() => ({})) as { error?: string };
       if (!response.ok) throw new Error(body.error ?? "Impossible d'enregistrer ce jalon.");
-      if (action === "depart") {
-        toast.success("Trajet démarré : les deux sites sont prévenus.");
+      if (action === "en-route") {
+        toast.success("Départ du véhicule signalé : le site d'arrivée est prévenu avec l'heure estimée.");
         watch();
       } else {
         stopWatching();
-        toast.success("Arrivée enregistrée : les responsables des deux sites sont prévenus.");
+        toast.success("Arrivée enregistrée : le responsable du site d'arrivée est prévenu.");
       }
       await load();
     } catch (error) {
@@ -165,9 +178,11 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
   const departure = [...events].reverse().find((event) => event.type === "DEPART");
   const status = state.arrived
     ? `Arrivé à ${timeFormatter.format(state.arrivedAt!)}${state.arrivalAutomatic ? " (détecté automatiquement)" : ""}`
-    : state.onTheRoad
-      ? `En route depuis ${timeFormatter.format(state.departedAt!)}${departure?.user ? `, ${departure.user.name}` : ""}`
-      : "Pas encore parti";
+    : state.movingAt
+      ? `En route depuis ${timeFormatter.format(state.movingAt)}${state.etaAt ? `, arrivée estimée vers ${timeFormatter.format(state.etaAt)}` : ""}`
+      : state.onTheRoad
+        ? `Fiche de départ remplie à ${timeFormatter.format(state.departedAt!)}${departure?.user ? ` par ${departure.user.name}` : ""} : en attente du mouvement du véhicule`
+        : state.loadingStartedAt && !state.loadingEndedAt ? "Chargement en cours" : "Pas encore parti";
 
   return (
     <Card className="bg-card/95">
@@ -194,6 +209,9 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
             {canTrack && !state.onTheRoad && !autoWatch ? (
               <Button variant={state.arrived ? "outline" : "default"} render={<Link href="/transferts/convois" />}><Navigation /> {state.arrived ? "Nouveau trajet" : "Préparer le départ"}</Button>
             ) : null}
+            {canTrack && state.onTheRoad && !state.movingAt ? (
+              <Button disabled={busy} onClick={() => void declare("en-route")}>{busy ? <Loader2 className="animate-spin" /> : <Truck />} Le véhicule roule</Button>
+            ) : null}
             {canTrack && state.onTheRoad && !tracking ? <Button variant="outline" onClick={watch}><Navigation /> Reprendre le suivi</Button> : null}
             {canTrack && state.onTheRoad ? (
               <Button disabled={busy} onClick={() => void declare("arrivee")}>{busy ? <Loader2 className="animate-spin" /> : <Flag />} Je suis arrivé</Button>
@@ -201,15 +219,16 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
             {canTrack && tracking ? <Button variant="ghost" onClick={stopWatching}><Pause /> Suspendre l&apos;envoi</Button> : null}
             {googleLink ? <Button variant="outline" render={<a href={googleLink} target="_blank" rel="noreferrer" />}><ExternalLink /> Ouvrir dans Google Maps</Button> : null}
           </div>
-          {canTrack ? <p className="text-xs leading-5 text-muted-foreground">Gardez cette page ouverte pendant le trajet. L&apos;arrivée est aussi détectée automatiquement à moins de 150 m du site d&apos;arrivée lorsque sa position GPS est renseignée.</p> : null}
+          {canTrack ? <p className="text-xs leading-5 text-muted-foreground">Gardez cette page ouverte (ou Traccar actif) pendant le trajet : le départ du véhicule est détecté dès qu&apos;il s&apos;éloigne de 300 m du site, et l&apos;arrivée à moins de 150 m du site d&apos;arrivée lorsque sa position GPS est renseignée.</p> : null}
+          {events.length ? <ConvoySteps state={state} className="rounded-md border p-3" /> : null}
         </div>
         <div className="space-y-2">
           <p className="text-xs font-medium text-muted-foreground">Jalons</p>
           <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
             {[...events].reverse().map((event, index) => (
               <div key={`${event.type}-${event.occurredAt}-${index}`} className="flex items-start gap-2 rounded-md border px-3 py-2 text-xs">
-                {event.type === "ARRIVEE" ? <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand-green" /> : <Navigation className="mt-0.5 size-3.5 shrink-0 text-primary" />}
-                <span><span className="font-medium">{event.type === "ARRIVEE" ? "Arrivée" : "Départ"} · {dateTimeFormatter.format(new Date(event.occurredAt))}</span><span className="mt-0.5 block text-muted-foreground">{event.automatic ? "Détectée par GPS" : event.user?.name ?? ""}</span></span>
+                {event.type === "ARRIVEE" ? <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-brand-green" /> : event.type.includes("CHARGEMENT") ? <PackageCheck className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" /> : <Navigation className="mt-0.5 size-3.5 shrink-0 text-primary" />}
+                <span><span className="font-medium">{EVENT_LABELS[event.type] ?? event.type} · {dateTimeFormatter.format(new Date(event.occurredAt))}</span><span className="mt-0.5 block text-muted-foreground">{event.automatic ? "Détecté par GPS" : event.user?.name ?? ""}</span></span>
               </div>
             ))}
             {points.slice(-3).reverse().map((point) => (

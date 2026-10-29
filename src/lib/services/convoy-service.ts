@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma/client";
 import { ApiError } from "@/lib/utils/api-error";
 import { SITE_RESPONSIBLE_ROLE_CODE } from "@/lib/permissions/constants";
 import { notifyTransferWorkflow } from "@/lib/services/transfer-notification-service";
-import { convoyState, distanceMeters, isAtDestination, type GeoPoint } from "@/lib/transfers/convoy";
+import { convoyState, distanceMeters, hasLeft, isAtDestination, refusEtape, type ConvoyEventType, type GeoPoint } from "@/lib/transfers/convoy";
+import { buildOsrmRouteUrl, summarizeOsrmRoute } from "@/lib/transfers/route-suggestion";
 import { randomBytes } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import type { ConvoyDepartureInput } from "@/lib/validation/transfer";
@@ -12,11 +13,12 @@ import type { ConvoyDepartureInput } from "@/lib/validation/transfer";
 export type ConvoyActor = { userId: number; name: string; roleCode?: string };
 
 /**
- * Départ et arrivée des convois. Le convoyeur appuie sur « Démarrer le
- * trajet » : le départ est enregistré et les deux sites sont prévenus. À
- * l'arrivée (bouton, ou position à moins de 150 m du site d'arrivée), le
- * responsable du site de départ et celui du site qui reçoit sont notifiés que
- * le véhicule est là.
+ * Étapes des convois. Au site de départ, le responsable indique le début et
+ * la fin du chargement (le convoyeur est alors prévenu). Le convoyeur remplit
+ * la fiche de départ ; dès que le GPS montre que le véhicule a quitté le site,
+ * le responsable du site d'arrivée est alerté avec l'heure d'arrivée estimée.
+ * À l'arrivée (bouton, ou position à moins de 150 m du site), il est de
+ * nouveau prévenu, puis il indique le début et la fin du déchargement.
  */
 
 const timeFormatter = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short", timeZone: "Africa/Abidjan" });
@@ -36,10 +38,10 @@ async function loadLot(lotId: number) {
       createdById: true,
       sourceSiteId: true,
       destinationSiteId: true,
-      sourceSite: { select: { nom: true } },
+      sourceSite: { select: { nom: true, latitude: true, longitude: true } },
       destinationSite: { select: { nom: true, latitude: true, longitude: true } },
       items: { where: { status: "SORTI" }, select: { dossierCountSnapshot: true } },
-      convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true } },
+      convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, details: true } },
     },
   });
 }
@@ -51,8 +53,8 @@ export async function assertConvoyActor(session: ConvoyActor, lotId: number) {
   if (!assigned) throw new ApiError("Vous n'êtes pas désigné comme convoyeur de ce lot.", 403);
 }
 
-/** Seul le responsable du site d'arrivée est alerté (l'auteur du lot s'il n'y en a pas). */
-async function recipients(lot: { createdById: number; destinationSiteId: number }) {
+/** Responsables actifs du site d'arrivée (l'auteur du lot s'il n'y en a pas). */
+async function destinationResponsibles(lot: { createdById: number; destinationSiteId: number }) {
   const responsibles = await prisma.userSite.findMany({
     where: { siteId: lot.destinationSiteId, user: { isActive: true, role: { code: SITE_RESPONSIBLE_ROLE_CODE } } },
     select: { userId: true },
@@ -60,71 +62,170 @@ async function recipients(lot: { createdById: number; destinationSiteId: number 
   return responsibles.length ? [...new Set(responsibles.map((row) => row.userId))] : [lot.createdById];
 }
 
-async function notify(eventId: number, type: "DEPART" | "ARRIVEE", lot: NonNullable<Awaited<ReturnType<typeof loadLot>>>, at: Date, by: string, automatic: boolean) {
+/** Convoyeurs désignés sur le lot (l'auteur du lot s'il n'y en a pas). */
+async function lotConvoyeurs(lot: { id: number; createdById: number }) {
+  const rows = await prisma.transferLotParticipant.findMany({ where: { transferLotId: lot.id, roleCode: "CONVOYEUR", user: { isActive: true } }, select: { userId: true } });
+  return rows.length ? [...new Set(rows.map((row) => row.userId))] : [lot.createdById];
+}
+
+async function notify(eventId: number, type: ConvoyEventType, lot: NonNullable<Awaited<ReturnType<typeof loadLot>>>, at: Date, by: string, automatic: boolean, details?: { etaAt?: string; distanceKm?: number; durationMinutes?: number } | null) {
+  // Chaque étape n'alerte que l'acteur suivant ; les autres se suivent dans l'application.
+  if (type !== "CHARGEMENT_FIN" && type !== "EN_ROUTE" && type !== "ARRIVEE") return;
   const cartons = lot.items.length;
   const dossiers = lot.items.reduce((sum, item) => sum + item.dossierCountSnapshot, 0);
   const route = `${lot.sourceSite.nom} → ${lot.destinationSite.nom}`;
+  const eta = details?.etaAt ? timeFormatter.format(new Date(details.etaAt)) : null;
+  const content = type === "CHARGEMENT_FIN" ? {
+    event: "CONVOY_LOADED" as const,
+    recipients: await lotConvoyeurs(lot),
+    title: `Convoi ${lot.reference} chargé`,
+    message: `Le chargement est terminé à ${lot.sourceSite.nom}. Remplissez la fiche de départ dans « Mes convois » et laissez le suivi GPS actif : le site d'arrivée sera prévenu dès que le véhicule roule.`,
+    statusLabel: "Chargement terminé",
+    actionPath: "/transferts/convois",
+    actionLabel: "Démarrer le trajet",
+    when: "Fin du chargement",
+  } : type === "EN_ROUTE" ? {
+    event: "CONVOY_DEPARTED" as const,
+    recipients: await destinationResponsibles(lot),
+    title: `Convoi ${lot.reference} en route${eta ? ` : arrivée vers ${eta}` : ""}`,
+    message: `Le véhicule a quitté ${lot.sourceSite.nom}${automatic ? " (mouvement détecté par GPS)" : ""} et se dirige vers ${lot.destinationSite.nom}.${eta ? ` Arrivée estimée vers ${eta}, circulation comprise de façon approximative.` : ""} Préparez la réception : vous serez prévenu à son arrivée.`,
+    statusLabel: eta ? `Arrivée estimée vers ${eta}` : "Convoi en route",
+    actionPath: `/transferts/${lot.id}`,
+    actionLabel: "Suivre le trajet",
+    when: "En route depuis",
+  } : {
+    event: "CONVOY_ARRIVED" as const,
+    recipients: await destinationResponsibles(lot),
+    title: `Convoi ${lot.reference} arrivé à ${lot.destinationSite.nom}`,
+    message: `Le véhicule est arrivé à ${lot.destinationSite.nom}${automatic ? " (position détectée automatiquement)" : ""}. Indiquez le début du déchargement dans « Mon site », contrôlez les cartons et signez l'état des lieux (F03).`,
+    statusLabel: "Véhicule arrivé",
+    actionPath: "/transferts/mon-site",
+    actionLabel: "Réceptionner",
+    when: "Arrivée",
+  };
   try {
     await notifyTransferWorkflow({
-      event: type === "DEPART" ? "CONVOY_DEPARTED" : "CONVOY_ARRIVED",
+      event: content.event,
       entityType: "TRANSFER_CONVOY",
       entityId: eventId,
       recipientRoleCodes: [],
-      recipientUserIds: await recipients(lot),
-      title: type === "DEPART" ? `Convoi ${lot.reference} en route` : `Convoi ${lot.reference} arrivé à ${lot.destinationSite.nom}`,
-      message: type === "DEPART"
-        ? `Le convoi a quitté ${lot.sourceSite.nom} et se dirige vers ${lot.destinationSite.nom}. Son trajet est suivi en direct.`
-        : `Le véhicule est arrivé à ${lot.destinationSite.nom}${automatic ? " (position détectée automatiquement)" : ""}. Le responsable du site d'arrivée peut contrôler les cartons et signer l'état des lieux (F03).`,
+      recipientUserIds: content.recipients,
+      title: content.title,
+      message: content.message,
       reference: lot.reference,
-      statusLabel: type === "DEPART" ? "Convoi en route" : "Véhicule arrivé",
-      actionPath: type === "DEPART" ? `/transferts/${lot.id}` : "/transferts/mon-site",
-      actionLabel: type === "DEPART" ? "Suivre le trajet" : "Faire l'état des lieux",
+      statusLabel: content.statusLabel,
+      actionPath: content.actionPath,
+      actionLabel: content.actionLabel,
       details: [
         { label: "Trajet", value: route },
-        { label: type === "DEPART" ? "Départ" : "Arrivée", value: timeFormatter.format(at) },
-        { label: "Convoyeur", value: by },
+        { label: content.when, value: timeFormatter.format(at) },
+        ...(eta ? [{ label: "Arrivée estimée", value: `${eta}${details?.distanceKm ? ` (${details.distanceKm.toFixed(1).replace(".", ",")} km)` : ""}` }] : []),
+        { label: "Déclaré par", value: by },
         { label: "Chargement", value: `${cartons} carton${cartons > 1 ? "s" : ""}, ${dossiers} dossier${dossiers > 1 ? "s" : ""}` },
       ],
     });
   } catch (error) {
-    // Le jalon est enregistré ; une panne de messagerie ne doit pas le masquer.
+    // L'étape est enregistrée ; une panne de messagerie ne doit pas la masquer.
     console.error("Convoy notification failed.", { eventId, type, error });
   }
 }
 
-export async function recordConvoyEvent(session: ConvoyActor, lotId: number, type: "DEPART" | "ARRIVEE", position?: GeoPoint | null, automatic = false, details?: Prisma.InputJsonValue) {
+/** Les étapes du trajet exigent des cartons sortis (F02 contre-signé). */
+const NEEDS_CARTONS_IN_TRANSIT = new Set<ConvoyEventType>(["DEPART", "EN_ROUTE", "ARRIVEE"]);
+
+export async function recordConvoyEvent(session: ConvoyActor, lotId: number, type: ConvoyEventType, position?: GeoPoint | null, automatic = false, details?: Prisma.InputJsonValue) {
   const lot = await loadLot(lotId);
   if (!lot) throw new ApiError("Lot introuvable.", 404);
-  if (lot.items.length === 0) throw new ApiError("Aucun carton n'est en transit sur ce lot : la remise au départ (F02) doit d'abord être contre-signée.", 409);
+  if (NEEDS_CARTONS_IN_TRANSIT.has(type) && lot.items.length === 0) throw new ApiError("Aucun carton n'est en transit sur ce lot : la remise au départ (F02) doit d'abord être contre-signée.", 409);
   const state = convoyState(lot.convoyEvents);
-  if (type === "DEPART" && state.onTheRoad) return { created: false, state };
-  if (type === "ARRIVEE" && state.arrived) return { created: false, state };
+  // Une étape déjà franchie (double clic, détection répétée) n'est pas une erreur.
+  const alreadyDone = (type === "DEPART" && state.onTheRoad) || (type === "ARRIVEE" && state.arrived) || (type === "EN_ROUTE" && !!state.movingAt);
+  if (alreadyDone) return { created: false, state };
+  const refusal = refusEtape(lot.convoyEvents, type);
+  if (refusal) {
+    if (automatic) return { created: false, state };
+    throw new ApiError(refusal, 409);
+  }
 
   const event = await prisma.$transaction(async (tx) => {
     // Sérialise les déclarations simultanées (bouton et détection automatique).
     await tx.$queryRaw`SELECT id FROM transfer_lots WHERE id = ${lotId} FOR UPDATE`;
-    const last = await tx.transferConvoyEvent.findFirst({ where: { transferLotId: lotId }, orderBy: { occurredAt: "desc" }, select: { type: true } });
-    if (last?.type === type) return null;
+    const current = await tx.transferConvoyEvent.findMany({ where: { transferLotId: lotId }, orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, details: true } });
+    if (refusEtape(current, type)) return null;
     return tx.transferConvoyEvent.create({
       data: { transferLotId: lotId, type, userId: session.userId, latitude: position?.latitude, longitude: position?.longitude, automatic, details },
       select: { id: true, occurredAt: true },
     });
   });
   if (!event) return { created: false, state };
-  await notify(event.id, type, lot, event.occurredAt, session.name, automatic);
-  return { created: true, state: convoyState([...lot.convoyEvents, { type, occurredAt: event.occurredAt, automatic }]) };
+  await notify(event.id, type, lot, event.occurredAt, session.name, automatic, details as { etaAt?: string; distanceKm?: number } | null | undefined);
+  return { created: true, state: convoyState([...lot.convoyEvents, { type, occurredAt: event.occurredAt, automatic, details }]) };
 }
 
-/** Appelé à chaque point GPS : déclare l'arrivée quand le véhicule atteint le site. */
+/**
+ * Heure d'arrivée estimée depuis la position du véhicule : itinéraire routier
+ * (OpenStreetMap/OSRM, hors trafic) majoré de 30 % pour la circulation ; à
+ * défaut, distance à vol d'oiseau à 25 km/h.
+ */
+export async function estimateArrival(from: GeoPoint, to: GeoPoint | null, now = new Date()) {
+  if (!to) return null;
+  let distanceKm = (distanceMeters(from, to) * 1.4) / 1000;
+  let durationMinutes = (distanceKm / 25) * 60;
+  let source = "estimation";
+  try {
+    const response = await fetch(buildOsrmRouteUrl(from, to), {
+      headers: { "User-Agent": "GeoArchives/1.0 (contact: CEIBA Analytics)", Accept: "application/json" },
+      signal: AbortSignal.timeout(6_000),
+      cache: "no-store",
+    });
+    const summary = response.ok ? summarizeOsrmRoute(await response.json()) : null;
+    if (summary) { distanceKm = summary.distanceKm; durationMinutes = summary.durationMinutes * 1.3; source = "itineraire"; }
+  } catch {
+    // Estimation à vol d'oiseau.
+  }
+  const minutes = Math.max(1, Math.round(durationMinutes));
+  return { etaAt: new Date(now.getTime() + minutes * 60_000).toISOString(), distanceKm: Math.round(distanceKm * 10) / 10, durationMinutes: minutes, source };
+}
+
+/** Le véhicule roule : étape « en route » et alerte du site d'arrivée avec l'heure estimée. */
+export async function declareMoving(session: ConvoyActor, lotId: number, point: GeoPoint | null, automatic: boolean) {
+  const lot = await prisma.transferLot.findUnique({ where: { id: lotId }, select: { destinationSite: { select: { latitude: true, longitude: true } } } });
+  if (!lot) throw new ApiError("Lot introuvable.", 404);
+  const eta = point ? await estimateArrival(point, siteGeoPoint(lot.destinationSite)) : null;
+  return recordConvoyEvent(session, lotId, "EN_ROUTE", point, automatic, eta ?? undefined);
+}
+
+/**
+ * Appelé à chaque point GPS : signale le véhicule en route dès qu'il a quitté
+ * son point de départ, puis déclare l'arrivée quand il atteint le site.
+ */
 export async function detectArrival(session: ConvoyActor, lotId: number, point: GeoPoint & { accuracy?: number | null }) {
   const lot = await prisma.transferLot.findUnique({
     where: { id: lotId },
-    select: { destinationSite: { select: { latitude: true, longitude: true } }, convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true } } },
+    select: {
+      sourceSite: { select: { latitude: true, longitude: true } },
+      destinationSite: { select: { latitude: true, longitude: true } },
+      convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, details: true, latitude: true, longitude: true } },
+    },
   });
   if (!lot) return null;
+  const state = convoyState(lot.convoyEvents);
+  if (!state.onTheRoad) return null;
   const destination = siteGeoPoint(lot.destinationSite);
-  if (!convoyState(lot.convoyEvents).onTheRoad || !isAtDestination(point, destination)) return null;
+  if (!state.movingAt) {
+    const departure = [...lot.convoyEvents].reverse().find((event) => event.type === "DEPART");
+    const start = siteGeoPoint(lot.sourceSite) ?? (departure ? siteGeoPoint(departure) : null) ?? await firstPointSince(lotId, state.departedAt);
+    if (hasLeft(point, start) || isAtDestination(point, destination)) await declareMoving(session, lotId, point, true);
+  }
+  if (!isAtDestination(point, destination)) return null;
   return recordConvoyEvent(session, lotId, "ARRIVEE", point, true);
+}
+
+/** Premier point GPS reçu après le départ : référence quand le site n'a pas de coordonnées. */
+async function firstPointSince(lotId: number, since: Date | null) {
+  if (!since) return null;
+  const first = await prisma.transferTrackingPoint.findFirst({ where: { transferLotId: lotId, capturedAt: { gte: since } }, orderBy: { capturedAt: "asc" }, select: { latitude: true, longitude: true } });
+  return first ? siteGeoPoint(first) : null;
 }
 
 export async function getConvoyOverview(lotId: number) {
@@ -132,7 +233,7 @@ export async function getConvoyOverview(lotId: number) {
     where: { id: lotId },
     select: {
       destinationSite: { select: { latitude: true, longitude: true } },
-      convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, user: { select: { name: true } } } },
+      convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, details: true, user: { select: { name: true } } } },
     },
   });
   if (!lot) return null;
@@ -248,3 +349,28 @@ export async function recordTrackerPosition(position: { deviceId: string } & Geo
 }
 
 export { distanceMeters };
+
+/** Étapes du site : chargement au départ, déchargement à l'arrivée. */
+export const SITE_STEPS = {
+  "chargement-debut": { type: "CHARGEMENT_DEBUT", end: "source" },
+  "chargement-fin": { type: "CHARGEMENT_FIN", end: "source" },
+  "dechargement-debut": { type: "DECHARGEMENT_DEBUT", end: "destination" },
+  "dechargement-fin": { type: "DECHARGEMENT_FIN", end: "destination" },
+} as const satisfies Record<string, { type: ConvoyEventType; end: "source" | "destination" }>;
+
+export async function recordSiteStep(session: ConvoyActor, lotId: number, step: keyof typeof SITE_STEPS) {
+  const { type, end } = SITE_STEPS[step];
+  const lot = await prisma.transferLot.findUnique({
+    where: { id: lotId },
+    select: { sourceSiteId: true, destinationSiteId: true, movements: { where: { type: "SORTIE", status: { not: "REJETE" } }, select: { id: true }, take: 1 } },
+  });
+  if (!lot) throw new ApiError("Lot introuvable.", 404);
+  if (end === "source" && lot.movements.length === 0) throw new ApiError("Faites d'abord l'état des lieux de sortie (F02) : le chargement vient ensuite.", 409);
+  // Un responsable de site n'agit que sur son site : départ pour le chargement, arrivée pour le déchargement.
+  if (session.roleCode === SITE_RESPONSIBLE_ROLE_CODE) {
+    const siteId = end === "source" ? lot.sourceSiteId : lot.destinationSiteId;
+    const mine = await prisma.userSite.findFirst({ where: { userId: session.userId, siteId }, select: { userId: true } });
+    if (!mine) throw new ApiError(end === "source" ? "Seul le responsable du site de départ indique le chargement." : "Seul le responsable du site d'arrivée indique le déchargement.", 403);
+  }
+  return recordConvoyEvent(session, lotId, type);
+}

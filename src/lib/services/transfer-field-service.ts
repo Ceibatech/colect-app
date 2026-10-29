@@ -29,7 +29,7 @@ const lotInclude = {
   destinationSite: { select: { id: true, nom: true, organisation: true, latitude: true, longitude: true, adresse: true, ville: true } },
   destinationEntrepot: { select: { nom: true, localisation: true } },
   participants: { where: { roleCode: "CONVOYEUR" }, select: { user: { select: { name: true } } } },
-  convoyEvents: { orderBy: { occurredAt: "asc" as const }, select: { type: true, occurredAt: true, automatic: true } },
+  convoyEvents: { orderBy: { occurredAt: "asc" as const }, select: { type: true, occurredAt: true, automatic: true, details: true } },
   items: {
     orderBy: { cartonCode: "asc" as const },
     select: {
@@ -83,10 +83,12 @@ export async function getSiteWorkspace() {
     ? (await prisma.userSite.findMany({ where: { userId: session.userId }, select: { site: { select: { id: true, nom: true, organisation: true } } } })).map((row) => row.site)
     : await prisma.site.findMany({ where: { isActive: true }, orderBy: { nom: "asc" }, select: { id: true, nom: true, organisation: true } });
   const siteIds = sites.map((site) => site.id);
-  if (siteIds.length === 0) return { sites, departures: [], arrivals: [], bordereaux: [] };
+  if (siteIds.length === 0) return { sites, departures: [], loadings: [], arrivals: [], bordereaux: [] };
 
-  const [outgoing, incoming, bordereaux] = await Promise.all([
+  const [outgoing, loading, incoming, bordereaux] = await Promise.all([
     loadLots({ sourceSiteId: { in: siteIds }, status: { in: [...ACTIVE_LOT_STATUSES] }, items: { some: { status: "PREVU" } } }),
+    // État des lieux de sortie fait : chargement, puis départ du véhicule.
+    loadLots({ sourceSiteId: { in: siteIds }, status: { in: [...ACTIVE_LOT_STATUSES] }, movements: { some: { type: "SORTIE", status: { not: "REJETE" } } }, items: { some: { status: { in: ["PREVU", "SORTI"] } } } }),
     loadLots({ destinationSiteId: { in: siteIds }, status: { in: [...ACTIVE_LOT_STATUSES] }, items: { some: { status: "SORTI" } } }),
     // Le site de départ suit aussi l'arrivée de ses cartons.
     prisma.transferMovement.findMany({
@@ -106,6 +108,8 @@ export async function getSiteWorkspace() {
   return {
     sites,
     departures: outgoing.map((lot) => ({ ...summarize(lot), items: movementOptions(lot, "PREVU") })).filter((lot) => lot.items.length > 0),
+    // Lots encore sur le site : le véhicule n'a pas été vu en route.
+    loadings: loading.map(summarize).filter((lot) => !lot.convoy.movingAt && !lot.convoy.arrived),
     arrivals: incoming.map((lot) => ({ ...summarize(lot), items: movementOptions(lot, "SORTI") })),
     bordereaux: bordereaux.map((movement) => ({
       id: movement.id,
