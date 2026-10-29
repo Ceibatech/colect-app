@@ -79,7 +79,27 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
   return { items, unidentifiedDossierCount, engagedCartonCount: [...grouped.values()].filter((item) => item.hasConflict).length };
 }
 
+/**
+ * Plage de cotes saisie dans la recherche : « 2010-KOU-0001 à 0200 »,
+ * « 2010-KOU-0001 - 2010-KOU-0200 » (tiret entouré d'espaces, pour ne pas
+ * confondre avec la cote d'un dossier 2010-KOU-0001-012) ou « 2010-KOU-0001..0200 ».
+ */
+export function parseCoteRange(query: string) {
+  const match = query.trim().toUpperCase().match(/^(\d{4}-[A-Z][A-Z0-9]{1,5})-(\d{1,6})(?:\s*(?:À|A|AU|\.\.)\s*|\s+[-–]\s+)(?:(\d{4}-[A-Z][A-Z0-9]{1,5})-)?(\d{1,6})$/);
+  if (!match || (match[3] && match[3] !== match[1])) return null;
+  const from = Number(match[2]);
+  const to = Number(match[4]);
+  return to >= from ? { prefix: match[1], from, to } : null;
+}
+
 export function filterTransferCartons(items: TransferCartonItem[], query?: string) {
+  const range = parseCoteRange(query ?? "");
+  if (range) {
+    return items.filter((item) => {
+      const match = item.code.match(/^(\d{4}-[A-Z][A-Z0-9]{1,5})-(\d{1,6})$/);
+      return !!match && match[1] === range.prefix && Number(match[2]) >= range.from && Number(match[2]) <= range.to;
+    });
+  }
   const cartonId = parseCartonReference(query ?? "");
   if (cartonId !== null) return items.filter((item) => item.token === `carton:${cartonId}` || item.code === formatCartonReference(cartonId));
   const normalizedQuery = normalizeSearch(query ?? "");

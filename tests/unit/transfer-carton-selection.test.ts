@@ -77,3 +77,20 @@ function row(id: number, cartonId: number | null, codeBarres: string | null, lib
     transferLotDossiers: conflict ? [{ id: id * 10 }] : [],
   };
 }
+
+import { filterTransferCartons as filterRange, parseCoteRange } from "@/lib/transfers/carton-selection";
+
+describe("sélection par plage de cotes", () => {
+  const item = (code: string) => ({ token: `carton:${code}`, code, label: null, dossierCount: 1, unlocatedDossierCount: 0, codes: [] });
+  const items = ["2010-KOU-0001", "2010-KOU-0150", "2010-KOU-0200", "2010-KOU-0201", "2010-MAR-0005"].map(item);
+  it("reconnaît les écritures courantes d'une plage", () => {
+    expect(parseCoteRange("2010-KOU-0001 à 0200")).toEqual({ prefix: "2010-KOU", from: 1, to: 200 });
+    expect(parseCoteRange("2010-kou-0201 - 2010-KOU-0320")).toEqual({ prefix: "2010-KOU", from: 201, to: 320 });
+    expect(parseCoteRange("2010-KOU-0001..0200")).toEqual({ prefix: "2010-KOU", from: 1, to: 200 });
+    expect(parseCoteRange("2010-KOU-0001 à 2010-MAR-0002")).toBeNull();
+    expect(parseCoteRange("2010-KOU-0001-012")).toBeNull();
+  });
+  it("ne garde que les cartons de la plage", () => {
+    expect(filterRange(items, "2010-KOU-0001 à 0200").map((i) => i.code)).toEqual(["2010-KOU-0001", "2010-KOU-0150", "2010-KOU-0200"]);
+  });
+});
