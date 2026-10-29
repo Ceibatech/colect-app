@@ -34,7 +34,7 @@ export function buildCotesMessage(summary, files, { replaces = false } = {}) {
   const intro = `Nous vous transmettons la liste des ${nf(summary.boxes)} cartons ${summary.first} à ${summary.last} et les étiquettes QR à apposer sur les cartons et sur chaque dossier.`;
   const points = [
     `${nf(summary.boxes)} cartons, contenant au total ${nf(summary.dossiers)} dossiers ;`,
-    `les ${nf(summary.listBoxes)} premiers cartons suivent l'ordre de la liste d'enlèvement (références provisoires 1 à ${nf(summary.listBoxes)}) ;`,
+    `les ${nf(summary.listBoxes)} premiers cartons suivent l'ordre de la liste d'enlèvement${summary.listAuthor ? ` tirée par ${summary.listAuthor}` : ""} (références provisoires 1 à ${nf(summary.listBoxes)}) ;`,
     "chaque carton porte sa cote du référentiel de classement (exemple\u00a0: 2010\u2011KOU\u20110001 = Dossiers ACD, Koumassi, carton n°\u00a01) ;",
     "chaque dossier porte la cote de son carton suivie de son numéro (exemple\u00a0: 2010\u2011KOU\u20110001\u2011012), sans trou dans la numérotation ;",
     "l'étiquette d'un dossier ne porte aucun nom : on la colle sur la chemise qui porte le même îlot, le même lot et, le cas échéant, le même titre foncier ;",
@@ -42,7 +42,7 @@ export function buildCotesMessage(summary, files, { replaces = false } = {}) {
   ];
   const replaceNote = "Ce message remplace l'envoi précédent : correspondance des cartons de la liste améliorée et étiquettes des dossiers sans le nom des titulaires.";
   const notes = [
-    ...(summary.listBoxes ? [`dossiers retrouvés en base pour ${nf(summary.listFound)} des ${nf(summary.listBoxes)} cartons de la liste d'enlèvement (${nf(summary.listDossiers ?? summary.dossiers)} dossiers) ;`] : []),
+    ...(summary.listBoxes ? [`dossiers retrouvés en base pour ${nf(summary.listFound)} des ${nf(summary.listBoxes)} cartons de la liste${summary.listAuthor ? ` tirée par ${summary.listAuthor}` : ""} (${nf(summary.listDossiers ?? summary.dossiers)} dossiers) ;`] : []),
     ...(summary.empty ? [`${nf(summary.empty)} carton${summary.empty > 1 ? "s n'ont" : " n'a"} pas encore de dossier enregistré : ${summary.empty > 1 ? "leurs dossiers seront rattachés" : "ses dossiers seront rattachés"} lors de l'inventaire, en scannant le QR du carton${summary.emptyList?.length ? ` (${summary.emptyList.join(", ")})` : ""}. ${summary.empty > 1 ? "Ils sont signalés" : "Il est signalé"} en couleur dans la liste.`] : []),
   ];
   const procedure = summary.empty ? [
