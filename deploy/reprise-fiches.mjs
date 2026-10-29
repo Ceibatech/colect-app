@@ -116,6 +116,30 @@ export function communeId(value, communes) {
 
 const titulaire = (r) => norm(`${r.nom ?? ""} ${r.prenoms ?? ""}`);
 
+/** Distance d'édition (Levenshtein) bornée. */
+export function distance(a, b, max = 3) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      best = Math.min(best, cur[j]);
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/** Noms proches : 1 lettre d'écart (2 au-delà de 10 lettres), ou l'un contient l'autre (prénom ajouté). */
+export function proche(a, b) {
+  if (a === b) return true;
+  if (a.length >= 6 && b.length >= 6 && (a.includes(b) || b.includes(a))) return true;
+  return distance(a, b, 2) <= (Math.min(a.length, b.length) > 10 ? 2 : 1);
+}
+
 /** Doublons exacts entre fiches : la saisie la plus récente est gardée. */
 export function dedoublonner(rows) {
   const best = new Map();
@@ -156,42 +180,63 @@ export async function reprendreFiches(db, { dir, apply = false }) {
   const communes = new Map(communesRows.map((c) => [norm(c.nom), c.id]));
   const salle = site?.entrepots.find((e) => e.code === "MIN-S01") ?? site?.entrepots[0] ?? null;
 
-  // Index des dossiers en base.
-  const parLot = new Map();
-  const parLibelle = new Map();
-  const push = (map, key, d) => { if (!map.has(key)) map.set(key, []); map.get(key).push(d); };
-  for (const d of existants) {
-    const t = titulaire(d);
-    if (!t) continue;
-    if (d.numeroLot) push(parLot, `${t}|${norm(d.numeroLot)}|${d.communeId ?? ""}`, d);
-    if (d.libelleCarton) push(parLibelle, `${t}|${norm(d.libelleCarton)}`, d);
-  }
+  // Rapprochement en plusieurs passes, de la plus sûre à la plus large ; chaque
+  // passe ne traite que les lignes encore sans correspondance.
+  const index = (keyOf) => {
+    const map = new Map();
+    for (const d of existants) {
+      const key = keyOf(d);
+      if (!key) continue;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(d);
+    }
+    return map;
+  };
+  const tfKey = (v) => { const digits = String(v ?? "").replace(/\D/g, ""); return digits.length >= 4 ? digits : null; };
+  const t = (d) => titulaire(d) || null;
+  const passes = [
+    ["titulaire + lot + commune", (d) => t(d) && d.numeroLot ? `${t(d)}|${norm(d.numeroLot)}|${d.communeId ?? ""}` : null, (l) => t(l) && l.lot ? `${t(l)}|${norm(l.lot)}|${l.communeId ?? ""}` : null],
+    ["titulaire + lot", (d) => t(d) && d.numeroLot ? `${t(d)}|${norm(d.numeroLot)}` : null, (l) => t(l) && l.lot ? `${t(l)}|${norm(l.lot)}` : null],
+    ["titulaire + libellé", (d) => t(d) && d.libelleCarton ? `${t(d)}|${norm(d.libelleCarton)}` : null, (l) => t(l) && l.libelle ? `${t(l)}|${norm(l.libelle)}` : null],
+    ["titre foncier", (d) => tfKey(d.numeroTitreFoncier), (l) => tfKey(l.tf)],
+    ["libellé + îlot + lot", (d) => d.numeroLot && d.libelleCarton ? `${norm(d.libelleCarton)}|${norm(d.numeroIlot)}|${norm(d.numeroLot)}` : null, (l) => l.lot && l.libelle ? `${norm(l.libelle)}|${norm(l.ilot)}|${norm(l.lot)}` : null],
+  ];
   const pris = new Set();
-  // Premier dossier encore libre (homonymes au même lot : appariés dans l'ordre).
-  const take = (candidates) => (candidates ?? []).find((d) => !pris.has(d.id)) ?? null;
+  const appariement = new Map();
+  const parPasse = {};
+  const lignesAvecCommune = lignes.map((ligne) => ({ ...ligne, communeId: communeId(ligne.commune, communes) }));
+  for (const [nom, keyDb, keyFiche] of passes) {
+    const map = index(keyDb);
+    for (const ligne of lignesAvecCommune) {
+      if (appariement.has(ligne)) continue;
+      const key = keyFiche(ligne);
+      const match = key ? (map.get(key) ?? []).find((d) => !pris.has(d.id)) : null;
+      if (match) { pris.add(match.id); appariement.set(ligne, match); parPasse[nom] = (parPasse[nom] ?? 0) + 1; }
+    }
+  }
+  // Nom proche (1 à 2 lettres d'écart) au même lot : fautes de frappe corrigées sur le terrain.
+  const parLotSeul = index((d) => (d.numeroLot && !pris.has(d.id) ? norm(d.numeroLot) : null));
+  for (const ligne of lignesAvecCommune) {
+    if (appariement.has(ligne) || !ligne.lot || !t(ligne)) continue;
+    const candidats = (parLotSeul.get(norm(ligne.lot)) ?? []).filter((d) => !pris.has(d.id) && t(d) && proche(t(d), t(ligne)));
+    if (candidats.length === 1) { pris.add(candidats[0].id); appariement.set(ligne, candidats[0]); parPasse["nom proche + même lot"] = (parPasse["nom proche + même lot"] ?? 0) + 1; }
+  }
 
   const majs = [];
   const nouveaux = [];
   const champsModifies = new Map();
-  for (const ligne of lignes) {
-    const cId = communeId(ligne.commune, communes);
-    const t = titulaire(ligne);
-    let match = null;
-    if (t && ligne.lot) match = take(parLot.get(`${t}|${norm(ligne.lot)}|${cId ?? ""}`));
-    if (!match && t && ligne.libelle) match = take(parLibelle.get(`${t}|${norm(ligne.libelle)}`));
-    if (match) {
-      pris.add(match.id);
-      const data = {};
-      for (const [from, to] of CHAMPS) {
-        if (ligne[from] != null && ligne[from] !== match[to]) data[to] = ligne[from];
-      }
-      if (ligne.superficie != null && Number(match.superficie ?? 0) !== ligne.superficie) data.superficie = ligne.superficie;
-      if (cId && cId !== match.communeId) data.communeId = cId;
-      for (const key of Object.keys(data)) champsModifies.set(key, (champsModifies.get(key) ?? 0) + 1);
-      if (Object.keys(data).length) majs.push({ id: match.id, data });
-    } else {
-      nouveaux.push({ ...ligne, communeId: cId });
+  for (const ligne of lignesAvecCommune) {
+    const match = appariement.get(ligne);
+    if (!match) { nouveaux.push(ligne); continue; }
+    const data = {};
+    // Une valeur n'est remplacée que si elle change vraiment (pas une simple différence de casse ou d'espaces).
+    for (const [from, to] of CHAMPS) {
+      if (ligne[from] != null && norm(ligne[from]) !== norm(match[to])) data[to] = ligne[from];
     }
+    if (ligne.superficie != null && Number(match.superficie ?? 0) !== ligne.superficie) data.superficie = ligne.superficie;
+    if (ligne.communeId && ligne.communeId !== match.communeId) data.communeId = ligne.communeId;
+    for (const key of Object.keys(data)) champsModifies.set(key, (champsModifies.get(key) ?? 0) + 1);
+    if (Object.keys(data).length) majs.push({ id: match.id, data });
   }
   const inchanges = lignes.length - majs.length - nouveaux.length;
   const absents = existants.length - pris.size;
@@ -203,6 +248,7 @@ export async function reprendreFiches(db, { dir, apply = false }) {
     nouveauxParCommune: Object.entries(nouveaux.reduce((acc, n) => { const c = communesRows.find((x) => x.id === n.communeId)?.nom ?? "sans commune"; acc[c] = (acc[c] ?? 0) + 1; return acc; }, {})),
     nouveauxLibelles: new Set(nouveaux.map((n) => norm(n.libelle))).size,
     site: site?.nom ?? null, salle: salle?.nom ?? null, statut: statuts[0] ?? null,
+    parPasse: Object.entries(parPasse),
   };
   if (!apply) return { applied: false, report };
   if (!site) throw new Error("Site ministère - Plateau introuvable.");
@@ -272,6 +318,7 @@ function print(result) {
   console.log(`Fichiers : ${r.fichiers.join(", ")}`);
   console.log(`Lignes lues : ${r.lues} — doublons exacts écartés : ${r.doublons} — dossiers distincts : ${r.lignes}`);
   console.log(`Dossiers en base : ${r.existants}`);
+  console.log(`  rapprochements : ${r.parPasse.map(([p, n]) => `${p} ${n}`).join(", ")}`);
   console.log(`  à mettre à jour : ${r.majs}   déjà identiques : ${r.inchanges}   absents des fiches (inchangés) : ${r.absents}`);
   console.log(`  nouveaux dossiers : ${r.nouveaux} (${r.nouveauxLibelles} libellés de carton) → ${r.site} · ${r.salle}`);
   console.log(`  nouveaux par commune : ${r.nouveauxParCommune.map(([c, n]) => `${c} ${n}`).join(", ")}`);
