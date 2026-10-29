@@ -26,3 +26,12 @@ describe("reprise des fiches terrain", () => {
     expect(dedoublonner([a, b])).toEqual([b]);
   });
 });
+
+describe("noms proches", () => {
+  it("tolère une faute de frappe ou un prénom ajouté, pas un autre nom", async () => {
+    const { proche } = await import("../../deploy/reprise-fiches.mjs");
+    expect(proche("kouame alexandre", "kouame alexandr")).toBe(true);
+    expect(proche("yace jean", "yace jean marcel")).toBe(true);
+    expect(proche("kone awa", "kone ali")).toBe(false);
+  });
+});
