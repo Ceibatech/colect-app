@@ -11,14 +11,15 @@ import { PrismaClient } from "@prisma/client";
 
 /** Liste d'enlèvement (référence provisoire et libellé de chaque boîte), si elle existe pour ce préfixe. */
 function listeEnlevement(prefixe) {
-  if (prefixe !== "2010-KOU") return new Map();
+  if (prefixe !== "2010-KOU") return { boites: new Map(), etabliePar: null };
   const file = path.join(path.dirname(new URL(import.meta.url).pathname), "enlevement-koumassi.json");
-  if (!existsSync(file)) return new Map();
-  return new Map(JSON.parse(readFileSync(file, "utf8")).boites.map((boite) => [boite.ref, boite]));
+  if (!existsSync(file)) return { boites: new Map(), etabliePar: null };
+  const data = JSON.parse(readFileSync(file, "utf8"));
+  return { boites: new Map(data.boites.map((boite) => [boite.ref, boite])), etabliePar: data.etabliePar ?? null };
 }
 
 export async function loadCotes(db, { prefixe, de, a }) {
-  const liste = listeEnlevement(prefixe);
+  const { boites: liste } = listeEnlevement(prefixe);
   const cartons = await db.carton.findMany({
     where: { cotePrefixe: prefixe, coteSequence: { gte: de, lte: a } },
     orderBy: { coteSequence: "asc" },
@@ -72,7 +73,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     if (!/^\d{4}-[A-Z][A-Z0-9]{1,5}$/.test(prefixe)) throw new Error("--prefixe invalide (ex. 2010-KOU).");
     if (!Number.isInteger(de) || !Number.isInteger(a) || de < 1 || a < de || a - de > 2000) throw new Error("Plage --de/--a invalide.");
     const cartons = await loadCotes(prisma, { prefixe, de, a });
-    process.stdout.write(JSON.stringify({ exportedAt: new Date().toISOString(), prefixe, de, a, cartons }));
+    process.stdout.write(JSON.stringify({ exportedAt: new Date().toISOString(), prefixe, de, a, listeEtabliePar: listeEnlevement(prefixe).etabliePar, cartons }));
     console.error(`Cartons exportés : ${cartons.length}, dossiers : ${cartons.reduce((s, c) => s + c.dossiers.length, 0)}`);
   } catch (error) {
     console.error(`Export échoué : ${error instanceof Error ? error.message : String(error)}`);

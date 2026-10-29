@@ -185,6 +185,7 @@ summary = {
     "first": cartons[0]["cote"] if cartons else None, "last": cartons[-1]["cote"] if cartons else None,
     "listBoxes": len(liste), "listFound": sum(1 for c in liste if c["dossiers"]), "empty": len(vides),
     "listDossiers": sum(len(c["dossiers"]) for c in liste),
+    "listAuthor": data.get("listeEtabliePar"),
     "emptyList": [f'n° {c["listeRef"]} « {c["listeLibelle"]} » ({c["cote"]})' for c in liste if not c["dossiers"]],
     "exportedAt": data["exportedAt"],
 }
