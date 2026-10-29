@@ -1,0 +1,806 @@
+{
+ "commune": "Koumassi",
+ "source": "Liste_200_Cartons_Archives.pdf (enlèvement)",
+ "boites": [
+  {
+   "ref": 1,
+   "libelle": "lots 16-116"
+  },
+  {
+   "ref": 2,
+   "libelle": "lots 296-426"
+  },
+  {
+   "ref": 3,
+   "libelle": "lots 296-426"
+  },
+  {
+   "ref": 4,
+   "libelle": "lots 148-252"
+  },
+  {
+   "ref": 5,
+   "libelle": "lots 437-490"
+  },
+  {
+   "ref": 6,
+   "libelle": "lots 1-1482"
+  },
+  {
+   "ref": 7,
+   "libelle": "lots 193-417"
+  },
+  {
+   "ref": 8,
+   "libelle": "lots 14-1458"
+  },
+  {
+   "ref": 9,
+   "libelle": "lots 1458-1476"
+  },
+  {
+   "ref": 10,
+   "libelle": "lots 127-1441"
+  },
+  {
+   "ref": 11,
+   "libelle": "lots 868-2338"
+  },
+  {
+   "ref": 12,
+   "libelle": "lots 1410-1420"
+  },
+  {
+   "ref": 13,
+   "libelle": "lots 2A-1982"
+  },
+  {
+   "ref": 14,
+   "libelle": "lots 52-1408"
+  },
+  {
+   "ref": 15,
+   "libelle": "lots 159-1392"
+  },
+  {
+   "ref": 16,
+   "libelle": "lots 1315-1346"
+  },
+  {
+   "ref": 17,
+   "libelle": "lots 1-2268"
+  },
+  {
+   "ref": 18,
+   "libelle": "lots 82-1575"
+  },
+  {
+   "ref": 19,
+   "libelle": "lots 98B-1523"
+  },
+  {
+   "ref": 20,
+   "libelle": "lots 1590-2877"
+  },
+  {
+   "ref": 21,
+   "libelle": "lots 148-1589"
+  },
+  {
+   "ref": 22,
+   "libelle": "lots 1485-1512"
+  },
+  {
+   "ref": 23,
+   "libelle": "lots 163-1620"
+  },
+  {
+   "ref": 24,
+   "libelle": "lots 1623-2755"
+  },
+  {
+   "ref": 25,
+   "libelle": "lots 1635-1650"
+  },
+  {
+   "ref": 26,
+   "libelle": "lots 1651-1662"
+  },
+  {
+   "ref": 27,
+   "libelle": "lots 181-1669"
+  },
+  {
+   "ref": 28,
+   "libelle": "lots 1670-1696"
+  },
+  {
+   "ref": 29,
+   "libelle": "lots 424-1700"
+  },
+  {
+   "ref": 30,
+   "libelle": "lots 1702-1749"
+  },
+  {
+   "ref": 31,
+   "libelle": "lots 1722-1731"
+  },
+  {
+   "ref": 32,
+   "libelle": "lots 553-1745"
+  },
+  {
+   "ref": 33,
+   "libelle": "lots 213-1757"
+  },
+  {
+   "ref": 34,
+   "libelle": "lots 1758-1774"
+  },
+  {
+   "ref": 35,
+   "libelle": "lots 18B-1782"
+  },
+  {
+   "ref": 36,
+   "libelle": "lots 1785-1795"
+  },
+  {
+   "ref": 37,
+   "libelle": "lots 1796-1802"
+  },
+  {
+   "ref": 38,
+   "libelle": "lots 595-1815"
+  },
+  {
+   "ref": 39,
+   "libelle": "lots 1818-1830"
+  },
+  {
+   "ref": 40,
+   "libelle": "lots 245-1920"
+  },
+  {
+   "ref": 41,
+   "libelle": "lots 1921-1932"
+  },
+  {
+   "ref": 42,
+   "libelle": "lots 327-1869"
+  },
+  {
+   "ref": 43,
+   "libelle": "lots 1874-1887"
+  },
+  {
+   "ref": 44,
+   "libelle": "lots 1891-2828"
+  },
+  {
+   "ref": 45,
+   "libelle": "lots 282-292"
+  },
+  {
+   "ref": 46,
+   "libelle": "lots 26B-811"
+  },
+  {
+   "ref": 47,
+   "libelle": "lots 386-672bis"
+  },
+  {
+   "ref": 48,
+   "libelle": "lots 282-317"
+  },
+  {
+   "ref": 49,
+   "libelle": "lots 302-2724"
+  },
+  {
+   "ref": 50,
+   "libelle": "lots 217-906"
+  },
+  {
+   "ref": 51,
+   "libelle": "lots A-373"
+  },
+  {
+   "ref": 52,
+   "libelle": "lots 379-2092"
+  },
+  {
+   "ref": 53,
+   "libelle": "lots 230-612B"
+  },
+  {
+   "ref": 54,
+   "libelle": "lots 406-413"
+  },
+  {
+   "ref": 55,
+   "libelle": "lots 419-570"
+  },
+  {
+   "ref": 56,
+   "libelle": "lots 571-1334"
+  },
+  {
+   "ref": 57,
+   "libelle": "lots 348-580"
+  },
+  {
+   "ref": 58,
+   "libelle": "lots 587-611"
+  },
+  {
+   "ref": 59,
+   "libelle": "lots 601-611"
+  },
+  {
+   "ref": 60,
+   "libelle": "lots B-T"
+  },
+  {
+   "ref": 61,
+   "libelle": "lots V-Z"
+  },
+  {
+   "ref": 62,
+   "libelle": "lots 625-636"
+  },
+  {
+   "ref": 63,
+   "libelle": "lots 637-2/95"
+  },
+  {
+   "ref": 64,
+   "libelle": "lots 343-652"
+  },
+  {
+   "ref": 65,
+   "libelle": "lots 653-664"
+  },
+  {
+   "ref": 66,
+   "libelle": "lots A-J"
+  },
+  {
+   "ref": 67,
+   "libelle": "lots K-P"
+  },
+  {
+   "ref": 68,
+   "libelle": "lots 282-2311"
+  },
+  {
+   "ref": 69,
+   "libelle": "lots 343-347"
+  },
+  {
+   "ref": 70,
+   "libelle": "lots 349-358"
+  },
+  {
+   "ref": 71,
+   "libelle": "lots 205-365"
+  },
+  {
+   "ref": 72,
+   "libelle": "lots 331-465"
+  },
+  {
+   "ref": 73,
+   "libelle": "lots 466-483"
+  },
+  {
+   "ref": 74,
+   "libelle": "lots 376-489"
+  },
+  {
+   "ref": 75,
+   "libelle": "lots 490-517"
+  },
+  {
+   "ref": 76,
+   "libelle": "lots 379-542"
+  },
+  {
+   "ref": 77,
+   "libelle": "lots 154bis-564"
+  },
+  {
+   "ref": 78,
+   "libelle": "lots 432-587"
+  },
+  {
+   "ref": 79,
+   "libelle": "lots 446-2315"
+  },
+  {
+   "ref": 80,
+   "libelle": "lots 524-620"
+  },
+  {
+   "ref": 81,
+   "libelle": "lots 621-635"
+  },
+  {
+   "ref": 82,
+   "libelle": "lots 637-676"
+  },
+  {
+   "ref": 83,
+   "libelle": "lots 482-695"
+  },
+  {
+   "ref": 84,
+   "libelle": "lots 697-709"
+  },
+  {
+   "ref": 85,
+   "libelle": "lots 480-2332"
+  },
+  {
+   "ref": 86,
+   "libelle": "lots 538-2201"
+  },
+  {
+   "ref": 87,
+   "libelle": "lots 571-759"
+  },
+  {
+   "ref": 88,
+   "libelle": "lots 757-777"
+  },
+  {
+   "ref": 89,
+   "libelle": "lots 592-3050"
+  },
+  {
+   "ref": 90,
+   "libelle": "lots 817-3181"
+  },
+  {
+   "ref": 91,
+   "libelle": "lots 614-815"
+  },
+  {
+   "ref": 92,
+   "libelle": "lots 835-852"
+  },
+  {
+   "ref": 93,
+   "libelle": "lots 644-863"
+  },
+  {
+   "ref": 94,
+   "libelle": "lots 929"
+  },
+  {
+   "ref": 95,
+   "libelle": "lots 874-2335"
+  },
+  {
+   "ref": 96,
+   "libelle": "lots 3421-3445"
+  },
+  {
+   "ref": 97,
+   "libelle": "lots 2272-3419"
+  },
+  {
+   "ref": 98,
+   "libelle": "lots 3358A-3396"
+  },
+  {
+   "ref": 99,
+   "libelle": "lots 3374-3378"
+  },
+  {
+   "ref": 100,
+   "libelle": "lots 2526-3371"
+  },
+  {
+   "ref": 101,
+   "libelle": "lots 3342A-3335"
+  },
+  {
+   "ref": 102,
+   "libelle": "lots 2289A-2583"
+  },
+  {
+   "ref": 103,
+   "libelle": "lots 2276-2288"
+  },
+  {
+   "ref": 104,
+   "libelle": "lots 1550-1583"
+  },
+  {
+   "ref": 105,
+   "libelle": "lots 2414-2479"
+  },
+  {
+   "ref": 106,
+   "libelle": "lots 2408X-2413"
+  },
+  {
+   "ref": 107,
+   "libelle": "ilots 155 TF:11539-27636"
+  },
+  {
+   "ref": 108,
+   "libelle": "lots 2386-3548"
+  },
+  {
+   "ref": 109,
+   "libelle": "lots 3501-3506"
+  },
+  {
+   "ref": 110,
+   "libelle": "lots 3489A-3501"
+  },
+  {
+   "ref": 111,
+   "libelle": "lots 3473-3501"
+  },
+  {
+   "ref": 112,
+   "libelle": "lots 1560-3472"
+  },
+  {
+   "ref": 113,
+   "libelle": "lots 1552-3459"
+  },
+  {
+   "ref": 114,
+   "libelle": "lots 1944-1965"
+  },
+  {
+   "ref": 115,
+   "libelle": "lots 2972-3186"
+  },
+  {
+   "ref": 116,
+   "libelle": "lots 3017-3156"
+  },
+  {
+   "ref": 117,
+   "libelle": "lots 3552-3784"
+  },
+  {
+   "ref": 118,
+   "libelle": "ilots 169-183"
+  },
+  {
+   "ref": 119,
+   "libelle": "ilots 165-168"
+  },
+  {
+   "ref": 120,
+   "libelle": "lots 177-232"
+  },
+  {
+   "ref": 121,
+   "libelle": "ilots A8-A9"
+  },
+  {
+   "ref": 122,
+   "libelle": "ilots A6-A7"
+  },
+  {
+   "ref": 123,
+   "libelle": "ilots A4-A5"
+  },
+  {
+   "ref": 124,
+   "libelle": "ilots A-A3"
+  },
+  {
+   "ref": 125,
+   "libelle": "ilots 413-646"
+  },
+  {
+   "ref": 126,
+   "libelle": "ilots A17-A19"
+  },
+  {
+   "ref": 127,
+   "libelle": "ilots A15-A16"
+  },
+  {
+   "ref": 128,
+   "libelle": "lots 174-259"
+  },
+  {
+   "ref": 129,
+   "libelle": "lots 490-546"
+  },
+  {
+   "ref": 130,
+   "libelle": "lots 392-444"
+  },
+  {
+   "ref": 131,
+   "libelle": "lots 278-444"
+  },
+  {
+   "ref": 132,
+   "libelle": "lots 2614-2623"
+  },
+  {
+   "ref": 133,
+   "libelle": "lots 2609-2613"
+  },
+  {
+   "ref": 134,
+   "libelle": "lots 1607-2607"
+  },
+  {
+   "ref": 135,
+   "libelle": "lots 1587-2601"
+  },
+  {
+   "ref": 136,
+   "libelle": "lots 1557-2587"
+  },
+  {
+   "ref": 137,
+   "libelle": "lots 2560-2570"
+  },
+  {
+   "ref": 138,
+   "libelle": "lots 1656-1671"
+  },
+  {
+   "ref": 139,
+   "libelle": "lots 2664-2666"
+  },
+  {
+   "ref": 140,
+   "libelle": "lots 1558-1655"
+  },
+  {
+   "ref": 141,
+   "libelle": "lots 2638--2651"
+  },
+  {
+   "ref": 142,
+   "libelle": "lots 1626-2637"
+  },
+  {
+   "ref": 143,
+   "libelle": "lots 1619-3533"
+  },
+  {
+   "ref": 144,
+   "libelle": "lots 2734-2743"
+  },
+  {
+   "ref": 145,
+   "libelle": "lots 2714-2731"
+  },
+  {
+   "ref": 146,
+   "libelle": "lots 2705-2743"
+  },
+  {
+   "ref": 147,
+   "libelle": "lots 1722-2704"
+  },
+  {
+   "ref": 148,
+   "libelle": "lots 2691-2678"
+  },
+  {
+   "ref": 149,
+   "libelle": "lots 2670-2682"
+  },
+  {
+   "ref": 150,
+   "libelle": "lots 1814-1834"
+  },
+  {
+   "ref": 151,
+   "libelle": "lots 2797-3555"
+  },
+  {
+   "ref": 152,
+   "libelle": "lots 2786-2793"
+  },
+  {
+   "ref": 153,
+   "libelle": "lots 2778-3539"
+  },
+  {
+   "ref": 154,
+   "libelle": "lots 2766-2775"
+  },
+  {
+   "ref": 155,
+   "libelle": "lots 2744-2764"
+  },
+  {
+   "ref": 156,
+   "libelle": "lots 2882-2895"
+  },
+  {
+   "ref": 157,
+   "libelle": "lots 2858-2881"
+  },
+  {
+   "ref": 158,
+   "libelle": "lots 2844-2857"
+  },
+  {
+   "ref": 159,
+   "libelle": "lots 2822-2840"
+  },
+  {
+   "ref": 160,
+   "libelle": "lots 2812-2818"
+  },
+  {
+   "ref": 161,
+   "libelle": "lots 2802-2811A et B"
+  },
+  {
+   "ref": 162,
+   "libelle": "lots 3327-3331"
+  },
+  {
+   "ref": 163,
+   "libelle": "lots 3318-3324"
+  },
+  {
+   "ref": 164,
+   "libelle": "lots 2096-2163"
+  },
+  {
+   "ref": 165,
+   "libelle": "lots 2078-3357bis"
+  },
+  {
+   "ref": 166,
+   "libelle": "lots 1534-2055"
+  },
+  {
+   "ref": 167,
+   "libelle": "lots 1968-1951A"
+  },
+  {
+   "ref": 168,
+   "libelle": "lots 748-2355"
+  },
+  {
+   "ref": 169,
+   "libelle": "lots 2344-2350"
+  },
+  {
+   "ref": 170,
+   "libelle": "lots 1211-1232"
+  },
+  {
+   "ref": 171,
+   "libelle": "lots 2340-2342"
+  },
+  {
+   "ref": 172,
+   "libelle": "lots 1190-1210"
+  },
+  {
+   "ref": 173,
+   "libelle": "lots 2329-2337"
+  },
+  {
+   "ref": 174,
+   "libelle": "lots 2360-2377"
+  },
+  {
+   "ref": 175,
+   "libelle": "lots 1273-1295"
+  },
+  {
+   "ref": 176,
+   "libelle": "lots 1283-1293"
+  },
+  {
+   "ref": 177,
+   "libelle": "lots 2356-2365"
+  },
+  {
+   "ref": 178,
+   "libelle": "lots 2363-2347"
+  },
+  {
+   "ref": 179,
+   "libelle": "lots 1236-1271"
+  },
+  {
+   "ref": 180,
+   "libelle": "lots 1362-2426"
+  },
+  {
+   "ref": 181,
+   "libelle": "lots 2400-2407"
+  },
+  {
+   "ref": 182,
+   "libelle": "lots 1339-1365"
+  },
+  {
+   "ref": 183,
+   "libelle": "lots 1321-2399"
+  },
+  {
+   "ref": 184,
+   "libelle": "lots 1297-2388"
+  },
+  {
+   "ref": 185,
+   "libelle": "lots 2378-2393"
+  },
+  {
+   "ref": 186,
+   "libelle": "lots 709-2476"
+  },
+  {
+   "ref": 187,
+   "libelle": "lots 1432-2463"
+  },
+  {
+   "ref": 188,
+   "libelle": "lots 1415-1430"
+  },
+  {
+   "ref": 189,
+   "libelle": "lots 1398-2452"
+  },
+  {
+   "ref": 190,
+   "libelle": "lots 2433-2440"
+  },
+  {
+   "ref": 191,
+   "libelle": "lots 508-2429"
+  },
+  {
+   "ref": 192,
+   "libelle": "lots 2509-2518"
+  },
+  {
+   "ref": 193,
+   "libelle": "lots 1478-2507"
+  },
+  {
+   "ref": 194,
+   "libelle": "lots 2501-2505"
+  },
+  {
+   "ref": 195,
+   "libelle": "lots 1634-2500"
+  },
+  {
+   "ref": 196,
+   "libelle": "lots 2483-2494"
+  },
+  {
+   "ref": 197,
+   "libelle": "lots 1459-2422"
+  },
+  {
+   "ref": 198,
+   "libelle": "lots 2537-2557"
+  },
+  {
+   "ref": 199,
+   "libelle": "lots 1535-1549"
+  },
+  {
+   "ref": 200,
+   "libelle": "lots 2532-2543"
+  }
+ ]
+}
