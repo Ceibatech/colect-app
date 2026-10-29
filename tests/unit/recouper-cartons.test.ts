@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cleBoite, formatDossierCote, norm, planRecoupe } from "../../deploy/recouper-cartons.mjs";
 
-type Plan = { boites: Array<{ cote: string; listeRef: number | null; reference: string | null; dossiers: Array<{ id: number }> }>; partagees: number[] };
+type Plan = { boites: Array<{ cote: string; listeRef: number | null; reference: string | null; correspondance?: string | null; dossiers: Array<{ id: number }> }>; partagees: number[] };
 const d = (id: number, cartonId: number, reference: string | null, ancienneCote = "2010-KOU-0001", rang: number | null = id) => ({ id, cartonId, reference, ancienneCote, rang });
 
 describe("recoupe des cartons sur les boîtes physiques", () => {
@@ -47,7 +47,7 @@ describe("bornes de boîte quelle que soit l'écriture", () => {
   });
   it("rattache une faute de frappe ou une lettre en plus à la boîte de la liste", () => {
     const d = (id: number, reference: string) => ({ id, cartonId: 1, reference, ancienneCote: "2010-KOU-0001", rang: id });
-    const plan = planRecoupe([d(1, "3358-3396"), d(2, "18 B-1780")], [{ ref: 1, libelle: "lots 3358A-3396" }, { ref: 2, libelle: "lots 18B-1782" }]) as unknown as Plan & { boites: Array<{ correspondance: string | null }> };
+    const plan = planRecoupe([d(1, "3358-3396"), d(2, "18 B-1780")], [{ ref: 1, libelle: "lots 3358A-3396" }, { ref: 2, libelle: "lots 18B-1782" }]) as unknown as Plan;
     expect(plan.boites.slice(0, 2).map((b) => [b.dossiers.length, b.correspondance])).toEqual([[1, "proche"], [1, "proche"]]);
   });
 });
