@@ -40,17 +40,18 @@ export function buildCotesMessage(summary, files, { replaces = false } = {}) {
     "l'étiquette d'un dossier ne porte aucun nom : on la colle sur la chemise qui porte le même îlot, le même lot et, le cas échéant, le même titre foncier ;",
     "le QR code de chaque étiquette ouvre directement la fiche correspondante dans GeoArchives.",
   ];
-  const replaceNote = "Ce message remplace l'envoi précédent : les étiquettes des dossiers ne portent plus le nom des titulaires.";
-  const notes = summary.empty
-    ? [`${nf(summary.empty)} carton${summary.empty > 1 ? "s n'ont" : " n'a"} pas encore de dossier enregistré : ${summary.empty > 1 ? "leurs dossiers seront rattachés" : "ses dossiers seront rattachés"} lors de l'inventaire, en scannant le QR du carton. ${summary.empty > 1 ? "Ils sont signalés" : "Il est signalé"} en couleur dans la liste.`]
-    : [];
+  const replaceNote = "Ce message remplace l'envoi précédent : correspondance des cartons de la liste améliorée et étiquettes des dossiers sans le nom des titulaires.";
+  const notes = [
+    ...(summary.listBoxes ? [`dossiers retrouvés en base pour ${nf(summary.listFound)} des ${nf(summary.listBoxes)} cartons de la liste d'enlèvement (${nf(summary.listDossiers ?? summary.dossiers)} dossiers) ;`] : []),
+    ...(summary.empty ? [`${nf(summary.empty)} carton${summary.empty > 1 ? "s n'ont" : " n'a"} pas encore de dossier enregistré : ${summary.empty > 1 ? "leurs dossiers seront rattachés" : "ses dossiers seront rattachés"} lors de l'inventaire, en scannant le QR du carton${summary.emptyList?.length ? ` (${summary.emptyList.join(", ")})` : ""}. ${summary.empty > 1 ? "Ils sont signalés" : "Il est signalé"} en couleur dans la liste.`] : []),
+  ];
   const p = (text) => `<p style="margin:0 0 12px">${text}</p>`;
   const ul = (items, tag = "ul") => `<${tag} style="margin:0 0 14px;padding-left:22px">${items.map((item) => `<li style="margin-bottom:4px">${esc(item)}</li>`).join("")}</${tag}>`;
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#1f2937;line-height:1.55;max-width:680px">
 ${replaces ? p(`<i>${esc(replaceNote)}</i>`) : ""}${p("Bonjour à tous,")}
 ${p(esc(intro))}
 ${p("En synthèse :")}${ul(points)}
-${notes.length ? `${p("Point à noter :")}${ul(notes)}` : ""}
+${notes.length ? `${p("Points à noter :")}${ul(notes)}` : ""}
 ${p("Documents joints :")}${ul(documents, "ol")}
 ${p("Nous restons à votre disposition pour tout complément.")}
 <p style="margin:16px 0 0">Cordialement,<br><b>L'équipe GeoArchives</b><br><span style="color:#6b7280">CEIBA Analytics</span></p></div>`;
@@ -58,7 +59,7 @@ ${p("Nous restons à votre disposition pour tout complément.")}
     ...(replaces ? [replaceNote, ""] : []),
     "Bonjour à tous,", "", intro, "",
     "En synthèse :", ...points.map((x) => `- ${x}`), "",
-    ...(notes.length ? ["Point à noter :", ...notes.map((x) => `- ${x}`), ""] : []),
+    ...(notes.length ? ["Points à noter :", ...notes.map((x) => `- ${x}`), ""] : []),
     "Documents joints :", ...documents.map((x, i) => `${i + 1}. ${x}`), "",
     "Nous restons à votre disposition pour tout complément.", "", "Cordialement,", "L'équipe GeoArchives", "CEIBA Analytics",
   ].join("\n");

@@ -35,6 +35,32 @@ export function norm(value) {
     .replace(/[^a-z0-9-]+/g, " ").trim();
 }
 
+/**
+ * Bornes de la boîte, quelle que soit l'écriture : « lots 82-1575 »,
+ * « ILOT 11 LOTS 82-1575 », « Îlot 11-97/148-252 » (→ 148-252),
+ * « 2614 à 2623 », « îlot 66 lots 929 », « 154bis-564 » (→ 154-564).
+ */
+export function cleBoite(value) {
+  const text = norm((value ?? "").replace(/\s+(?:à|a|au)\.?\s+/gi, "-")).replace(/bis\b/g, "").replace(/\s*:\s*/g, " ");
+  const ranges = [...text.matchAll(/([a-z]?\d+[a-z]?|[a-z]\d*)\s*-\s*([a-z]?\d+[a-z]?|[a-z]\d*)(?![\w])/g)];
+  if (ranges.length) {
+    const last = ranges.at(-1);
+    return `${last[1]}-${last[2]}`;
+  }
+  const single = text.match(/lot\s+([a-z0-9]+)\s*$/) ?? text.match(/^([a-z0-9]+)$/);
+  return single ? single[1] : null;
+}
+
+/** Même première borne et seconde borne à 5 près : faute de frappe probable (« 18B-1782 » / « 18B-1780 »). */
+function proche(a, b) {
+  const [a1, a2] = a.split("-");
+  const [b1, b2] = b.split("-");
+  if (!a2 || !b2 || a1 !== b1) return null;
+  const x = Number(a2.replace(/\D/g, ""));
+  const y = Number(b2.replace(/\D/g, ""));
+  return Number.isFinite(x) && Number.isFinite(y) && a2.replace(/\d/g, "") === b2.replace(/\d/g, "") && Math.abs(x - y) <= 5 ? Math.abs(x - y) : null;
+}
+
 export const formatCote = (sequence) => `${PREFIXE}-${String(sequence).padStart(4, "0")}`;
 export const formatDossierCote = (cote, rang) => `${cote}-${rang < 1000 ? String(rang).padStart(3, "0") : rang}`;
 
@@ -65,13 +91,48 @@ export function planRecoupe(dossiers, liste) {
   const boites = [];
   const pris = new Set();
   const partagees = [];
+  // Groupes de référence par bornes de boîte (plusieurs écritures d'une même boîte).
+  const parCle = new Map();
+  for (const groupe of groupes.values()) {
+    const cle = groupe.reference ? cleBoite(groupe.reference) : null;
+    if (!cle) continue;
+    if (!parCle.has(cle)) parCle.set(cle, []);
+    parCle.get(cle).push(groupe);
+  }
+  // Même boîte à une lettre près (« 3358A-3396 » / « 3358-3396 »).
+  const sansLettres = (cle) => (/\d/.test(cle) ? cle.replace(/[a-z]/g, "") : cle);
+  const parCleSansLettres = new Map();
+  for (const [cle, groupesCle] of parCle) {
+    const simple = sansLettres(cle);
+    parCleSansLettres.set(simple, [...(parCleSansLettres.get(simple) ?? []), ...groupesCle]);
+  }
+  const libres = (liste_) => liste_.filter((groupe) => !pris.has(groupe.key));
   for (const boite of liste) {
-    const key = `ref:${norm(boite.libelle)}`;
-    const groupe = groupes.get(key);
-    if (groupe && pris.has(key)) partagees.push(boite.ref);
-    const dossiersBoite = groupe && !pris.has(key) ? groupe.dossiers : [];
-    if (groupe) pris.add(key);
-    boites.push({ listeRef: boite.ref, libelle: boite.libelle, reference: groupe?.reference ?? boite.libelle, dossiers: dossiersBoite, trouvee: Boolean(groupe) });
+    const cle = cleBoite(boite.libelle);
+    let trouves = cle ? parCle.get(cle) ?? [] : [];
+    let correspondance = trouves.length ? "exacte" : null;
+    if (!libres(trouves).length && cle && libres(parCleSansLettres.get(sansLettres(cle)) ?? []).length) {
+      trouves = parCleSansLettres.get(sansLettres(cle));
+      correspondance = "proche";
+    }
+    if (!trouves.length && cle) {
+      // Faute de frappe probable : la clé la plus proche encore libre.
+      let best = null;
+      for (const [autre, groupesCle] of parCle) {
+        const ecart = proche(cle, autre);
+        if (ecart != null && libres(groupesCle).length && (!best || ecart < best.ecart)) best = { ecart, groupesCle };
+      }
+      if (best) { trouves = best.groupesCle; correspondance = "proche"; }
+    }
+    const disponibles = libres(trouves);
+    if (trouves.length && !disponibles.length) partagees.push(boite.ref);
+    for (const groupe of disponibles) pris.add(groupe.key);
+    const dossiersBoite = disponibles.flatMap((groupe) => groupe.dossiers).sort(ordreDossier);
+    boites.push({
+      listeRef: boite.ref, libelle: boite.libelle,
+      reference: disponibles.map((groupe) => groupe.reference).join(" / ") || boite.libelle,
+      dossiers: dossiersBoite, trouvee: dossiersBoite.length > 0, correspondance: dossiersBoite.length ? correspondance : null,
+    });
   }
   const reste = [...groupes.values()].filter((groupe) => !pris.has(groupe.key))
     .sort((a, b) => ordreDossier(a.premier, b.premier));
@@ -166,11 +227,11 @@ function print(result) {
   console.log(`Dossiers dans les cartons ${PREFIXE} : ${report.dossiers} (aujourd'hui ${report.anciensCartons} cartons)`);
   console.log(`Après recoupe : ${report.boites.length} cartons ${PREFIXE}`);
   console.log(`\nListe d'enlèvement : ${liste.length} boîtes → ${PREFIXE}-0001 à ${formatCote(liste.length)}`);
-  console.log(`  - retrouvées dans la base : ${trouvees.length} (${trouvees.reduce((s, b) => s + b.dossiers.length, 0)} dossiers)`);
+  console.log(`  - retrouvées dans la base : ${trouvees.length} (${trouvees.reduce((s, b) => s + b.dossiers.length, 0)} dossiers), dont ${trouvees.filter((b) => b.correspondance === "proche").length} par une référence proche (faute de frappe probable)`);
   console.log(`  - sans dossier en base (carton créé vide, dossiers rattachés à l'inventaire) : ${liste.length - trouvees.length}`);
   if (report.partagees.length) console.log(`  - même référence qu'une boîte précédente (créée vide, à départager) : n° ${report.partagees.join(", ")}`);
   console.log("\nBoîtes de la liste :");
-  for (const b of liste) console.log(`  ${String(b.listeRef).padStart(3)} | ${b.cote} | ${b.libelle} | ${b.dossiers.length} dossier(s)`);
+  for (const b of liste) console.log(`  ${String(b.listeRef).padStart(3)} | ${b.cote} | ${b.libelle} | ${b.dossiers.length} dossier(s)${b.correspondance === "proche" ? ` | référence proche en base : ${b.reference}` : b.dossiers.length && b.reference !== b.libelle ? ` | en base : ${b.reference}` : ""}`);
   const suivants = report.boites.filter((b) => b.listeRef == null);
   console.log(`\nAutres boîtes (${suivants.length}) — les 120 suivantes :`);
   for (const b of suivants.slice(0, 120)) console.log(`  ${b.cote} | ${b.reference ?? "sans référence (carton d'origine)"} | ${b.dossiers.length} dossier(s)`);

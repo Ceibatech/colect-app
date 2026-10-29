@@ -180,6 +180,8 @@ summary = {
     "kind": "cotes", "boxes": len(cartons), "dossiers": total_dossiers,
     "first": cartons[0]["cote"] if cartons else None, "last": cartons[-1]["cote"] if cartons else None,
     "listBoxes": len(liste), "listFound": sum(1 for c in liste if c["dossiers"]), "empty": len(vides),
+    "listDossiers": sum(len(c["dossiers"]) for c in liste),
+    "emptyList": [f'n° {c["listeRef"]} « {c["listeLibelle"]} » ({c["cote"]})' for c in liste if not c["dossiers"]],
     "exportedAt": data["exportedAt"],
 }
 json.dump(summary, open(f"{outdir}/summary.json", "w", encoding="utf-8"), ensure_ascii=False)

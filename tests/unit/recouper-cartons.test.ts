@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDossierCote, norm, planRecoupe } from "../../deploy/recouper-cartons.mjs";
+import { cleBoite, formatDossierCote, norm, planRecoupe } from "../../deploy/recouper-cartons.mjs";
 
 type Plan = { boites: Array<{ cote: string; listeRef: number | null; reference: string | null; dossiers: Array<{ id: number }> }>; partagees: number[] };
 const d = (id: number, cartonId: number, reference: string | null, ancienneCote = "2010-KOU-0001", rang: number | null = id) => ({ id, cartonId, reference, ancienneCote, rang });
@@ -34,5 +34,20 @@ describe("recoupe des cartons sur les boîtes physiques", () => {
   it("numérote les dossiers sans trou", () => {
     expect(formatDossierCote("2010-KOU-0001", 12)).toBe("2010-KOU-0001-012");
     expect(formatDossierCote("2010-KOU-0001", 1203)).toBe("2010-KOU-0001-1203");
+  });
+});
+
+describe("bornes de boîte quelle que soit l'écriture", () => {
+  it("retrouve la même boîte", () => {
+    expect(cleBoite("ILOT 11 LOTS 82-1575")).toBe(cleBoite("lots 82-1575"));
+    expect(cleBoite("Îlot 11-97/148-252")).toBe(cleBoite("lots 148-252"));
+    expect(cleBoite("2614 à 2623")).toBe(cleBoite("lots 2614-2623"));
+    expect(cleBoite("îlot 66 lots 929")).toBe(cleBoite("lots 929"));
+    expect(cleBoite("lots 154bis-564")).toBe(cleBoite("îlot 45 lot 154-564"));
+  });
+  it("rattache une faute de frappe ou une lettre en plus à la boîte de la liste", () => {
+    const d = (id: number, reference: string) => ({ id, cartonId: 1, reference, ancienneCote: "2010-KOU-0001", rang: id });
+    const plan = planRecoupe([d(1, "3358-3396"), d(2, "18 B-1780")], [{ ref: 1, libelle: "lots 3358A-3396" }, { ref: 2, libelle: "lots 18B-1782" }]) as unknown as Plan & { boites: Array<{ correspondance: string | null }> };
+    expect(plan.boites.slice(0, 2).map((b) => [b.dossiers.length, b.correspondance])).toEqual([[1, "proche"], [1, "proche"]]);
   });
 });
