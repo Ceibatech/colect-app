@@ -8,6 +8,8 @@ describe("recoupe des cartons sur les boîtes physiques", () => {
   it("normalise « Lots 16 - 116 » comme « lots 16-116 »", () => {
     expect(norm("Lots 16 - 116")).toBe(norm("lots 16-116"));
     expect(norm("Îlots 155 TF:11539")).toBe("ilot 155 tf 11539");
+    expect(norm("lots 424-1700")).toBe(norm("424-1700"));
+    expect(norm("18 B-1780")).toBe(norm("lots 18B-1780"));
   });
 
   it("cote d'abord les boîtes de la liste dans leur ordre, même vides, puis les autres", () => {
