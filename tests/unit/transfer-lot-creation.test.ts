@@ -191,8 +191,8 @@ describe("creation of a full 200-carton transfer batch", () => {
       transportMethod: "Fourgon sécurisé d'un prestataire agréé",
       ceibaParticipants: "Agent CEIBA — Gestionnaire des transferts CEIBA",
       sdaParticipants: "Agent SDA — Responsable validation SDA",
-      riskAssessment: "Perte ou égarement de cartons",
-      securityMeasures: "Cartons fermés et scellés numérotés",
+      riskAssessment: expect.stringMatching(/^Perte ou égarement de cartons; Vol ou intrusion;/),
+      securityMeasures: expect.stringMatching(/^Cartons fermés et scellés numérotés;/),
     }) });
     expect(mocks.createParticipants).toHaveBeenCalledWith({ data: [
       { transferLotId: 42, userId: 4, side: "CEIBA", roleCode: "GESTIONNAIRE_TRANSFERT" },
@@ -214,12 +214,29 @@ describe("creation of a full 200-carton transfer batch", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("refuse un intervenant SDA qui n'a pas de profil de transfert SDA", async () => {
+  it("désigne d'office les intervenants : un identifiant envoyé par le formulaire est ignoré", async () => {
     const data = form();
     data.set("sdaParticipantIds", "4");
-    const result = await createTransferLot({}, data);
+    expect(await createTransferLot({}, data)).toMatchObject({ success: true });
+    expect(mocks.createParticipants).toHaveBeenCalledWith({ data: [
+      { transferLotId: 42, userId: 4, side: "CEIBA", roleCode: "GESTIONNAIRE_TRANSFERT" },
+      { transferLotId: 42, userId: 9, side: "SDA", roleCode: "VALIDATEUR_MINISTERE" },
+    ] });
+  });
+
+  it("refuse l'opération quand aucun responsable validation SDA n'est actif", async () => {
+    mocks.users.mockResolvedValue([{ id: 4, name: "Agent CEIBA", role: { code: "GESTIONNAIRE_TRANSFERT" } }]);
+    const result = await createTransferLot({}, form());
     expect(result.error).toContain("intervenant SDA");
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("applique le référentiel harmonisé des risques et mesures", async () => {
+    expect(await createTransferLot({}, form())).toMatchObject({ success: true });
+    expect(mocks.createLot).toHaveBeenLastCalledWith({ data: expect.objectContaining({
+      riskAssessment: expect.stringContaining("Perte ou égarement de cartons"),
+      securityMeasures: expect.not.stringContaining("Escorte"),
+    }) });
   });
 
   it("exige une précision pour le moyen de transport « Autre »", async () => {

@@ -29,8 +29,6 @@ const optionalChoiceDetail = z.preprocess(
   (value) => value === null ? undefined : value,
   z.string().trim().max(300, "La précision « Autre » est trop longue.").optional(),
 );
-const participantIds = (message: string) => z.array(z.coerce.number().int().positive()).min(1, message).max(30, "Trop d'intervenants sélectionnés.");
-const choiceList = (message: string) => z.array(z.string().trim().min(1).max(40)).min(1, message).max(20);
 const requiredPlanningText = (label: string, max = 2_000) => z.string().trim().min(2, `${label} est requis.`).max(max, `${label} est trop long.`);
 
 export const createTransferLotSchema = z.object({
@@ -44,12 +42,6 @@ export const createTransferLotSchema = z.object({
   plannedRoute: requiredPlanningText("L'itinéraire"),
   transportMethod: z.string({ message: "Le moyen de transport est requis." }).trim().min(1, "Le moyen de transport est requis.").max(40),
   transportMethodOther: optionalChoiceDetail,
-  ceibaParticipantIds: participantIds("Choisissez au moins un intervenant CEIBA habilité."),
-  sdaParticipantIds: participantIds("Choisissez au moins un intervenant SDA habilité."),
-  risks: choiceList("Cochez au moins un risque identifié."),
-  riskOther: optionalChoiceDetail,
-  securityMeasures: choiceList("Cochez au moins une mesure de sécurisation."),
-  securityMeasureOther: optionalChoiceDetail,
   motif: z.string().trim().max(2_000, "Le motif est trop long.").optional().or(z.literal("")),
   cartonTokens: z.array(z.string().trim().min(1).max(500))
     .min(1, "Sélectionnez au moins un carton.")

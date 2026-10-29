@@ -66,3 +66,18 @@ export function resolveMultiChoice(options: readonly Option[], values: readonly 
   }
   return labels;
 }
+
+/**
+ * Le lot peut être préparé hors site : les risques et les mesures ne sont plus
+ * choisis au cas par cas mais forment un référentiel harmonisé, identique pour
+ * toutes les opérations. Les supports électroniques ajoutent leur chiffrement.
+ * Ce qui arrive réellement se consigne à l'état des lieux sur site.
+ */
+export function referentielSecurisation(archiveSupport: string) {
+  return {
+    risks: TRANSFER_RISKS.map((option) => option.label),
+    securityMeasures: SECURITY_MEASURES
+      .filter((option) => option.value !== "ESCORTE" && (option.value !== "SUPPORTS_CHIFFRES" || archiveSupport !== "PHYSIQUE"))
+      .map((option) => option.label),
+  };
+}
