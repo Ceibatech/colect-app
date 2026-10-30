@@ -29,10 +29,13 @@ export function ConvoyDepartureForm({
   lotId,
   cartons,
   prefill,
+  apercu,
 }: {
   lotId: number;
   cartons: LoadedCarton[];
   prefill: { vehicleRegistration: string; driverName: string; driverPhone: string; sealReferences: string; vehiclePhoto?: boolean };
+  /** Fiche montrée à l'avance, sans pouvoir démarrer le trajet. */
+  apercu?: string;
 }) {
   const router = useRouter();
   const [form, setForm] = useState({ vehicleRegistration: prefill.vehicleRegistration, driverName: prefill.driverName, driverPhone: prefill.driverPhone, sealReferences: prefill.sealReferences });
@@ -154,7 +157,8 @@ export function ConvoyDepartureForm({
         ) : null}
       </fieldset>
 
-      <Button className="h-12 w-full text-base" disabled={!ready || busy} onClick={() => void start()}>
+      {apercu ? <p className="rounded-md border border-brand-gold/40 bg-brand-gold/10 p-3 text-sm"><strong>Aperçu.</strong> {apercu}</p> : null}
+      <Button className="h-12 w-full text-base" disabled={!ready || busy || !!apercu} onClick={() => void start()}>
         {busy ? <Loader2 className="animate-spin" /> : <Navigation />} 3. Démarrer le trajet
       </Button>
     </div>

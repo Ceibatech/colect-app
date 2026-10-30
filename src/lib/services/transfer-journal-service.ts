@@ -32,6 +32,7 @@ export async function getTransferLotJournal(lotId: number): Promise<JournalEntry
   const lot = await prisma.transferLot.findUnique({
     where: { id: lotId },
     select: {
+      createdAt: true,
       movements: { select: { id: true, reference: true, type: true, occurredAt: true, createdAt: true, createdBy: { select: { name: true } } } },
       convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, details: true, user: { select: { name: true } } } },
       trackingPoints: { orderBy: { capturedAt: "asc" }, select: { latitude: true, longitude: true, capturedAt: true, capturedBy: { select: { name: true } } } },
@@ -39,8 +40,11 @@ export async function getTransferLotJournal(lotId: number): Promise<JournalEntry
   });
   if (!lot) return [];
   const movementIds = lot.movements.map((movement) => movement.id);
+  // Les identifiants de lots et de bordereaux réinitialisés ont pu être réattribués :
+  // seules les traces postérieures à la création de ce lot lui appartiennent.
+  const depuis = new Date(lot.createdAt.getTime() - 5_000);
   const audits = await prisma.auditLog.findMany({
-    where: { OR: [{ entity: "TRANSFER_LOT", entityId: lotId }, ...(movementIds.length ? [{ entity: "TRANSFER_MOVEMENT", entityId: { in: movementIds } }] : [])] },
+    where: { createdAt: { gte: depuis }, OR: [{ entity: "TRANSFER_LOT", entityId: lotId }, ...(movementIds.length ? [{ entity: "TRANSFER_MOVEMENT", entityId: { in: movementIds } }] : [])] },
     orderBy: { createdAt: "asc" },
     select: { action: true, createdAt: true, entityId: true, user: { select: { name: true } } },
   });

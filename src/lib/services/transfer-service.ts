@@ -155,7 +155,7 @@ export async function getTransferDashboardData() {
     reference: lot.reference,
     status: lot.status,
     // Où en est physiquement le convoi (chargement, en route, arrivé, déchargement).
-    convoyLabel: convoyLabel(convoyState(lot.convoyEvents)),
+    convoyLabel: convoyLabel(convoyState(lot.convoyEvents), lot.items.some((item) => item.status === "SORTI")),
     sourceSiteId: lot.sourceSiteId,
     sourceEntrepotId: lot.sourceEntrepotId,
     destinationSiteId: lot.destinationSiteId,
@@ -395,7 +395,7 @@ export async function getTransferBordereau(lotId: number, movementId: number) {
 const hour = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short", timeZone: "Africa/Abidjan" });
 
 /** Étape physique du convoi, pour le registre. */
-function convoyLabel(state: ConvoyState): string | null {
+function convoyLabel(state: ConvoyState, sorti: boolean): string | null {
   if (state.arrived) {
     if (state.unloadingEndedAt) return `Déchargé à ${hour.format(state.unloadingEndedAt)}`;
     if (state.unloadingStartedAt) return "Déchargement en cours";
@@ -403,7 +403,8 @@ function convoyLabel(state: ConvoyState): string | null {
   }
   if (state.movingAt) return `En route${state.etaAt ? `, arrivée vers ${hour.format(state.etaAt)}` : ""}`;
   if (state.onTheRoad) return "Départ déclaré, véhicule pas encore en mouvement";
-  if (state.loadingStartedAt && !state.loadingEndedAt) return "Chargement en cours";
-  if (state.loadingEndedAt) return "Chargé, en attente du départ";
+  // Le départ exige le F02 contre-signé par le SDA (cartons sortis du stock).
+  if (state.loadingStartedAt && !state.loadingEndedAt) return sorti ? "Chargement en cours" : "Chargement en cours, F02 à contre-signer par le SDA";
+  if (state.loadingEndedAt) return sorti ? "Chargé, en attente du départ" : "Chargé, F02 à contre-signer par le SDA avant le départ";
   return null;
 }

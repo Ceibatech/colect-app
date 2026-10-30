@@ -31,7 +31,7 @@ const conditionLabel: Record<string, string> = {
 };
 
 export default async function SiteWorkspacePage() {
-  const { sites, departures, loadings, arrivals, bordereaux } = await getSiteWorkspace();
+  const { sites, upcoming, departures, loadings, arrivals, bordereaux } = await getSiteWorkspace();
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -44,6 +44,7 @@ export default async function SiteWorkspacePage() {
           ? `Cartons à remettre et arrivées à constater pour ${sites.map((site) => site.nom).join(", ")}.`
           : "Aucun site ne vous est encore rattaché."}
         stats={[
+          { label: "À venir", value: upcoming.length },
           { label: "À remettre", value: departures.length },
           { label: "Chargements", value: loadings.length },
           { label: "Arrivées attendues", value: arrivals.length, tone: arrivals.length ? "warning" : "default" },
@@ -53,6 +54,30 @@ export default async function SiteWorkspacePage() {
 
       {sites.length === 0 ? (
         <Card><CardContent className="py-6 text-sm text-muted-foreground">Demandez à un administrateur de vous rattacher à votre site (Administration, Utilisateurs) : les départs et les arrivées de ce site apparaîtront ici.</CardContent></Card>
+      ) : null}
+
+      {upcoming.length ? (
+        <section aria-labelledby="a-venir" className="space-y-3">
+          <div>
+            <h2 id="a-venir" className="text-lg font-semibold">À venir sur vos sites</h2>
+            <p className="text-sm text-muted-foreground">Lots en cours de validation (interne puis SDA). Découvrez dès maintenant la fiche que vous remplirez : elle se signe une fois le lot autorisé.</p>
+          </div>
+          {upcoming.map((lot) => (
+            <FieldLotStrip key={lot.id} lot={lot} highlight={lot.side}>
+              <TransferMovementDialog
+                lotId={lot.id}
+                type={lot.side === "source" ? "SORTIE" : "RECEPTION"}
+                items={lot.items}
+                escortSuggestions={lot.escorts}
+                sourceLabel={lot.source}
+                destinationLabel={lot.destination}
+                apercu={lot.side === "source"
+                  ? "Le lot attend sa validation : au départ, vous ferez l'état des lieux de sortie (F02), puis indiquerez le début et la fin du chargement."
+                  : "Le lot attend sa validation : à l'arrivée du véhicule, vous indiquerez le début et la fin du déchargement, puis ferez ce constat (F03)."}
+              />
+            </FieldLotStrip>
+          ))}
+        </section>
       ) : null}
 
       <section aria-labelledby="arrivees" className="space-y-3">

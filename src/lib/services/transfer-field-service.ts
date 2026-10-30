@@ -15,6 +15,9 @@ import { convoyState } from "@/lib/transfers/convoy";
  * personne.
  */
 
+/** Lots encore en validation : montrés à l'avance aux gens de terrain, fiches en aperçu. */
+const UPCOMING_LOT_STATUSES = ["SOUMIS", "VALIDE_CEIBAC"] as const;
+
 const ACTIVE_LOT_STATUSES = ["AUTORISE", "PARTIELLEMENT_SORTI", "EN_TRANSIT", "RECU_PARTIEL", "CHEZ_CEIBAC", "RETOUR_PARTIEL"] as const;
 
 function placeLabel(site: { nom: string }, entrepot: { nom: string; localisation: string | null } | null) {
@@ -83,9 +86,10 @@ export async function getSiteWorkspace() {
     ? (await prisma.userSite.findMany({ where: { userId: session.userId }, select: { site: { select: { id: true, nom: true, organisation: true } } } })).map((row) => row.site)
     : await prisma.site.findMany({ where: { isActive: true }, orderBy: { nom: "asc" }, select: { id: true, nom: true, organisation: true } });
   const siteIds = sites.map((site) => site.id);
-  if (siteIds.length === 0) return { sites, departures: [], loadings: [], arrivals: [], bordereaux: [] };
+  if (siteIds.length === 0) return { sites, upcoming: [], departures: [], loadings: [], arrivals: [], bordereaux: [] };
 
-  const [outgoing, loading, incoming, bordereaux] = await Promise.all([
+  const [upcomingLots, outgoing, loading, incoming, bordereaux] = await Promise.all([
+    loadLots({ status: { in: [...UPCOMING_LOT_STATUSES] }, OR: [{ sourceSiteId: { in: siteIds } }, { destinationSiteId: { in: siteIds } }] }),
     loadLots({ sourceSiteId: { in: siteIds }, status: { in: [...ACTIVE_LOT_STATUSES] }, items: { some: { status: "PREVU" } } }),
     // État des lieux de sortie fait : chargement, puis départ du véhicule.
     loadLots({ sourceSiteId: { in: siteIds }, status: { in: [...ACTIVE_LOT_STATUSES] }, movements: { some: { type: "SORTIE", status: { not: "REJETE" } } }, items: { some: { status: { in: ["PREVU", "SORTI"] } } } }),
@@ -107,6 +111,11 @@ export async function getSiteWorkspace() {
 
   return {
     sites,
+    upcoming: upcomingLots.map((lot) => ({
+      ...summarize(lot),
+      side: siteIds.includes(lot.sourceSiteId) ? "source" as const : "destination" as const,
+      items: movementOptions(lot, "PREVU"),
+    })),
     departures: outgoing.map((lot) => ({ ...summarize(lot), items: movementOptions(lot, "PREVU") })).filter((lot) => lot.items.length > 0),
     // Lots encore sur le site : le véhicule n'a pas été vu en route.
     loadings: loading.map(summarize).filter((lot) => !lot.convoy.movingAt && !lot.convoy.arrived),
@@ -142,7 +151,7 @@ export async function getConvoyWorkspace() {
   const session = await requirePermission("TRANSFER_TRACK");
   const onlyAssigned = session.roleCode === "CONVOYEUR";
   const lots = await loadLots({
-    status: { in: [...ACTIVE_LOT_STATUSES] },
+    status: { in: [...UPCOMING_LOT_STATUSES, ...ACTIVE_LOT_STATUSES] },
     items: { some: { status: { in: ["PREVU", "SORTI"] } } },
     ...(onlyAssigned ? { participants: { some: { userId: session.userId } } } : {}),
   });
@@ -161,6 +170,16 @@ export async function getConvoyWorkspace() {
       waiting: lot.items.filter((item) => item.status === "PREVU").length,
       navigationUrl: navigationUrl(lot.destinationSite),
       wazeUrl: wazeUrl(lot.destinationSite),
+      plannedCartons: lot.items
+        .filter((item) => item.status === "PREVU")
+        .map((item) => ({
+          id: item.id,
+          cartonId: item.cartonId,
+          code: item.carton?.cote ?? (item.cartonId == null ? item.cartonCode : formatCartonReference(item.cartonId)),
+          ctn: item.cartonId == null ? null : formatCartonReference(item.cartonId),
+          label: item.cartonLabel,
+          dossiers: item.dossierCountSnapshot,
+        })),
       loadedCartons: lot.items
         .filter((item) => item.status === "SORTI")
         .map((item) => ({
