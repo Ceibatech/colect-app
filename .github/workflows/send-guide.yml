@@ -1,0 +1,79 @@
+name: Envoyer le guide du circuit de transfert (Contabo)
+
+# Lancement manuel. Envoie deploy/guides/guide-circuit-transfert.pdf par e-mail
+# avec le service d'envoi de l'application.
+on:
+  workflow_dispatch:
+    inputs:
+      destinataires:
+        description: "Destinataires, séparés par des virgules (obligatoire)"
+        required: true
+        type: string
+      copie:
+        description: "Copie, séparée par des virgules, ou « aucune »"
+        required: true
+        default: "aucune"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-send-guide
+  cancel-in-progress: false
+
+jobs:
+  send:
+    name: Envoi du guide
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Envoyer
+        env:
+          TO: ${{ inputs.destinataires }}
+          CC: ${{ inputs.copie }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$TO" =~ ^[A-Za-z0-9._%+@,\ -]{3,600}$ && "$CC" =~ ^[A-Za-z0-9._%+@,\ -]{0,600}$ ]] || { echo "Adresses invalides." >&2; exit 1; }
+          TO="${TO// /}"; CC="${CC// /}"
+          if [[ "$CC" == aucune ]]; then CC=""; fi
+          [[ -n "$TO" ]] || { echo "Destinataires obligatoires." >&2; exit 1; }
+          echo "Destinataires : $TO — copie : ${CC:-aucune}"
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-report.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+          ssh_options=(-F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" -o GlobalKnownHostsFile=/dev/null
+            -o ConnectTimeout=15 -o ServerAliveInterval=30 -o ServerAliveCountMax=6)
+          destination="$CONTABO_USER@$CONTABO_HOST"
+
+          mkdir -p envoi
+          cp deploy/guides/guide-circuit-transfert.pdf envoi/Guide_circuit_transfert_GeoArchives.pdf
+          printf '{"kind":"guide"}' > envoi/summary.json
+          id="$GITHUB_RUN_ID"
+          ssh "${ssh_options[@]}" "$destination" "umask 022; mkdir -p /opt/colect-app/shared/outbox/$id"
+          for file in envoi/*; do
+            ssh "${ssh_options[@]}" "$destination" "umask 022; set -C; cat > '/opt/colect-app/shared/outbox/$id/$(basename "$file")'" < "$file"
+          done
+          ssh "${ssh_options[@]}" "$destination" "bash /opt/colect-app/current/deploy/send-report-email.sh $id '$TO' '$CC' 0"
