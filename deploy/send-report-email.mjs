@@ -81,7 +81,27 @@ ${p("Nous restons à votre disposition pour tout complément.")}
   return { subject, html, text };
 }
 
+/** Guide du circuit de transfert, envoyé pour aider les équipes à maîtriser le flux. */
+export function buildGuideMessage(files) {
+  const subject = "GeoArchives – guide du circuit de transfert";
+  const paragraphs = [
+    "Bonjour,",
+    "Des actions étaient en attente dans le circuit de transfert : je me suis connecté pour les valider.",
+    "Pour aider à bien maîtriser le flux, voici le guide du circuit de transfert. Il présente les 9 étapes, qui agit à chacune, sur quel écran et avec quel bouton, et qui reçoit l'e-mail ensuite. Chaque étape est illustrée par une capture de l'écran.",
+  ];
+  const html = [
+    ...paragraphs.map((p) => `<p>${esc(p)}</p>`),
+    `<p>Document joint :</p><ul>${files.map((f) => `<li>${esc(f)}</li>`).join("")}</ul>`,
+    "<p>Nous restons à votre disposition pour toute question.</p>",
+    "<p>Cordialement,<br>Idriss Olivier Bado<br>CEIBA Analytics</p>",
+  ].join("\n");
+  const text = [...paragraphs.flatMap((p) => [p, ""]), "Document joint :", ...files.map((f) => `- ${f}`), "",
+    "Nous restons à votre disposition pour toute question.", "", "Cordialement,", "Idriss Olivier Bado", "CEIBA Analytics"].join("\n");
+  return { subject, html, text };
+}
+
 export function buildMessage(summary, files, { replaces = false } = {}) {
+  if (summary.kind === "guide") return buildGuideMessage(files);
   if (summary.kind === "cotes") return buildCotesMessage(summary, files, { replaces });
   const subject = `Récupération des archives MULCV – liste des ${nf(summary.boxes)} premiers cartons et étiquettes`;
   const labels = {
@@ -136,7 +156,7 @@ async function main() {
   const order = ["liste-cartons", "rapport-cartons", "etiquettes-cartons", "etiquettes-dossiers"];
   const files = readdirSync(dir).filter((file) => /\.(xlsx|pdf)$/.test(file))
     .sort((a, b) => order.findIndex((k) => a.startsWith(k)) - order.findIndex((k) => b.startsWith(k)));
-  if (files.length < (summary.kind === "cotes" ? 3 : 4)) throw new Error(`Pièces jointes incomplètes : ${files.join(", ")}`);
+  if (files.length < ({ guide: 1, cotes: 3 }[summary.kind] ?? 4)) throw new Error(`Pièces jointes incomplètes : ${files.join(", ")}`);
   const total = files.reduce((sum, file) => sum + statSync(path.join(dir, file)).size, 0);
   if (total > 30 * 1024 * 1024) throw new Error("Pièces jointes trop volumineuses (plus de 30 Mo).");
   const { subject, html, text } = buildMessage(summary, files, { replaces: args.replaces === "1" });
