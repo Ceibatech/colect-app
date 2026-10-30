@@ -1,13 +1,29 @@
 /**
  * Règles de suppression d'un compte (Administration → Utilisateurs).
  *
+ * Un compte sans trace (créé par erreur, compte de démonstration, invitation
+ * jamais utilisée) est supprimé pour de bon ; ses simples événements d'audit
+ * sont conservés sans auteur, et une entrée USER_DELETE garde son identité.
+ *
  * Un compte qui a laissé une trace métier (dossiers, transitions de workflow,
- * documents, transferts...) ne peut pas être supprimé : l'historique perdrait
- * son auteur. Seule sa désactivation reste possible. Un compte sans trace
- * (créé par erreur, compte de démonstration, invitation jamais utilisée) peut
- * l'être ; ses simples événements d'audit sont conservés sans auteur, et une
- * entrée USER_DELETE garde son identité.
+ * documents, transferts...) est ANONYMISÉ : l'accès, l'identité, la signature
+ * et les données personnelles disparaissent, mais les données métier restent,
+ * rattachées à « Compte supprimé » (les preuves ne perdent pas leur auteur).
+ * Seules les opérateurs encore affectés à un superviseur bloquent : il faut
+ * d'abord les réaffecter, sinon plus personne ne pourrait les valider.
  */
+
+export const ANONYMIZED_NAME = "Compte supprimé";
+export const ANONYMIZED_EMAIL_DOMAIN = "supprime.invalid";
+
+/** E-mail unique et non délivrable d'un compte anonymisé. */
+export function anonymizedEmail(id: number): string {
+  return `compte-${id}@${ANONYMIZED_EMAIL_DOMAIN}`;
+}
+
+export function isAnonymizedEmail(email: string): boolean {
+  return email.trim().toLowerCase().endsWith(`@${ANONYMIZED_EMAIL_DOMAIN}`);
+}
 
 export const USER_DELETION_BLOCKERS = {
   dossierHistory: "historique de dossiers",
@@ -44,10 +60,16 @@ export const USER_DELETION_BLOCKERS = {
 
 export type UserDeletionBlockerKey = keyof typeof USER_DELETION_BLOCKERS;
 
+/** Traces qui empêchent même l'anonymisation : à traiter avant de supprimer le compte. */
+export const USER_DELETION_HARD_BLOCKERS: readonly UserDeletionBlockerKey[] = ["supervisedOperateurs"];
+
 /** Libellés des traces présentes (compteur > 0), dans l'ordre de la liste. */
-export function userDeletionBlockers(counts: Partial<Record<UserDeletionBlockerKey, number>>): string[] {
+export function userDeletionBlockers(
+  counts: Partial<Record<UserDeletionBlockerKey, number>>,
+  only?: readonly UserDeletionBlockerKey[],
+): string[] {
   return (Object.keys(USER_DELETION_BLOCKERS) as UserDeletionBlockerKey[])
-    .filter((key) => (counts[key] ?? 0) > 0)
+    .filter((key) => (!only || only.includes(key)) && (counts[key] ?? 0) > 0)
     .map((key) => `${counts[key]} ${USER_DELETION_BLOCKERS[key]}`);
 }
 

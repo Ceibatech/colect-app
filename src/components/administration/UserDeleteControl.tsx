@@ -45,7 +45,7 @@ export function UserDeleteControl({ userId, name, email }: { userId: number; nam
           <DialogHeader>
             <DialogTitle>Supprimer le compte</DialogTitle>
             <DialogDescription>
-              Le compte de {name} ({email}) sera supprimé définitivement. Cette action est irréversible. Si ce compte a déjà travaillé dans l&apos;application (dossiers, validations, transferts), la suppression sera refusée : désactivez-le plutôt pour conserver l&apos;historique.
+              Le compte de {name} ({email}) sera supprimé définitivement. Cette action est irréversible. Si ce compte a déjà travaillé dans l&apos;application (dossiers, validations, transferts), son accès, son identité et sa signature sont effacés, mais les données restent, rattachées à « Compte supprimé ». Les opérateurs affectés à un superviseur doivent d&apos;abord être réaffectés.
             </DialogDescription>
           </DialogHeader>
           {state.error ? (

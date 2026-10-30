@@ -9,7 +9,10 @@ import { createUserSchema, updateUserSchema } from "@/lib/validation/user-admin"
 import { issuePasswordAccessEmail } from "@/lib/services/password-reset-service";
 import { Prisma } from "@prisma/client";
 import { SITE_RESPONSIBLE_ROLE_CODE } from "@/lib/permissions/constants";
-import { isDeletionConfirmed, userDeletionBlockers, type UserDeletionBlockerKey } from "@/lib/utils/user-deletion";
+import {
+  ANONYMIZED_EMAIL_DOMAIN, ANONYMIZED_NAME, USER_DELETION_HARD_BLOCKERS, anonymizedEmail, isAnonymizedEmail, isDeletionConfirmed,
+  userDeletionBlockers, type UserDeletionBlockerKey,
+} from "@/lib/utils/user-deletion";
 
 /**
  * CRUD administration des utilisateurs (Phase 15+, §11) — un utilisateur est
@@ -36,6 +39,8 @@ export interface ActionResult {
 export async function listUsersWithRoles() {
   await requirePermission("USER_MANAGE");
   return prisma.user.findMany({
+    // Les comptes anonymisés (supprimés mais dont les données sont conservées) ne sont plus gérables.
+    where: { NOT: { email: { endsWith: `@${ANONYMIZED_EMAIL_DOMAIN}` } } },
     orderBy: { name: "asc" },
     include: {
       role: true,
@@ -439,11 +444,13 @@ async function countUserTraces(db: Prisma.TransactionClient, id: number): Promis
 }
 
 /**
- * Suppression définitive d'un compte, réservée à USER_MANAGE. Refusée pour
- * son propre compte, pour le dernier administrateur et pour tout compte ayant
- * laissé une trace métier (on propose alors la désactivation). Les événements
- * d'audit déjà journalisés par ce compte restent, sans auteur ; l'entrée
- * USER_DELETE conserve son identité.
+ * Suppression d'un compte, réservée à USER_MANAGE. Refusée pour son propre
+ * compte, pour le dernier administrateur et tant que des opérateurs lui sont
+ * affectés. Sans trace métier, le compte est supprimé définitivement (les
+ * événements d'audit restent sans auteur ; l'entrée USER_DELETE conserve son
+ * identité). Avec des traces, il est anonymisé : accès, identité, signature et
+ * données personnelles disparaissent, les données métier restent rattachées à
+ * « Compte supprimé » (l'entrée USER_ANONYMIZE ne garde ni nom ni e-mail).
  */
 export async function deleteUser(id: number, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
   void _prevState;
@@ -461,6 +468,9 @@ export async function deleteUser(id: number, _prevState: ActionResult, formData:
   }
 
   const ip = await getClientIp();
+  // Haché avant la transaction (bcrypt est lent) : mot de passe aléatoire que personne ne connaît.
+  const lockedPasswordHash = await hashPassword(randomBytes(32).toString("base64url"));
+  let anonymized = false as boolean;
   try {
     await prisma.$transaction(async (tx) => {
       // Verrou du compte : toute écriture qui le référence (clé étrangère) attend
@@ -476,9 +486,56 @@ export async function deleteUser(id: number, _prevState: ActionResult, formData:
         if (admins.length === 0) throw new UserDeletionRefused("Impossible de supprimer le dernier administrateur actif.");
       }
 
-      const blockers = userDeletionBlockers(await countUserTraces(tx, id));
+      const traces = await countUserTraces(tx, id);
+      const hardBlockers = userDeletionBlockers(traces, USER_DELETION_HARD_BLOCKERS);
+      if (hardBlockers.length > 0) {
+        throw new UserDeletionRefused(`Suppression impossible : ${hardBlockers.join(", ")}. Réaffectez-les à un autre superviseur d'abord.`);
+      }
+
+      const blockers = userDeletionBlockers(traces);
       if (blockers.length > 0) {
-        throw new UserDeletionRefused(`Suppression impossible : ce compte a laissé une trace dans l'application (${blockers.join(", ")}). Désactivez-le plutôt pour conserver l'historique.`);
+        if (isAnonymizedEmail(user.email)) throw new UserDeletionRefused("Ce compte est déjà anonymisé.");
+        // Le compte a travaillé dans l'application : il est anonymisé, ses données métier restent.
+        await tx.auditLog.create({
+          data: {
+            userId: session.userId,
+            action: "USER_ANONYMIZE",
+            entity: "USER",
+            entityId: id,
+            oldValue: { role: user.role.code, matricule: user.operateur?.matricule ?? null, traces: blockers },
+            ipAddress: ip,
+          },
+        });
+        await tx.notification.deleteMany({ where: { userId: id } });
+        await tx.transferEmailDelivery.deleteMany({ where: { recipientUserId: id } });
+        await tx.emailReportDelivery.deleteMany({ where: { recipientUserId: id } });
+        await tx.emailReportSubscription.deleteMany({ where: { userId: id } });
+        await tx.passwordResetToken.deleteMany({ where: { userId: id } });
+        await tx.convoyTrackerToken.deleteMany({ where: { userId: id } });
+        await tx.presenceUtilisateur.deleteMany({ where: { userId: id } });
+        await tx.userSite.deleteMany({ where: { userId: id } });
+        await tx.pmoSupervisorScope.deleteMany({ where: { OR: [{ pmoUserId: id }, { supervisorUserId: id }] } });
+        if (user.operateur) {
+          await tx.operateur.update({
+            where: { id: user.operateur.id },
+            data: { nom: ANONYMIZED_NAME, prenoms: null, telephone: null, email: null, isActive: false },
+          });
+        }
+        await tx.user.update({
+          where: { id },
+          data: {
+            name: ANONYMIZED_NAME,
+            fonction: null,
+            signatureData: null,
+            email: anonymizedEmail(id),
+            passwordHash: lockedPasswordHash,
+            isActive: false,
+            sessionVersion: { increment: 1 },
+            lastLoginAt: null,
+          },
+        });
+        anonymized = true;
+        return;
       }
 
       await tx.auditLog.create({
@@ -501,10 +558,15 @@ export async function deleteUser(id: number, _prevState: ActionResult, formData:
   } catch (error) {
     if (error instanceof UserDeletionRefused) return { error: error.message };
     console.error("User deletion failed.", error);
-    return { error: "Suppression impossible : des données restent liées à ce compte. Désactivez-le plutôt." };
+    return { error: "Suppression impossible : des données restent liées à ce compte. Réessayez, ou désactivez-le en attendant." };
   }
 
-  return { success: true, message: `Compte ${user.email} supprimé.` };
+  return {
+    success: true,
+    message: anonymized
+      ? `Compte ${user.email} supprimé : accès et identité effacés, données conservées sous « ${ANONYMIZED_NAME} ».`
+      : `Compte ${user.email} supprimé.`,
+  };
 }
 
 export async function sendUserAccessEmail(
