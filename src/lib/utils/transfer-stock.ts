@@ -38,7 +38,9 @@ export function isTransferMovementChronologyValid(
     : type === "RECEPTION"
       ? item.departedAt
       : item.receivedAt;
-  return minimumDate !== null && occurredAt.getTime() >= minimumDate.getTime();
+  // L'heure se saisit à la minute : un mouvement daté de la même minute que le
+  // jalon précédent (ex. 05:21 après une création à 05:21:56) est valable.
+  return minimumDate !== null && occurredAt.getTime() >= Math.floor(minimumDate.getTime() / 60_000) * 60_000;
 }
 
 export function deriveTransferLotStatus(

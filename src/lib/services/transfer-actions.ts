@@ -24,6 +24,7 @@ import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, SITE_
 import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 import { dechargerCartons } from "@/lib/services/caisse-service";
 import { signataireDe } from "@/lib/transfers/signataire";
+import { parseAbidjanDateTime } from "@/lib/utils/abidjan-time";
 
 export interface TransferActionState {
   success?: boolean;
@@ -205,14 +206,6 @@ function nextActor(userIds: number[], fallbackUserIds: number[]) {
   return userIds.length ? [...new Set(userIds)] : [...new Set(fallbackUserIds)];
 }
 
-async function getLotConvoyeurIds(lotId: number): Promise<number[]> {
-  const rows = await prisma.transferLotParticipant.findMany({
-    where: { transferLotId: lotId, roleCode: "CONVOYEUR", user: { isActive: true } },
-    select: { userId: true },
-  });
-  return rows.map((row) => row.userId);
-}
-
 /**
  * Sites d'un responsable de site ; null pour les profils sans restriction de
  * site (gestionnaire des transferts, administrateur).
@@ -344,7 +337,7 @@ export async function createTransferLot(
 
   try {
     const ip = await getClientIp();
-    const plannedAt = new Date(parsed.data.plannedAt);
+    const plannedAt = parseAbidjanDateTime(parsed.data.plannedAt);
     const result = await prisma.$transaction(async (tx) => {
       // Same lock as inventory intake: no dossier can join a carton while its
       // complete manifest is being captured. Lock in ID order to avoid deadlocks.
@@ -749,7 +742,7 @@ export async function recordTransferMovement(
   const itemIds = [...new Set(parsed.data.itemIds)];
   if (itemIds.length !== parsed.data.itemIds.length) return { error: "Un groupe de dossiers a été sélectionné plusieurs fois." };
   const responsibleSiteIds = await getResponsibleSiteIds(session);
-  const occurredAt = new Date(parsed.data.occurredAt);
+  const occurredAt = parseAbidjanDateTime(parsed.data.occurredAt);
   if (occurredAt.getTime() > Date.now() + 5 * 60 * 1000) return { error: "La date du mouvement ne peut pas être dans le futur." };
 
   try {
@@ -1167,19 +1160,22 @@ export async function approveTransferMovementByMinistry(
         event: "MOVEMENT_SIGNED",
         entityType: "TRANSFER_MOVEMENT",
         entityId: movement.id,
-        // Étape suivante : sortie signée → le convoyeur part ; retour signé → le site
-        // qui récupère ses archives ; réception signée → le gestionnaire du lot.
+        // Étape suivante : sortie signée → le responsable du site de départ charge le
+        // véhicule (le convoyeur est prévenu à la fin du chargement) ; retour signé →
+        // le site qui récupère ses archives ; réception signée → le gestionnaire du lot.
         recipientRoleCodes: [],
         recipientUserIds: nextActor(
           movement.type === "SORTIE"
-            ? await getLotConvoyeurIds(movement.transferLot.id)
+            ? await getSiteResponsibleUserIds([movement.fromSiteId])
             : movement.type === "RETOUR"
               ? await getSiteResponsibleUserIds([movement.toSiteId])
               : [movement.transferLot.createdById],
           [movement.transferLot.createdById],
         ),
         title: `Bordereau ${movement.reference} signé`,
-        message: "Le visa final du ministère est enregistré. Le bordereau signé est disponible et le stock documentaire a été mis à jour.",
+        message: movement.type === "SORTIE"
+          ? "Le SDA a contre-signé le bordereau de sortie : le lot est en transit. Indiquez le début puis la fin du chargement dans « Mon site » ; le convoyeur sera prévenu à la fin du chargement."
+          : "Le visa final du ministère est enregistré. Le bordereau signé est disponible et le stock documentaire a été mis à jour.",
         reference: movement.reference,
         statusLabel: `Document ${documentCode} signé disponible`,
         actionPath: `/transferts/${movement.transferLot.id}`,

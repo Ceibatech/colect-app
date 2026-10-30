@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SignaturePad } from "@/components/transferts/SignaturePad";
+import { abidjanNowInputValue } from "@/lib/utils/abidjan-time";
 import { SignataireIdentite } from "@/components/transferts/Signataire";
 import { VehiclePhotoInput } from "@/components/transferts/VehiclePhotoInput";
 
@@ -35,11 +36,8 @@ export interface TransferMovementItemOption {
   dossierCount: number;
 }
 
-function localDateTimeValue() {
-  const date = new Date();
-  const offset = date.getTimezoneOffset();
-  return new Date(date.getTime() - offset * 60_000).toISOString().slice(0, 16);
-}
+/** Heure d'Abidjan, quel que soit le fuseau réglé sur l'appareil. */
+const localDateTimeValue = () => abidjanNowInputValue();
 
 export function SubmitTransferButton({ lotId }: { lotId: number }) {
   const router = useRouter();

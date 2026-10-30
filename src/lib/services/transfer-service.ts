@@ -1,4 +1,5 @@
 import "server-only";
+import { convoyState, type ConvoyState } from "@/lib/transfers/convoy";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
@@ -120,6 +121,7 @@ export async function getTransferDashboardData() {
           orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
           select: { id: true, reference: true, type: true, status: true, occurredAt: true },
         },
+        convoyEvents: { orderBy: { occurredAt: "asc" }, select: { type: true, occurredAt: true, automatic: true, details: true } },
       },
     }),
     prisma.site.findMany({
@@ -152,6 +154,8 @@ export async function getTransferDashboardData() {
     id: lot.id,
     reference: lot.reference,
     status: lot.status,
+    // Où en est physiquement le convoi (chargement, en route, arrivé, déchargement).
+    convoyLabel: convoyLabel(convoyState(lot.convoyEvents)),
     sourceSiteId: lot.sourceSiteId,
     sourceEntrepotId: lot.sourceEntrepotId,
     destinationSiteId: lot.destinationSiteId,
@@ -386,4 +390,20 @@ export async function getTransferBordereau(lotId: number, movementId: number) {
       signatures: { orderBy: { party: "asc" } },
     },
   });
+}
+
+const hour = new Intl.DateTimeFormat("fr-FR", { timeStyle: "short", timeZone: "Africa/Abidjan" });
+
+/** Étape physique du convoi, pour le registre. */
+function convoyLabel(state: ConvoyState): string | null {
+  if (state.arrived) {
+    if (state.unloadingEndedAt) return `Déchargé à ${hour.format(state.unloadingEndedAt)}`;
+    if (state.unloadingStartedAt) return "Déchargement en cours";
+    return `Arrivé à ${hour.format(state.arrivedAt!)}`;
+  }
+  if (state.movingAt) return `En route${state.etaAt ? `, arrivée vers ${hour.format(state.etaAt)}` : ""}`;
+  if (state.onTheRoad) return "Départ déclaré, véhicule pas encore en mouvement";
+  if (state.loadingStartedAt && !state.loadingEndedAt) return "Chargement en cours";
+  if (state.loadingEndedAt) return "Chargé, en attente du départ";
+  return null;
 }
