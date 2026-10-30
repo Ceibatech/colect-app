@@ -191,6 +191,7 @@ export function TransferMovementDialog({
   sourceLabel,
   destinationLabel,
   escortSuggestions = [],
+  apercu,
 }: {
   lotId: number;
   type: TransferMovementTypeCode;
@@ -199,6 +200,8 @@ export function TransferMovementDialog({
   destinationLabel: string;
   /** Convoyeurs désignés sur l'opération, proposés pour le champ convoyeur. */
   escortSuggestions?: string[];
+  /** Fiche montrée à l'avance : on la découvre et la remplit pour voir, sans pouvoir la signer. */
+  apercu?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -243,8 +246,8 @@ export function TransferMovementDialog({
   const allSelected = items.length > 0 && selected.length === items.length;
   return (
     <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (next) void loadVehicles(); }}>
-      <DialogTrigger render={<Button variant={type === "SORTIE" ? "default" : "outline"} />} disabled={items.length === 0}>
-        <ClipboardSignature /> {isReception ? "Constat de déchargement" : label}
+      <DialogTrigger render={<Button variant={apercu ? "outline" : type === "SORTIE" ? "default" : "outline"} />} disabled={items.length === 0}>
+        <ClipboardSignature /> {apercu ? `Aperçu : ${isReception ? "constat d'arrivée (F03)" : "fiche de sortie (F02)"}` : isReception ? "Constat de déchargement" : label}
       </DialogTrigger>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
@@ -256,6 +259,7 @@ export function TransferMovementDialog({
           </DialogDescription>
         </DialogHeader>
         <form key={formVersion} onSubmit={keepFormAction} className="space-y-5">
+          {apercu ? <Alert><AlertDescription><strong>Aperçu.</strong> {apercu} Vous pouvez parcourir et remplir la fiche pour vous familiariser ; elle ne s&apos;enregistre pas.</AlertDescription></Alert> : null}
           <input type="hidden" name="type" value={type} />
           {selected.map((id) => <input key={id} type="hidden" name="itemIds" value={id} />)}
           {state.error ? <Alert variant="destructive"><AlertDescription>{state.error}</AlertDescription></Alert> : null}
@@ -319,7 +323,7 @@ export function TransferMovementDialog({
             </section>
           </div>
 
-          <DialogFooter><Button type="submit" disabled={pending || selected.length === 0}>{pending ? <Loader2 className="animate-spin" /> : <ClipboardSignature />} {isReception ? "Signer et soumettre le constat" : "Signer et transmettre le F02 au ministère"}</Button></DialogFooter>
+          <DialogFooter><Button type="submit" disabled={pending || selected.length === 0 || !!apercu}>{pending ? <Loader2 className="animate-spin" /> : <ClipboardSignature />} {isReception ? "Signer et soumettre le constat" : "Signer et transmettre le F02 au ministère"}</Button></DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

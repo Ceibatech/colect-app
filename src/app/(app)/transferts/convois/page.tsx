@@ -36,7 +36,7 @@ export default async function ConvoysPage() {
       />
 
       {convoys.length === 0 ? (
-        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Aucun convoi ne vous est confié pour le moment. Les lots où vous êtes désigné convoyeur apparaîtront ici dès leur autorisation.</p>
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">Aucun convoi ne vous est confié pour le moment. Les lots où vous êtes désigné convoyeur apparaissent ici dès leur soumission.</p>
       ) : null}
 
       {loaded.map((convoy) => {
@@ -62,12 +62,27 @@ export default async function ConvoysPage() {
         <section aria-labelledby="attente" className="space-y-3">
           <div>
             <h2 id="attente" className="text-lg font-semibold">En attente de chargement</h2>
-            <p className="text-sm text-muted-foreground">La fiche de départ s&apos;ouvre quand le responsable du site de départ a remis les cartons (bordereau F02 contre-signé).</p>
+            <p className="text-sm text-muted-foreground">Vos prochains convois. La fiche de départ est visible dès maintenant ; elle se valide quand le responsable du site de départ a remis les cartons (bordereau F02 contre-signé) et indiqué la fin du chargement.</p>
           </div>
           {waiting.map((convoy) => (
-            <FieldLotStrip key={convoy.id} lot={convoy} highlight="destination">
-              <a href={convoy.navigationUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants({ variant: "outline" }))}><Navigation /> Voir le trajet</a>
-            </FieldLotStrip>
+            <section key={convoy.id} className="space-y-3">
+              <FieldLotStrip lot={convoy} highlight="destination">
+                <a href={convoy.navigationUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants({ variant: "outline" }))}><Navigation /> Voir le trajet</a>
+              </FieldLotStrip>
+              <details className="rounded-lg border bg-card p-3">
+                <summary className="cursor-pointer text-sm font-medium">Aperçu de la fiche de départ</summary>
+                <div className="mt-3">
+                  <ConvoyDepartureForm
+                    lotId={convoy.id}
+                    cartons={convoy.plannedCartons}
+                    prefill={convoy.prefill}
+                    apercu={convoy.status === "SOUMIS" || convoy.status === "VALIDE_CEIBAC"
+                      ? "Le lot est encore en validation (interne, puis SDA). Vous pourrez démarrer le trajet après la remise des cartons et la fin du chargement."
+                      : "Vous pourrez démarrer le trajet quand le responsable du site aura remis les cartons (F02 contre-signé) et terminé le chargement."}
+                  />
+                </div>
+              </details>
+            </section>
           ))}
         </section>
       ) : null}
