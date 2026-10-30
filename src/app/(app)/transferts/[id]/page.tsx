@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, Download, FileText,
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ApproveTransferLotByCeibacButton, AuthorizeTransferButton, ReceptionApprovalDialog, SubmitTransferButton, TransferMovementDialog, type TransferMovementItemOption } from "@/components/transferts/TransferActions";
 import { ConvoyTrackingPanel } from "@/components/transferts/ConvoyTrackingPanel";
+import { LotJournal } from "@/components/transferts/LotJournal";
+import { getTransferLotJournal } from "@/lib/services/transfer-journal-service";
 import { LotCaisses } from "@/components/caisses/LotCaisses";
 import { getCaissesDuLot } from "@/lib/services/caisse-service";
 import { TransferItemStatusBadge, TransferLotStatusBadge } from "@/components/transferts/TransferStatusBadge";
@@ -40,10 +42,11 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
   const id = Number(idParam);
   if (!Number.isInteger(id) || id <= 0) notFound();
 
-  const [session, lot, caisses] = await Promise.all([
+  const [session, lot, caisses, journal] = await Promise.all([
     requirePermission("TRANSFER_VIEW"),
     getTransferLotDetail(id),
     getCaissesDuLot(id),
+    getTransferLotJournal(id),
   ]);
   if (!lot) notFound();
 
@@ -160,6 +163,8 @@ export default async function TransferDetailPage({ params }: { params: Promise<{
       />
 
       {lot.items.some((item) => item.departedAt !== null) ? <ConvoyTrackingPanel lotId={lot.id} canTrack={canTrack && stock.inTransit > 0} mapsKey={process.env.GOOGLE_MAPS_API_KEY ?? null} /> : null}
+
+      <LotJournal entries={journal} />
 
       <Card className="bg-card/95">
         <CardHeader className="border-b border-border/60 pb-4">

@@ -151,8 +151,8 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
   const [stepTime, setStepTime] = useState("");
 
   function askTime(action: "en-route" | "arrivee") {
-    const now = new Date();
-    setStepTime(`${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`);
+    // Heure d'Abidjan (UTC+0), quel que soit le fuseau du téléphone.
+    setStepTime(new Date().toISOString().slice(11, 16));
     setPendingStep(action);
   }
 
@@ -161,12 +161,7 @@ export function ConvoyTrackingPanel({ lotId, canTrack, mapsKey, autoWatch = fals
     try {
       const position = await currentPosition();
       let occurredAt: string | undefined;
-      if (time) {
-        const [hours, minutes] = time.split(":").map(Number);
-        const at = new Date();
-        at.setHours(hours, minutes, 0, 0);
-        occurredAt = at.toISOString();
-      }
+      if (time) occurredAt = `${new Date().toISOString().slice(0, 10)}T${time}:00Z`;
       const response = await fetch(`/api/transferts/${lotId}/convoi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

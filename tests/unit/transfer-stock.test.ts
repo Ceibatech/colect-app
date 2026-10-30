@@ -77,3 +77,12 @@ describe("transfer stock", () => {
     expect(isTransferMovementChronologyValid("RETOUR", new Date("2026-10-22T08:00:00Z"), item, lotCreatedAt)).toBe(true);
   });
 });
+
+
+describe("chronologie des mouvements à la minute près", () => {
+  it("accepte un bordereau daté de la même minute que le jalon précédent", () => {
+    const created = new Date("2026-10-30T05:21:56Z");
+    expect(isTransferMovementChronologyValid("SORTIE", new Date("2026-10-30T05:21:00Z"), { departedAt: null, receivedAt: null }, created)).toBe(true);
+    expect(isTransferMovementChronologyValid("SORTIE", new Date("2026-10-30T05:20:00Z"), { departedAt: null, receivedAt: null }, created)).toBe(false);
+  });
+});

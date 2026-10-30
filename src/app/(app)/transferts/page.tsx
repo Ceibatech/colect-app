@@ -207,7 +207,7 @@ export default async function TransfersPage() {
                       <p className="font-mono font-semibold text-foreground">{row.reference}</p>
                       <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground"><MapPin className="h-3.5 w-3.5 shrink-0" />{row.source}</p>
                     </div>
-                    <TransferLotStatusBadge status={row.status as TransferLotStatusCode} />
+                    <div className="text-right"><TransferLotStatusBadge status={row.status as TransferLotStatusCode} />{row.convoyLabel ? <p className="mt-1 text-xs font-medium text-brand-gold">{row.convoyLabel}</p> : null}</div>
                   </div>
                   <div className="grid grid-cols-3 gap-3 border-y border-border/60 py-3 text-sm">
                     <Metric label="Dossiers" value={row.stock.total} />
@@ -251,7 +251,7 @@ export default async function TransfersPage() {
                       <TableCell className="text-center font-semibold tabular-nums text-brand-gold">{row.stock.outsideOrigin}</TableCell>
                       <TableCell className="text-center font-semibold tabular-nums text-brand-green">{row.stock.atDestination}</TableCell>
                       <TableCell><span className="tabular-nums">{row.movementCount}</span><span className="text-muted-foreground"> bordereau{row.movementCount > 1 ? "x" : ""}</span></TableCell>
-                      <TableCell><TransferLotStatusBadge status={row.status as TransferLotStatusCode} /></TableCell>
+                      <TableCell><TransferLotStatusBadge status={row.status as TransferLotStatusCode} />{row.convoyLabel ? <p className="mt-1 text-xs font-medium text-brand-gold">{row.convoyLabel}</p> : null}</TableCell>
                       <TableCell className="pr-5 text-right">
                         <Link href={`/transferts/${row.id}`} className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))} aria-label={`Ouvrir ${row.reference}`}>
                           <ArrowRight />

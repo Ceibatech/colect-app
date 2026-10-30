@@ -56,6 +56,7 @@ export function activiteDAction(action: string): ActiviteCode {
 
 /** « 2 h 05 », « 45 min ». */
 export function formatDuree(minutes: number) {
+  if (minutes < 1) return "moins d'une minute";
   if (minutes < 60) return `${minutes} min`;
   return `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, "0")}`;
 }
