@@ -6,6 +6,7 @@ import { COOKIE_NAME, verifySessionToken, type SessionPayload } from "@/lib/auth
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 import { ApiError } from "@/lib/utils/api-error";
 import { prisma } from "@/lib/prisma/client";
+import { getActingSession } from "@/lib/auth/acting-session";
 
 /**
  * Lit et vérifie la session depuis le cookie httpOnly. `cache()` évite de
@@ -13,6 +14,8 @@ import { prisma } from "@/lib/prisma/client";
  * Server Components peuvent appeler getSession()).
  */
 export const getSession = cache(async (): Promise<SessionPayload | null> => {
+  const acting = getActingSession();
+  if (acting) return acting;
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;

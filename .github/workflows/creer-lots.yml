@@ -1,0 +1,75 @@
+name: Créer les lots de transfert préparés (Contabo)
+
+# Lancement manuel. Crée, par plage de cotes, les lots de transfert au nom du
+# gestionnaire désigné et les soumet à la validation interne (le circuit normal
+# suit). « simulation » compte seulement (voir deploy/creer-lots.mjs).
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "simulation ou appliquer"
+        required: true
+        default: simulation
+        type: choice
+        options: [simulation, appliquer]
+      gestionnaire:
+        description: "Nom du compte gestionnaire (ex. IDRISS BADO)"
+        required: true
+        type: string
+      plages:
+        description: "Plages séparées par ; (ex. 2010-KOU-0001 à 200;2010-KOU-0201 à 320)"
+        required: true
+        type: string
+      date:
+        description: "Date prévue (AAAA-MM-JJTHH:MM, heure d'Abidjan)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-creer-lots
+  cancel-in-progress: false
+
+jobs:
+  lots:
+    name: Lots de transfert (${{ inputs.mode }})
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Exécuter sur le VPS en SSH vérifié
+        env:
+          MODE: ${{ inputs.mode }}
+          GESTIONNAIRE: ${{ inputs.gestionnaire }}
+          PLAGES: ${{ inputs.plages }}
+          DATE_PREVUE: ${{ inputs.date }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$MODE" == simulation || "$MODE" == appliquer ]] || { echo "Mode invalide." >&2; exit 1; }
+          [[ "$GESTIONNAIRE" =~ ^[[:alpha:][:space:].\'-]{2,80}$ ]] || { echo "Nom invalide." >&2; exit 1; }
+          [[ "$PLAGES" =~ ^[0-9A-Z\ à\;-]{5,300}$ ]] || { echo "Plages invalides." >&2; exit 1; }
+          [[ "$DATE_PREVUE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$ ]] || { echo "Date invalide." >&2; exit 1; }
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-lots.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            "$CONTABO_USER@$CONTABO_HOST" "bash /opt/colect-app/current/deploy/creer-lots.sh $(printf '%q' "$MODE") $(printf '%q' "$GESTIONNAIRE") $(printf '%q' "$PLAGES") $(printf '%q' "$DATE_PREVUE")"
