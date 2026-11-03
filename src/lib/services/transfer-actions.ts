@@ -23,6 +23,7 @@ import { referentielSecurisation, resolveSingleChoice, TRANSPORT_METHODS } from 
 import { CEIBA_TRANSFER_ROLE_CODES, getRoleLabel, SDA_TRANSFER_ROLE_CODES, SITE_RESPONSIBLE_ROLE_CODE, type RoleCode } from "@/lib/permissions/constants";
 import { cartonWhereFromToken, getCartonDisplay, parseCartonToken } from "@/lib/workflow/carton-identity";
 import { dechargerCartons } from "@/lib/services/caisse-service";
+import { enqueueMulcvReception } from "@/lib/services/mulcv-sync-service";
 import { signataireDe } from "@/lib/transfers/signataire";
 import { parseAbidjanDateTime } from "@/lib/utils/abidjan-time";
 
@@ -1089,6 +1090,14 @@ export async function approveTransferMovementByMinistry(
         data: { status: flow.after, ...flow.timestamp },
       });
       if (updatedItems.count !== itemIds.length) throw new TransferRuleError("Le stock a changé pendant la validation.");
+      // Prise en charge reçue chez CEIBA : chaque caisse est mise en file pour MULCV (cartons et
+      // dossiers sous leurs cotes), avant que les caisses ne soient vidées.
+      if (flow.after === "RECU") {
+        await enqueueMulcvReception(tx, {
+          transferLotId: movement.transferLotId, lotReference: movement.transferLot.reference, movementId,
+          destinationSiteId: movement.transferLot.destinationSiteId, cartonIds,
+        });
+      }
       // Réception ou retour finalisés : les conteneurs de transport de ces cartons sont vidés.
       if (flow.after === "RECU" || flow.after === "RETOURNE") await dechargerCartons(tx, cartonIds, movement.transferLotId, session.userId);
 
