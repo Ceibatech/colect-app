@@ -1,7 +1,26 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { isDeletionConfirmed, userDeletionBlockers } from "@/lib/utils/user-deletion";
+import {
+  USER_DELETION_HARD_BLOCKERS, anonymizedEmail, isAnonymizedEmail, isDeletionConfirmed, userDeletionBlockers,
+} from "@/lib/utils/user-deletion";
+
+describe("anonymisation d'un compte", () => {
+  it("produit un e-mail unique et reconnaissable, que personne ne peut recevoir", () => {
+    expect(anonymizedEmail(42)).toBe("compte-42@supprime.invalid");
+    expect(anonymizedEmail(42)).not.toBe(anonymizedEmail(43));
+    expect(isAnonymizedEmail(anonymizedEmail(42))).toBe(true);
+    expect(isAnonymizedEmail(" Compte-7@SUPPRIME.INVALID ")).toBe(true);
+    expect(isAnonymizedEmail("agent@ceiba-analytics.com")).toBe(false);
+  });
+
+  it("ne bloque que sur les opérateurs encore affectés, pas sur les données métier", () => {
+    const counts = { dossierHistory: 500, transferSignaturesCaptured: 12, operateurDossiers: 900 };
+    expect(userDeletionBlockers(counts, USER_DELETION_HARD_BLOCKERS)).toEqual([]);
+    expect(userDeletionBlockers({ ...counts, supervisedOperateurs: 3 }, USER_DELETION_HARD_BLOCKERS)).toEqual(["3 opérateurs encore affectés"]);
+    expect(userDeletionBlockers(counts)).toHaveLength(3);
+  });
+});
 
 describe("userDeletionBlockers", () => {
   it("ne signale rien pour un compte sans trace métier", () => {
