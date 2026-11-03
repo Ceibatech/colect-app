@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   transaction: vi.fn(), movement: vi.fn(), lock: vi.fn(), extraMembers: vi.fn(),
-  dossiers: vi.fn(), cartons: vi.fn(), items: vi.fn(), signature: vi.fn(),
+  dossiers: vi.fn(), cartons: vi.fn(), items: vi.fn(), signature: vi.fn(), mulcv: vi.fn(),
 }));
 vi.mock("@/lib/auth/current-user", () => ({ requirePermission: async () => ({ userId: 7 }) }));
 vi.mock("@/lib/prisma/client", () => ({ prisma: {
@@ -13,6 +13,7 @@ vi.mock("@/lib/utils/server-request", () => ({ getClientIp: async () => "192.0.2
 vi.mock("@/lib/services/transfer-notification-service", () => ({ notifyTransferWorkflow: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/services/caisse-service", () => ({ dechargerCartons: vi.fn(async () => 0) }));
+vi.mock("@/lib/services/mulcv-sync-service", () => ({ enqueueMulcvReception: mocks.mulcv }));
 
 import { approveTransferMovementByMinistry } from "@/lib/services/transfer-actions";
 
@@ -60,6 +61,9 @@ describe("permanent carton identity across physical movements", () => {
     expect(mocks.dossiers).toHaveBeenCalledWith({ where: { id: { in: [10, 11] }, ...from }, data: to });
     expect(mocks.cartons).toHaveBeenCalledWith({ where: { id: { in: [123] } }, data: { legacyKey: null } });
     expect(mocks.signature).toHaveBeenCalledOnce();
+    // Seule la réception met les caisses en file pour MULCV, avant qu'elles soient vidées.
+    if (type === "RECEPTION") expect(mocks.mulcv).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ movementId: 12, cartonIds: [123] }));
+    else expect(mocks.mulcv).not.toHaveBeenCalled();
   });
 
   it("refuses to move a carton whose current content exceeds the signed manifest", async () => {

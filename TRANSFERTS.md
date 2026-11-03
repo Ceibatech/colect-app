@@ -104,6 +104,44 @@ L'espace ministère propose les réceptions à signer, celles encore en attente 
 CEIBA, les bordereaux validés et l'ensemble des bordereaux, avec recherche par référence
 et pagination. Chaque bordereau peut être ouvert puis imprimé depuis le navigateur.
 
+## Envoi automatique vers MULCV
+
+À la **réception chez CEIBA** d'une prise en charge (F03 contre-signée par le ministère),
+chaque caisse du bordereau est envoyée à MULCV comme un **conteneur** :
+
+| GeoArchives | MULCV |
+|---|---|
+| Lot + caisse (`LOT-2026-000007` + `C-01`) | conteneur `LOT-2026-000007-C-01` (unique par voyage : la caisse peut resservir) |
+| Cote du carton (`2010-KOU-0201`) | carton |
+| Cote du dossier (`2010-KOU-0201-001`) | dossier |
+
+MULCV crée `Scan/Production/<zone>/<conteneur>/<carton>/<dossier>` : les étiquettes QR
+des cartons et dossiers sont alors reconnues au scan, sans aucune saisie. La zone est
+`MULCV_ZONE` (défaut `Zone_Sud`). Les cartons ou dossiers sans cote ne sont pas envoyés.
+
+L'envoi passe par la file `mulcv_deliveries` : la réception n'attend jamais MULCV.
+L'ordonnanceur (`email-report-scheduler`) envoie la file chaque minute ; une panne est
+retentée (délai croissant, 12 essais), un refus de MULCV (`REJECTED`, ex. plus de 40 cartons
+dans une caisse) garde sa raison dans `error_message`. MULCV traite un renvoi sans doublon.
+
+Configuration dans `/opt/colect-app/shared/app.env` (les trois premières ensemble, sinon
+l'envoi reste en attente sans erreur) :
+
+```
+MULCV_API_BASE=https://mulcv-dev.ceiba-analytics.com/api/v1
+MULCV_TOKEN_URL=https://mulcv-kc-dev.ceiba-analytics.com/auth/realms/mulcv/protocol/openid-connect/token
+MULCV_CLIENT_SECRET=<secret du client Keycloak geoarchiv>
+MULCV_CLIENT_ID=geoarchiv
+MULCV_ZONE=Zone_Sud
+```
+
+Rattrapage, une fois, des prises en charge reçues avant la mise en service (sans effet sur
+ce qui est déjà en file, peut être relancé) :
+
+```
+curl -X POST -H "Authorization: Bearer $REPORTS_CRON_SECRET" http://127.0.0.1:8300/api/internal/mulcv/rattrapage
+```
+
 ## Mise en service
 
 La migration `20261023120000_secure_transfer_procedure` ajoute les informations de

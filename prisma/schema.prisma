@@ -1904,3 +1904,29 @@ model PresenceUtilisateur {
 
   @@map("presence_utilisateurs")
 }
+
+/// Envoi d'une caisse (conteneur) reçue chez CEIBA vers MULCV, pour que ses cartons et
+/// dossiers y existent avant la numérisation. File d'attente : un envoi en échec temporaire
+/// est retenté par l'ordonnanceur ; MULCV traite un renvoi sans rien créer en double.
+model MulcvDelivery {
+  id             Int       @id @default(autoincrement())
+  transferLotId  Int       @map("transfer_lot_id")
+  movementId     Int?      @map("movement_id")
+  conteneurId    String    @map("conteneur_id") @db.VarChar(64)
+  idempotencyKey String    @unique @map("idempotency_key") @db.VarChar(191)
+  payload        Json
+  cartonCount    Int       @map("carton_count")
+  dossierCount   Int       @map("dossier_count")
+  status         String    @default("PENDING") @db.VarChar(16)
+  attemptCount   Int       @default(0) @map("attempt_count")
+  nextAttemptAt  DateTime? @default(now()) @map("next_attempt_at")
+  lastAttemptAt  DateTime? @map("last_attempt_at")
+  errorMessage   String?   @map("error_message") @db.Text
+  mulcvPath      String?   @map("mulcv_path") @db.VarChar(255)
+  sentAt         DateTime? @map("sent_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@index([status, nextAttemptAt])
+  @@index([transferLotId])
+  @@map("mulcv_deliveries")
+}

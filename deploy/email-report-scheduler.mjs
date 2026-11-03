@@ -30,11 +30,28 @@ async function runOnce() {
   }
 }
 
+// Caisses reçues chez CEIBA à envoyer à MULCV (sans effet tant que MULCV n'est pas configuré).
+async function syncMulcv() {
+  const response = await fetch(`${baseUrl}/api/internal/mulcv/sync`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(300_000),
+  });
+  if (!response.ok) throw new Error(`MULCV sync returned HTTP ${response.status}.`);
+  const result = await response.json();
+  if (result.due > 0) console.log(JSON.stringify({ event: "mulcv_deliveries_processed", due: result.due, sent: result.sent, failed: result.failed }));
+}
+
 while (!stopping) {
   try {
     await runOnce();
   } catch (error) {
     console.error(error instanceof Error ? error.message : "Email report scheduler failed.");
+  }
+  try {
+    await syncMulcv();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "MULCV sync failed.");
   }
   if (!stopping) await sleep(pollSeconds * 1000);
 }

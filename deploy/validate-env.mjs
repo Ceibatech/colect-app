@@ -65,6 +65,19 @@ if (reportsToken.length < 32 || /change|example|placeholder/i.test(reportsToken)
   errors.push("REPORTS_CRON_SECRET must be a generated secret of at least 32 characters.");
 }
 
+// Envoi des caisses reçues vers MULCV : facultatif, mais complet s'il est commencé.
+const mulcv = ["MULCV_API_BASE", "MULCV_TOKEN_URL", "MULCV_CLIENT_SECRET"].filter((name) => (process.env[name] || "").trim());
+if (mulcv.length > 0 && mulcv.length < 3) {
+  errors.push("MULCV_API_BASE, MULCV_TOKEN_URL and MULCV_CLIENT_SECRET must be set together (or all left empty).");
+}
+for (const name of ["MULCV_API_BASE", "MULCV_TOKEN_URL"]) {
+  const value = (process.env[name] || "").trim();
+  if (value && !/^https?:\/\//.test(value)) errors.push(`${name} must be an http(s) URL.`);
+}
+if ((process.env.MULCV_ZONE || "").trim() && !/^[A-Za-z0-9](?:[A-Za-z0-9_-]{0,62}[A-Za-z0-9])?$/.test(process.env.MULCV_ZONE.trim())) {
+  errors.push("MULCV_ZONE must be a MULCV zone name such as Zone_Sud.");
+}
+
 if (errors.length) {
   for (const error of errors) console.error(error);
   process.exitCode = 1;
