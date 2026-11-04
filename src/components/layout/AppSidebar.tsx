@@ -22,14 +22,18 @@ import {
 import { NAV_ITEMS, isNavItemVisible, type NavItem } from "@/config/navigation";
 import { getRoleLabel, type PermissionCode, type RoleCode } from "@/lib/permissions/constants";
 import { cn } from "@/lib/utils";
+import { isHrefDisabled, type DisabledModules } from "@/lib/modules/catalog";
 
 function isActive(pathname: string, href: string) {
   return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar({ permissions, roleCode }: { permissions: PermissionCode[]; roleCode: RoleCode }) {
+export function AppSidebar({ permissions, roleCode, disabledModules = {} }: { permissions: PermissionCode[]; roleCode: RoleCode; disabledModules?: DisabledModules }) {
   const pathname = usePathname();
-  const visibleItems = NAV_ITEMS.filter((item) => isNavItemVisible(item, permissions, roleCode));
+  // Les modules mis hors service disparaissent du menu.
+  const visibleItems = NAV_ITEMS
+    .filter((item) => isNavItemVisible(item, permissions, roleCode) && !isHrefDisabled(item.href, disabledModules))
+    .map((item) => (item.children ? { ...item, children: item.children.filter((child) => !isHrefDisabled(child.href, disabledModules)) } : item));
 
   return (
     <Sidebar collapsible="icon" variant="floating" className="border-sidebar-border/70">
