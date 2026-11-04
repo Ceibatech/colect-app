@@ -63,6 +63,22 @@ jobs:
             child.on("error", (e) => console.log("mariadb-dump introuvable :", e.code));
             child.on("close", (code, signal) => { console.log("code", code, signal ?? "", "|", err.split(password).join("***").replace(/\s+/g, " ").trim()); });
           ' 2>&1 | tail -3
+          echo "== Base : réglages et plus grosses lignes de l'historique (lecture seule)"
+          docker exec colect-app-app-1 node --input-type=module -e '
+            import { PrismaClient } from "@prisma/client";
+            const db = new PrismaClient();
+            const big = (v) => typeof v === "bigint" ? Number(v) : v;
+            try {
+              const vars = await db.$queryRawUnsafe("SHOW VARIABLES WHERE Variable_name IN (\"max_allowed_packet\",\"net_write_timeout\",\"net_read_timeout\",\"wait_timeout\",\"version\",\"max_statement_time\")");
+              console.log(vars.map((v) => `${v.Variable_name}=${v.Value}`).join(" "));
+              const [n] = await db.$queryRawUnsafe("SELECT COUNT(*) AS n, MAX(id) AS maxid FROM dossier_history");
+              console.log("dossier_history lignes", big(n.n), "id max", big(n.maxid));
+              const rows = await db.$queryRawUnsafe("SELECT id, action, created_at, LENGTH(metadata) AS m, LENGTH(commentaire) AS c FROM dossier_history ORDER BY COALESCE(LENGTH(metadata),0) + COALESCE(LENGTH(commentaire),0) DESC LIMIT 5");
+              for (const r of rows) console.log(big(r.id), r.action, r.created_at.toISOString(), "metadata", big(r.m), "commentaire", big(r.c));
+              const around = await db.$queryRawUnsafe("SELECT id, action, LENGTH(metadata) AS m FROM dossier_history ORDER BY id LIMIT 3 OFFSET 12884");
+              console.log("autour de la ligne 12886 :", around.map((r) => `${big(r.id)} ${r.action} ${big(r.m)}`).join(" | "));
+            } catch (e) { console.log("erreur", e.message.split("\n").slice(-2).join(" ")); } finally { await db.$disconnect(); }
+          ' 2>&1 | tail -12
           echo "== Fichiers partiels"; find "$shared/db-backups" "$shared/document-backups" -name '*.partial' 2>/dev/null | head
           echo "== Releases"; du -sh /opt/colect-app/releases 2>/dev/null; ls -1 /opt/colect-app/releases 2>/dev/null | wc -l
           echo "== Docker"; docker system df 2>/dev/null || true
