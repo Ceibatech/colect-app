@@ -15,6 +15,18 @@ npx playwright test --project=api tests/api/workflow.spec.ts   # un seul fichier
 npx playwright show-trace test-results/.../trace.zip           # rejouer un échec (trace conservée)
 ```
 
+## Avant chaque déploiement (CI)
+
+Le workflow `contabo.yml` lance, en parallèle de l'unitaire/lint/build, le job
+**regression** : MariaDB jetable, migrations, seed de démonstration (fictif),
+build, démarrage du serveur, puis `playwright test --project=api`. Le
+déploiement sur Contabo attend que les deux jobs passent.
+
+`tests/api/modules-smoke.spec.ts` ouvre chaque page du menu (liste tirée de
+`src/config/navigation.ts`, donc un module ajouté est couvert d'office) et les
+API appelées à l'ouverture : une modification qui casse un autre module bloque
+le déploiement.
+
 ## Prérequis
 
 - Les tests **API** et **E2E** ont besoin d'une vraie base MySQL/MariaDB seedée

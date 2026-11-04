@@ -1,5 +1,5 @@
 import { testPrisma } from "./auth";
-import type { StatutValidation, StatutPreparation, StatutNumerisation, StatutIndexation, StatutArchivage } from "@prisma/client";
+import type { StatutValidation, StatutPreparation, StatutNumerisation, StatutConditionnement, StatutIndexation, StatutArchivage } from "@prisma/client";
 
 /**
  * Crée un dossier de test directement en base (contourne la Collecte/le
@@ -15,6 +15,7 @@ export async function createTestDossier(overrides: {
   statutValidation?: StatutValidation;
   statutPreparation?: StatutPreparation;
   statutNumerisation?: StatutNumerisation;
+  statutConditionnement?: StatutConditionnement;
   statutIndexation?: StatutIndexation;
   statutArchivage?: StatutArchivage;
   operateurId?: number;
@@ -31,6 +32,8 @@ export async function createTestDossier(overrides: {
       statutValidation: overrides.statutValidation ?? "EN_CONTROLE",
       statutPreparation: overrides.statutPreparation ?? "EN_ATTENTE",
       statutNumerisation: overrides.statutNumerisation ?? "EN_ATTENTE",
+      // Un dossier numérisé est par défaut reconditionné : l'indexation l'exige.
+      statutConditionnement: overrides.statutConditionnement ?? (overrides.statutNumerisation === "TERMINE" ? "TERMINE" : "EN_ATTENTE"),
       statutIndexation: overrides.statutIndexation ?? "EN_ATTENTE",
       statutArchivage: overrides.statutArchivage ?? "EN_ATTENTE",
       nom: "Dossier",
