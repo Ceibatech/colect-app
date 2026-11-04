@@ -34,7 +34,9 @@ export async function proxy(request: NextRequest) {
   const token = request.cookies.get(COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
 
-  const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isPublicPath = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+    // Adresse courte d'un ancien QR : la route décide elle-même (SAE pour un carton versé, sinon connexion).
+    || (!session && pathname.startsWith("/c/"));
 
   // Non authentifié sur une route protégée -> /login
   if (!session && !isPublicPath) {

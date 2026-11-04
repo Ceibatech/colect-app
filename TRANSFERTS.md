@@ -135,6 +135,18 @@ MULCV_CLIENT_ID=geoarchiv
 MULCV_ZONE=Zone_Sud
 ```
 
+**QR des étiquettes vers le SAE.** Les étiquettes restent chez le ministère après l'archivage :
+leur QR ne doit plus ouvrir GeoArchiv. Avec `LABEL_QR_BASE` (adresse https du portail MULCV), les
+étiquettes imprimées encodent `<LABEL_QR_BASE>/q/<cote>` ; le SAE note chaque scan (date, réseau,
+appareil, agent s'il est connecté) et ouvre l'emplacement après connexion. Les anciens QR
+(`…/c/<cote>`) scannés sans session GeoArchiv sont renvoyés vers le SAE dès que le carton a été
+envoyé à MULCV ; un agent GeoArchiv connecté arrive toujours sur la fiche. La douchette de
+GeoArchiv lit la cote dans les deux adresses.
+
+```
+LABEL_QR_BASE=https://mulcv-dev.ceiba-analytics.com/app
+```
+
 Rattrapage, une fois, des prises en charge reçues avant la mise en service (sans effet sur
 ce qui est déjà en file, peut être relancé) :
 

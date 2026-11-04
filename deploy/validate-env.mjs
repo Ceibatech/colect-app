@@ -66,6 +66,10 @@ if (reportsToken.length < 32 || /change|example|placeholder/i.test(reportsToken)
 }
 
 // Envoi des caisses reçues vers MULCV : facultatif, mais complet s'il est commencé.
+const labelBase = (process.env.LABEL_QR_BASE || "").trim();
+if (labelBase && !/^https:\/\/[^\s/?#]+(\/[^\s?#]*)?$/.test(labelBase)) {
+  errors.push("LABEL_QR_BASE must be the https address of the SAE portal, such as https://mulcv-dev.ceiba-analytics.com/app.");
+}
 const mulcv = ["MULCV_API_BASE", "MULCV_TOKEN_URL", "MULCV_CLIENT_SECRET"].filter((name) => (process.env[name] || "").trim());
 if (mulcv.length > 0 && mulcv.length < 3) {
   errors.push("MULCV_API_BASE, MULCV_TOKEN_URL and MULCV_CLIENT_SECRET must be set together (or all left empty).");
