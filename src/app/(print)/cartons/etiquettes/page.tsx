@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { communeDeCote } from "@/lib/referentiel/codification";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/transferts/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
@@ -58,10 +57,10 @@ export default async function CartonLabelsPage({ searchParams }: { searchParams:
             <div className="size-[40mm] shrink-0" dangerouslySetInnerHTML={{ __html: label.qr }} />
             <div className="flex min-w-0 flex-1 flex-col">
               <p className="whitespace-nowrap font-mono text-[13pt] font-bold leading-tight tracking-tight">{label.reference}</p>
-              {communeDeCote(label.reference) ? <p className="text-[12pt] font-semibold uppercase leading-tight">{communeDeCote(label.reference)}</p> : null}
               <p className="mt-[3mm] line-clamp-3 text-[14pt] font-semibold leading-snug">{label.label ?? "Sans libellé"}</p>
               <p className="mt-auto text-[8.5pt] leading-snug text-slate-700">{[label.site, label.salle].filter(Boolean).join(" · ")}</p>
-              <p className="text-[8.5pt] text-slate-700">{label.dossiers} dossier{label.dossiers > 1 ? "s" : ""} · GeoArchives CEIBA</p>
+              {/* Pas de nombre de dossiers : il change dès qu'un dossier s'ajoute au carton. */}
+              <p className="text-[8.5pt] text-slate-700">GeoArchives CEIBA</p>
             </div>
           </article>
         ))}

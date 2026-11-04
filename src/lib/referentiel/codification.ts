@@ -125,12 +125,3 @@ export function communeCiParNom(nom: string | null | undefined): CommuneCi | nul
 export function communeCiParIdentifiant(identifiant: string | null | undefined) {
   return COMMUNES_CI.find((c) => c.identifiant === identifiant) ?? null;
 }
-
-/**
- * Nom de la commune écrit en clair à côté d'une cote, pour qu'un identifiant
- * numérique reste lisible : FON-3302-113-0001 → « KOUMASSI ». Ancienne cote : null.
- */
-export function communeDeCote(cote: string | null | undefined): string | null {
-  const match = /^[A-Z]{2,3}-\d{4}-(\d{3})-\d{4,6}(?:-\d{3,4})?$/.exec((cote ?? "").trim().toUpperCase());
-  return match ? communeCiParIdentifiant(match[1])?.nom ?? null : null;
-}

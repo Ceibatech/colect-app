@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { communeDeCote } from "@/lib/referentiel/codification";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/transferts/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
@@ -51,8 +50,8 @@ export default async function DossierLabelsPage({ searchParams }: { searchParams
             <div className="size-[26mm] shrink-0" dangerouslySetInnerHTML={{ __html: label.qr }} />
             <div className="min-w-0 flex-1">
               <p className="whitespace-nowrap font-mono text-[7.6pt] font-bold leading-tight tracking-tight">{label.code}</p>
-              {communeDeCote(label.code) ? <p className="text-[7.5pt] font-semibold uppercase leading-tight">{communeDeCote(label.code)}</p> : null}
-              {label.rangCarton ? <p className="text-[8pt] text-slate-700">Dossier n° {label.rangCarton}/{labels.length}</p> : null}
+              {/* Rang seul : il ne change jamais, alors qu'un total deviendrait faux au premier ajout. */}
+              {label.rangCarton ? <p className="text-[8pt] text-slate-700">Dossier n° {label.rangCarton}</p> : null}
               {/* Aucun nom sur l'étiquette : le titulaire ne se voit qu'au scan, après connexion.
                   Repères de collage : îlot, lot et titre foncier, tels qu'écrits sur la chemise. */}
               <p className="mt-[1mm] line-clamp-2 text-[8pt] font-semibold leading-snug">

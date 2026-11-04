@@ -14,16 +14,6 @@ src, outdir = sys.argv[1], sys.argv[2]
 data = json.load(open(src, encoding="utf-8"))
 APP = "https://geoarchives.ceiba-analytics.com"
 
-# Codification FONCTION V3 : le nom de la commune s'imprime en clair à côté de la
-# cote (FON-3302-113-0001 → KOUMASSI), pour qu'un identifiant numérique reste lisible.
-import os, re
-_COMMUNES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "src", "lib", "referentiel", "communes-ci.json")
-COMMUNES = {c["identifiant"]: c["nom"] for c in json.load(open(_COMMUNES, encoding="utf-8"))} if os.path.exists(_COMMUNES) else {}
-
-
-def commune_de_cote(cote):
-    m = re.match(r"^[A-Z]{2,3}-\d{4}-(\d{3})-\d{4,6}(?:-\d{3,4})?$", str(cote or "").strip().upper())
-    return COMMUNES.get(m.group(1)) if m else None
 cartons = data["cartons"]
 
 
@@ -144,15 +134,10 @@ def carton_labels(path):
         size = 15
         while size > 9 and c.stringWidth(carton["cote"], "Helvetica-Bold", size) > tw: size -= 0.5
         c.setFont("Helvetica-Bold", size); c.drawString(tx, y + lh - 11 * mm, carton["cote"])
-        commune = commune_de_cote(carton["cote"])
-        if commune:
-            c.setFont("Helvetica-Bold", 10); c.drawString(tx, y + lh - 16.5 * mm, pdf_text(commune))
-        top = 22.5 if commune else 19
-        for j, line in enumerate(wrap(carton["nom"], tw, "Helvetica-Bold", 11, c, 2 if commune else 3)):
-            c.setFont("Helvetica-Bold", 11); c.drawString(tx, y + lh - top * mm - j * 5 * mm, line)
+        for j, line in enumerate(wrap(carton["nom"], tw, "Helvetica-Bold", 11, c, 3)):
+            c.setFont("Helvetica-Bold", 11); c.drawString(tx, y + lh - 19 * mm - j * 5 * mm, line)
         c.setFont("Helvetica", 8.5)
-        n = len(carton["dossiers"])
-        c.drawString(tx, y + 17 * mm, f"{n} dossier{'s' if n > 1 else ''}" if n else "Dossiers à rattacher")
+        # Pas de nombre de dossiers : il change dès qu'un dossier s'ajoute au carton.
         if carton["listeRef"] is not None: c.drawString(tx, y + 12.5 * mm, f"Liste d'enlèvement : n° {carton['listeRef']}")
         c.setFont("Helvetica", 7)
         for j, line in enumerate(wrap(carton["lieu"] or "Koumassi", tw, "Helvetica", 7, c, 2)):
@@ -175,11 +160,8 @@ def dossier_labels(path):
             draw_qr(c, f"{APP}/c/{d['cote']}", x + 1.5 * mm, y + 2.5 * mm, 28 * mm)
             tx, tw = x + 30.5 * mm, lw - 32 * mm
             c.setFont("Helvetica-Bold", 7.6); c.drawString(tx, y + lh - 6 * mm, pdf_text(d["cote"]))
-            c.setFont("Helvetica", 7); c.drawString(tx, y + lh - 10 * mm, f"Dossier {d['rang']}/{n}")
-            commune = commune_de_cote(d["cote"])
-            if commune:
-                left = tx + c.stringWidth(f"Dossier {d['rang']}/{n}  ", "Helvetica", 7)
-                c.setFont("Helvetica-Bold", 6.5); c.drawString(left, y + lh - 10 * mm, pdf_text(commune)[:22])
+            # Rang seul : il ne change jamais, alors qu'un total deviendrait faux au premier ajout.
+            c.setFont("Helvetica", 7); c.drawString(tx, y + lh - 10 * mm, f"Dossier n° {d['rang']}")
             # Repères de collage sans nom : îlot, lot et titre foncier, tels qu'écrits sur la chemise.
             reperes = [("Îlot", d["ilot"]), ("Lot", d["lot"]), ("TF", d["titreFoncier"])]
             line_y = y + lh - 15 * mm
