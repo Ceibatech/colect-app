@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { createWriteStream } from "node:fs";
+import { once } from "node:events";
+import { createReadStream, createWriteStream } from "node:fs";
 import { lstat, open, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import { Transform } from "node:stream";
@@ -77,86 +78,124 @@ export function redact(text, password) {
   return password ? clean.split(password).join("***") : clean;
 }
 
+// Options de mariadb-dump sans effet pour le client mariadb (liste des tables).
+const DUMP_ONLY = new Set(["--single-transaction", "--quick", "--skip-lock-tables", "--no-tablespaces", "--hex-blob"]);
+const ATTEMPTS = 3;
+
+/** Lance un programme du client MariaDB ; stdout vers `stdout` (flux) ou capturé. */
+function run(spawnDump, command, args, password, stdout) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawnDump(command, args, {
+        shell: false,
+        stdio: ["ignore", "pipe", "pipe"],
+        // The password is never an argument, parent environment mutation or log.
+        env: { PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin", LANG: "C.UTF-8", MYSQL_PWD: password },
+      });
+    } catch {
+      reject(new DumpError(`${command} introuvable`));
+      return;
+    }
+    let stderr = "";
+    let captured = "";
+    let bytes = 0;
+    child.stderr?.on("data", (chunk) => { if (stderr.length < 4000) stderr += chunk.toString("utf8"); });
+    const written = stdout
+      ? pipeline(child.stdout, new Transform({ transform(chunk, _e, cb) { bytes += chunk.length; cb(null, chunk); } }), stdout).then(() => true, () => false)
+      : new Promise((done) => { child.stdout.on("data", (c) => { captured += c.toString("utf8"); bytes += c.length; }); child.stdout.on("end", () => done(true)); });
+    let spawnFailed = false;
+    child.once("error", () => { spawnFailed = true; });
+    child.once("close", async (code, signal) => {
+      const ok = await written;
+      if (spawnFailed || code !== 0 || signal || !ok) {
+        reject(new DumpError([spawnFailed ? `${command} introuvable` : null, code ? `code ${code}` : null, signal ? `signal ${signal}` : null, !ok ? "écriture interrompue" : null, redact(stderr, password)].filter(Boolean).join(" ; ")));
+      } else resolve({ bytes, captured });
+    });
+  });
+}
+
+/**
+ * Sauvegarde table par table : chaque table est lue sur sa propre connexion,
+ * jusqu'à trois essais. Un hébergement mutualisé (CloudLinux) coupe une
+ * lecture trop longue (« Lost connection… », erreur 2013) : un seul dump de
+ * toute la base échouait. L'application est arrêtée pendant la sauvegarde du
+ * déploiement : les tables restent cohérentes entre elles. Les tables, puis
+ * les vues, sont réunies dans une seule archive .sql.gz, restaurable telle quelle.
+ */
 export async function backupDatabase({
   databaseUrl = process.env.DATABASE_URL,
   backupDirectory = "/backups",
   spawnDump = spawn,
+  pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 } = {}) {
   const { args, password } = dumpConnection(databaseUrl);
   if (!path.isAbsolute(backupDirectory) || !(await lstat(backupDirectory)).isDirectory()) {
     throw new Error("Backup directory must already exist.");
   }
+  const separator = args.indexOf("--");
+  const connection = args.slice(0, separator);
+  const database = args[separator + 1];
   const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
   const filename = `database-${timestamp}-${randomBytes(12).toString("hex")}.sql.gz`;
   const destination = path.join(backupDirectory, filename);
   const partial = `${destination}.partial`;
-  let child;
-  let output;
+  const tableFile = `${destination}.table`;
   let interrupted = false;
-  const cancel = () => {
-    interrupted = true;
-    child?.kill("SIGKILL");
-    output?.destroy(new Error("Backup interrupted."));
-  };
+  const cancel = () => { interrupted = true; };
+  process.once("SIGINT", cancel);
+  process.once("SIGTERM", cancel);
 
   try {
-    child = spawnDump("mariadb-dump", args, {
-      shell: false,
-      // stderr gardé (tronqué, sans mot de passe) pour dire pourquoi le dump échoue.
-      stdio: ["ignore", "pipe", "pipe"],
-      // The password is never an argument, parent environment mutation or log.
-      env: {
-        PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
-        LANG: "C.UTF-8",
-        MYSQL_PWD: password,
-      },
-    });
-    let stderr = "";
-    child.stderr?.on("data", (chunk) => { if (stderr.length < 4000) stderr += chunk.toString("utf8"); });
-    const completion = new Promise((resolve) => {
-      let spawnFailed = false;
-      child.once("error", () => { spawnFailed = true; });
-      child.once("close", (code, signal) => resolve({ code, signal, spawnFailed }));
-    });
-    process.once("SIGINT", cancel);
-    process.once("SIGTERM", cancel);
-    output = createWriteStream(partial, { flags: "wx", mode: 0o600 });
-    let bytes = 0;
-    const countBytes = new Transform({
-      transform(chunk, encoding, callback) {
-        bytes += chunk.length;
-        callback(null, chunk);
-      },
-    });
-    const streaming = pipeline(child.stdout, countBytes, createGzip(), output).then(
-      () => true,
-      () => { child.kill("SIGKILL"); return false; },
-    );
-    const [result, streamed] = await Promise.all([completion, streaming]);
-    if (interrupted || result.spawnFailed || result.code !== 0 || result.signal || !streamed || bytes === 0) {
-      const reason = [
-        result.spawnFailed ? "mariadb-dump introuvable" : null,
-        result.code ? `code ${result.code}` : null,
-        result.signal ? `signal ${result.signal}` : null,
-        !streamed ? "écriture interrompue" : null,
-        bytes === 0 ? "dump vide" : null,
-        redact(stderr, password),
-      ].filter(Boolean).join(" ; ");
-      throw new DumpError(reason);
+    const listing = await run(spawnDump, "mariadb", [
+      ...connection.filter((arg) => !DUMP_ONLY.has(arg)),
+      "--batch", "--skip-column-names", `--database=${database}`,
+      "--execute=SHOW FULL TABLES",
+    ], password);
+    const entries = listing.captured.split("\n").map((line) => line.split("\t")).filter(([name]) => name);
+    // Tables d'abord, vues ensuite : une vue se restaure après les tables qu'elle lit.
+    const tables = [...entries.filter(([, type]) => type !== "VIEW"), ...entries.filter(([, type]) => type === "VIEW")].map(([name]) => name);
+    if (!tables.length) throw new DumpError("aucune table à sauvegarder");
+
+    const gzip = createGzip();
+    const output = createWriteStream(partial, { flags: "wx", mode: 0o600 });
+    const archive = pipeline(gzip, output);
+    let total = 0;
+    for (const table of tables) {
+      let lastError = null;
+      for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
+        if (interrupted) throw new DumpError("sauvegarde interrompue");
+        try {
+          const file = createWriteStream(tableFile, { flags: "w", mode: 0o600 });
+          const { bytes } = await run(spawnDump, "mariadb-dump", [...connection, "--", database, table], password, file);
+          total += bytes;
+          for await (const chunk of createReadStream(tableFile)) {
+            if (!gzip.write(chunk)) await once(gzip, "drain");
+          }
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt < ATTEMPTS) await pause(2000 * attempt);
+        }
+      }
+      if (lastError) throw new DumpError(`table ${table} : ${lastError.message}`);
     }
+    gzip.end();
+    await archive;
+    if (total === 0) throw new DumpError("dump vide");
     // Flush the completed compressed file before its final name becomes visible.
     const completedFile = await open(partial, "r+");
     try { await completedFile.sync(); } finally { await completedFile.close(); }
-    if (interrupted) throw new Error("Backup interrupted.");
+    if (interrupted) throw new DumpError("sauvegarde interrompue");
     await rename(partial, destination);
     return destination;
   } catch (error) {
-    child?.kill("SIGKILL");
-    output?.destroy();
     await unlink(partial).catch(() => {});
     const detail = error instanceof DumpError ? ` Cause : ${error.message}` : error instanceof Error ? ` Cause : ${redact(error.message, password)}` : "";
     throw new Error(`Backup failed. Check database access, TLS configuration and backup-directory permissions.${detail}`);
   } finally {
+    await unlink(tableFile).catch(() => {});
     process.removeListener("SIGINT", cancel);
     process.removeListener("SIGTERM", cancel);
   }
