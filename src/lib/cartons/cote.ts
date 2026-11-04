@@ -43,13 +43,67 @@ export function formatDossierCote(cartonCote: string, rang: number) {
   return `${cartonCote}-${String(rang).padStart(3, "0")}`;
 }
 
-const COTE = /^(\d{4})-([A-Z][A-Z0-9]{1,5})-(\d{4,6})(?:-(\d{3,4}))?$/;
+// Deux formats cohabitent pendant la migration vers la nouvelle codification :
+//
+//   nouveau : FON-3302-113-0001[-012]   fonction · rubrique V3 · identifiant de commune · n° du carton [· rang]
+//   ancien  : 2010-KOU-0001[-012]       rubrique · sigle de commune · n° du carton [· rang]
+//
+// Les deux sont lus partout ; seul l'ancien est encore attribué.
 
-/** « 2010-kou-0001-012 » → { carton: "2010-KOU-0001", rang: 12 }. */
+/** Préfixe d'une cote (tout sauf le n° du carton), pour construire les motifs de recherche : FON-3302-113 ou 2010-KOU. */
+export const COTE_PREFIXE_PATTERN = "(?:[A-Z]{2,3}-\\d{4}-\\d{3}|\\d{4}-[A-Z][A-Z0-9]{1,5})";
+
+const COTE_NOUVEAU = /^([A-Z]{2,3})-(\d{4})-(\d{3})-(\d{4,6})(?:-(\d{3,4}))?$/;
+const COTE_ANCIEN = /^(\d{4})-([A-Z][A-Z0-9]{1,5})-(\d{4,6})(?:-(\d{3,4}))?$/;
+
+/** Les 14 fonctions de la nouvelle codification. */
+export const FONCTIONS = ["GOV", "ADM", "JUR", "FIN", "RH", "FON", "URB", "TOP", "CON", "LOG", "PAT", "CTL", "SI", "ARC"] as const;
+export type Fonction = (typeof FONCTIONS)[number];
+
+export type CoteDetail = {
+  format: "nouveau" | "ancien";
+  /** Cote du carton, normalisée en majuscules. */
+  carton: string;
+  /** Préfixe sans le n° du carton (valeur de cotePrefixe) : FON-3302-113 ou 2010-KOU. */
+  prefixe: string;
+  rubrique: string;
+  /** Fonction (nouveau format seulement). */
+  fonction: string | null;
+  /** Identifiant de commune sur 3 chiffres (nouveau) ou sigle (ancien). */
+  commune: string;
+  rang: number | null;
+};
+
+/** Lit une cote carton ou dossier dans l'un des deux formats. */
+export function parseCoteDetail(value: string): CoteDetail | null {
+  const text = value.trim().toUpperCase();
+  const nouveau = COTE_NOUVEAU.exec(text);
+  if (nouveau) {
+    const prefixe = `${nouveau[1]}-${nouveau[2]}-${nouveau[3]}`;
+    return { format: "nouveau", carton: `${prefixe}-${nouveau[4]}`, prefixe, rubrique: nouveau[2], fonction: nouveau[1], commune: nouveau[3], rang: nouveau[5] ? Number(nouveau[5]) : null };
+  }
+  const ancien = COTE_ANCIEN.exec(text);
+  if (!ancien) return null;
+  const prefixe = `${ancien[1]}-${ancien[2]}`;
+  return { format: "ancien", carton: `${prefixe}-${ancien[3]}`, prefixe, rubrique: ancien[1], fonction: null, commune: ancien[2], rang: ancien[4] ? Number(ancien[4]) : null };
+}
+
+/** « 2010-kou-0001-012 » ou « fon-3302-113-0001-012 » → { carton, rang: 12 }. */
 export function parseCote(value: string): { carton: string; rang: number | null } | null {
-  const match = COTE.exec(value.trim().toUpperCase());
-  if (!match) return null;
-  return { carton: `${match[1]}-${match[2]}-${match[3]}`, rang: match[4] ? Number(match[4]) : null };
+  const detail = parseCoteDetail(value);
+  return detail ? { carton: detail.carton, rang: detail.rang } : null;
+}
+
+/** Identifiant de commune sur 3 chiffres, tiré du code de la commune : « CI-113 » → « 113 ». */
+export function communeIdentifiant(code: string | null | undefined): string | null {
+  const match = /^CI-(\d{3})$/.exec((code ?? "").trim().toUpperCase());
+  return match ? match[1] : null;
+}
+
+/** Préfixe de la nouvelle codification : ("FON", "3302", "113") → « FON-3302-113 ». */
+export function cotePrefixeNouveau(fonction: string, rubrique: string, commune: string): string | null {
+  const prefixe = `${fonction}-${rubrique}-${commune}`.toUpperCase();
+  return /^[A-Z]{2,3}-\d{4}-\d{3}$/.test(prefixe) && (FONCTIONS as readonly string[]).includes(fonction.toUpperCase()) ? prefixe : null;
 }
 
 /** Commune majoritaire d'un carton (la première rencontrée en cas d'égalité). */
@@ -62,7 +116,7 @@ export function majorityCommune(communeIds: Array<number | null>): number | null
   return best;
 }
 
-/** Cote du carton déduite de celle du dossier (2010-KOU-0001-012 → 2010-KOU-0001). */
+/** Cote du carton déduite de celle du dossier (2010-KOU-0001-012 → 2010-KOU-0001, FON-3302-113-0001-012 → FON-3302-113-0001). */
 export function cartonCoteOf(dossierCote: string | null | undefined): string | null {
   return dossierCote ? parseCote(dossierCote)?.carton ?? null : null;
 }

@@ -1,5 +1,6 @@
 import { buildCartonToken, getCartonDisplay } from "@/lib/workflow/carton-identity";
 import { formatCartonReference, parseCartonReference } from "@/lib/cartons/reference";
+import { COTE_PREFIXE_PATTERN } from "@/lib/cartons/cote";
 
 export const MAX_TRANSFER_CARTONS = 200;
 
@@ -79,13 +80,17 @@ export function groupAvailableTransferCartons(rows: TransferCartonSourceRow[]) {
   return { items, unidentifiedDossierCount, engagedCartonCount: [...grouped.values()].filter((item) => item.hasConflict).length };
 }
 
+const COTE_RANGE = new RegExp(`^(${COTE_PREFIXE_PATTERN})-(\\d{1,6})(?:\\s*(?:À|A|AU|\\.\\.)\\s*|\\s+[-–]\\s+)(?:(${COTE_PREFIXE_PATTERN})-)?(\\d{1,6})$`);
+const CARTON_CODE = new RegExp(`^(${COTE_PREFIXE_PATTERN})-(\\d{1,6})$`);
+
 /**
- * Plage de cotes saisie dans la recherche : « 2010-KOU-0001 à 0200 »,
- * « 2010-KOU-0001 - 2010-KOU-0200 » (tiret entouré d'espaces, pour ne pas
- * confondre avec la cote d'un dossier 2010-KOU-0001-012) ou « 2010-KOU-0001..0200 ».
+ * Plage de cotes saisie dans la recherche : « FON-3302-113-0001 à 0200 »,
+ * « FON-3302-113-0001 - FON-3302-113-0200 » (tiret entouré d'espaces, pour ne
+ * pas confondre avec la cote d'un dossier FON-3302-113-0001-012) ou
+ * « FON-3302-113-0001..0200 ». L'ancien format (2010-KOU-0001 à 0200) reste lu.
  */
 export function parseCoteRange(query: string) {
-  const match = query.trim().toUpperCase().match(/^(\d{4}-[A-Z][A-Z0-9]{1,5})-(\d{1,6})(?:\s*(?:À|A|AU|\.\.)\s*|\s+[-–]\s+)(?:(\d{4}-[A-Z][A-Z0-9]{1,5})-)?(\d{1,6})$/);
+  const match = query.trim().toUpperCase().match(COTE_RANGE);
   if (!match || (match[3] && match[3] !== match[1])) return null;
   const from = Number(match[2]);
   const to = Number(match[4]);
@@ -96,7 +101,7 @@ export function filterTransferCartons(items: TransferCartonItem[], query?: strin
   const range = parseCoteRange(query ?? "");
   if (range) {
     return items.filter((item) => {
-      const match = item.code.match(/^(\d{4}-[A-Z][A-Z0-9]{1,5})-(\d{1,6})$/);
+      const match = item.code.match(CARTON_CODE);
       return !!match && match[1] === range.prefix && Number(match[2]) >= range.from && Number(match[2]) <= range.to;
     });
   }
