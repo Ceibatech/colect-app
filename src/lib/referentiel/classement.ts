@@ -2,6 +2,7 @@
 // La rubrique choisie à l'inventaire ouvre la cote du carton (2010-KOU-0001)
 // et fixe la nature de ses dossiers (nature = rubrique du carton).
 import referentiel from "./classement.json";
+import { parseCoteDetail } from "@/lib/cartons/cote";
 
 export type Rubrique = { code: string; libelle: string; nature?: string };
 export type Serie = { code: string; libelle: string; rubriques: Rubrique[] };
@@ -17,8 +18,8 @@ export function findRubrique(code: string | null | undefined) {
 
 /** Rubrique d'un carton, lue dans sa cote (2010-KOU-0001 → 2010). */
 export function rubriqueOfCote(cote: string | null | undefined) {
-  const match = /^(\d{4})-/.exec(cote ?? "");
-  return match ? findRubrique(match[1]) : null;
+  const detail = cote ? parseCoteDetail(cote) : null;
+  return detail ? findRubrique(detail.rubrique) : null;
 }
 
 /** Libellé affiché d'une rubrique : « 2010 · Dossiers ACD ». */

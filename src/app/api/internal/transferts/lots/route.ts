@@ -3,6 +3,7 @@ import { z } from "zod";
 import { actingAs } from "@/lib/auth/acting-session";
 import { requireEmailReportScheduler } from "@/lib/auth/email-report-scheduler";
 import type { SessionPayload } from "@/lib/auth/session";
+import { COTE_PREFIXE_PATTERN } from "@/lib/cartons/cote";
 import type { PermissionCode, RoleCode } from "@/lib/permissions/constants";
 import { prisma } from "@/lib/prisma/client";
 import { createTransferLot, submitTransferLot } from "@/lib/services/transfer-actions";
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     const results = [];
     for (const plage of input.plages) {
       // Emplacement des cartons de la plage : site et salle où se trouvent leurs dossiers.
-      const match = plage.match(/^(\d{4}-[A-Z][A-Z0-9]{1,5})-(\d+)\s*à\s*(\d+)$/);
+      const match = plage.toUpperCase().match(new RegExp(`^(${COTE_PREFIXE_PATTERN})-(\\d+)\\s*À\\s*(\\d+)$`));
       if (!match) throw new ApiError(`Plage invalide : ${plage}`, 400);
       const [prefixe, de, a] = [match[1], Number(match[2]), Number(match[3])];
       const lieux = await prisma.dossier.groupBy({
