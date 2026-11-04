@@ -13,7 +13,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  file:
+    name: File production
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      # Une seule opération à la fois sur la production ; priorité éventuelle.
+      - uses: ./.github/actions/file-production
+        with:
+          token: ${{ github.token }}
+
   export:
+    needs: file
     name: Export des libellés de cartons
     if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
