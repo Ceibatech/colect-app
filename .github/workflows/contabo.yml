@@ -58,9 +58,78 @@ jobs:
       - name: Build without production credentials
         run: npm run build
 
+  # Non-régression : l'application construite tourne sur une base MariaDB
+  # jetable (données de démonstration fictives) et chaque module est vérifié
+  # par les tests API, dont l'ouverture de chaque page du menu. Une
+  # modification qui casse un autre module bloque le déploiement.
+  regression:
+    name: Non-regression tests on a throwaway database
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: ci-root
+          MARIADB_DATABASE: colect_ci
+          MARIADB_USER: colect
+          MARIADB_PASSWORD: colect-ci
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      TZ: Africa/Abidjan
+      DATABASE_URL: mysql://colect:colect-ci@127.0.0.1:3306/colect_ci
+      STORAGE_PROVIDER: local
+      DOCUMENTS_STORAGE_PATH: ${{ github.workspace }}/.ci-documents
+      APP_URL: http://127.0.0.1:3000
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+    steps:
+      - name: Check out the commit being validated
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Install the latest Node.js 22 release
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22.x"
+          check-latest: true
+          cache: npm
+
+      - name: Install dependencies including development tools
+        run: npm ci --include=dev
+
+      - name: Create a throwaway session secret
+        run: echo "AUTH_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Apply migrations and load the fictitious demo data
+        run: |
+          npm run db:generate
+          npx prisma migrate deploy
+          npx prisma db seed
+          mkdir -p "$DOCUMENTS_STORAGE_PATH"
+
+      - name: Build and start the application
+        run: |
+          npm run build
+          nohup npx next start -p 3000 > "$RUNNER_TEMP/app.log" 2>&1 &
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3000/api/health >/dev/null && exit 0; sleep 2; done
+          cat "$RUNNER_TEMP/app.log"; exit 1
+
+      - name: Run the API and per-module tests
+        run: npx playwright test --project=api --reporter=list
+
+      - name: Show the application log on failure
+        if: failure()
+        run: tail -200 "$RUNNER_TEMP/app.log" || true
+
   deploy:
     name: Deploy the validated commit
-    needs: validate
+    needs: [validate, regression]
     if: >-
       vars.CONTABO_ENABLED == 'true' &&
       github.ref == 'refs/heads/main' &&

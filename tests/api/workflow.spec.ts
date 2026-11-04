@@ -21,6 +21,12 @@ async function validPreparationData(nombrePieces = 1, nombrePages = nombrePieces
   };
 }
 
+/** La préparation exige que l'agent ait d'abord pris le dossier en charge. */
+async function claimPreparation(request: import("@playwright/test").APIRequestContext, dossierId: number, cookie: string) {
+  const res = await request.post(`/api/dossiers/${dossierId}/prepare/claim`, { headers: { Cookie: cookie } });
+  expect(res.status()).toBe(200);
+}
+
 async function createIndexedTestDocument(dossierId: number) {
   return testPrisma.document.create({
     data: {
@@ -129,6 +135,7 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
     const dossier = await createTestDossier({ statutValidation: "VALIDE" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
+      await claimPreparation(request, dossier.id, cookie);
       const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
         headers: { Cookie: cookie },
         data: await validPreparationData(5, 12),
@@ -158,6 +165,7 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
 
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
+      await claimPreparation(request, dossier.id, cookie);
       const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
         headers: { Cookie: cookie },
         data: {
@@ -223,6 +231,7 @@ test.describe("POST /api/dossiers/[id]/prepare (soumission opérateur, Phase 20+
     const dossier = await createTestDossier({ statutValidation: "VALIDE", statutPreparation: "REJETE" });
     try {
       const cookie = await sessionCookieHeader(DEMO_USERS.operateur1);
+      await claimPreparation(request, dossier.id, cookie);
       const res = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
         headers: { Cookie: cookie },
         data: await validPreparationData(),
@@ -524,6 +533,8 @@ test.describe("POST /api/dossiers/[id]/index/validate|reject (Phase 19+)", () =>
       statutIndexation: "A_VALIDER",
     });
     try {
+      // Valider une indexation exige au moins un document numérisé et traité.
+      await createIndexedTestDocument(dossier.id);
       const cookie = await sessionCookieHeader(DEMO_USERS.superviseur);
       const res = await request.post(`/api/dossiers/${dossier.id}/index/validate`, { headers: { Cookie: cookie } });
       expect(res.status()).toBe(200);
@@ -672,6 +683,7 @@ test("cycle continu : les étapes conformes avancent sans validation humaine sys
     expect(r1.status()).toBe(200);
 
     // Préparation cohérente : validation automatique.
+    await claimPreparation(request, dossier.id, operateurCookie);
     const r1p = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
       headers: { Cookie: operateurCookie },
       data: await validPreparationData(4, 5),
@@ -688,6 +700,13 @@ test("cycle continu : les étapes conformes avancent sans validation humaine sys
     });
     expect(r2.status()).toBe(200);
     expect((await r2.json()).dossier.statutNumerisation).toBe("TERMINE");
+
+    // Reconditionnement terminé : l'indexation conforme se valide d'elle-même.
+    const adminCookie = await sessionCookieHeader(DEMO_USERS.admin);
+    const r3s = await request.post(`/api/conditionnement/dossiers/${dossier.id}`, { headers: { Cookie: adminCookie }, data: { action: "start" } });
+    expect(r3s.status()).toBe(200);
+    const r3f = await request.post(`/api/conditionnement/dossiers/${dossier.id}`, { headers: { Cookie: adminCookie }, data: { action: "finish", etat: "ETAT_INITIAL" } });
+    expect(r3f.status()).toBe(200);
     const automaticallyIndexed = await testPrisma.dossier.findUniqueOrThrow({ where: { id: dossier.id } });
     expect(automaticallyIndexed.statutIndexation).toBe("TERMINE");
 
@@ -727,6 +746,7 @@ test("un rejet d'exception peut être corrigé puis validé automatiquement", as
     expect((await r2.json()).dossier.statutPreparation).toBe("REJETE");
 
     // L'opérateur relance — nouvelle soumission autorisée depuis Rejeté.
+    await claimPreparation(request, dossier.id, operateurCookie);
     const r3 = await request.post(`/api/dossiers/${dossier.id}/prepare`, {
       headers: { Cookie: operateurCookie },
       data: await validPreparationData(),
