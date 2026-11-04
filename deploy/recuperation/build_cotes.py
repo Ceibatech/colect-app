@@ -138,9 +138,6 @@ def carton_labels(path):
             c.setFont("Helvetica-Bold", 11); c.drawString(tx, y + lh - 19 * mm - j * 5 * mm, line)
         c.setFont("Helvetica", 8.5)
         # Pas de nombre de dossiers : il change dès qu'un dossier s'ajoute au carton.
-        c.setFont("Helvetica", 7)
-        for j, line in enumerate(wrap(carton["lieu"] or "Koumassi", tw, "Helvetica", 7, c, 2)):
-            c.drawString(tx, y + 7 * mm - j * 3.2 * mm, line)
     c.save()
 
 
