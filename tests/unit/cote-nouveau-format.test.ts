@@ -78,9 +78,12 @@ describe("nouvelle codification FON-3302-113-0001", () => {
     expect(parseCoteRange("2010-KOU-0001 à 0200")).toEqual({ prefix: "2010-KOU", from: 1, to: 200 });
   });
 
-  it("trouve la rubrique sans échouer quand elle n'est pas dans le référentiel", () => {
-    expect(rubriqueOfCote("2010-KOU-0001-012")?.code).toBe("2010");
-    expect(() => rubriqueOfCote("FON-3302-113-0001")).not.toThrow();
+  it("trouve la rubrique V3, y compris depuis une ancienne cote", () => {
+    // Référentiel V3 : l'ancienne rubrique 2010 (Dossiers ACD) correspond à FON-3302.
+    expect(rubriqueOfCote("2010-KOU-0001-012")?.code).toBe("FON-3302");
+    expect(rubriqueOfCote("FON-3302-113-0001")?.libelle).toBe("Dossiers ACD");
+    expect(rubriqueOfCote("CTL-5101-048-0001")?.libelle).toBe("Rapports de contrôle");
+    expect(rubriqueOfCote("LOG-5101-048-0001")?.libelle).toBe("Documents d’études des projets immobiliers");
     expect(rubriqueOfCote("n'importe quoi")).toBeNull();
     expect(rubriqueOfCote(null)).toBeNull();
   });

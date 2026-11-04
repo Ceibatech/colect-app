@@ -1,0 +1,1300 @@
+{
+ "version": "3.00",
+ "date": "2026-10-28",
+ "statut": "Projet de référentiel",
+ "source": "Codification-cartons-dossiers-FONCTION-V3_1.pdf",
+ "blocs": [
+  {
+   "code": "1100",
+   "libelle": "Cabinet",
+   "section": "1000",
+   "rubriques": [
+    {
+     "code": "1101",
+     "libelle": "Notes Techniques",
+     "fonction": "GOV"
+    },
+    {
+     "code": "1102",
+     "libelle": "Correspondances",
+     "fonction": "GOV"
+    },
+    {
+     "code": "1103",
+     "libelle": "Rapports de missions",
+     "fonction": "GOV"
+    },
+    {
+     "code": "1104",
+     "libelle": "Agendas",
+     "fonction": "GOV"
+    }
+   ]
+  },
+  {
+   "code": "1200",
+   "libelle": "Conseillers techniques & chargés d’études",
+   "section": "1000",
+   "rubriques": [
+    {
+     "code": "1201",
+     "libelle": "Rapports d’activités",
+     "fonction": "GOV"
+    },
+    {
+     "code": "1202",
+     "libelle": "Etudes sectorielles",
+     "fonction": "GOV"
+    },
+    {
+     "code": "1203",
+     "libelle": "Avis techniques",
+     "fonction": "GOV"
+    }
+   ]
+  },
+  {
+   "code": "1300",
+   "libelle": "Secrétariat particulier",
+   "section": "1000",
+   "rubriques": [
+    {
+     "code": "1301",
+     "libelle": "Courriers Officiels",
+     "fonction": "ADM"
+    },
+    {
+     "code": "1302",
+     "libelle": "Parapheurs",
+     "fonction": "ADM"
+    },
+    {
+     "code": "1303",
+     "libelle": "Dossiers confidentiels",
+     "fonction": "GOV"
+    },
+    {
+     "code": "1304",
+     "libelle": "Communiqué en conseil des Ministres",
+     "fonction": "GOV"
+    },
+    {
+     "code": "1305",
+     "libelle": "Textes règlementaires",
+     "fonction": "JUR"
+    }
+   ]
+  },
+  {
+   "code": "2100",
+   "libelle": "Ressources Humaines",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2101",
+     "libelle": "Dossiers du personnel fonctionnaire",
+     "fonction": "RH"
+    },
+    {
+     "code": "2102",
+     "libelle": "Dossiers des contractuels",
+     "fonction": "RH"
+    },
+    {
+     "code": "2103",
+     "libelle": "Formation du personnel",
+     "fonction": "RH"
+    },
+    {
+     "code": "2104",
+     "libelle": "Evaluations du personnel",
+     "fonction": "RH"
+    },
+    {
+     "code": "2105",
+     "libelle": "Code du travail et Lois sociales",
+     "fonction": "RH"
+    },
+    {
+     "code": "2106",
+     "libelle": "Dossiers du personnel retraité",
+     "fonction": "RH"
+    },
+    {
+     "code": "2107",
+     "libelle": "Etat des primes et avantages",
+     "fonction": "RH"
+    }
+   ]
+  },
+  {
+   "code": "2200",
+   "libelle": "Affaires Financières",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2201",
+     "libelle": "Budgets",
+     "fonction": "FIN"
+    },
+    {
+     "code": "2202",
+     "libelle": "Comptabilité",
+     "fonction": "FIN"
+    },
+    {
+     "code": "2203",
+     "libelle": "Marchés publics",
+     "fonction": "FIN"
+    },
+    {
+     "code": "2204",
+     "libelle": "Audits financiers",
+     "fonction": "FIN"
+    },
+    {
+     "code": "2205",
+     "libelle": "Lois de finances",
+     "fonction": "FIN"
+    },
+    {
+     "code": "2206",
+     "libelle": "Gestion du patrimoine",
+     "fonction": "PAT"
+    }
+   ]
+  },
+  {
+   "code": "2300",
+   "libelle": "Affaires Juridiques et Contentieux",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2301",
+     "libelle": "Textes réglementaires",
+     "fonction": "JUR"
+    },
+    {
+     "code": "2302",
+     "libelle": "Avis juridiques",
+     "fonction": "JUR"
+    },
+    {
+     "code": "2303",
+     "libelle": "Dossiers de contentieux",
+     "fonction": "JUR"
+    },
+    {
+     "code": "2304",
+     "libelle": "Notification de décisions juridiques",
+     "fonction": "JUR"
+    }
+   ]
+  },
+  {
+   "code": "2400",
+   "libelle": "Planification, Évaluation et Statistiques",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2401",
+     "libelle": "Plans stratégiques",
+     "fonction": "GOV"
+    },
+    {
+     "code": "2402",
+     "libelle": "Indicateurs de performance",
+     "fonction": "GOV"
+    },
+    {
+     "code": "2403",
+     "libelle": "Bilans annuels",
+     "fonction": "GOV"
+    }
+   ]
+  },
+  {
+   "code": "2500",
+   "libelle": "Communication et de coopération internationale",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2501",
+     "libelle": "Communiqués",
+     "fonction": "ADM"
+    },
+    {
+     "code": "2502",
+     "libelle": "Dossiers de presses",
+     "fonction": "ADM"
+    },
+    {
+     "code": "2503",
+     "libelle": "Campagnes de sensibilisation",
+     "fonction": "ADM"
+    },
+    {
+     "code": "2504",
+     "libelle": "Accords",
+     "fonction": "GOV"
+    },
+    {
+     "code": "2505",
+     "libelle": "Projets internationaux",
+     "fonction": "GOV"
+    },
+    {
+     "code": "2506",
+     "libelle": "Partenariats",
+     "fonction": "GOV"
+    },
+    {
+     "code": "2507",
+     "libelle": "Missions",
+     "fonction": "GOV"
+    }
+   ]
+  },
+  {
+   "code": "2600",
+   "libelle": "Modernisation, Informatique et Sécurisation des Actes",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2601",
+     "libelle": "Systèmes d’information",
+     "fonction": "SI"
+    },
+    {
+     "code": "2602",
+     "libelle": "Procédures de dématérialisation SIGFU",
+     "fonction": "SI"
+    },
+    {
+     "code": "2603",
+     "libelle": "Sécurité documentaire",
+     "fonction": "SI"
+    }
+   ]
+  },
+  {
+   "code": "2700",
+   "libelle": "Direction de la coordination des services territoriaux",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2701",
+     "libelle": "Documents de supervision des services territoriaux",
+     "fonction": "GOV"
+    },
+    {
+     "code": "2702",
+     "libelle": "Rapports des services territoriaux",
+     "fonction": "GOV"
+    },
+    {
+     "code": "2703",
+     "libelle": "Documents d’expertise et contrôle des normes en matière de construction et d’architecture",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "2800",
+   "libelle": "Service de la Documentation et des Archives",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2801",
+     "libelle": "Politique d’archivage du MULCV",
+     "fonction": "ARC"
+    },
+    {
+     "code": "2802",
+     "libelle": "Outils de gestion des archives du MULCV",
+     "fonction": "ARC"
+    },
+    {
+     "code": "2803",
+     "libelle": "Manuel de Procédures de gestion des archives du MULCV",
+     "fonction": "ARC"
+    },
+    {
+     "code": "2804",
+     "libelle": "Formations",
+     "fonction": "ARC"
+    }
+   ]
+  },
+  {
+   "code": "2900",
+   "libelle": "Contrôle et Production des Actes",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "2901",
+     "libelle": "ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "2902",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "2903",
+     "libelle": "Arreté d’approbation",
+     "fonction": "URB"
+    },
+    {
+     "code": "2904",
+     "libelle": "Dérogation",
+     "fonction": "URB"
+    },
+    {
+     "code": "2905",
+     "libelle": "Radiation de clause",
+     "fonction": "FON"
+    },
+    {
+     "code": "2906",
+     "libelle": "Ouverture d’enquête",
+     "fonction": "FON"
+    },
+    {
+     "code": "2907",
+     "libelle": "Arretés modificatifs",
+     "fonction": "URB"
+    },
+    {
+     "code": "2908",
+     "libelle": "Affectation",
+     "fonction": "FON"
+    },
+    {
+     "code": "2910",
+     "libelle": "Mise en réserve",
+     "fonction": "FON"
+    },
+    {
+     "code": "2911",
+     "libelle": "Agréments",
+     "fonction": "LOG"
+    },
+    {
+     "code": "2912",
+     "libelle": "Annulations",
+     "fonction": "FON"
+    },
+    {
+     "code": "2913",
+     "libelle": "Retour au domaine privé de l’Etat",
+     "fonction": "FON"
+    }
+   ]
+  },
+  {
+   "code": "3000",
+   "libelle": "Gestion du Patrimoine",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "3001",
+     "libelle": "Inventaires de biens mobiliers et immobiliers de l’Etat",
+     "fonction": "PAT",
+     "remarque": "Code en double dans le V3 (autre fonction : URB)"
+    },
+    {
+     "code": "3002",
+     "libelle": "Gestion des Biens mobiliers et immobiliers",
+     "fonction": "PAT",
+     "remarque": "Code en double dans le V3 (autre fonction : URB)"
+    },
+    {
+     "code": "3003",
+     "libelle": "Gestion du parc automobile",
+     "fonction": "PAT",
+     "remarque": "Code en double dans le V3 (autre fonction : URB)"
+    }
+   ]
+  },
+  {
+   "code": "4000",
+   "libelle": "Cellule Passation de Marché",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "4001",
+     "libelle": "Dossiers d’appel d’offre",
+     "fonction": "FIN"
+    },
+    {
+     "code": "4002",
+     "libelle": "Demandes de propositions",
+     "fonction": "FIN"
+    },
+    {
+     "code": "4003",
+     "libelle": "Rapports d’évaluation des offres",
+     "fonction": "FIN"
+    },
+    {
+     "code": "4004",
+     "libelle": "PV d’ouverture et de jugement des offres",
+     "fonction": "FIN"
+    },
+    {
+     "code": "4005",
+     "libelle": "Marchés",
+     "fonction": "FIN"
+    },
+    {
+     "code": "4006",
+     "libelle": "Contrats",
+     "fonction": "FIN"
+    }
+   ]
+  },
+  {
+   "code": "3000",
+   "libelle": "Direction Générale de l’Urbanisme et du foncière (DGUF)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "3001",
+     "libelle": "Politique nationale et restructuration des quartiers précaires",
+     "fonction": "URB",
+     "remarque": "Code en double dans le V3 (autre fonction : PAT)"
+    },
+    {
+     "code": "3002",
+     "libelle": "Politique nationale d’adressage",
+     "fonction": "URB",
+     "remarque": "Code en double dans le V3 (autre fonction : PAT)"
+    },
+    {
+     "code": "3003",
+     "libelle": "Textes règlementaires en matière d’urbanisme et du foncier",
+     "fonction": "URB",
+     "remarque": "Code en double dans le V3 (autre fonction : PAT)"
+    },
+    {
+     "code": "3004",
+     "libelle": "Procédures d’approbation des plans de lotissement et de délivrance",
+     "fonction": "URB"
+    },
+    {
+     "code": "3005",
+     "libelle": "Gestion des réserves foncières",
+     "fonction": "FON"
+    },
+    {
+     "code": "3006",
+     "libelle": "Procédures de la purge des droits coutumiers",
+     "fonction": "FON"
+    }
+   ]
+  },
+  {
+   "code": "3100",
+   "libelle": "Direction de l’urbanisme et de la mobilisation foncière (DUMF)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "3101",
+     "libelle": "Plans d’urbanisme",
+     "fonction": "URB"
+    },
+    {
+     "code": "3102",
+     "libelle": "Schémas d’urbanisme directeur",
+     "fonction": "URB"
+    },
+    {
+     "code": "3103",
+     "libelle": "Plan d’urbanisme directeur",
+     "fonction": "URB"
+    },
+    {
+     "code": "3104",
+     "libelle": "Plan d’urbanisme de détail",
+     "fonction": "URB"
+    },
+    {
+     "code": "3105",
+     "libelle": "Arretés d’approbation",
+     "fonction": "URB"
+    },
+    {
+     "code": "3106",
+     "libelle": "Plans de lotissements approuvés",
+     "fonction": "URB"
+    },
+    {
+     "code": "3107",
+     "libelle": "Autorisations de lotir",
+     "fonction": "URB"
+    },
+    {
+     "code": "3108",
+     "libelle": "Documents de purge de droits coutumiers",
+     "fonction": "FON"
+    }
+   ]
+  },
+  {
+   "code": "3200",
+   "libelle": "Direction de la Topographie et de la cartographie (DTC)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "3201",
+     "libelle": "Plans de lotissement",
+     "fonction": "TOP"
+    },
+    {
+     "code": "3202",
+     "libelle": "Dossiers d’état des lieux",
+     "fonction": "TOP",
+     "remarque": "Code en double dans le V3 (autre fonction : FON)"
+    },
+    {
+     "code": "3203",
+     "libelle": "Dossiers hors lotissement",
+     "fonction": "TOP"
+    },
+    {
+     "code": "3204",
+     "libelle": "Cartes et bases de données géographiques",
+     "fonction": "TOP"
+    }
+   ]
+  },
+  {
+   "code": "3300",
+   "libelle": "Direction du foncier Urbain (DFU)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "3301",
+     "libelle": "Dossiers de base",
+     "fonction": "FON"
+    },
+    {
+     "code": "3302",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON",
+     "remarque": "Imprimé 3202 dans le V3 : corrigé en 3302 (doublon avec la DTC)"
+    },
+    {
+     "code": "3303",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "3304",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "3305",
+     "libelle": "Dossiers d’affectation",
+     "fonction": "FON"
+    },
+    {
+     "code": "3306",
+     "libelle": "Mise en réserve",
+     "fonction": "FON"
+    }
+   ]
+  },
+  {
+   "code": "3400",
+   "libelle": "Direction de l’adressage, de la Rénovation et de la Restructuration Urbaine (DARRU)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "3401",
+     "libelle": "Dossiers d’adressage",
+     "fonction": "URB"
+    },
+    {
+     "code": "3402",
+     "libelle": "Dossiers de rénovation et restructuration",
+     "fonction": "URB"
+    }
+   ]
+  },
+  {
+   "code": "4100",
+   "libelle": "Direction Générale de la Construction, de la maintenance et de l’architecture",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "4101",
+     "libelle": "Politique de construction, d’architecture, d’entretien et de maintenance des ouvrages et édifices publics",
+     "fonction": "CON"
+    },
+    {
+     "code": "4102",
+     "libelle": "Politique nationale de gestion du patrimoine immobilier de l’Etat",
+     "fonction": "PAT",
+     "remarque": "Code en double dans le V3 (autre fonction : CON)"
+    },
+    {
+     "code": "4103",
+     "libelle": "Textes règlementaires en matière de construction, d’architecture et de maintenance",
+     "fonction": "CON"
+    },
+    {
+     "code": "4104",
+     "libelle": "Politique nationale en matière de matériaux de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "4110",
+   "libelle": "Direction de l’architecture et des matériaux (DAM)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "4201",
+     "libelle": "Dossiers d’études architecturales de l’Etat et des collectivités",
+     "fonction": "CON",
+     "remarque": "Code en double dans le V3 (autre fonction : LOG)"
+    },
+    {
+     "code": "4102",
+     "libelle": "Documents de contrôle des matériaux de construction",
+     "fonction": "CON",
+     "remarque": "Code en double dans le V3 (autre fonction : PAT)"
+    }
+   ]
+  },
+  {
+   "code": "4120",
+   "libelle": "Direction de la construction et de la maintenance (DCM)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "4121",
+     "libelle": "Documents de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    },
+    {
+     "code": "4122",
+     "libelle": "Documents de suivi et de contrôle des édifices de l’Etat",
+     "fonction": "CON"
+    },
+    {
+     "code": "4123",
+     "libelle": "Documents de réhabilitation des édifices publics",
+     "fonction": "CON"
+    },
+    {
+     "code": "4124",
+     "libelle": "Dossiers d’expertise",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "4200",
+   "libelle": "Direction Générale du Logement (DGL)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "4201",
+     "libelle": "Textes règlementaires en matière d’habitat social et d’aménagement foncier",
+     "fonction": "LOG",
+     "remarque": "Code en double dans le V3 (autre fonction : CON)"
+    },
+    {
+     "code": "4202",
+     "libelle": "Politique nationale de logement",
+     "fonction": "LOG"
+    },
+    {
+     "code": "4203",
+     "libelle": "Gestion du patrimoine foncier urbain mobilisé",
+     "fonction": "LOG"
+    },
+    {
+     "code": "4204",
+     "libelle": "Programme de relogement des populations déguerpies",
+     "fonction": "LOG"
+    },
+    {
+     "code": "4205",
+     "libelle": "Politique de financement du logement",
+     "fonction": "LOG"
+    }
+   ]
+  },
+  {
+   "code": "4210",
+   "libelle": "Direction du logement et de l’Aménagement foncier (DLAF)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "5101",
+     "libelle": "Documents d’études des projets immobiliers",
+     "fonction": "LOG",
+     "remarque": "Code en double dans le V3 (autre fonction : CTL)"
+    },
+    {
+     "code": "5102",
+     "libelle": "Documents de contrôle des études des programmes projets immobiliers",
+     "fonction": "LOG",
+     "remarque": "Code en double dans le V3 (autre fonction : CTL)"
+    },
+    {
+     "code": "5103",
+     "libelle": "Documents d’approbation des programmes immobiliers",
+     "fonction": "LOG",
+     "remarque": "Code en double dans le V3 (autre fonction : CTL)"
+    },
+    {
+     "code": "5104",
+     "libelle": "Documents d’aménagement fonciers pour logements sociaux",
+     "fonction": "LOG",
+     "remarque": "Code en double dans le V3 (autre fonction : CTL)"
+    }
+   ]
+  },
+  {
+   "code": "4220",
+   "libelle": "Direction du financement du logement (DFL)",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "5201",
+     "libelle": "Politique du financement du logement",
+     "fonction": "LOG"
+    },
+    {
+     "code": "5202",
+     "libelle": "Document de mobilisation des ressources financières",
+     "fonction": "LOG"
+    },
+    {
+     "code": "5203",
+     "libelle": "Gestion du fonds de garantie",
+     "fonction": "LOG"
+    }
+   ]
+  },
+  {
+   "code": "4310",
+   "libelle": "Direction de l’amélioration du cadre de vie",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "4311",
+     "libelle": "Politique nationale en matière du cadre de vie",
+     "fonction": "LOG"
+    },
+    {
+     "code": "4312",
+     "libelle": "Documents des projets et actions pour l’embellissement et la revitalisation des bâtiments",
+     "fonction": "LOG"
+    },
+    {
+     "code": "4313",
+     "libelle": "Textes règlementaires en matière de cadre de vie et de copropriété",
+     "fonction": "LOG"
+    }
+   ]
+  },
+  {
+   "code": "4320",
+   "libelle": "Direction de la copropriété",
+   "section": "2000",
+   "rubriques": [
+    {
+     "code": "4321",
+     "libelle": "Documents des syndics professionnels et copropriétés",
+     "fonction": "LOG"
+    },
+    {
+     "code": "4322",
+     "libelle": "Politique nationale de la copropriété dans le cadre de la gestion des cités",
+     "fonction": "LOG"
+    }
+   ]
+  },
+  {
+   "code": "5100",
+   "libelle": "Brigade d’Investigation et Contrôle Urbain",
+   "section": "5000",
+   "rubriques": [
+    {
+     "code": "5101",
+     "libelle": "Rapports de contrôle",
+     "fonction": "CTL",
+     "remarque": "Code en double dans le V3 (autre fonction : LOG)"
+    },
+    {
+     "code": "5102",
+     "libelle": "Procès-verbaux de constat",
+     "fonction": "CTL",
+     "remarque": "Code en double dans le V3 (autre fonction : LOG)"
+    },
+    {
+     "code": "5103",
+     "libelle": "Mises en demeure de démolition",
+     "fonction": "CTL",
+     "remarque": "Code en double dans le V3 (autre fonction : LOG)"
+    },
+    {
+     "code": "5104",
+     "libelle": "Ordre de mission",
+     "fonction": "CTL",
+     "remarque": "Code en double dans le V3 (autre fonction : LOG)"
+    },
+    {
+     "code": "5105",
+     "libelle": "Courriers",
+     "fonction": "CTL"
+    }
+   ]
+  },
+  {
+   "code": "6100",
+   "libelle": "ANAH",
+   "section": "6000",
+   "rubriques": [
+    {
+     "code": "6101",
+     "libelle": "Dossiers clients",
+     "fonction": "LOG"
+    },
+    {
+     "code": "6102",
+     "libelle": "Projets immobiliers",
+     "fonction": "LOG"
+    }
+   ]
+  },
+  {
+   "code": "6200",
+   "libelle": "AGEF",
+   "section": "6000",
+   "rubriques": [
+    {
+     "code": "6201",
+     "libelle": "Dossiers clients",
+     "fonction": "FON"
+    },
+    {
+     "code": "6202",
+     "libelle": "Aménagement foncier",
+     "fonction": "FON"
+    }
+   ]
+  },
+  {
+   "code": "6300",
+   "libelle": "SONAPIE",
+   "section": "6000",
+   "rubriques": [
+    {
+     "code": "6301",
+     "libelle": "Inventaire du patrimoine immobilier de l’Etat en Côte d’Ivoire",
+     "fonction": "PAT"
+    },
+    {
+     "code": "6302",
+     "libelle": "Inventaire du patrimoine immobilier de l’Etat hors Côte d’Ivoire",
+     "fonction": "PAT"
+    },
+    {
+     "code": "6303",
+     "libelle": "Dossiers des cessions",
+     "fonction": "PAT"
+    },
+    {
+     "code": "6304",
+     "libelle": "Dossiers des baux",
+     "fonction": "PAT"
+    },
+    {
+     "code": "6305",
+     "libelle": "Dossiers des locations",
+     "fonction": "PAT"
+    }
+   ]
+  },
+  {
+   "code": "7010",
+   "libelle": "Yamoussoukro",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7011",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7012",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7013",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7014",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7015",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7016",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7020",
+   "libelle": "Bouaké",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7021",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7022",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7023",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7024",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7025",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7026",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7030",
+   "libelle": "Korhogo",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7031",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7032",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7033",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7034",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7035",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7036",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7040",
+   "libelle": "Daloa",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7041",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7042",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7043",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7044",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7045",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7046",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7050",
+   "libelle": "San Pédro",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7051",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7052",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7053",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7054",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7055",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7056",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7060",
+   "libelle": "Dabou",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7061",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7062",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7063",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7064",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7065",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7066",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7070",
+   "libelle": "Jacquesville",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7071",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7072",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7073",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7074",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7075",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7076",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7080",
+   "libelle": "Bonoua",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7081",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7082",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7083",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7084",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7085",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7086",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7090",
+   "libelle": "Assinie Mafia",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7091",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7092",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7093",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7094",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7095",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7096",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  },
+  {
+   "code": "7100",
+   "libelle": "Grand Bassam",
+   "section": "7000",
+   "rubriques": [
+    {
+     "code": "7101",
+     "libelle": "Dossiers de Base",
+     "fonction": "FON"
+    },
+    {
+     "code": "7102",
+     "libelle": "Dossiers ACD",
+     "fonction": "FON"
+    },
+    {
+     "code": "7103",
+     "libelle": "Guides",
+     "fonction": "FON"
+    },
+    {
+     "code": "7104",
+     "libelle": "Registres",
+     "fonction": "FON"
+    },
+    {
+     "code": "7105",
+     "libelle": "Permis de construire",
+     "fonction": "CON"
+    },
+    {
+     "code": "7106",
+     "libelle": "Dossiers d’expertise et de contrôle des normes en matière de construction",
+     "fonction": "CON"
+    }
+   ]
+  }
+ ]
+}

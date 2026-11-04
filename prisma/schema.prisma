@@ -585,6 +585,13 @@ model Commune {
   // Sigle de 3 lettres utilisé dans les cotes (2010-KOU-0001). Attribué une
   // fois, puis stable : il est imprimé sur les étiquettes.
   sigle       String?  @unique @db.VarChar(6)
+  // Identifiant figé à 3 chiffres du référentiel des communes (RGPH 2021 :
+  // CI-COM-113 → 113), segment commune de la cote FON-3302-113-0001. Jamais
+  // réattribué ; une commune ajoutée au référentiel reçoit 202, 203…
+  identifiant String?  @unique @db.Char(3)
+  district    String?  @db.VarChar(80)
+  region      String?  @db.VarChar(80)
+  departement String?  @db.VarChar(80)
   description String?  @db.Text
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -1012,6 +1019,9 @@ model Carton {
   // ex. 2010-KOU-0001 (2010 = Dossiers ACD). Attribuée une fois, puis stable.
   cote             String?           @unique @db.VarChar(40)
   cotePrefixe      String?           @map("cote_prefixe") @db.VarChar(20)
+  // Cote avant la codification FONCTION V3 (2010-KOU-0001) : reste lue au
+  // scan et à la recherche, car elle est imprimée sur des étiquettes posées.
+  coteAncienne     String?           @unique @map("cote_ancienne") @db.VarChar(40)
   // Caisse de transport dans laquelle le carton voyage (enlèvement ou retour).
   caisseId         Int?              @map("caisse_id")
   misEnCaisseAt    DateTime?         @map("mis_en_caisse_at")
@@ -1079,12 +1089,14 @@ enum CaisseMouvementType {
 }
 
 model Dossier {
-  id         Int     @id @default(autoincrement())
-  cartonId   Int?    @map("carton_id")
+  id           Int     @id @default(autoincrement())
+  cartonId     Int?    @map("carton_id")
   // Rang du dossier dans son carton (1, 2, … : le suivant est n+1) et sa cote
   // complète, ex. 2010-KOU-0001-012.
-  rangCarton Int?    @map("rang_carton")
-  cote       String? @unique @db.VarChar(50)
+  rangCarton   Int?    @map("rang_carton")
+  cote         String? @unique @db.VarChar(50)
+  // Cote avant la codification FONCTION V3 (2010-KOU-0001-012), lue en alias.
+  coteAncienne String? @unique @map("cote_ancienne") @db.VarChar(50)
 
   // Référence unique générée automatiquement : DOS-2026-000001
   reference String @unique

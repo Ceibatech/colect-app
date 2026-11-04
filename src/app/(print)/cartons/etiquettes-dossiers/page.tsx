@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { communeDeCote } from "@/lib/referentiel/codification";
 import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/transferts/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
@@ -49,7 +50,8 @@ export default async function DossierLabelsPage({ searchParams }: { searchParams
           <article key={label.id} className="dossier-label flex items-center gap-[2.5mm] overflow-hidden rounded-[1.5mm] border border-slate-400 p-[2.5mm] text-black">
             <div className="size-[26mm] shrink-0" dangerouslySetInnerHTML={{ __html: label.qr }} />
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[9.5pt] font-bold leading-tight">{label.code}</p>
+              <p className="whitespace-nowrap font-mono text-[7.6pt] font-bold leading-tight tracking-tight">{label.code}</p>
+              {communeDeCote(label.code) ? <p className="text-[7.5pt] font-semibold uppercase leading-tight">{communeDeCote(label.code)}</p> : null}
               {label.rangCarton ? <p className="text-[8pt] text-slate-700">Dossier n° {label.rangCarton}/{labels.length}</p> : null}
               <p className="mt-[1mm] line-clamp-2 text-[8.5pt] font-semibold leading-snug">{[label.nom, label.prenoms].filter(Boolean).join(" ") || "Titulaire non renseigné"}</p>
               <p className="text-[7pt] text-slate-600">{label.reference}</p>

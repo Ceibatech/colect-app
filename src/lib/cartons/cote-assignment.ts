@@ -2,13 +2,17 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import {
   CLASSEMENT_ACD,
+  parseCote,
   SIGLE_INCONNU,
+  communeIdentifiant,
   cotePrefixe,
+  cotePrefixeNouveau,
   formatCartonCote,
   formatDossierCote,
   majorityCommune,
   proposeSigle,
 } from "@/lib/cartons/cote";
+import { communeCiParNom, findRubriqueV3, RUBRIQUE_ACD, rubriquePourCommune } from "@/lib/referentiel/codification";
 
 type Tx = Prisma.TransactionClient;
 
@@ -30,15 +34,58 @@ export async function ensureCommuneSigle(tx: Tx, communeId: number | null): Prom
   return SIGLE_INCONNU;
 }
 
+/**
+ * Identifiant figé (3 chiffres, référentiel RGPH) de la commune. Rattaché à la
+ * première utilisation, depuis le code « CI-113 » ou le nom de la commune dans
+ * la table maîtresse ; null si la commune n'y figure pas.
+ */
+export async function ensureCommuneIdentifiant(tx: Tx, communeId: number | null): Promise<string | null> {
+  if (!communeId) return null;
+  const commune = await tx.commune.findUnique({ where: { id: communeId }, select: { identifiant: true, code: true, nom: true } });
+  if (!commune) return null;
+  if (commune.identifiant) return commune.identifiant;
+  const ci = communeCiParNom(commune.nom);
+  const identifiant = communeIdentifiant(commune.code) ?? ci?.identifiant ?? null;
+  if (!identifiant) return null;
+  const taken = await tx.commune.findFirst({ where: { identifiant, id: { not: communeId } }, select: { id: true } });
+  if (taken) return null;
+  await tx.commune.update({
+    where: { id: communeId },
+    data: { identifiant, ...(ci ? { district: ci.district, region: ci.region, departement: ci.departement } : {}) },
+  });
+  return identifiant;
+}
+
+/**
+ * Préfixe de la cote d'un nouveau carton : FON-3302-113 (fonction déduite de la
+ * rubrique, identifiant de commune). Une commune absente du référentiel garde
+ * l'ancien format 2010-XXX, toujours lu, le temps de la rattacher.
+ */
+export async function cartonCotePrefixe(tx: Tx, communeId: number | null, classement: string = RUBRIQUE_ACD): Promise<{ prefixe: string; ancien: string | null }> {
+  const identifiant = await ensureCommuneIdentifiant(tx, communeId);
+  const rubrique = findRubriqueV3(classement) ?? findRubriqueV3(RUBRIQUE_ACD)!;
+  if (identifiant) {
+    const [fonction, numero] = rubriquePourCommune(rubrique.key, identifiant).split("-");
+    const prefixe = cotePrefixeNouveau(fonction, numero, identifiant);
+    if (prefixe) {
+      // Les ACD de l'ancien format (2010-KOU-…) deviennent ceux du nouveau
+      // (FON-3302-113-…) en gardant leur numéro : la suite continue après eux.
+      const sigle = rubrique.key === RUBRIQUE_ACD && communeId ? (await tx.commune.findUnique({ where: { id: communeId }, select: { sigle: true } }))?.sigle : null;
+      return { prefixe, ancien: sigle ? cotePrefixe(sigle, CLASSEMENT_ACD) : null };
+    }
+  }
+  return { prefixe: cotePrefixe(await ensureCommuneSigle(tx, communeId), CLASSEMENT_ACD), ancien: null };
+}
+
 /** Cote du carton : attribuée une fois (commune majoritaire de ses dossiers), puis stable. */
-export async function ensureCartonCote(tx: Tx, cartonId: number, classement: string = CLASSEMENT_ACD): Promise<string> {
+export async function ensureCartonCote(tx: Tx, cartonId: number, classement: string = RUBRIQUE_ACD): Promise<string> {
   const carton = await tx.carton.findUnique({ where: { id: cartonId }, select: { cote: true } });
   if (carton?.cote) return carton.cote;
   const dossiers = await tx.dossier.findMany({ where: { cartonId }, select: { communeId: true } });
-  const sigle = await ensureCommuneSigle(tx, majorityCommune(dossiers.map((d) => d.communeId)));
-  const prefixe = cotePrefixe(sigle, /^\d{4}$/.test(classement) ? classement : CLASSEMENT_ACD);
+  const { prefixe, ancien } = await cartonCotePrefixe(tx, majorityCommune(dossiers.map((d) => d.communeId)), classement);
+  // Compteur par préfixe : une suite par fonction, rubrique et commune, jamais réutilisée.
   for (let attempt = 0; attempt < 5; attempt++) {
-    const last = await tx.carton.aggregate({ where: { cotePrefixe: prefixe }, _max: { coteSequence: true } });
+    const last = await tx.carton.aggregate({ where: { cotePrefixe: { in: ancien ? [prefixe, ancien] : [prefixe] } }, _max: { coteSequence: true } });
     const sequence = (last._max.coteSequence ?? 0) + 1;
     const cote = formatCartonCote(prefixe, sequence);
     try {
@@ -73,12 +120,13 @@ export async function assignDossierCote(tx: Tx, dossierId: number, classement?: 
   return cote;
 }
 
-/** Carton désigné par sa cote (ou son ancien CTN). */
+/** Carton désigné par sa cote, son ancienne cote (2010-KOU-0001, alias) ou son ancien CTN. */
 export async function findCartonByCote(tx: Tx | Prisma.DefaultPrismaClient, value: string) {
   const text = value.trim().toUpperCase();
   const ctn = /^CTN-(\d{1,10})$/.exec(text);
+  const carton = ctn ? null : parseCote(text)?.carton ?? text;
   return tx.carton.findFirst({
-    where: ctn ? { id: Number(ctn[1]) } : { cote: text.split("-").slice(0, 3).join("-") },
+    where: ctn ? { id: Number(ctn[1]) } : { OR: [{ cote: carton }, { coteAncienne: carton }] },
     select: { id: true, cote: true },
   });
 }

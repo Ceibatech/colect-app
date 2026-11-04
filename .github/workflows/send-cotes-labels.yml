@@ -29,9 +29,9 @@ on:
         default: false
         type: boolean
       prefixe:
-        description: "Préfixe des cotes (ex. 2010-KOU)"
+        description: "Préfixe des cotes (ex. FON-3302-113 ; ancien format 2010-KOU avant le recodage)"
         required: true
-        default: "2010-KOU"
+        default: "FON-3302-113"
         type: string
       de:
         description: "Premier n° de carton"
@@ -107,7 +107,7 @@ jobs:
           set -euo pipefail
           umask 077
           [[ "$MODE" == apercu || "$MODE" == envoyer ]] || { echo "Mode invalide." >&2; exit 1; }
-          [[ "$PREFIXE" =~ ^[0-9]{4}-[A-Z][A-Z0-9]{1,5}$ ]] || { echo "Préfixe invalide." >&2; exit 1; }
+          [[ "$PREFIXE" =~ ^([0-9]{4}-[A-Z][A-Z0-9]{1,5}|[A-Z]{2,3}-[0-9]{4}-[0-9]{3})$ ]] || { echo "Préfixe invalide." >&2; exit 1; }
           [[ "$DE" =~ ^[0-9]{1,5}$ && "$A" =~ ^[0-9]{1,5}$ ]] || { echo "Plage invalide." >&2; exit 1; }
           [[ "$TO" =~ ^[A-Za-z0-9._%+@,\ -]{3,600}$ && "$CC" =~ ^[A-Za-z0-9._%+@,\ -]{0,600}$ ]] || { echo "Adresses invalides." >&2; exit 1; }
           TO="${TO// /}"; CC="${CC// /}"
