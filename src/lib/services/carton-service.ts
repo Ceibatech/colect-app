@@ -1,6 +1,7 @@
 import "server-only";
 import { headers } from "next/headers";
 import QRCode from "qrcode";
+import { labelScanUrl } from "@/lib/cartons/label-url";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma/client";
 import { formatCartonReference, parseCartonReference } from "@/lib/cartons/reference";
@@ -160,9 +161,12 @@ export async function getPublicOrigin(): Promise<string> {
   return `${proto.split(",")[0].trim()}://${host.split(",")[0].trim()}`;
 }
 
-/** Adresse encodée dans le QR : la cote du carton (ou son CTN tant qu'elle n'existe pas). */
+/**
+ * Adresse encodée dans le QR : la cote du carton ou du dossier (ou son CTN tant qu'elle n'existe
+ * pas), sur le SAE dès que LABEL_QR_BASE est défini (voir label-url.ts).
+ */
 export function cartonScanUrl(origin: string, reference: string) {
-  return `${origin}/c/${encodeURIComponent(reference)}`;
+  return labelScanUrl(origin, reference);
 }
 
 /** Carton désigné dans une adresse : cote (2010-KOU-0001, ou celle d'un de ses dossiers) ou CTN. */
