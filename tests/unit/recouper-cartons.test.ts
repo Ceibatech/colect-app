@@ -16,11 +16,11 @@ describe("recoupe des cartons sur les boîtes physiques", () => {
     const dossiers = [d(1, 10, "lots 1-9"), d(2, 10, "lots 16-116"), d(3, 10, "Lots 16 - 116"), d(4, 11, null, "2010-KOU-0002"), d(5, 10, "lots 300-310")];
     const plan = planRecoupe(dossiers, [{ ref: 1, libelle: "lots 16-116" }, { ref: 2, libelle: "lots 999-1000" }, { ref: 3, libelle: "lots 1-9" }]) as unknown as Plan;
     expect(plan.boites.map((b) => [b.cote, b.listeRef, b.dossiers.map((x) => x.id)])).toEqual([
-      ["2010-KOU-0001", 1, [2, 3]],
-      ["2010-KOU-0002", 2, []],
-      ["2010-KOU-0003", 3, [1]],
-      ["2010-KOU-0004", null, [5]],
-      ["2010-KOU-0005", null, [4]],
+      ["FON-3302-113-0001", 1, [2, 3]],
+      ["FON-3302-113-0002", 2, []],
+      ["FON-3302-113-0003", 3, [1]],
+      ["FON-3302-113-0004", null, [5]],
+      ["FON-3302-113-0005", null, [4]],
     ]);
   });
 
@@ -32,8 +32,8 @@ describe("recoupe des cartons sur les boîtes physiques", () => {
   });
 
   it("numérote les dossiers sans trou", () => {
-    expect(formatDossierCote("2010-KOU-0001", 12)).toBe("2010-KOU-0001-012");
-    expect(formatDossierCote("2010-KOU-0001", 1203)).toBe("2010-KOU-0001-1203");
+    expect(formatDossierCote("FON-3302-113-0001", 12)).toBe("FON-3302-113-0001-012");
+    expect(formatDossierCote("FON-3302-113-0001", 1203)).toBe("FON-3302-113-0001-1203");
   });
 });
 
