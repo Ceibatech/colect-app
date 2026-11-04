@@ -6,7 +6,7 @@ set -Eeuo pipefail
 prefixe=${1:-2010-KOU}
 de=${2:-1}
 a=${3:-320}
-[[ "$prefixe" =~ ^[0-9]{4}-[A-Z][A-Z0-9]{1,5}$ ]] || { echo "Préfixe invalide." >&2; exit 1; }
+[[ "$prefixe" =~ ^([0-9]{4}-[A-Z][A-Z0-9]{1,5}|[A-Z]{2,3}-[0-9]{4}-[0-9]{3})$ ]] || { echo "Préfixe invalide." >&2; exit 1; }
 [[ "$de" =~ ^[0-9]{1,5}$ && "$a" =~ ^[0-9]{1,5}$ ]] || { echo "Plage invalide." >&2; exit 1; }
 umask 077
 

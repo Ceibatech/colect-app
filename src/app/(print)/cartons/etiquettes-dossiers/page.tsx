@@ -49,9 +49,14 @@ export default async function DossierLabelsPage({ searchParams }: { searchParams
           <article key={label.id} className="dossier-label flex items-center gap-[2.5mm] overflow-hidden rounded-[1.5mm] border border-slate-400 p-[2.5mm] text-black">
             <div className="size-[26mm] shrink-0" dangerouslySetInnerHTML={{ __html: label.qr }} />
             <div className="min-w-0 flex-1">
-              <p className="font-mono text-[9.5pt] font-bold leading-tight">{label.code}</p>
-              {label.rangCarton ? <p className="text-[8pt] text-slate-700">Dossier n° {label.rangCarton}/{labels.length}</p> : null}
-              <p className="mt-[1mm] line-clamp-2 text-[8.5pt] font-semibold leading-snug">{[label.nom, label.prenoms].filter(Boolean).join(" ") || "Titulaire non renseigné"}</p>
+              <p className="whitespace-nowrap font-mono text-[7.6pt] font-bold leading-tight tracking-tight">{label.code}</p>
+              {/* Rang seul : il ne change jamais, alors qu'un total deviendrait faux au premier ajout. */}
+              {label.rangCarton ? <p className="text-[8pt] text-slate-700">Dossier n° {label.rangCarton}</p> : null}
+              {/* Aucun nom sur l'étiquette : le titulaire ne se voit qu'au scan, après connexion.
+                  Repères de collage : îlot, lot et titre foncier, tels qu'écrits sur la chemise. */}
+              <p className="mt-[1mm] line-clamp-2 text-[8pt] font-semibold leading-snug">
+                {[label.numeroIlot && `Îlot ${label.numeroIlot}`, label.numeroLot && `Lot ${label.numeroLot}`, label.numeroTitreFoncier && `TF ${label.numeroTitreFoncier}`].filter(Boolean).join(" · ") || "Sans îlot ni lot"}
+              </p>
               <p className="text-[7pt] text-slate-600">{label.reference}</p>
             </div>
           </article>

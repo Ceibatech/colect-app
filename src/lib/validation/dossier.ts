@@ -77,7 +77,8 @@ export const dossierFormSchema = z.object({
   modeCarton: z.enum(["EXISTANT", "NOUVEAU"]).optional(),
   // Rubrique du référentiel de classement MULCV (2010 = Dossiers ACD) : ouvre
   // la cote d'un nouveau carton.
-  classement: z.string().regex(/^\d{4}$/, "Rubrique de classement invalide").optional().or(z.literal("")),
+  // Clé de la rubrique V3 (FON-3302) ; un ancien code V2 (2010) reste accepté.
+  classement: z.string().regex(/^(?:[A-Z]{2,3}-\d{4}|\d{4})$/, "Rubrique de classement invalide").optional().or(z.literal("")),
   // Cote du carton (2010-KOU-0001) scannée ou saisie : range le dossier dans ce
   // carton existant, quel que soit le libellé. Vide : carton reconnu par son
   // libellé, ou nouveau carton.

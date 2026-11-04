@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma/client";
+import { RUBRIQUE_ACD } from "@/lib/referentiel/codification";
 import { requirePermission } from "@/lib/auth/current-user";
 import { getClientIp } from "@/lib/utils/server-request";
 import { dossierSubmitSchema, type DossierFormValues } from "@/lib/validation/dossier";
@@ -268,7 +269,7 @@ export async function saveDraft(values: DossierFormValues, draftId?: number | nu
   if (values.modeCarton === "EXISTANT" && !values.cartonCote?.trim()) {
     throw new Error("Choisissez le carton auquel ajouter ce dossier (sa cote), ou répondez « Nouveau carton ».");
   }
-  const rubrique = values.modeCarton === "NOUVEAU" ? findRubrique(values.classement || "2010") : null;
+  const rubrique = values.modeCarton === "NOUVEAU" ? findRubrique(values.classement || RUBRIQUE_ACD) : null;
   if (values.modeCarton === "NOUVEAU" && !rubrique) throw new Error("Choisissez la rubrique de classement du nouveau carton.");
   const chosen = values.modeCarton === "NOUVEAU" ? null : await chosenCarton(values.cartonCote);
   // Règle du référentiel : la nature du dossier est la rubrique de son carton.

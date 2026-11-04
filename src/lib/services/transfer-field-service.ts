@@ -36,7 +36,7 @@ const lotInclude = {
   items: {
     orderBy: { cartonCode: "asc" as const },
     select: {
-      id: true, status: true, cartonId: true, cartonCode: true, cartonLabel: true, dossierCountSnapshot: true, carton: { select: { cote: true } },
+      id: true, status: true, cartonId: true, cartonCode: true, cartonLabel: true, dossierCountSnapshot: true, carton: { select: { cote: true, coteAncienne: true } },
       movementItems: { where: { movement: { status: { in: ["SOUMIS_CEIBAC" as const, "VALIDE_CEIBAC" as const] } } }, select: { id: true } },
     },
   },
@@ -177,6 +177,7 @@ export async function getConvoyWorkspace() {
           cartonId: item.cartonId,
           code: item.carton?.cote ?? (item.cartonId == null ? item.cartonCode : formatCartonReference(item.cartonId)),
           ctn: item.cartonId == null ? null : formatCartonReference(item.cartonId),
+          alias: item.carton?.coteAncienne ?? null,
           label: item.cartonLabel,
           dossiers: item.dossierCountSnapshot,
         })),
@@ -187,6 +188,7 @@ export async function getConvoyWorkspace() {
           cartonId: item.cartonId,
           code: item.carton?.cote ?? (item.cartonId == null ? item.cartonCode : formatCartonReference(item.cartonId)),
           ctn: item.cartonId == null ? null : formatCartonReference(item.cartonId),
+          alias: item.carton?.coteAncienne ?? null,
           label: item.cartonLabel,
           dossiers: item.dossierCountSnapshot,
         })),

@@ -58,7 +58,7 @@ function filterSql({ q, siteId, entrepotId }: CartonFilters) {
     const options: Prisma.Sql[] = [];
     if (id) options.push(Prisma.sql`c.id = ${id}`);
     const cote = parseCote(query);
-    options.push(cote ? Prisma.sql`c.cote = ${cote.carton}` : Prisma.sql`c.cote LIKE ${`%${query}%`}`);
+    options.push(cote ? Prisma.sql`(c.cote = ${cote.carton} OR c.cote_ancienne = ${cote.carton})` : Prisma.sql`c.cote LIKE ${`%${query}%`}`);
     if (key) {
       options.push(Prisma.sql`CONVERT(${cartonLabelKeySql(Prisma.sql`d.libelle_carton`)} USING utf8mb4) COLLATE utf8mb4_unicode_ci LIKE CONVERT(${`%${key}%`} USING utf8mb4) COLLATE utf8mb4_unicode_ci`);
     }
@@ -121,6 +121,7 @@ export async function getCartonSheet(id: number) {
         orderBy: [{ rangCarton: "asc" }, { id: "asc" }],
         select: {
           id: true, reference: true, cote: true, rangCarton: true, nom: true, prenoms: true, libelleCarton: true, codeBarres: true,
+          numeroIlot: true, numeroLot: true, numeroTitreFoncier: true,
           statutPreparation: true, statutNumerisation: true, statutConditionnement: true, statutIndexation: true, statutArchivage: true,
           site: { select: { nom: true } },
           entrepot: { select: { nom: true, localisation: true } },
@@ -172,7 +173,8 @@ export async function resolveCartonRef(ref: string): Promise<number | null> {
   if (id) return id;
   const cote = parseCote(text);
   if (!cote) return null;
-  const carton = await prisma.carton.findUnique({ where: { cote: cote.carton }, select: { id: true } });
+  // L'ancienne cote (2010-KOU-0001), imprimée sur des étiquettes posées, reste lue.
+  const carton = await prisma.carton.findFirst({ where: { OR: [{ cote: cote.carton }, { coteAncienne: cote.carton }] }, select: { id: true } });
   return carton?.id ?? null;
 }
 

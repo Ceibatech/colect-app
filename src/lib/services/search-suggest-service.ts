@@ -35,7 +35,7 @@ async function cartonSuggestions(stage: SuggestStage, query: string, words: stri
   const cote = parseCote(query);
   const match: Prisma.DossierWhereInput = exactId
     ? { cartonId: exactId }
-    : cote ? { carton: { cote: cote.carton } }
+    : cote ? { carton: { OR: [{ cote: cote.carton }, { coteAncienne: cote.carton }] } }
     : all ? { AND: words.map(wordInCarton) } : { OR: words.map(wordInCarton) };
   const rows = await prisma.dossier.groupBy({
     by: ["cartonId", "libelleCarton"],

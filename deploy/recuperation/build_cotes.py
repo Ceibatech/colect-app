@@ -13,6 +13,7 @@ from reportlab.graphics import renderPDF
 src, outdir = sys.argv[1], sys.argv[2]
 data = json.load(open(src, encoding="utf-8"))
 APP = "https://geoarchives.ceiba-analytics.com"
+
 cartons = data["cartons"]
 
 
@@ -129,12 +130,14 @@ def carton_labels(path):
         c.setStrokeColorRGB(.55, .55, .55); c.roundRect(x, y, lw, lh, 2 * mm)
         draw_qr(c, f"{APP}/c/{carton['cote']}", x + 3 * mm, y + (lh - 42 * mm) / 2, 42 * mm)
         tx, tw = x + 47 * mm, lw - 50 * mm
-        c.setFont("Helvetica-Bold", 15); c.drawString(tx, y + lh - 11 * mm, carton["cote"])
+        # La cote V3 (FON-3302-113-0001) est plus longue : taille ajustée à la largeur.
+        size = 15
+        while size > 9 and c.stringWidth(carton["cote"], "Helvetica-Bold", size) > tw: size -= 0.5
+        c.setFont("Helvetica-Bold", size); c.drawString(tx, y + lh - 11 * mm, carton["cote"])
         for j, line in enumerate(wrap(carton["nom"], tw, "Helvetica-Bold", 11, c, 3)):
             c.setFont("Helvetica-Bold", 11); c.drawString(tx, y + lh - 19 * mm - j * 5 * mm, line)
         c.setFont("Helvetica", 8.5)
-        n = len(carton["dossiers"])
-        c.drawString(tx, y + 17 * mm, f"{n} dossier{'s' if n > 1 else ''}" if n else "Dossiers à rattacher")
+        # Pas de nombre de dossiers : il change dès qu'un dossier s'ajoute au carton.
         if carton["listeRef"] is not None: c.drawString(tx, y + 12.5 * mm, f"Liste d'enlèvement : n° {carton['listeRef']}")
         c.setFont("Helvetica", 7)
         for j, line in enumerate(wrap(carton["lieu"] or "Koumassi", tw, "Helvetica", 7, c, 2)):
@@ -157,7 +160,8 @@ def dossier_labels(path):
             draw_qr(c, f"{APP}/c/{d['cote']}", x + 1.5 * mm, y + 2.5 * mm, 28 * mm)
             tx, tw = x + 30.5 * mm, lw - 32 * mm
             c.setFont("Helvetica-Bold", 7.6); c.drawString(tx, y + lh - 6 * mm, pdf_text(d["cote"]))
-            c.setFont("Helvetica", 7); c.drawString(tx, y + lh - 10 * mm, f"Dossier {d['rang']}/{n}")
+            # Rang seul : il ne change jamais, alors qu'un total deviendrait faux au premier ajout.
+            c.setFont("Helvetica", 7); c.drawString(tx, y + lh - 10 * mm, f"Dossier n° {d['rang']}")
             # Repères de collage sans nom : îlot, lot et titre foncier, tels qu'écrits sur la chemise.
             reperes = [("Îlot", d["ilot"]), ("Lot", d["lot"]), ("TF", d["titreFoncier"])]
             line_y = y + lh - 15 * mm

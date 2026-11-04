@@ -11,7 +11,8 @@ import { PrismaClient } from "@prisma/client";
 
 /** Liste d'enlèvement (référence provisoire et libellé de chaque boîte), si elle existe pour ce préfixe. */
 function listeEnlevement(prefixe) {
-  if (prefixe !== "2010-KOU") return { boites: new Map(), etabliePar: null };
+  // Liste d'enlèvement de Koumassi : ancien préfixe 2010-KOU, nouveau FON-3302-113 (mêmes numéros).
+  if (prefixe !== "2010-KOU" && prefixe !== "FON-3302-113") return { boites: new Map(), etabliePar: null };
   const file = path.join(path.dirname(new URL(import.meta.url).pathname), "enlevement-koumassi.json");
   if (!existsSync(file)) return { boites: new Map(), etabliePar: null };
   const data = JSON.parse(readFileSync(file, "utf8"));
@@ -70,7 +71,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   const a = Number(arg("a", 320));
   const prisma = new PrismaClient();
   try {
-    if (!/^\d{4}-[A-Z][A-Z0-9]{1,5}$/.test(prefixe)) throw new Error("--prefixe invalide (ex. 2010-KOU).");
+    if (!/^(?:\d{4}-[A-Z][A-Z0-9]{1,5}|[A-Z]{2,3}-\d{4}-\d{3})$/.test(prefixe)) throw new Error("--prefixe invalide (ex. FON-3302-113 ou 2010-KOU).");
     if (!Number.isInteger(de) || !Number.isInteger(a) || de < 1 || a < de || a - de > 2000) throw new Error("Plage --de/--a invalide.");
     const cartons = await loadCotes(prisma, { prefixe, de, a });
     process.stdout.write(JSON.stringify({ exportedAt: new Date().toISOString(), prefixe, de, a, listeEtabliePar: listeEnlevement(prefixe).etabliePar, cartons }));

@@ -1,0 +1,1610 @@
+[
+ {
+  "identifiant": "001",
+  "nom": "ABENGOUROU",
+  "district": "COMOE",
+  "region": "INDENIE-DJUABLIN",
+  "departement": "ABENGOUROU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "002",
+  "nom": "ABOBO",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "003",
+  "nom": "ABOISSO",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "ABOISSO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "004",
+  "nom": "ADIAKÉ",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "ADIAKE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "005",
+  "nom": "ADJAMÉ",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "006",
+  "nom": "ADZOPÉ",
+  "district": "LAGUNES",
+  "region": "ME",
+  "departement": "ADZOPE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "007",
+  "nom": "AFFÉRY",
+  "district": "LAGUNES",
+  "region": "ME",
+  "departement": "AKOUPE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "008",
+  "nom": "AGBOVILLE",
+  "district": "LAGUNES",
+  "region": "AGNEBY-TIASSA",
+  "departement": "AGBOVILLE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "009",
+  "nom": "AGNIBILÉKROU",
+  "district": "COMOE",
+  "region": "INDENIE-DJUABLIN",
+  "departement": "AGNIBILEKROU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "010",
+  "nom": "AGOU",
+  "district": "LAGUNES",
+  "region": "ME",
+  "departement": "ADZOPE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "011",
+  "nom": "AKOUPÉ",
+  "district": "LAGUNES",
+  "region": "ME",
+  "departement": "AKOUPE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "012",
+  "nom": "ALÉPÉ",
+  "district": "LAGUNES",
+  "region": "ME",
+  "departement": "ALEPE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "013",
+  "nom": "ANOUMABA",
+  "district": "LACS",
+  "region": "MORONOU",
+  "departement": "M'BATTO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "014",
+  "nom": "ANYAMA",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "015",
+  "nom": "ARRAH",
+  "district": "LACS",
+  "region": "MORONOU",
+  "departement": "ARRAH",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "016",
+  "nom": "ASSINIE",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "ADIAKE",
+  "rapprochement": "Variante de nom rapprochée"
+ },
+ {
+  "identifiant": "017",
+  "nom": "ASSUÉFFRY",
+  "district": "ZANZAN",
+  "region": "GONTOUGO",
+  "departement": "TRANSUA",
+  "rapprochement": "Variante de nom rapprochée"
+ },
+ {
+  "identifiant": "018",
+  "nom": "ATTÉCOUBÉ",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "019",
+  "nom": "ATTIEGOUAKRO",
+  "district": "YAMOUSSOUKRO",
+  "region": "YAMOUSSOUKRO",
+  "departement": "ATTIEGOUAKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "020",
+  "nom": "AYAMÉ",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "ABOISSO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "021",
+  "nom": "AZAGUIÉ",
+  "district": "LAGUNES",
+  "region": "AGNEBY-TIASSA",
+  "departement": "AGBOVILLE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "022",
+  "nom": "BAKO",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "ODIENNE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "023",
+  "nom": "BANGOLO",
+  "district": "MONTAGNES",
+  "region": "GUEMON",
+  "departement": "BANGOLO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "024",
+  "nom": "BASSAWA",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "DABAKALA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "025",
+  "nom": "BÉDIALA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "HAUT-SASSANDRA",
+  "departement": "DALOA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "026",
+  "nom": "BÉOUMI",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "BEOUMI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "027",
+  "nom": "BÉTTIÉ",
+  "district": "COMOE",
+  "region": "INDENIE-DJUABLIN",
+  "departement": "BETTIE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "028",
+  "nom": "BIANKOUMA",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "BIANKOUMA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "029",
+  "nom": "BIN-HOUYÉ",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "ZOUAN-HOUNIEN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "030",
+  "nom": "BINGERVILLE",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "031",
+  "nom": "BLOLÉQUIN",
+  "district": "MONTAGNES",
+  "region": "CAVALLY",
+  "departement": "BLOLEQUIN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "032",
+  "nom": "BOCANDA",
+  "district": "LACS",
+  "region": "N'ZI",
+  "departement": "BOCANDA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "033",
+  "nom": "BODOKRO",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "BEOUMI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "034",
+  "nom": "BONDOUKOU",
+  "district": "ZANZAN",
+  "region": "GONTOUGO",
+  "departement": "BONDOUKOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "035",
+  "nom": "BONGOUANOU",
+  "district": "LACS",
+  "region": "MORONOU",
+  "departement": "BONGOUANOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "036",
+  "nom": "BONIÉRÉDOUGOU",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "DABAKALA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "037",
+  "nom": "BONON",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "MARAHOUE",
+  "departement": "BONON",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "038",
+  "nom": "BONOUA",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "GRAND-BASSAM",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "039",
+  "nom": "BOOKO",
+  "district": "WOROBA",
+  "region": "BAFING",
+  "departement": "KORO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "040",
+  "nom": "BOROTOU",
+  "district": "WOROBA",
+  "region": "BAFING",
+  "departement": "KORO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "041",
+  "nom": "BOTRO",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "BOTRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "042",
+  "nom": "BOUAFLÉ",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "MARAHOUE",
+  "departement": "BOUAFLE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "043",
+  "nom": "BOUAKÉ",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "BOUAKE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "044",
+  "nom": "BOUNA",
+  "district": "ZANZAN",
+  "region": "BOUNKANI",
+  "departement": "BOUNA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "045",
+  "nom": "BOUNDIALI",
+  "district": "SAVANES",
+  "region": "BAGOUE",
+  "departement": "BOUNDIALI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "046",
+  "nom": "BROBO",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "BOUAKE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "047",
+  "nom": "BUYO",
+  "district": "BAS-SASSANDRA",
+  "region": "NAWA",
+  "departement": "BUYO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "048",
+  "nom": "COCODY",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "049",
+  "nom": "DABAKALA",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "DABAKALA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "050",
+  "nom": "DABOU",
+  "district": "LAGUNES",
+  "region": "GRANDS PONTS",
+  "departement": "DABOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "051",
+  "nom": "DALOA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "HAUT-SASSANDRA",
+  "departement": "DALOA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "052",
+  "nom": "DANANÉ",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "DANANE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "053",
+  "nom": "DAOUKRO",
+  "district": "LACS",
+  "region": "IFFOU",
+  "departement": "DAOUKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "054",
+  "nom": "DIABO",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "BOTRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "055",
+  "nom": "DIANRA",
+  "district": "WOROBA",
+  "region": "BERE",
+  "departement": "DIANRA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "056",
+  "nom": "DIAWALA",
+  "district": "SAVANES",
+  "region": "TCHOLOGO",
+  "departement": "OUANGOLODOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "057",
+  "nom": "DIDIÉVI",
+  "district": "LACS",
+  "region": "BELIER",
+  "departement": "DIDIEVI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "058",
+  "nom": "DIÉGONÉFLA",
+  "district": "GÔH-DJIBOUA",
+  "region": "GÔH",
+  "departement": "OUME",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "059",
+  "nom": "DIKODOUGOU",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "DIKODOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "060",
+  "nom": "DIMBOKRO",
+  "district": "LACS",
+  "region": "N'ZI",
+  "departement": "DIMBOKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "061",
+  "nom": "DIOULATIÉDOUGOU",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "ODIENNE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "062",
+  "nom": "DIVO",
+  "district": "GÔH-DJIBOUA",
+  "region": "LÔH-DJIBOUA",
+  "departement": "DIVO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "063",
+  "nom": "DJEBONOUA",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "BOUAKE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "064",
+  "nom": "DJÈKANOU",
+  "district": "LACS",
+  "region": "BELIER",
+  "departement": "DJEKANOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "065",
+  "nom": "DJIBROSSO",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "KANI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "066",
+  "nom": "DOROPO",
+  "district": "ZANZAN",
+  "region": "BOUNKANI",
+  "departement": "DOROPO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "067",
+  "nom": "DUALLA",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "SEGUELA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "068",
+  "nom": "DUÉKOUÉ",
+  "district": "MONTAGNES",
+  "region": "GUEMON",
+  "departement": "DUEKOUE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "069",
+  "nom": "ETTROKRO",
+  "district": "LACS",
+  "region": "IFFOU",
+  "departement": "DAOUKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "070",
+  "nom": "FACOBLY",
+  "district": "MONTAGNES",
+  "region": "GUEMON",
+  "departement": "FACOBLY",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "071",
+  "nom": "FERKESSÉDOUGOU",
+  "district": "SAVANES",
+  "region": "TCHOLOGO",
+  "departement": "FERKESSEDOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "072",
+  "nom": "FOUMBOLO",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "DABAKALA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "073",
+  "nom": "FRESCO",
+  "district": "BAS-SASSANDRA",
+  "region": "GBOKLE",
+  "departement": "FRESCO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "074",
+  "nom": "FRONAN",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "KATIOLA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "075",
+  "nom": "GAGNOA",
+  "district": "GÔH-DJIBOUA",
+  "region": "GÔH",
+  "departement": "GAGNOA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "076",
+  "nom": "GBELEBAN",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "GBELEBAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "077",
+  "nom": "GBOGUHÉ",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "HAUT-SASSANDRA",
+  "departement": "DALOA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "078",
+  "nom": "GBON",
+  "district": "SAVANES",
+  "region": "BAGOUE",
+  "departement": "KOUTO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "079",
+  "nom": "GBONNÉ",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "BIANKOUMA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "080",
+  "nom": "GOHITAFLA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "MARAHOUE",
+  "departement": "GOHITAFLA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "081",
+  "nom": "GOULIA",
+  "district": "DENGUELE",
+  "region": "FOLON",
+  "departement": "KANIASSO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "082",
+  "nom": "GRABO",
+  "district": "BAS-SASSANDRA",
+  "region": "SAN PEDRO",
+  "departement": "TABOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "083",
+  "nom": "GRAND-BASSAM",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "GRAND-BASSAM",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "084",
+  "nom": "GRAND-BÉRÉBY",
+  "district": "BAS-SASSANDRA",
+  "region": "SAN PEDRO",
+  "departement": "SAN-PEDRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "085",
+  "nom": "GRAND-LAHOU",
+  "district": "LAGUNES",
+  "region": "GRANDS PONTS",
+  "departement": "GRAND-LAHOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "086",
+  "nom": "GRAND-ZATTRY",
+  "district": "BAS-SASSANDRA",
+  "region": "NAWA",
+  "departement": "SOUBRE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "087",
+  "nom": "GUÉYO",
+  "district": "BAS-SASSANDRA",
+  "region": "NAWA",
+  "departement": "GUEYO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "088",
+  "nom": "GUIBÉROUA",
+  "district": "GÔH-DJIBOUA",
+  "region": "GÔH",
+  "departement": "GAGNOA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "089",
+  "nom": "GUIEMBÉ",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "DIKODOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "090",
+  "nom": "GUIGLO",
+  "district": "MONTAGNES",
+  "region": "CAVALLY",
+  "departement": "GUIGLO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "091",
+  "nom": "GUINTÉGUÉLA",
+  "district": "WOROBA",
+  "region": "BAFING",
+  "departement": "TOUBA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "092",
+  "nom": "GUITRY",
+  "district": "GÔH-DJIBOUA",
+  "region": "LÔH-DJIBOUA",
+  "departement": "GUITRY",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "093",
+  "nom": "HIRÉ",
+  "district": "GÔH-DJIBOUA",
+  "region": "LÔH-DJIBOUA",
+  "departement": "DIVO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "094",
+  "nom": "ISSIA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "HAUT-SASSANDRA",
+  "departement": "ISSIA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "095",
+  "nom": "JACQUEVILLE",
+  "district": "LAGUNES",
+  "region": "GRANDS PONTS",
+  "departement": "JACQUEVILLE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "096",
+  "nom": "KANAKONO",
+  "district": "SAVANES",
+  "region": "BAGOUE",
+  "departement": "TENGRELA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "097",
+  "nom": "KANI",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "KANI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "098",
+  "nom": "KANIASSO",
+  "district": "DENGUELE",
+  "region": "FOLON",
+  "departement": "KANIASSO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "099",
+  "nom": "KARAKORO",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "KORHOGO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "100",
+  "nom": "KASSÉRÉ",
+  "district": "SAVANES",
+  "region": "BAGOUE",
+  "departement": "BOUNDIALI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "101",
+  "nom": "KATIOLA",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "KATIOLA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "102",
+  "nom": "KOKOUMBO",
+  "district": "LACS",
+  "region": "BELIER",
+  "departement": "TOUMODI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "103",
+  "nom": "KOLIA",
+  "district": "SAVANES",
+  "region": "BAGOUE",
+  "departement": "KOUTO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "104",
+  "nom": "KOMBORODOUGOU",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "KORHOGO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "105",
+  "nom": "KONG",
+  "district": "SAVANES",
+  "region": "TCHOLOGO",
+  "departement": "KONG",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "106",
+  "nom": "KONGASSO",
+  "district": "WOROBA",
+  "region": "BERE",
+  "departement": "KOUNAHIRI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "107",
+  "nom": "KOONAN",
+  "district": "WOROBA",
+  "region": "BAFING",
+  "departement": "OUANINOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "108",
+  "nom": "KORHOGO",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "KORHOGO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "109",
+  "nom": "KORO",
+  "district": "WOROBA",
+  "region": "BAFING",
+  "departement": "KORO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "110",
+  "nom": "KOUASSI-DATÉKRO",
+  "district": "ZANZAN",
+  "region": "GONTOUGO",
+  "departement": "KOUN-FAO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "111",
+  "nom": "KOUASSI-KOUASSIKRO",
+  "district": "LACS",
+  "region": "N'ZI",
+  "departement": "KOUASSI-KOUASSIKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "112",
+  "nom": "KOUIBLY",
+  "district": "MONTAGNES",
+  "region": "GUEMON",
+  "departement": "KOUIBLY",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "113",
+  "nom": "KOUMASSI",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "114",
+  "nom": "KOUMBALA",
+  "district": "SAVANES",
+  "region": "TCHOLOGO",
+  "departement": "FERKESSEDOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "115",
+  "nom": "KOUN-FAO",
+  "district": "ZANZAN",
+  "region": "GONTOUGO",
+  "departement": "KOUN-FAO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "116",
+  "nom": "KOUNAHIRI",
+  "district": "WOROBA",
+  "region": "BERE",
+  "departement": "KOUNAHIRI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "117",
+  "nom": "KOUTO",
+  "district": "SAVANES",
+  "region": "BAGOUE",
+  "departement": "KOUTO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "118",
+  "nom": "LAKOTA",
+  "district": "GÔH-DJIBOUA",
+  "region": "LÔH-DJIBOUA",
+  "departement": "LAKOTA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "119",
+  "nom": "LOGOUALÉ",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "MAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "120",
+  "nom": "M’BAHIAKRO",
+  "district": "LACS",
+  "region": "IFFOU",
+  "departement": "M'BAHIAKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "121",
+  "nom": "M’BATTO",
+  "district": "LACS",
+  "region": "MORONOU",
+  "departement": "M'BATTO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "122",
+  "nom": "M’BENGUÉ",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "M'BENGUE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "123",
+  "nom": "MADINANI",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "MADINANI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "124",
+  "nom": "MAFÉRÉ",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "ABOISSO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "125",
+  "nom": "MAN",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "MAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "126",
+  "nom": "MANKONO",
+  "district": "WOROBA",
+  "region": "BERE",
+  "departement": "MANKONO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "127",
+  "nom": "MARCORY",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "128",
+  "nom": "MASSALA",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "SEGUELA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "129",
+  "nom": "MAYO",
+  "district": null,
+  "region": null,
+  "departement": null,
+  "rapprochement": "Rattachement à compléter"
+ },
+ {
+  "identifiant": "130",
+  "nom": "MÉAGUI",
+  "district": "BAS-SASSANDRA",
+  "region": "NAWA",
+  "departement": "MEAGUI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "131",
+  "nom": "MINIGNAN",
+  "district": "DENGUELE",
+  "region": "FOLON",
+  "departement": "MINIGNAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "132",
+  "nom": "MORONDO",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "KANI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "133",
+  "nom": "N’DOUCI",
+  "district": "LAGUNES",
+  "region": "AGNEBY-TIASSA",
+  "departement": "TIASSALE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "134",
+  "nom": "NAPIÉ",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "KORHOGO",
+  "rapprochement": "Variante de nom rapprochée"
+ },
+ {
+  "identifiant": "135",
+  "nom": "NASSIAN",
+  "district": "ZANZAN",
+  "region": "BOUNKANI",
+  "departement": "NASSIAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "136",
+  "nom": "NIABLÉ",
+  "district": "COMOE",
+  "region": "INDENIE-DJUABLIN",
+  "departement": "ABENGOUROU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "137",
+  "nom": "NIAKARAMANDOUGOU",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "NIAKARAMADOUGOU",
+  "rapprochement": "Variante de nom rapprochée"
+ },
+ {
+  "identifiant": "138",
+  "nom": "NIÉLLÉ",
+  "district": "SAVANES",
+  "region": "TCHOLOGO",
+  "departement": "OUANGOLODOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "139",
+  "nom": "NIOFOIN",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "KORHOGO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "140",
+  "nom": "ODIENNÉ",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "ODIENNE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "141",
+  "nom": "OUANGOLODOUGOU",
+  "district": "SAVANES",
+  "region": "TCHOLOGO",
+  "departement": "OUANGOLODOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "142",
+  "nom": "OUANINOU",
+  "district": "WOROBA",
+  "region": "BAFING",
+  "departement": "OUANINOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "143",
+  "nom": "OUELLÉ",
+  "district": "LACS",
+  "region": "IFFOU",
+  "departement": "OUELLE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "144",
+  "nom": "OUMÉ",
+  "district": "GÔH-DJIBOUA",
+  "region": "GÔH",
+  "departement": "OUME",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "145",
+  "nom": "OURAGAHIO",
+  "district": "GÔH-DJIBOUA",
+  "region": "GÔH",
+  "departement": "GAGNOA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "146",
+  "nom": "PLATEAU",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "147",
+  "nom": "PORT-BOUËT",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "148",
+  "nom": "PRIKRO",
+  "district": "LACS",
+  "region": "IFFOU",
+  "departement": "PRIKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "149",
+  "nom": "RUBINO",
+  "district": "LAGUNES",
+  "region": "AGNEBY-TIASSA",
+  "departement": "AGBOVILLE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "150",
+  "nom": "SAÏOUA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "HAUT-SASSANDRA",
+  "departement": "ISSIA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "151",
+  "nom": "SAKASSOU",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "GBEKE",
+  "departement": "SAKASSOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "152",
+  "nom": "SAMATIGUILA",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "SAMATIGUILA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "153",
+  "nom": "SAN PEDRO",
+  "district": "BAS-SASSANDRA",
+  "region": "SAN PEDRO",
+  "departement": "SAN-PEDRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "154",
+  "nom": "SANDÉGUÉ",
+  "district": "ZANZAN",
+  "region": "GONTOUGO",
+  "departement": "SANDEGUE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "155",
+  "nom": "SANGOUINÉ",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "MAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "156",
+  "nom": "SARHALA",
+  "district": "WOROBA",
+  "region": "BERE",
+  "departement": "MANKONO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "157",
+  "nom": "SASSANDRA",
+  "district": "BAS-SASSANDRA",
+  "region": "GBOKLE",
+  "departement": "SASSANDRA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "158",
+  "nom": "SATAMA-SOKORO",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "DABAKALA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "159",
+  "nom": "SATAMA-SOKOURA",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "DABAKALA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "160",
+  "nom": "SÉGUÉLA",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "SEGUELA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "161",
+  "nom": "SÉGUELON",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "SEGUELON",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "162",
+  "nom": "SEYDOUGOU",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "GBELEBAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "163",
+  "nom": "SIFIÉ",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "SEGUELA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "164",
+  "nom": "SIKENSI",
+  "district": "LAGUNES",
+  "region": "AGNEBY-TIASSA",
+  "departement": "SIKENSI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "165",
+  "nom": "SINÉMATIALI",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "SINEMATIALI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "166",
+  "nom": "SINFRA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "MARAHOUE",
+  "departement": "SINFRA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "167",
+  "nom": "SIPILOU",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "SIPILOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "168",
+  "nom": "SIRASSO",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "KORHOGO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "169",
+  "nom": "SONGON",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "170",
+  "nom": "SOUBRÉ",
+  "district": "BAS-SASSANDRA",
+  "region": "NAWA",
+  "departement": "SOUBRE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "171",
+  "nom": "TAABO",
+  "district": "LAGUNES",
+  "region": "AGNEBY-TIASSA",
+  "departement": "TAABO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "172",
+  "nom": "TABOU",
+  "district": "BAS-SASSANDRA",
+  "region": "SAN PEDRO",
+  "departement": "TABOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "173",
+  "nom": "TAFIRÉ",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "NIAKARAMADOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "174",
+  "nom": "TAÏ",
+  "district": "MONTAGNES",
+  "region": "CAVALLY",
+  "departement": "TAÏ",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "175",
+  "nom": "TANDA",
+  "district": "ZANZAN",
+  "region": "GONTOUGO",
+  "departement": "TANDA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "176",
+  "nom": "TÉHINI",
+  "district": "ZANZAN",
+  "region": "BOUNKANI",
+  "departement": "TEHINI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "177",
+  "nom": "TENGRÉLA",
+  "district": "SAVANES",
+  "region": "BAGOUE",
+  "departement": "TENGRELA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "178",
+  "nom": "TIAPOUM",
+  "district": "COMOE",
+  "region": "SUD-COMOE",
+  "departement": "TIAPOUM",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "179",
+  "nom": "TIASSALÉ",
+  "district": "LAGUNES",
+  "region": "AGNEBY-TIASSA",
+  "departement": "TIASSALE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "180",
+  "nom": "TIÉ-N’DIEKRO",
+  "district": "LACS",
+  "region": "BELIER",
+  "departement": "DIDIEVI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "181",
+  "nom": "TIÉBISSOU",
+  "district": "LACS",
+  "region": "BELIER",
+  "departement": "TIEBISSOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "182",
+  "nom": "TIÉMÉ",
+  "district": "DENGUELE",
+  "region": "KABADOUGOU",
+  "departement": "ODIENNE",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "183",
+  "nom": "TIÉMÉLÉKRO",
+  "district": "LACS",
+  "region": "MORONOU",
+  "departement": "M'BATTO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "184",
+  "nom": "TIÉNINGBOUÉ",
+  "district": "WOROBA",
+  "region": "BERE",
+  "departement": "MANKONO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "185",
+  "nom": "TIENKO",
+  "district": "DENGUELE",
+  "region": "FOLON",
+  "departement": "MINIGNAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "186",
+  "nom": "TIORONIARADOUGOU",
+  "district": "SAVANES",
+  "region": "PORO",
+  "departement": "KORHOGO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "187",
+  "nom": "TORTIYA",
+  "district": "VALLEE DU BANDAMAN",
+  "region": "HAMBOL",
+  "departement": "NIAKARAMADOUGOU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "188",
+  "nom": "TOUBA",
+  "district": "WOROBA",
+  "region": "BAFING",
+  "departement": "TOUBA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "189",
+  "nom": "TOULÉPLEU",
+  "district": "MONTAGNES",
+  "region": "CAVALLY",
+  "departement": "TOULEPLEU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "190",
+  "nom": "TOUMODI",
+  "district": "LACS",
+  "region": "BELIER",
+  "departement": "TOUMODI",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "191",
+  "nom": "TRANSUA",
+  "district": "ZANZAN",
+  "region": "GONTOUGO",
+  "departement": "TRANSUA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "192",
+  "nom": "TREICHVILLE",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "193",
+  "nom": "VAVOUA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "HAUT-SASSANDRA",
+  "departement": "VAVOUA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "194",
+  "nom": "WOROFLA",
+  "district": "WOROBA",
+  "region": "WORODOUGOU",
+  "departement": "SEGUELA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "195",
+  "nom": "YAKASSÉ-ATTOBROU",
+  "district": "LAGUNES",
+  "region": "ME",
+  "departement": "YAKASSE-ATTOBROU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "196",
+  "nom": "YAMOUSSOUKRO",
+  "district": "YAMOUSSOUKRO",
+  "region": "YAMOUSSOUKRO",
+  "departement": "YAMOUSSOUKRO",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "197",
+  "nom": "YOPOUGON",
+  "district": "ABIDJAN",
+  "region": "ABIDJAN",
+  "departement": "ABIDJAN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "198",
+  "nom": "ZIKISSO",
+  "district": "GÔH-DJIBOUA",
+  "region": "LÔH-DJIBOUA",
+  "departement": "LAKOTA",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "199",
+  "nom": "ZOUAN-HOUNIEN",
+  "district": "MONTAGNES",
+  "region": "TONKPI",
+  "departement": "ZOUAN-HOUNIEN",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "200",
+  "nom": "ZOUKOUGBEU",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "HAUT-SASSANDRA",
+  "departement": "ZOUKOUGBEU",
+  "rapprochement": "Nom concordant"
+ },
+ {
+  "identifiant": "201",
+  "nom": "ZUÉNOULA",
+  "district": "SASSANDRA-MARAHOUE",
+  "region": "MARAHOUE",
+  "departement": "ZUENOULA",
+  "rapprochement": "Nom concordant"
+ }
+]

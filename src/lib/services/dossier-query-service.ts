@@ -63,7 +63,10 @@ export async function searchDossiers(filters: DossierSearchFilters, options: Dos
       const cartonId = parseCartonReference(q);
       const cote = parseCote(q);
       where.OR = cartonId !== null ? [{ cartonId }] : cote ? [
-        cote.rang !== null ? { cote: formatDossierCote(cote.carton, cote.rang) } : { carton: { cote: cote.carton } },
+        // L'ancienne cote (alias) reste lue : elle est imprimée sur des étiquettes posées.
+        ...(cote.rang !== null
+          ? [{ cote: formatDossierCote(cote.carton, cote.rang) }, { coteAncienne: formatDossierCote(cote.carton, cote.rang) }]
+          : [{ carton: { OR: [{ cote: cote.carton }, { coteAncienne: cote.carton }] } }]),
       ] : [
         { cote: { contains: q } },
         { reference: { contains: q } },

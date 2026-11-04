@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RUBRIQUE_ACD } from "@/lib/referentiel/codification";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller, useWatch } from "react-hook-form";
 import { findRubrique, rubriqueLabel, rubriqueOfCote } from "@/lib/referentiel/classement";
@@ -41,7 +42,7 @@ export function StepDossier({
 
   const [autres, setAutres] = useState(() => !form.getValues("natureDossierId") && !!form.getValues("natureDossierAutre"));
   const [modeCarton, classement, cartonCote] = useWatch({ control, name: ["modeCarton", "classement", "cartonCote"] });
-  const rubrique = modeCarton === "NOUVEAU" ? findRubrique(classement || "2010") : modeCarton === "EXISTANT" ? rubriqueOfCote(cartonCote) : null;
+  const rubrique = modeCarton === "NOUVEAU" ? findRubrique(classement || RUBRIQUE_ACD) : modeCarton === "EXISTANT" ? rubriqueOfCote(cartonCote) : null;
 
   if (rubrique) {
     return (

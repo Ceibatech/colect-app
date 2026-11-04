@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { RUBRIQUE_ACD } from "@/lib/referentiel/codification";
 import type { UseFormReturn } from "react-hook-form";
 import { Controller, useWatch } from "react-hook-form";
 import { Archive, PackagePlus } from "lucide-react";
@@ -64,7 +65,7 @@ export function StepCarton({
     form.clearErrors("modeCarton");
     if (value === "NOUVEAU") {
       setValue("cartonCote", "");
-      if (!form.getValues("classement")) setValue("classement", "2010");
+      if (!form.getValues("classement")) setValue("classement", RUBRIQUE_ACD);
     }
   }
 
@@ -105,7 +106,7 @@ export function StepCarton({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field>
-              <FieldLabel htmlFor="classement">Classement (référentiel MULCV)</FieldLabel>
+              <FieldLabel htmlFor="classement">Rubrique (référentiel MULCV V3)</FieldLabel>
               <FieldContent>
                 <select id="classement" {...register("classement")} className={selectClass}>
                   {REFERENTIEL_CLASSEMENT.map((serie) => (
@@ -114,7 +115,7 @@ export function StepCarton({
                     </optgroup>
                   ))}
                 </select>
-                <FieldDescription>Les dossiers fonciers sont des « 2010 · Dossiers ACD ».</FieldDescription>
+                <FieldDescription>Les dossiers ACD sont en « FON-3302 · Dossiers ACD ». La fonction et l&apos;identifiant de la commune complètent la cote d&apos;eux-mêmes.</FieldDescription>
                 <FieldError errors={[errors.classement]} />
               </FieldContent>
             </Field>
@@ -143,7 +144,7 @@ export function StepCarton({
               </FieldContent>
             </Field>
           </div>
-          <CartonCotePreview nouveau classement={classement || "2010"} communeId={communeId} siteId={siteId} libelle={libelleCarton} draftId={draftId} />
+          <CartonCotePreview nouveau classement={classement || RUBRIQUE_ACD} communeId={communeId} siteId={siteId} libelle={libelleCarton} draftId={draftId} />
         </div>
       ) : null}
     </div>

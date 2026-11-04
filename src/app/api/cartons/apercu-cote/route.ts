@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 import { requireApiPermission } from "@/lib/auth/current-user";
-import { CLASSEMENT_ACD, cotePrefixe, formatCartonCote, formatDossierCote, proposeSigle, SIGLE_INCONNU } from "@/lib/cartons/cote";
+import { CLASSEMENT_ACD, communeIdentifiant, cotePrefixe, cotePrefixeNouveau, formatCartonCote, formatDossierCote, proposeSigle, SIGLE_INCONNU } from "@/lib/cartons/cote";
+import { communeCiParNom, findRubriqueV3, RUBRIQUE_ACD, rubriquePourCommune } from "@/lib/referentiel/codification";
 import { findCartonByCote } from "@/lib/cartons/cote-assignment";
 import { normalizeCartonLabel } from "@/lib/cartons/identity-normalization";
 import { cartonLabelKeySql } from "@/lib/cartons/persistence";
@@ -63,10 +64,16 @@ export async function GET(request: NextRequest) {
       if (match?.cartonId) return NextResponse.json(await describe(Number(match.cartonId), draftId));
     }
     const communeId = positive(params.get("commune"));
-    const commune = communeId ? await prisma.commune.findUnique({ where: { id: communeId }, select: { nom: true, sigle: true } }) : null;
-    const classement = /^\d{4}$/.test(params.get("classement") ?? "") ? params.get("classement")! : CLASSEMENT_ACD;
-    const prefixe = cotePrefixe(commune ? commune.sigle ?? proposeSigle(commune.nom) : SIGLE_INCONNU, classement);
-    const last = await prisma.carton.aggregate({ where: { cotePrefixe: prefixe }, _max: { coteSequence: true } });
+    const commune = communeId ? await prisma.commune.findUnique({ where: { id: communeId }, select: { nom: true, code: true, sigle: true, identifiant: true } }) : null;
+    // Même règle que l'attribution (cartonCotePrefixe), sans rien écrire.
+    const rubrique = findRubriqueV3(params.get("classement")) ?? findRubriqueV3(RUBRIQUE_ACD)!;
+    const identifiant = commune ? commune.identifiant ?? communeIdentifiant(commune.code) ?? communeCiParNom(commune.nom)?.identifiant ?? null : null;
+    const [fonction, numero] = rubriquePourCommune(rubrique.key, identifiant).split("-");
+    const prefixe = (identifiant ? cotePrefixeNouveau(fonction, numero, identifiant) : null)
+      ?? cotePrefixe(commune ? commune.sigle ?? proposeSigle(commune.nom) : SIGLE_INCONNU, CLASSEMENT_ACD);
+    // Même suite que l'attribution : après les ACD de l'ancien format de la commune.
+    const ancien = identifiant && rubrique.key === RUBRIQUE_ACD && commune?.sigle ? cotePrefixe(commune.sigle, CLASSEMENT_ACD) : null;
+    const last = await prisma.carton.aggregate({ where: { cotePrefixe: { in: ancien ? [prefixe, ancien] : [prefixe] } }, _max: { coteSequence: true } });
     const next = formatCartonCote(prefixe, (last._max.coteSequence ?? 0) + 1);
     return NextResponse.json({ mode: "nouveau", cote: next, commune: commune?.nom ?? null, dossiers: 0, prochaineCote: formatDossierCote(next, 1), rang: 1 });
   } catch (error) {

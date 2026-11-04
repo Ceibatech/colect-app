@@ -1,6 +1,7 @@
 "use client";
 
 import type { UseFormReturn } from "react-hook-form";
+import { RUBRIQUE_ACD } from "@/lib/referentiel/codification";
 import { ETAT_CONSERVATION_OPTIONS, type DossierFormValues } from "@/lib/validation/dossier";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -58,7 +59,7 @@ export function StepRecap({
   const site = lookups.sites.find((s) => s.id === v.siteId);
   const entrepot = site?.entrepots.find((e) => e.id === v.entrepotId);
   const commune = lookups.communes.find((c) => c.id === v.communeId);
-  const rubrique = v.modeCarton === "NOUVEAU" ? findRubrique(v.classement || "2010") : v.modeCarton === "EXISTANT" ? rubriqueOfCote(v.cartonCote) : null;
+  const rubrique = v.modeCarton === "NOUVEAU" ? findRubrique(v.classement || RUBRIQUE_ACD) : v.modeCarton === "EXISTANT" ? rubriqueOfCote(v.cartonCote) : null;
   const nature = rubrique ? rubriqueLabel(rubrique) : lookups.natures.find((n) => n.id === v.natureDossierId)?.libelle ?? v.natureDossierAutre;
   const etatLabel = (value?: string) => ETAT_CONSERVATION_OPTIONS.find((o) => o.value === value)?.label;
   const operateur = lookups.currentUserName;
