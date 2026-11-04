@@ -69,6 +69,14 @@ export function dumpConnection(databaseUrl) {
   return { args, password };
 }
 
+class DumpError extends Error {}
+
+/** Message d'erreur sur une ligne, sans le mot de passe. */
+export function redact(text, password) {
+  const clean = String(text ?? "").replace(/\s+/g, " ").trim().slice(0, 1500);
+  return password ? clean.split(password).join("***") : clean;
+}
+
 export async function backupDatabase({
   databaseUrl = process.env.DATABASE_URL,
   backupDirectory = "/backups",
@@ -94,7 +102,8 @@ export async function backupDatabase({
   try {
     child = spawnDump("mariadb-dump", args, {
       shell: false,
-      stdio: ["ignore", "pipe", "ignore"],
+      // stderr gardé (tronqué, sans mot de passe) pour dire pourquoi le dump échoue.
+      stdio: ["ignore", "pipe", "pipe"],
       // The password is never an argument, parent environment mutation or log.
       env: {
         PATH: process.env.PATH || "/usr/local/bin:/usr/bin:/bin",
@@ -102,6 +111,8 @@ export async function backupDatabase({
         MYSQL_PWD: password,
       },
     });
+    let stderr = "";
+    child.stderr?.on("data", (chunk) => { if (stderr.length < 4000) stderr += chunk.toString("utf8"); });
     const completion = new Promise((resolve) => {
       let spawnFailed = false;
       child.once("error", () => { spawnFailed = true; });
@@ -123,7 +134,15 @@ export async function backupDatabase({
     );
     const [result, streamed] = await Promise.all([completion, streaming]);
     if (interrupted || result.spawnFailed || result.code !== 0 || result.signal || !streamed || bytes === 0) {
-      throw new Error("Database dump did not complete successfully.");
+      const reason = [
+        result.spawnFailed ? "mariadb-dump introuvable" : null,
+        result.code ? `code ${result.code}` : null,
+        result.signal ? `signal ${result.signal}` : null,
+        !streamed ? "écriture interrompue" : null,
+        bytes === 0 ? "dump vide" : null,
+        redact(stderr, password),
+      ].filter(Boolean).join(" ; ");
+      throw new DumpError(reason);
     }
     // Flush the completed compressed file before its final name becomes visible.
     const completedFile = await open(partial, "r+");
@@ -131,11 +150,12 @@ export async function backupDatabase({
     if (interrupted) throw new Error("Backup interrupted.");
     await rename(partial, destination);
     return destination;
-  } catch {
+  } catch (error) {
     child?.kill("SIGKILL");
     output?.destroy();
     await unlink(partial).catch(() => {});
-    throw new Error("Backup failed. Check database access, TLS configuration and backup-directory permissions.");
+    const detail = error instanceof DumpError ? ` Cause : ${error.message}` : error instanceof Error ? ` Cause : ${redact(error.message, password)}` : "";
+    throw new Error(`Backup failed. Check database access, TLS configuration and backup-directory permissions.${detail}`);
   } finally {
     process.removeListener("SIGINT", cancel);
     process.removeListener("SIGTERM", cancel);
@@ -147,9 +167,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
     if (process.argv.length !== 2) throw new Error("Unexpected arguments.");
     const backup = await backupDatabase();
     console.log(`Database backup completed: ${path.basename(backup)}`);
-  } catch {
-    // Never expose the connection URL, password, SQL data or dump stderr.
-    console.error("Database backup failed. Deployment must stop before migrations.");
+  } catch (error) {
+    // Jamais l'URL de connexion ni le mot de passe (masqué) : seulement la cause
+    // donnée par mariadb-dump (une ligne), pour pouvoir corriger.
+    const cause = error instanceof Error ? (/Cause : (.*)$/.exec(error.message)?.[1] ?? "") : "";
+    console.error(`Database backup failed. Deployment must stop before migrations.${cause ? ` Cause : ${cause}` : ""}`);
     process.exitCode = 1;
   }
 }

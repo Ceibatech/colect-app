@@ -53,6 +53,16 @@ jobs:
           echo "== Droits des dossiers de sauvegarde"; ls -ld "$shared" "$shared/db-backups" "$shared/document-backups" 2>&1; stat -c '%n uid=%u gid=%g %A' "$shared/db-backups" "$shared/document-backups" 2>&1
           echo "== Essai d'écriture (uid 1000, comme le conteneur)"; for d in db-backups document-backups; do docker run --rm --user 1000:1000 -v "$shared/$d:/b" busybox sh -c 'touch /b/.essai && rm /b/.essai && echo "'$d' : écriture OK"' 2>&1 | tail -1; done
           echo "== Base de données"; docker ps --format '{{.Names}} {{.Image}} {{.Status}}' | grep -iE "maria|mysql|db" 2>/dev/null | head -5
+          echo "== Essai de dump (lecture seule, sortie jetée)"
+          docker exec colect-app-app-1 node --input-type=module -e '
+            import { spawn } from "node:child_process";
+            import { dumpConnection } from "/app/deploy/backup-database.mjs";
+            const { args, password } = dumpConnection(process.env.DATABASE_URL);
+            const child = spawn("mariadb-dump", args, { stdio: ["ignore", "ignore", "pipe"], env: { PATH: process.env.PATH, LANG: "C.UTF-8", MYSQL_PWD: password } });
+            let err = ""; child.stderr.on("data", (c) => { if (err.length < 3000) err += c; });
+            child.on("error", (e) => console.log("mariadb-dump introuvable :", e.code));
+            child.on("close", (code, signal) => { console.log("code", code, signal ?? "", "|", err.split(password).join("***").replace(/\s+/g, " ").trim()); });
+          ' 2>&1 | tail -3
           echo "== Fichiers partiels"; find "$shared/db-backups" "$shared/document-backups" -name '*.partial' 2>/dev/null | head
           echo "== Releases"; du -sh /opt/colect-app/releases 2>/dev/null; ls -1 /opt/colect-app/releases 2>/dev/null | wc -l
           echo "== Docker"; docker system df 2>/dev/null || true
