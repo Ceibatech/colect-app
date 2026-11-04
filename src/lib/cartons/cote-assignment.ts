@@ -44,8 +44,10 @@ export async function ensureCommuneIdentifiant(tx: Tx, communeId: number | null)
   const commune = await tx.commune.findUnique({ where: { id: communeId }, select: { identifiant: true, code: true, nom: true } });
   if (!commune) return null;
   if (commune.identifiant) return commune.identifiant;
+  // Le nom fait foi : le code « CI-0xx » saisi en base ne suit pas la
+  // numérotation du référentiel (Bingerville : CI-029, identifiant 030).
   const ci = communeCiParNom(commune.nom);
-  const identifiant = communeIdentifiant(commune.code) ?? ci?.identifiant ?? null;
+  const identifiant = ci?.identifiant ?? communeIdentifiant(commune.code) ?? null;
   if (!identifiant) return null;
   const taken = await tx.commune.findFirst({ where: { identifiant, id: { not: communeId } }, select: { id: true } });
   if (taken) return null;
