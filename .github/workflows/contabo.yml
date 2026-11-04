@@ -10,10 +10,9 @@ on:
 permissions:
   contents: read
 
-# A deployment must finish before another run can replace its release.
-concurrency:
-  group: contabo-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
+# Les déploiements passent par la file de production (job « File production ») :
+# une seule opération à la fois sur le serveur, priorité éventuelle. Les tests
+# de plusieurs commits peuvent, eux, tourner en parallèle.
 
 defaults:
   run:
@@ -127,13 +126,61 @@ jobs:
         if: failure()
         run: tail -200 "$RUNNER_TEMP/app.log" || true
 
-  deploy:
-    name: Deploy the validated commit
-    needs: [validate, regression]
+  file:
+    name: File production
     if: >-
       vars.CONTABO_ENABLED == 'true' &&
       github.ref == 'refs/heads/main' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      deployer: ${{ steps.recent.outputs.deployer }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      # Une seule opération à la fois sur la production ; priorité éventuelle.
+      - uses: ./.github/actions/file-production
+        with:
+          token: ${{ github.token }}
+      # Un commit plus récent déjà déployé contient celui-ci : ne pas revenir en arrière.
+      - name: Vérifier qu'aucune version plus récente n'est en ligne
+        id: recent
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          for run in $(gh api "repos/$repo/actions/workflows/contabo.yml/runs?branch=main&status=completed&per_page=30" --jq ".workflow_runs[] | select(.head_sha != \"$GITHUB_SHA\") | \"\(.id):\(.head_sha)\""); do
+            id="${run%%:*}"; sha="${run#*:}"
+            deployed=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq '[.jobs[] | select(.name == "Deploy the validated commit" and .conclusion == "success")] | length')
+            [[ "$deployed" -gt 0 ]] || continue
+            status=$(gh api "repos/$repo/compare/$GITHUB_SHA...$sha" --jq .status)
+            if [[ "$status" == ahead || "$status" == identical ]]; then
+              echo "Le commit ${sha:0:7}, plus récent et qui contient celui-ci, est déjà en ligne : déploiement sauté."
+              echo "deployer=false" >> "$GITHUB_OUTPUT"; exit 0
+            fi
+            break
+          done
+          echo "deployer=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Deploy the validated commit
+    needs: [validate, regression, file]
+    if: >-
+      vars.CONTABO_ENABLED == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      needs.file.outputs.deployer == 'true'
+    # Filet de sécurité en plus de la file : jamais deux déploiements à la fois.
+    concurrency:
+      group: contabo-deploy-production
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 60

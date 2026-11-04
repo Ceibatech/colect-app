@@ -1,0 +1,58 @@
+name: Priorité production
+
+# Lancement manuel. « activer » réserve la production au titulaire : tant que
+# la priorité est active, les déploiements et scripts de données qui ne
+# viennent pas de ses commits attendent (job « File production »), sans être
+# annulés. « relâcher » rend la main : les opérations en attente passent dans
+# l'ordre d'arrivée. L'état vit dans la branche prod-priorite (fichier PRIORITE).
+on:
+  workflow_dispatch:
+    inputs:
+      etat:
+        description: "activer ou relâcher la priorité"
+        required: true
+        default: activer
+        type: choice
+        options: [activer, relâcher]
+      titulaire:
+        description: "Adresse e-mail du titulaire (auteur ou co-auteur des commits prioritaires)"
+        required: false
+        default: idrissbadoolivier@gmail.com
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: priorite-production
+  cancel-in-progress: false
+
+jobs:
+  priorite:
+    name: Priorité (${{ inputs.etat }})
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mettre à jour la priorité
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ETAT: ${{ inputs.etat }}
+          TITULAIRE: ${{ inputs.titulaire }}
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          if [[ "$ETAT" == "relâcher" ]]; then
+            gh api -X DELETE "repos/$repo/git/refs/heads/prod-priorite" >/dev/null 2>&1 || true
+            echo "Priorité relâchée : les opérations en attente passent dans l'ordre d'arrivée."
+            exit 0
+          fi
+          [[ "$TITULAIRE" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] || { echo "Adresse du titulaire invalide." >&2; exit 1; }
+          if ! gh api "repos/$repo/git/refs/heads/prod-priorite" >/dev/null 2>&1; then
+            gh api "repos/$repo/git/refs" -f ref=refs/heads/prod-priorite -f sha="$GITHUB_SHA" >/dev/null
+          fi
+          content=$(printf 'auteur=%s\ndepuis=%s\n' "$TITULAIRE" "$(date -u +%Y-%m-%dT%H:%MZ)" | base64 -w0)
+          existing=$(gh api "repos/$repo/contents/PRIORITE?ref=prod-priorite" --jq .sha 2>/dev/null || true)
+          gh api -X PUT "repos/$repo/contents/PRIORITE" -f message="Priorité production : $TITULAIRE [skip ci]" \
+            -f content="$content" -f branch=prod-priorite ${existing:+-f sha="$existing"} >/dev/null
+          echo "Priorité active pour $TITULAIRE : les autres opérations de production attendent qu'elle soit relâchée."

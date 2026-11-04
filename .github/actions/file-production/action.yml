@@ -1,0 +1,95 @@
+name: File d'attente de la production
+description: >-
+  Une seule opération à la fois sur le serveur de production (déploiement ou
+  script de données) : attend que les opérations en cours se terminent, dans
+  l'ordre d'arrivée. Quand la priorité est activée (workflow « Priorité
+  production »), tout ce qui ne vient pas du titulaire attend qu'il la relâche.
+
+inputs:
+  token:
+    description: GITHUB_TOKEN (actions:read, contents:read)
+    required: true
+  minutes:
+    description: Attente maximale, en minutes
+    required: false
+    default: "300"
+
+runs:
+  using: composite
+  steps:
+    - name: Attendre son tour
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        MAX_MINUTES: ${{ inputs.minutes }}
+        # Auteur du commit déployé (push) ; vide pour un lancement manuel.
+        COMMIT_AUTHOR: ${{ github.event.head_commit.author.email }}
+        COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+      run: |
+        set -euo pipefail
+        repo="$GITHUB_REPOSITORY"
+        me="$GITHUB_RUN_ID"
+        job_name="File production"
+        mine_created=$(gh api "repos/$repo/actions/runs/$me" --jq .created_at)
+        deadline=$(( $(date +%s) + MAX_MINUTES * 60 ))
+
+        # Le titulaire de la priorité est reconnu à l'auteur du commit ou à la
+        # ligne Co-authored-by que GitHub ajoute aux commits fusionnés.
+        is_holder() {
+          local holder="$1"
+          [[ -n "$holder" ]] || return 1
+          [[ "${COMMIT_AUTHOR,,}" == "${holder,,}" ]] && return 0
+          grep -qiF "<$holder>" <<<"$COMMIT_MESSAGE"
+        }
+
+        # Priorité active : fichier PRIORITE de la branche prod-priorite.
+        holder_now() {
+          gh api "repos/$repo/contents/PRIORITE?ref=prod-priorite" --jq .content 2>/dev/null | base64 -d 2>/dev/null | sed -n 's/^auteur=//p' | head -1 || true
+        }
+
+        # Workflows qui agissent sur la production (la file s'applique à eux).
+        prod='(contabo|align-dossier-salle|assign-cotes|creer-lots|e2e-account|export-carton-labels|export-recuperation|recouper-cartons|regroup-cartons|reprise-fiches|reset-transfers|send-cotes-labels|send-guide|send-recuperation-report|supprimer-donnees-test|supprimer-lots-transferts|recoder-cotes)\\.yml$'
+
+        # Opérations de production en cours, hors celle-ci. mode=actives : celles
+        # qui ont passé la file (job « File production » réussi, ou exécution
+        # antérieure à la file). mode=avant : en plus, celles arrivées avant
+        # celle-ci et qui attendent encore (l'ordre d'arrivée est respecté).
+        blockers() {
+          local mode="$1"
+          gh api "repos/$repo/actions/runs?status=in_progress&per_page=100" \
+            --jq ".workflow_runs[] | select(.id != $me) | select(.path | test(\"$prod\")) | \"\(.id) \(.created_at) \(.name)\"" |
+          while read -r id created name; do
+            state=$(gh api "repos/$repo/actions/runs/$id/jobs" --jq "[.jobs[] | select(.name == \"$job_name\") | (.conclusion // .status)] | first // \"absent\"")
+            case "$state" in
+              success|absent) echo "$name ($id)" ;;
+              in_progress|queued|waiting|pending)
+                [[ "$mode" == avant && ! "$created" > "$mine_created" ]] && echo "$name ($id, en attente)" ;;
+            esac
+          done
+        }
+
+        while :; do
+          if (( $(date +%s) > deadline )); then
+            echo "::error::Attente de plus de $MAX_MINUTES min : relancez plus tard ou relâchez la priorité."
+            exit 1
+          fi
+          holder=$(holder_now)
+          if [[ -n "$holder" ]] && ! is_holder "$holder"; then
+            echo "En attente : la production est réservée à $holder (workflow « Priorité production » pour relâcher)."
+            sleep 30; continue
+          fi
+          busy=$(blockers actives)
+          if [[ -n "$busy" ]]; then
+            echo "En attente de la fin de : $(tr '\n' ';' <<<"$busy")"
+            sleep 30; continue
+          fi
+          # Deux opérations libérées au même instant : la plus ancienne passe.
+          # Le titulaire de la priorité ne fait pas la queue derrière les autres,
+          # qui sont de toute façon en attente.
+          sleep 15
+          if [[ -n "$holder" ]]; then busy=$(blockers actives); else busy=$(blockers avant); fi
+          if [[ -z "$busy" ]]; then
+            echo "Au tour de cette opération${holder:+ (priorité : $holder)}."
+            exit 0
+          fi
+        done

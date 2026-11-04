@@ -318,3 +318,23 @@ automatique de la base n'est mise en place. Garder les images nécessaires aux
 retours de version lors du nettoyage Docker.
 
 Les déploiements antérieurs sur Render sont décrits dans [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## File d'attente et priorité de la production
+
+Une seule opération à la fois touche le serveur : déploiement (`contabo.yml`) ou
+script de données (réinitialisation, reprises, envois, suppressions…). Chaque
+workflow de production commence par le job **File production**
+(`.github/actions/file-production`) : il attend que l'opération en cours se
+termine, puis passe dans l'ordre d'arrivée. Rien n'est annulé. Le diagnostic du
+serveur (`server-diagnostics.yml`), en lecture seule, n'attend pas.
+
+**Priorité.** Le workflow **Priorité production** (`activer`, titulaire = une
+adresse e-mail) réserve la production : les déploiements dont le commit n'a pas
+le titulaire pour auteur ou co-auteur (`Co-authored-by: … <adresse>`), ainsi
+que tous les scripts lancés à la main, attendent jusqu'à `relâcher`. Les
+déploiements du titulaire passent. L'état vit dans la branche `prod-priorite`
+(fichier `PRIORITE`).
+
+**Pas de retour en arrière.** Avant de déployer, le job vérifie qu'aucun commit
+plus récent qui contient celui-ci n'est déjà en ligne ; sinon le déploiement est
+sauté (le plus récent couvre déjà ce changement).
