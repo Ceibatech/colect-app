@@ -1,11 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { COOKIE_NAME, verifySessionToken } from "@/lib/auth/session";
 import { ROLE_ONLY_ROUTE_PREFIXES } from "@/lib/permissions/constants";
+import { disabledModuleFor } from "@/lib/modules/catalog";
+import { getDisabledModules } from "@/lib/modules/state";
 
 const PUBLIC_PATHS = ["/login", "/mot-de-passe-oublie", "/reinitialiser-mot-de-passe"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Module mis hors service par l'administrateur : le reste de l'application
+  // continue de tourner. Les API répondent 503 ; les pages (et leurs actions
+  // serveur) affichent l'avis de module indisponible.
+  const outage = disabledModuleFor(pathname, await getDisabledModules());
+  if (outage) {
+    const message = `Le module ${outage.module.label} est momentanément indisponible.`;
+    if (outage.api || request.method !== "GET") {
+      return NextResponse.json({ error: message }, { status: 503, headers: { "Retry-After": "300" } });
+    }
+    const notice = new URL("/module-indisponible", request.url);
+    notice.searchParams.set("module", outage.module.code);
+    return NextResponse.rewrite(notice);
+  }
 
   // Les routes API gèrent elles-mêmes leur authentification
   // (requireApiUser/requireApiPermission) et répondent en JSON avec le bon
