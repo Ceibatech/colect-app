@@ -63,9 +63,11 @@ runs:
             case "$state" in
               success|absent) echo "$name ($id)" ;;
               in_progress|queued|waiting|pending)
-                [[ "$mode" == avant && ! "$created" > "$mine_created" ]] && echo "$name ($id, en attente)" ;;
+                if [[ "$mode" == avant && ! "$created" > "$mine_created" ]]; then echo "$name ($id, en attente)"; fi ;;
             esac
           done
+          # Un test faux en fin de boucle ne doit pas faire échouer la fonction (set -e).
+          return 0
         }
 
         while :; do
@@ -73,12 +75,12 @@ runs:
             echo "::error::Attente de plus de $MAX_MINUTES min : relancez plus tard ou relâchez la priorité."
             exit 1
           fi
-          holder=$(holder_now)
+          holder=$(holder_now || true)
           if [[ -n "$holder" ]] && ! is_holder "$holder"; then
             echo "En attente : la production est réservée à $holder (workflow « Priorité production » pour relâcher)."
             sleep 30; continue
           fi
-          busy=$(blockers actives)
+          busy=$(blockers actives || true)
           if [[ -n "$busy" ]]; then
             echo "En attente de la fin de : $(tr '\n' ';' <<<"$busy")"
             sleep 30; continue
@@ -87,7 +89,7 @@ runs:
           # Le titulaire de la priorité ne fait pas la queue derrière les autres,
           # qui sont de toute façon en attente.
           sleep 15
-          if [[ -n "$holder" ]]; then busy=$(blockers actives); else busy=$(blockers avant); fi
+          if [[ -n "$holder" ]]; then busy=$(blockers actives || true); else busy=$(blockers avant || true); fi
           if [[ -z "$busy" ]]; then
             echo "Au tour de cette opération${holder:+ (priorité : $holder)}."
             exit 0
