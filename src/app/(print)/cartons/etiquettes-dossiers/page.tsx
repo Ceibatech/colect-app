@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/transferts/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
 import { requireAnyPermission } from "@/lib/auth/current-user";
-import { cartonQrSvg, cartonScanUrl, getCartonSheet, getPublicOrigin } from "@/lib/services/carton-service";
+import { cartonQrSvg, cartonScanUrl, getCartonSheet } from "@/lib/services/carton-service";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Étiquettes des dossiers — GeoArchives" };
@@ -18,12 +18,11 @@ export default async function DossierLabelsPage({ searchParams }: { searchParams
   const raw = (await searchParams).carton;
   const id = Number(Array.isArray(raw) ? raw[0] : raw);
   const carton = Number.isInteger(id) && id > 0 ? await getCartonSheet(id) : null;
-  const origin = await getPublicOrigin();
   const labels = carton
     ? await Promise.all(carton.dossiers.map(async (dossier) => ({
         ...dossier,
         code: dossier.cote ?? dossier.reference,
-        qr: await cartonQrSvg(cartonScanUrl(origin, dossier.cote ?? carton.reference)),
+        qr: await cartonQrSvg(cartonScanUrl(dossier.cote ?? carton.reference)),
       })))
     : [];
 

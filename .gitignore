@@ -48,3 +48,4 @@ next-env.d.ts
 
 # documents uploadés (stockage local — jamais commités, cf. SECURITY.md/DATABASE.md)
 /storage/documents/
+__pycache__/

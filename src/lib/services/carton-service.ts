@@ -1,4 +1,5 @@
 import "server-only";
+import { qrLink } from "@/lib/cartons/qr-link";
 import { headers } from "next/headers";
 import QRCode from "qrcode";
 import { Prisma } from "@prisma/client";
@@ -160,9 +161,13 @@ export async function getPublicOrigin(): Promise<string> {
   return `${proto.split(",")[0].trim()}://${host.split(",")[0].trim()}`;
 }
 
-/** Adresse encodée dans le QR : la cote du carton (ou son CTN tant qu'elle n'existe pas). */
-export function cartonScanUrl(origin: string, reference: string) {
-  return `${origin}/c/${encodeURIComponent(reference)}`;
+/**
+ * Adresse encodée dans le QR : le portail MULCV (conteneurs), qui reçoit les
+ * caisses envoyées par GeoArchives. Modèle réglable par QR_LINK_TEMPLATE
+ * ({ref} = cote du carton ou du dossier, ou ancien CTN).
+ */
+export function cartonScanUrl(reference: string) {
+  return qrLink(reference, process.env.QR_LINK_TEMPLATE);
 }
 
 /** Carton désigné dans une adresse : cote (2010-KOU-0001, ou celle d'un de ses dossiers) ou CTN. */

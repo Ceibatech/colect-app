@@ -1,5 +1,7 @@
 """Liste et étiquettes QR d'une plage de cartons cotés (ex. 2010-KOU-0001 à 0320).
 usage: python3 build_cotes.py cartons.json sortie_dossier"""
+import os
+from urllib.parse import quote
 import json, sys, collections, datetime, unicodedata
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -13,6 +15,12 @@ from reportlab.graphics import renderPDF
 src, outdir = sys.argv[1], sys.argv[2]
 data = json.load(open(src, encoding="utf-8"))
 APP = "https://geoarchives.ceiba-analytics.com"
+# Lien des QR codes : page « Scanner une étiquette » du portail MULCV (réglable par QR_LINK_TEMPLATE, {ref} = cote).
+QR_LINK_TEMPLATE = os.environ.get("QR_LINK_TEMPLATE") or "https://mulcv-dev.ceiba-analytics.com/app/portal/conteneurs?etiquette={ref}"
+
+
+def qr_link(ref):
+    return QR_LINK_TEMPLATE.replace("{ref}", quote(str(ref).strip(), safe=""))
 cartons = data["cartons"]
 
 
@@ -127,7 +135,7 @@ def carton_labels(path):
         if i and i % (cols * rows) == 0: c.showPage()
         k = i % (cols * rows); x = mx + (k % cols) * (lw + 4 * mm); y = height - my - (k // cols + 1) * (lh + 3 * mm)
         c.setStrokeColorRGB(.55, .55, .55); c.roundRect(x, y, lw, lh, 2 * mm)
-        draw_qr(c, f"{APP}/c/{carton['cote']}", x + 3 * mm, y + (lh - 42 * mm) / 2, 42 * mm)
+        draw_qr(c, qr_link(carton['cote']), x + 3 * mm, y + (lh - 42 * mm) / 2, 42 * mm)
         tx, tw = x + 47 * mm, lw - 50 * mm
         c.setFont("Helvetica-Bold", 15); c.drawString(tx, y + lh - 11 * mm, carton["cote"])
         for j, line in enumerate(wrap(carton["nom"], tw, "Helvetica-Bold", 11, c, 3)):
@@ -154,7 +162,7 @@ def dossier_labels(path):
             if i and i % (cols * rows) == 0: c.showPage()
             k = i % (cols * rows); x = mx + (k % cols) * (lw + 2 * mm); y = height - my - (k // cols + 1) * (lh + 1.5 * mm)
             c.setStrokeColorRGB(.7, .7, .7); c.rect(x, y, lw, lh)
-            draw_qr(c, f"{APP}/c/{d['cote']}", x + 1.5 * mm, y + 2.5 * mm, 28 * mm)
+            draw_qr(c, qr_link(d['cote']), x + 1.5 * mm, y + 2.5 * mm, 28 * mm)
             tx, tw = x + 30.5 * mm, lw - 32 * mm
             c.setFont("Helvetica-Bold", 7.6); c.drawString(tx, y + lh - 6 * mm, pdf_text(d["cote"]))
             c.setFont("Helvetica", 7); c.drawString(tx, y + lh - 10 * mm, f"Dossier {d['rang']}/{n}")

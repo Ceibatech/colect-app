@@ -3,7 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { PrintButton } from "@/components/transferts/PrintButton";
 import { buttonVariants } from "@/components/ui/button";
 import { requireAnyPermission } from "@/lib/auth/current-user";
-import { cartonQrSvg, cartonScanUrl, getLabelCartons, getPublicOrigin, LABEL_PRINT_LIMIT } from "@/lib/services/carton-service";
+import { cartonQrSvg, cartonScanUrl, getLabelCartons, LABEL_PRINT_LIMIT } from "@/lib/services/carton-service";
 import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Étiquettes QR des cartons — GeoArchives" };
@@ -31,8 +31,7 @@ export default async function CartonLabelsPage({ searchParams }: { searchParams:
     siteId: positiveInt(single(params.site)),
     entrepotId: positiveInt(single(params.salle)),
   });
-  const origin = await getPublicOrigin();
-  const labels = await Promise.all(rows.map(async (row) => ({ ...row, qr: await cartonQrSvg(cartonScanUrl(origin, row.reference)) })));
+  const labels = await Promise.all(rows.map(async (row) => ({ ...row, qr: await cartonQrSvg(cartonScanUrl(row.reference)) })));
 
   return (
     <div className="mx-auto max-w-[210mm]">

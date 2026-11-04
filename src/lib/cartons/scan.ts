@@ -14,11 +14,12 @@ export function cartonIdFromScan(value: string): number | null {
 }
 
 /**
- * Cote lue dans un QR (…/c/2010-KOU-0001) ou saisie : « 2010-KOU-0001 ».
+ * Cote lue dans un QR (MULCV …/conteneurs?cote=2010-KOU-0001, ancien …/c/2010-KOU-0001)
+ * ou saisie : « 2010-KOU-0001 ».
  * La cote d'un dossier (…-012) donne celle de son carton.
  */
 export function coteFromScan(value: string): string | null {
-  const text = decodeURIComponent(value.trim()).split(/[/?#]/).filter(Boolean);
+  const text = decodeURIComponent(value.trim()).split(/[/?#&=]/).filter(Boolean);
   for (const part of text.reverse()) {
     const cote = parseCote(part);
     if (cote) return cote.carton;

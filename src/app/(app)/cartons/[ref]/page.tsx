@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireAnyPermission } from "@/lib/auth/current-user";
-import { cartonQrSvg, cartonScanUrl, getCartonSheet, getPublicOrigin, resolveCartonRef } from "@/lib/services/carton-service";
+import { cartonQrSvg, cartonScanUrl, getCartonSheet, resolveCartonRef } from "@/lib/services/carton-service";
 
 export const metadata = { title: "Fiche carton — GeoArchives" };
 
@@ -25,7 +25,7 @@ export default async function CartonSheetPage({ params }: { params: Promise<{ re
   if (!id) notFound();
   const carton = await getCartonSheet(id);
   if (!carton) notFound();
-  const qr = await cartonQrSvg(cartonScanUrl(await getPublicOrigin(), carton.reference));
+  const qr = await cartonQrSvg(cartonScanUrl(carton.reference));
   const total = carton.dossiers.length;
   const canOpenDossiers = session.permissions.includes("DOSSIER_READ");
 

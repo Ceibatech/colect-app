@@ -1,5 +1,7 @@
 """Liste, rapport et étiquettes code-barres des premiers cartons à récupérer.
 usage: python3 build.py boites.json sortie_dossier"""
+import os
+from urllib.parse import quote
 import json, sys, collections, datetime
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -13,6 +15,12 @@ from reportlab.graphics import renderPDF
 src, outdir = sys.argv[1], sys.argv[2]
 data = json.load(open(src, encoding="utf-8"))
 APP = "https://geoarchives.ceiba-analytics.com"
+# Lien des QR codes : page « Scanner une étiquette » du portail MULCV (réglable par QR_LINK_TEMPLATE, {ref} = cote).
+QR_LINK_TEMPLATE = os.environ.get("QR_LINK_TEMPLATE") or "https://mulcv-dev.ceiba-analytics.com/app/portal/conteneurs?etiquette={ref}"
+
+
+def qr_link(ref):
+    return QR_LINK_TEMPLATE.replace("{ref}", quote(str(ref).strip(), safe=""))
 GENERIC = 80
 
 def ctn(i): return f"CTN-{i:08d}"
@@ -118,7 +126,7 @@ def box_labels(path):
         if i and i % (cols*rows) == 0: c.showPage()
         k = i % (cols*rows); x = mx + (k % cols) * (lw + 4*mm); y = Hh - my - (k // cols + 1) * (lh + 3*mm)
         c.setStrokeColorRGB(.6, .6, .6); c.roundRect(x, y, lw, lh, 2*mm)
-        q = qr.QrCodeWidget(f"{APP}/c/{b['code']}"); bx = q.getBounds(); s = 34*mm
+        q = qr.QrCodeWidget(qr_link(b['code'])); bx = q.getBounds(); s = 34*mm
         d = Drawing(s, s, transform=[s/(bx[2]-bx[0]), 0, 0, s/(bx[3]-bx[1]), 0, 0]); d.add(q); renderPDF.draw(d, c, x + 3*mm, y + lh - s - 3*mm)
         c.setFont("Helvetica-Bold", 15); c.drawString(x + 40*mm, y + lh - 10*mm, b["code"])
         c.setFont("Helvetica-Bold", 10)
