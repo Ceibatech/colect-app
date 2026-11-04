@@ -121,6 +121,7 @@ export async function getCartonSheet(id: number) {
         orderBy: [{ rangCarton: "asc" }, { id: "asc" }],
         select: {
           id: true, reference: true, cote: true, rangCarton: true, nom: true, prenoms: true, libelleCarton: true, codeBarres: true,
+          numeroIlot: true, numeroLot: true, numeroTitreFoncier: true,
           statutPreparation: true, statutNumerisation: true, statutConditionnement: true, statutIndexation: true, statutArchivage: true,
           site: { select: { nom: true } },
           entrepot: { select: { nom: true, localisation: true } },

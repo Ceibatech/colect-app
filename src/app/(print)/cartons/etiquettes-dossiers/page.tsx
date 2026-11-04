@@ -53,7 +53,11 @@ export default async function DossierLabelsPage({ searchParams }: { searchParams
               <p className="whitespace-nowrap font-mono text-[7.6pt] font-bold leading-tight tracking-tight">{label.code}</p>
               {communeDeCote(label.code) ? <p className="text-[7.5pt] font-semibold uppercase leading-tight">{communeDeCote(label.code)}</p> : null}
               {label.rangCarton ? <p className="text-[8pt] text-slate-700">Dossier n° {label.rangCarton}/{labels.length}</p> : null}
-              <p className="mt-[1mm] line-clamp-2 text-[8.5pt] font-semibold leading-snug">{[label.nom, label.prenoms].filter(Boolean).join(" ") || "Titulaire non renseigné"}</p>
+              {/* Aucun nom sur l'étiquette : le titulaire ne se voit qu'au scan, après connexion.
+                  Repères de collage : îlot, lot et titre foncier, tels qu'écrits sur la chemise. */}
+              <p className="mt-[1mm] line-clamp-2 text-[8pt] font-semibold leading-snug">
+                {[label.numeroIlot && `Îlot ${label.numeroIlot}`, label.numeroLot && `Lot ${label.numeroLot}`, label.numeroTitreFoncier && `TF ${label.numeroTitreFoncier}`].filter(Boolean).join(" · ") || "Sans îlot ni lot"}
+              </p>
               <p className="text-[7pt] text-slate-600">{label.reference}</p>
             </div>
           </article>
