@@ -99,13 +99,20 @@ if [[ -n "$previous" ]]; then
   dc stop email-report-scheduler indexing-worker app
 fi
 # Fail before changing schema/application when the database cannot be backed up.
-dc run --rm --no-deps --volume "$shared/db-backups:/backups" app node deploy/backup-database.mjs
-stamp=$(date -u +%Y%m%dT%H%M%SZ)
-document_backup="/backups/documents-$stamp-$revision.tar.gz"
-# Run as the container's uid 1000, which owns the private document directories.
-dc run --rm --no-deps --volume "$shared/document-backups:/backups" app \
-  sh -c 'umask 077; tar -czf "$1.partial" -C /var/data/documents . && mv -- "$1.partial" "$1"' \
-  sh "$document_backup"
+# Dérogation volontaire et temporaire : si le fichier $shared/skip-backup existe
+# (créé à la main sur le serveur), les sauvegardes sont sautées avec un
+# avertissement. Supprimer ce fichier rétablit la sauvegarde obligatoire.
+if [[ -f "$shared/skip-backup" ]]; then
+  echo "ATTENTION : sauvegardes sautées ($shared/skip-backup présent). Supprimer ce fichier pour les rétablir." >&2
+else
+  dc run --rm --no-deps --volume "$shared/db-backups:/backups" app node deploy/backup-database.mjs
+  stamp=$(date -u +%Y%m%dT%H%M%SZ)
+  document_backup="/backups/documents-$stamp-$revision.tar.gz"
+  # Run as the container's uid 1000, which owns the private document directories.
+  dc run --rm --no-deps --volume "$shared/document-backups:/backups" app \
+    sh -c 'umask 077; tar -czf "$1.partial" -C /var/data/documents . && mv -- "$1.partial" "$1"' \
+    sh "$document_backup"
+fi
 dc run --rm --no-deps app node node_modules/prisma/build/index.js migrate deploy
 
 rollout_started=true
