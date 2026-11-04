@@ -1,0 +1,94 @@
+name: Supprimer des données de test (Contabo)
+
+# Lancement manuel uniquement. « simulation » n'écrit rien et affiche ce qui
+# serait supprimé ; « appliquer » sauvegarde la base puis supprime les cartons
+# indiqués et leurs dossiers (voir deploy/supprimer-donnees-test.mjs). La
+# suppression est refusée si un dossier est lié à un document, un lot de
+# transfert, un conteneur, etc.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "simulation (aucune écriture) ou appliquer"
+        required: true
+        default: simulation
+        type: choice
+        options: [simulation, appliquer]
+      cartons:
+        description: "Cotes des cartons à supprimer, séparées par des virgules"
+        required: true
+        default: "2010-ABS-0001,2010-ADZ-0001"
+        type: string
+      confirmation:
+        description: "Pour appliquer, saisir exactement SUPPRIMER-DONNEES-TEST"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-supprimer-donnees-test
+  cancel-in-progress: false
+
+jobs:
+  supprimer:
+    name: Suppression de données de test (${{ inputs.mode }})
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Exécuter sur le VPS en SSH vérifié
+        env:
+          MODE: ${{ inputs.mode }}
+          CARTONS: ${{ inputs.cartons }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          [[ "$MODE" == simulation || "$MODE" == appliquer ]] || { echo "Mode invalide." >&2; exit 1; }
+          [[ "$CARTONS" =~ ^[A-Za-z0-9,-]{1,300}$ ]] || { echo "Liste de cotes invalide." >&2; exit 1; }
+          if [[ "$MODE" == appliquer ]]; then
+            [[ "$CONFIRMATION" == SUPPRIMER-DONNEES-TEST ]] || { echo "Confirmation absente ou incorrecte : saisir SUPPRIMER-DONNEES-TEST." >&2; exit 1; }
+          else
+            CONFIRMATION=none
+          fi
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-supprimer.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            "$CONTABO_USER@$CONTABO_HOST" bash -s -- "$MODE" "$CARTONS" "$CONFIRMATION" <<'REMOTE'
+          set -euo pipefail
+          mode="$1"
+          cartons="$2"
+          confirmation="$3"
+          script=/opt/colect-app/current/deploy/supprimer-donnees-test.sh
+          test -f "$script" || { echo "La release en service ne contient pas encore le script de suppression." >&2; exit 1; }
+          if [[ "$mode" == appliquer ]]; then
+            bash "$script" appliquer "$cartons" "$confirmation"
+          else
+            bash "$script" simulation "$cartons"
+          fi
+          REMOTE
