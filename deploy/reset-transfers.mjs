@@ -7,10 +7,12 @@
 //   1. chaque dossier déjà sorti revient à l'emplacement (site + salle) d'où
 //      il est parti lors de sa première sortie, qu'il soit en transit, reçu
 //      ou retourné ; les dossiers jamais sortis n'ont pas bougé ;
-//   2. suppression des lots, cartons engagés, mouvements (bordereaux),
-//      signatures, points GPS et e-mails de transfert ;
+//   2. suppression des lots, cartons engagés, participants, mouvements
+//      (bordereaux), signatures, étapes du convoi, points GPS, e-mails de
+//      transfert et file d'envoi vers MULCV ;
 //   3. suppression de l'historique dossier TRANSFER_SORTIE/RECEPTION/RETOUR ;
-//   4. suppression des cartons devenus vides et sans historique ;
+//   4. conteneurs vidés et libérés, historique des conteneurs supprimé ; les
+//      conteneurs et tous les cartons (même vides) sont conservés ;
 //   5. une ligne d'audit TRANSFER_RESET ;
 // puis, hors transaction, remise à 1 des compteurs (LOT-AAAA-000001, BTR-…).
 //
@@ -22,13 +24,18 @@ import { PrismaClient } from "@prisma/client";
 
 export const CONFIRMATION = "REINITIALISER-TRANSFERTS";
 
+// Ordre : les tables filles d'abord.
 const TRANSFER_TABLES = [
+  "mulcv_deliveries",
+  "caisse_mouvements",
+  "transfer_convoy_events",
   "transfer_movement_items",
   "transfer_signatures",
   "transfer_movements",
   "transfer_tracking_points",
   "transfer_lot_dossiers",
   "transfer_lot_items",
+  "transfer_lot_participants",
   "transfer_lots",
 ];
 const HISTORY_ACTIONS = ["TRANSFER_SORTIE", "TRANSFER_RECEPTION", "TRANSFER_RETOUR"];
@@ -65,6 +72,8 @@ async function inspect(db) {
       SUM(d.site_id IS NULL) AS in_transit,
       SUM(NOT (d.site_id <=> o.source_site_id AND d.entrepot_id <=> o.source_entrepot_id)) AS to_restore
     FROM (${ORIGIN_SQL}) o JOIN dossiers d ON d.id = o.dossier_id`);
+  const [boxed] = await db.$queryRawUnsafe(`SELECT COUNT(*) AS c FROM cartons WHERE caisse_id IS NOT NULL`);
+  const [loaded] = await db.$queryRawUnsafe(`SELECT COUNT(*) AS c FROM caisses WHERE transfer_lot_id IS NOT NULL`);
   const [attached] = await db.$queryRawUnsafe(`
     SELECT COALESCE(SUM(CAST(JSON_VALUE(new_value, '$.attachedToSourceCount') AS UNSIGNED)), 0) AS c
     FROM audit_logs WHERE action = 'TRANSFER_LOT_CREATE'`);
@@ -75,6 +84,8 @@ async function inspect(db) {
     lotsByStatus: lotsByStatus.map((row) => ({ status: row.status, count: n(row.c) })),
     dossiers: { total: n(moves.total), inTransit: n(moves.in_transit), toRestore: n(moves.to_restore) },
     attachedFromHistoricalStock: n(attached.c),
+    cartonsEnConteneur: n(boxed.c),
+    conteneursCharges: n(loaded.c),
   };
 }
 
@@ -83,6 +94,8 @@ function printReport(report, heading, { notes = true } = {}) {
   console.log(`  Lots : ${report.counts.transfer_lots}${report.lotsByStatus.length ? ` (${report.lotsByStatus.map((s) => `${s.status} ${s.count}`).join(", ")})` : ""}`);
   console.log(`  Cartons engagés : ${report.counts.transfer_lot_items} — liens dossier : ${report.counts.transfer_lot_dossiers}`);
   console.log(`  Bordereaux : ${report.counts.transfer_movements} — signatures : ${report.counts.transfer_signatures} — points GPS : ${report.counts.transfer_tracking_points}`);
+  console.log(`  Conteneurs chargés : ${report.conteneursCharges} — cartons en conteneur : ${report.cartonsEnConteneur} — historique conteneurs : ${report.counts.caisse_mouvements}`);
+  console.log(`  Étapes du convoi : ${report.counts.transfer_convoy_events} — envois MULCV en file : ${report.counts.mulcv_deliveries}`);
   console.log(`  E-mails de transfert : ${report.emails} — historique dossier transfert : ${report.history}`);
   console.log(`  Dossiers déjà sortis : ${report.dossiers.total} — en transit : ${report.dossiers.inTransit} — à remettre à l'origine : ${report.dossiers.toRestore}`);
   if (notes && report.attachedFromHistoricalStock > 0) {
@@ -103,11 +116,11 @@ export async function resetTransfers(prisma, { apply = false } = {}) {
       WHERE NOT (d.site_id <=> o.source_site_id AND d.entrepot_id <=> o.source_entrepot_id)`);
     await tx.$executeRawUnsafe(`DELETE FROM dossier_history WHERE action IN (${list(HISTORY_ACTIONS)})`);
     await tx.$executeRawUnsafe(`DELETE FROM transfer_email_deliveries WHERE entity_type IN (${list(EMAIL_ENTITIES)})`);
+    // Conteneurs vidés et libérés ; les conteneurs eux-mêmes et les cartons restent
+    // (un carton vide peut porter une étiquette déjà imprimée).
+    await tx.$executeRawUnsafe(`UPDATE cartons SET caisse_id = NULL, mis_en_caisse_at = NULL WHERE caisse_id IS NOT NULL`);
+    await tx.$executeRawUnsafe(`UPDATE caisses SET transfer_lot_id = NULL WHERE transfer_lot_id IS NOT NULL`);
     for (const table of TRANSFER_TABLES) await tx.$executeRawUnsafe(`DELETE FROM ${table}`);
-    await tx.$executeRawUnsafe(`
-      DELETE c FROM cartons c
-      LEFT JOIN dossiers d ON d.carton_id = c.id
-      WHERE d.id IS NULL`);
     await tx.auditLog.create({
       data: {
         action: "TRANSFER_RESET",
