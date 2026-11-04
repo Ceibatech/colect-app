@@ -1,4 +1,5 @@
-// Recoupe des cartons de Koumassi sur les boîtes physiques.
+// Recoupe des cartons de Koumassi sur les boîtes physiques, cotés FON-3302-113-nnnn
+// (liste : fiche de 320 cartons, deploy/enlevement-koumassi.json).
 //
 //   node deploy/recouper-cartons.mjs                                       → simulation
 //   node deploy/recouper-cartons.mjs --apply --confirm=RECOUPER-CARTONS     → application
@@ -7,10 +8,10 @@
 // 1 303 dossiers). La boîte physique est donnée par la « référence de
 // classement » du dossier (ex. « lots 16-116 »), celle de la liste
 // d'enlèvement. Le script :
-// 1. regroupe les dossiers des cartons 2010-KOU par référence de classement
+// 1. regroupe les dossiers des cartons KOU (ancien 2010-KOU ou déjà FON-3302-113) par référence de classement
 //    (un dossier sans référence reste avec son carton d'origine) ;
-// 2. cote d'abord les 200 boîtes de la liste d'enlèvement, dans l'ordre de leur
-//    référence provisoire (1 → 2010-KOU-0001…), même vides ; puis les autres
+// 2. cote d'abord les boîtes de la fiche (320), dans l'ordre de leur
+//    numéro (1 → FON-3302-113-0001…), même vides ; puis les autres
 //    boîtes dans l'ordre des anciennes cotes ;
 // 3. numérote les dossiers de chaque boîte 001, 002… sans trou.
 // Aucune étiquette n'ayant été imprimée pour Koumassi, les cotes KOU peuvent
@@ -21,7 +22,11 @@ import { pathToFileURL } from "node:url";
 import { PrismaClient, Prisma } from "@prisma/client";
 
 export const CONFIRMATION = "RECOUPER-CARTONS";
-export const PREFIXE = "2010-KOU";
+// Nouvelle codification : fonction · rubrique · identifiant de commune (CI-113).
+export const PREFIXE = "FON-3302-113";
+// Ancien préfixe (étiquettes jamais imprimées) : repris par la recoupe, puis remplacé.
+export const PREFIXE_ANCIEN = "2010-KOU";
+const PREFIXES = [PREFIXE, PREFIXE_ANCIEN];
 
 /**
  * Clé de boîte : « lots 424-1700 », « Lots 424 - 1700 » et « 424-1700 »
@@ -145,7 +150,7 @@ async function charger(db) {
   return db.$queryRaw(Prisma.sql`
     SELECT d.id, d.carton_id AS cartonId, c.cote AS ancienneCote, d.rang_carton AS rang, d.reference_classement AS reference
     FROM dossiers d JOIN cartons c ON c.id = d.carton_id
-    WHERE c.cote_prefixe = ${PREFIXE}`);
+    WHERE c.cote_prefixe IN (${Prisma.join(PREFIXES)})`);
 }
 
 async function references(db) {
@@ -153,8 +158,8 @@ async function references(db) {
     db.$queryRaw(Prisma.sql`
       SELECT l.reference, l.status, COUNT(*) AS n
       FROM transfer_lot_items i JOIN cartons c ON c.id = i.carton_id JOIN transfer_lots l ON l.id = i.transfer_lot_id
-      WHERE c.cote_prefixe = ${PREFIXE} GROUP BY l.id, l.reference, l.status`),
-    db.$queryRaw(Prisma.sql`SELECT COUNT(*) AS n FROM cartons c WHERE c.cote_prefixe = ${PREFIXE} AND (c.caisse_id IS NOT NULL OR EXISTS (SELECT 1 FROM caisse_mouvements m WHERE m.carton_id = c.id))`),
+      WHERE c.cote_prefixe IN (${Prisma.join(PREFIXES)}) GROUP BY l.id, l.reference, l.status`),
+    db.$queryRaw(Prisma.sql`SELECT COUNT(*) AS n FROM cartons c WHERE c.cote_prefixe IN (${Prisma.join(PREFIXES)}) AND (c.caisse_id IS NOT NULL OR EXISTS (SELECT 1 FROM caisse_mouvements m WHERE m.carton_id = c.id))`),
   ]);
   const detail = lots.map((row) => ({ reference: row.reference, status: row.status, cartons: Number(row.n) }));
   return { lots: detail.reduce((sum, row) => sum + row.cartons, 0), lotsDetail: detail, caisses: Number(caisses[0].n) };
@@ -186,8 +191,8 @@ export async function recouper(db, { apply = false } = {}) {
     const restants = disponibles.slice(plan.boites.length);
 
     // Libère les cotes et rangs KOU (contraintes d'unicité), puis réattribue en masse.
-    await tx.$executeRaw(Prisma.sql`UPDATE dossiers SET rang_carton = NULL, cote = NULL WHERE id IN (SELECT id FROM (SELECT d.id FROM dossiers d JOIN cartons c ON c.id = d.carton_id WHERE c.cote_prefixe = ${PREFIXE}) x)`);
-    await tx.$executeRaw(Prisma.sql`UPDATE cartons SET cote = NULL, cote_sequence = NULL, cote_prefixe = NULL WHERE cote_prefixe = ${PREFIXE}`);
+    await tx.$executeRaw(Prisma.sql`UPDATE dossiers SET rang_carton = NULL, cote = NULL WHERE id IN (SELECT id FROM (SELECT d.id FROM dossiers d JOIN cartons c ON c.id = d.carton_id WHERE c.cote_prefixe IN (${Prisma.join(PREFIXES)})) x)`);
+    await tx.$executeRaw(Prisma.sql`UPDATE cartons SET cote = NULL, cote_sequence = NULL, cote_prefixe = NULL WHERE cote_prefixe IN (${Prisma.join(PREFIXES)})`);
     step("anciennes cotes libérées");
     for (let i = 0; i < plan.boites.length; i += 500) {
       const chunk = plan.boites.slice(i, i + 500);
