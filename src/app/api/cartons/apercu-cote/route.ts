@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     const commune = communeId ? await prisma.commune.findUnique({ where: { id: communeId }, select: { nom: true, code: true, sigle: true, identifiant: true } }) : null;
     // Même règle que l'attribution (cartonCotePrefixe), sans rien écrire.
     const rubrique = findRubriqueV3(params.get("classement")) ?? findRubriqueV3(RUBRIQUE_ACD)!;
-    const identifiant = commune ? commune.identifiant ?? communeIdentifiant(commune.code) ?? communeCiParNom(commune.nom)?.identifiant ?? null : null;
+    const identifiant = commune ? commune.identifiant ?? communeCiParNom(commune.nom)?.identifiant ?? communeIdentifiant(commune.code) ?? null : null;
     const [fonction, numero] = rubriquePourCommune(rubrique.key, identifiant).split("-");
     const prefixe = (identifiant ? cotePrefixeNouveau(fonction, numero, identifiant) : null)
       ?? cotePrefixe(commune ? commune.sigle ?? proposeSigle(commune.nom) : SIGLE_INCONNU, CLASSEMENT_ACD);

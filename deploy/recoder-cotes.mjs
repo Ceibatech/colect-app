@@ -40,13 +40,24 @@ export function loadCommunes() {
   return JSON.parse(readFileSync(file, "utf8"));
 }
 
-/** Identifiant RGPH d'une commune de la base : déjà posé, code « CI-113 », ou nom. */
+/** Identifiant RGPH par le nom de la commune (« Port Bouet », « PORT-BOUËT »…). */
+export function identifiantParNom(nom, referentiel) {
+  const key = simplify(nom);
+  return referentiel.find((c) => simplify(c.nom) === key)?.identifiant ?? VARIANTES[key] ?? null;
+}
+
+/**
+ * Identifiant RGPH d'une commune de la base : déjà posé, sinon par son NOM
+ * dans le référentiel. Le code « CI-0xx » saisi en base ne suit pas la
+ * numérotation du référentiel (Bingerville y est CI-029, son identifiant est
+ * 030) : il ne sert qu'en dernier recours, quand le nom est inconnu.
+ */
 export function identifiantPour(commune, referentiel) {
   if (commune.identifiant) return commune.identifiant;
+  const parNom = identifiantParNom(commune.nom, referentiel);
+  if (parNom) return parNom;
   const code = /^CI-(?:COM-)?(\d{3})$/i.exec(String(commune.code ?? "").trim());
-  if (code && referentiel.some((c) => c.identifiant === code[1])) return code[1];
-  const key = simplify(commune.nom);
-  return referentiel.find((c) => simplify(c.nom) === key)?.identifiant ?? VARIANTES[key] ?? null;
+  return code && referentiel.some((c) => c.identifiant === code[1]) ? code[1] : null;
 }
 
 /** Nouveau préfixe d'un ancien préfixe ACD : 2010-KOU + 113 → FON-3302-113 (ou 7x12 en région). */
@@ -64,13 +75,18 @@ export async function planRecodage(db, referentiel = loadCommunes()) {
   const communeUpdates = [];
   const conflits = [];
   for (const commune of communes) {
-    if (commune.identifiant) continue;
+    if (commune.identifiant) {
+      const attendu = identifiantParNom(commune.nom, referentiel);
+      if (attendu && attendu !== commune.identifiant) conflits.push(`${commune.nom} porte déjà ${commune.identifiant}, le référentiel donne ${attendu} (à corriger avant d'appliquer)`);
+      continue;
+    }
     const identifiant = identifiantPour(commune, referentiel);
     if (!identifiant) continue;
     if (pris.has(identifiant) && pris.get(identifiant) !== commune.id) { conflits.push(`${commune.nom} → ${identifiant} (déjà pris)`); continue; }
     pris.set(identifiant, commune.id);
     const ref = referentiel.find((c) => c.identifiant === identifiant);
-    communeUpdates.push({ id: commune.id, nom: commune.nom, identifiant, district: ref?.district ?? null, region: ref?.region ?? null, departement: ref?.departement ?? null });
+    const code = /^CI-(?:COM-)?(\d{3})$/i.exec(String(commune.code ?? "").trim())?.[1] ?? null;
+    communeUpdates.push({ id: commune.id, nom: commune.nom, code: commune.code, identifiant, codeDifferent: code && code !== identifiant ? code : null, district: ref?.district ?? null, region: ref?.region ?? null, departement: ref?.departement ?? null });
   }
   const identifiantDe = new Map(communes.map((c) => [c.id, c.identifiant ?? communeUpdates.find((u) => u.id === c.id)?.identifiant ?? null]));
   const communeDuSigle = new Map(communes.filter((c) => c.sigle).map((c) => [c.sigle, c]));
@@ -135,7 +151,10 @@ export async function recoderCotes(db, { apply = false } = {}) {
 function printPlan(plan, heading) {
   console.log(heading);
   console.log(`  Communes rattachées à leur identifiant : ${plan.communeUpdates.length}`);
-  for (const u of plan.communeUpdates) console.log(`    ${u.nom} → ${u.identifiant}`);
+  const differents = plan.communeUpdates.filter((u) => u.codeDifferent);
+  console.log(`  Dont code en base différent de l'identifiant RGPH (le nom fait foi) : ${differents.length}`);
+  for (const u of differents) console.log(`    ${u.nom} : code ${u.code} → identifiant ${u.identifiant}`);
+  for (const u of plan.communeUpdates.filter((x) => !x.codeDifferent && !/^CI-/i.test(String(x.code ?? "")))) console.log(`    ${u.nom} (code ${u.code}) → ${u.identifiant}`);
   for (const c of plan.conflits) console.log(`    Conflit : ${c}`);
   const totals = plan.plan.reduce((t, p) => ({ cartons: t.cartons + p.cartons, dossiers: t.dossiers + p.dossiers }), { cartons: 0, dossiers: 0 });
   console.log(`  Cartons recodés : ${totals.cartons} — dossiers recodés : ${totals.dossiers}`);
