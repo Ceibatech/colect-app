@@ -1,0 +1,84 @@
+name: Diagnostic global de la base (Contabo, lecture seule)
+
+# Lancement manuel. N'écrit rien : totaux, répartitions et contrôles de cohérence
+# (codification des cartons et des dossiers, rangs, rattachements, statuts).
+# Aucune donnée personnelle dans le fichier produit (deploy/diagnostic-base.mjs).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contabo-diagnostic-base
+  cancel-in-progress: false
+
+jobs:
+  file:
+    name: File production
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/actions
+          persist-credentials: false
+      # Une seule opération à la fois sur la production ; priorité éventuelle.
+      - uses: ./.github/actions/file-production
+        with:
+          token: ${{ github.token }}
+
+  diagnostic:
+    needs: file
+    name: Diagnostic de la base
+    if: vars.CONTABO_ENABLED == 'true' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Lire la base depuis le VPS en SSH vérifié
+        env:
+          CONTABO_HOST: ${{ secrets.CONTABO_HOST }}
+          CONTABO_USER: ${{ secrets.CONTABO_USER }}
+          CONTABO_SSH_KEY: ${{ secrets.CONTABO_SSH_KEY }}
+          CONTABO_KNOWN_HOSTS: ${{ secrets.CONTABO_KNOWN_HOSTS }}
+          CONTABO_PORT: ${{ vars.CONTABO_PORT || '22' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          [[ "$CONTABO_HOST" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || { echo "CONTABO_HOST invalide." >&2; exit 1; }
+          [[ "$CONTABO_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]] || { echo "CONTABO_USER invalide." >&2; exit 1; }
+          [[ "$CONTABO_PORT" =~ ^[0-9]{1,5}$ ]] || { echo "CONTABO_PORT invalide." >&2; exit 1; }
+          [[ -n "$CONTABO_SSH_KEY" && -n "$CONTABO_KNOWN_HOSTS" ]] || { echo "Secrets SSH requis." >&2; exit 1; }
+
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/colect-diag.XXXXXX")"
+          trap 'rm -rf -- "$ssh_dir"' EXIT
+          printf '%s\n' "$CONTABO_SSH_KEY" > "$ssh_dir/key"
+          printf '%s\n' "$CONTABO_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/key" "$ssh_dir/known_hosts"
+          unset CONTABO_SSH_KEY CONTABO_KNOWN_HOSTS
+
+          mkdir -p export
+          ssh -F /dev/null -i "$ssh_dir/key" -p "$CONTABO_PORT" \
+            -o BatchMode=yes -o IdentitiesOnly=yes -o IdentityAgent=none \
+            -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$ssh_dir/known_hosts" \
+            -o GlobalKnownHostsFile=/dev/null -o ConnectTimeout=15 \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=6 \
+            "$CONTABO_USER@$CONTABO_HOST" \
+            'test -f /opt/colect-app/current/deploy/diagnostic-base.sh || { echo "La release en service ne contient pas encore le script de diagnostic." >&2; exit 1; }; bash /opt/colect-app/current/deploy/diagnostic-base.sh' \
+            > export/diagnostic-base.json
+          head -c 1 export/diagnostic-base.json | grep -q "{" || { echo "Le fichier produit n'est pas un JSON valide." >&2; exit 1; }
+          echo "Taille du diagnostic : $(wc -c < export/diagnostic-base.json) octets"
+
+      - name: Publier le fichier (conservé 3 jours)
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-base
+          path: export/diagnostic-base.json
+          retention-days: 3
+          if-no-files-found: error
