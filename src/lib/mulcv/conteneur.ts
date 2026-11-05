@@ -6,7 +6,12 @@
  */
 
 export const MULCV_MAX_CARTONS = 40;
-export const MULCV_MAX_DOSSIERS_PER_SEND = 2000;
+/**
+ * Dossiers par envoi : MULCV crée un dossier Alfresco par cote (environ 6 par seconde) et le proxy
+ * web coupe une requête après 60 s. Par paquets de 150, un envoi tient en une trentaine de secondes ;
+ * MULCV cumule les envois d'un même conteneur, sans doublon.
+ */
+export const MULCV_MAX_DOSSIERS_PER_SEND = 150;
 const ID = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9_-])?$/;
 
 export type MulcvCarton = { cartonUid: string; dossiers: Array<{ dossierId: string }> };
@@ -61,7 +66,7 @@ export function buildPayloads(lotReference: string, zone: string, caisses: Caiss
       cartons.push({ cartonUid: carton.cote, dossiers });
     }
     cartons.sort((a, b) => a.cartonUid.localeCompare(b.cartonUid));
-    // Découpage sous 2000 dossiers par envoi : MULCV cumule les envois d'un même conteneur.
+    // Découpage en paquets courts (voir MULCV_MAX_DOSSIERS_PER_SEND) ; un carton n'est jamais coupé.
     let batch: MulcvCarton[] = [];
     let total = 0;
     for (const carton of cartons) {
