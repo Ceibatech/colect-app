@@ -22,7 +22,7 @@ describe("diagnostic de la base", () => {
 
   it("isole un contrôle en erreur sans arrêter les autres", async () => {
     const db = { $queryRawUnsafe: async (sql: string) => { if (sql.includes("BOOM")) throw new Error("table inconnue"); return [{ n: BigInt(2) }]; } };
-    const resultat = await diagnostiquer(db, [["bon", "SELECT 1"], ["mauvais", "SELECT BOOM"]]);
+    const resultat = (await diagnostiquer(db, [["bon", "SELECT 1"], ["mauvais", "SELECT BOOM"]])) as { controles: Record<string, unknown>; erreurs: Record<string, string> };
     expect(resultat.controles.bon).toEqual([{ n: 2 }]);
     expect(resultat.erreurs.mauvais).toContain("table inconnue");
   });
