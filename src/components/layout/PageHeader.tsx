@@ -66,7 +66,7 @@ export function PageHeader({
       </div>
 
       {stats && stats.length > 0 ? (
-        <div className="relative mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className={cn("relative mt-5 grid gap-3 sm:grid-cols-2", stats.length === 5 ? "lg:grid-cols-3 xl:grid-cols-5" : "xl:grid-cols-4")}>
           {stats.map((stat) => (
             <div key={String(stat.label)} className="min-w-0 rounded-lg border border-border/70 bg-background/70 p-3 shadow-sm">
               <div className="truncate text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{stat.label}</div>

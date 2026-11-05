@@ -1,5 +1,5 @@
 import { requirePermission, requireRole } from "@/lib/auth/current-user";
-import { getRepartitionByCommune, getRepartitionByLotissement } from "@/lib/services/dashboard-service";
+import { getCartonsByCommune, getRepartitionByCommune, getRepartitionByLotissement } from "@/lib/services/dashboard-service";
 import { RepartitionBarChart } from "@/components/dashboard/RepartitionBarChart";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ export default async function DashboardGeographiePage() {
   const session = await requireRole("ADMIN", "EXECUTIF", "PMO", "SUPERVISEUR", "CONSULTATION");
   await requirePermission("DASHBOARD_VIEW");
 
-  const [byCommune, byLotissement] = await Promise.all([getRepartitionByCommune(), getRepartitionByLotissement()]);
+  const [byCommune, byLotissement, cartons] = await Promise.all([getRepartitionByCommune(), getRepartitionByLotissement(), getCartonsByCommune()]);
   const total = byCommune.reduce((sum, item) => sum + item.total, 0);
   const topShare = total > 0 ? Math.round(((byCommune[0]?.total ?? 0) / total) * 100) : 0;
   const scopeLabel = session.roleCode === "SUPERVISEUR" ? "Périmètre équipe" : session.roleCode === "PMO" ? "Périmètre PMO" : "Périmètre global";
@@ -27,6 +27,7 @@ export default async function DashboardGeographiePage() {
         actions={<Badge variant="outline" className="rounded-md bg-background/80">{scopeLabel}</Badge>}
         stats={[
           { label: "Dossiers localisés", value: total },
+          { label: "Cartons localisés", value: cartons.totalCartons },
           { label: "Communes actives", value: byCommune.length },
           { label: "Lotissements actifs", value: byLotissement.length },
           { label: "Zone principale", value: byCommune[0]?.label ?? "Aucune" },
@@ -52,6 +53,29 @@ export default async function DashboardGeographiePage() {
         </Card>
 
         <Card className="min-w-0 bg-card/95">
+          <CardHeader className="border-b border-border/60 pb-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <CardTitle>Cartons par commune</CardTitle>
+                <CardDescription>
+                  {cartons.totalCartons} carton{cartons.totalCartons > 1 ? "s" : ""}, rattaché{cartons.totalCartons > 1 ? "s" : ""} à la commune de leurs dossiers. Un carton qui mêle plusieurs communes compte dans chacune.
+                </CardDescription>
+              </div>
+              {cartons.rows[0] ? (
+                <Badge variant="secondary" className="w-fit rounded-md">{cartons.rows[0].label} · {cartons.rows[0].total}</Badge>
+              ) : null}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            {cartons.rows.length ? (
+              <RepartitionBarChart data={cartons.rows} limit={cartons.rows.length} leftAxisWidth={120} barSize={18} />
+            ) : (
+              <p className="py-8 text-center text-sm text-muted-foreground">Aucun carton rattaché à une commune.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="min-w-0 bg-card/95 xl:col-span-2">
           <CardHeader className="border-b border-border/60 pb-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">

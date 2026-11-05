@@ -281,6 +281,30 @@ export async function getRepartitionByCommune(): Promise<RepartitionRow[]> {
   return rows.map((r) => ({ label: r.commune_nom, total: Number(r.total_dossiers) }));
 }
 
+/**
+ * Cartons par commune : un carton compte pour la commune de ses dossiers (un
+ * carton qui mêle deux communes compte dans chacune). Renvoie aussi le
+ * nombre total de cartons distincts ayant au moins un dossier localisé.
+ */
+export async function getCartonsByCommune(): Promise<{ rows: RepartitionRow[]; totalCartons: number }> {
+  const session = await requirePermission("DASHBOARD_VIEW");
+  const scope = await getDashboardOperateurScope(session);
+  if (scope && scope.length === 0) return { rows: [], totalCartons: 0 };
+  const filter = scope ? Prisma.sql`AND d.operateur_id IN (${Prisma.join(scope)})` : Prisma.empty;
+
+  const [rows, total] = await Promise.all([
+    prisma.$queryRaw<Array<{ nom: string; total: bigint }>>`
+      SELECT c.nom AS nom, COUNT(DISTINCT d.carton_id) AS total
+      FROM dossiers d JOIN communes c ON c.id = d.commune_id
+      WHERE d.carton_id IS NOT NULL ${filter}
+      GROUP BY c.id, c.nom ORDER BY total DESC, c.nom`,
+    prisma.$queryRaw<Array<{ total: bigint }>>`
+      SELECT COUNT(DISTINCT d.carton_id) AS total FROM dossiers d
+      WHERE d.carton_id IS NOT NULL AND d.commune_id IS NOT NULL ${filter}`,
+  ]);
+  return { rows: rows.map((r) => ({ label: r.nom, total: Number(r.total) })), totalCartons: Number(total[0]?.total ?? 0) };
+}
+
 /** Répartition par lotissement (§48 item 8) — pas de vue dédiée (non prévue §63), agrégation directe. */
 export async function getRepartitionByLotissement(): Promise<RepartitionRow[]> {
   const session = await requirePermission("DASHBOARD_VIEW");
