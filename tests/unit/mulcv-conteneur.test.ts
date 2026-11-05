@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPayloads, conteneurId, isMulcvId, MULCV_MAX_CARTONS } from "@/lib/mulcv/conteneur";
+import { buildPayloads, conteneurId, isMulcvId, MULCV_MAX_CARTONS, MULCV_MAX_DOSSIERS_PER_SEND } from "@/lib/mulcv/conteneur";
 
 const carton = (cote: string | null, n: number) => ({
   cote,
@@ -45,7 +45,23 @@ describe("envoi des caisses reçues vers MULCV", () => {
       ["LOT-2026-000007-HORS-CAISSE-1", MULCV_MAX_CARTONS], ["LOT-2026-000007-HORS-CAISSE-2", 1],
     ]);
     const heavy = buildPayloads("LOT-2026-000007", "Zone_Sud", [{ caisseNumero: "C-09", cartons: [carton("2010-KOU-0001", 450), carton("2010-KOU-0002", 450), carton("2010-KOU-0003", 450), carton("2010-KOU-0004", 450), carton("2010-KOU-0005", 450)] }]);
-    expect(heavy.payloads.map((p) => p.cartons.length)).toEqual([4, 1]);
+    // Un carton plus gros que le paquet part seul, jamais coupé.
+    expect(heavy.payloads.map((p) => p.cartons.length)).toEqual([1, 1, 1, 1, 1]);
     expect(new Set(heavy.payloads.map((p) => p.conteneurId))).toEqual(new Set(["LOT-2026-000007-C-09"]));
+  });
+});
+
+describe("envois courts vers MULCV", () => {
+  it("découpe une grosse caisse en paquets d'au plus 150 dossiers sans couper un carton", () => {
+    const cartons = Array.from({ length: 40 }, (_, c) => ({
+      cote: `FON-3302-113-${String(c + 1).padStart(4, "0")}`,
+      dossiers: Array.from({ length: 14 }, (_, d) => ({ cote: `FON-3302-113-${String(c + 1).padStart(4, "0")}-${String(d + 1).padStart(3, "0")}` })),
+    }));
+    const { payloads } = buildPayloads("LOT-2026-000009", "Zone_Sud", [{ caisseNumero: "C-01", cartons }]);
+    const sizes = payloads.map((payload) => payload.cartons.reduce((sum, carton) => sum + carton.dossiers.length, 0));
+    expect(sizes.every((size) => size <= MULCV_MAX_DOSSIERS_PER_SEND)).toBe(true);
+    expect(sizes.reduce((a, b) => a + b, 0)).toBe(560);
+    expect(new Set(payloads.map((payload) => payload.conteneurId))).toEqual(new Set(["LOT-2026-000009-C-01"]));
+    expect(payloads.flatMap((payload) => payload.cartons.map((carton) => carton.cartonUid))).toHaveLength(40);
   });
 });
